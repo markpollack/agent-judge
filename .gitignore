@@ -37,3 +37,7 @@ logs/
 
 # Flattened POMs
 .flattened-pom.xml
+
+# Claude Code / local project docs
+CLAUDE.md
+plans/
