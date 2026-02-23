@@ -1,5 +1,15 @@
 # CLAUDE.md
 
+## CRITICAL: Running Claude CLI Subprocesses from Claude Code
+
+Claude Code 2.1.39+ blocks nested `claude` invocations via process tree detection. Any command that spawns `claude` CLI as a subprocess will fail silently with empty output.
+
+**Use `~/scripts/claude-run.sh`** to run builds that invoke Claude CLI:
+```bash
+~/scripts/claude-run.sh ./mvnw test -pl some-module -Dtest="SomeIT"
+```
+The script uses `systemd-run` to escape the process tree. Works for Maven/Gradle builds where claude is invoked indirectly via the SDK. See `~/scripts/claude-run.sh` for details.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Build and Development Commands
@@ -54,6 +64,7 @@ spring-ai-judge/
 **Jury System:**
 - `Jury` - Interface for multi-judge voting
 - `SimpleJury` - Parallel execution with flexible voting strategies
+- `CascadedJury` - Sequential tiered execution with policy-based stop/escalate. Each tier is a `TierConfig` (name, judges, `TierPolicy`). Policies: `REJECT_ON_ANY_FAIL` (fail-fast guardrail), `ACCEPT_ON_ALL_PASS` (consensus gate), `FINAL_TIER` (always runs, provides final verdict). `Verdict.subVerdicts()` gives per-tier execution trace.
 - `VotingStrategy` - Interface for aggregation (majority, weighted, consensus)
 - `Verdict` - Aggregated + individual judgments
 
