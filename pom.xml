@@ -87,7 +87,7 @@
 
         <!-- Core dependency versions - aligned with Spring AI 2.0 -->
         <spring-framework.version>7.0.2</spring-framework.version>
-        <spring-ai.version>2.0.0-SNAPSHOT</spring-ai.version>
+        <spring-ai.version>2.0.0-M2</spring-ai.version>
         <spring-boot.version>4.0.1</spring-boot.version>
         <reactor.version>2024.0.5</reactor.version>
         <slf4j.version>2.0.9</slf4j.version>
