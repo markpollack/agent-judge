@@ -85,6 +85,7 @@
         <agent-judge.version>${project.version}</agent-judge.version>
 
         <!-- Core dependency versions - aligned with Spring AI 2.0 -->
+        <agent-sandbox-core.version>0.9.0</agent-sandbox-core.version>
         <spring-framework.version>7.0.2</spring-framework.version>
         <spring-ai.version>2.0.0-M2</spring-ai.version>
         <spring-boot.version>4.0.1</spring-boot.version>
@@ -163,7 +164,7 @@
             <dependency>
                 <groupId>org.springaicommunity</groupId>
                 <artifactId>agent-sandbox-core</artifactId>
-                <version>0.9.0-SNAPSHOT</version>
+                <version>${agent-sandbox-core.version}</version>
             </dependency>
 
             <!-- Slf4j API -->
