@@ -82,7 +82,7 @@
 
     <properties>
         <!-- Agent Judge project version -->
-        <agent-judge.version>0.9.0-SNAPSHOT</agent-judge.version>
+        <agent-judge.version>${project.version}</agent-judge.version>
 
         <!-- Core dependency versions - aligned with Spring AI 2.0 -->
         <spring-framework.version>7.0.2</spring-framework.version>
