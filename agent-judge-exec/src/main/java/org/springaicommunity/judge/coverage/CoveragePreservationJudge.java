@@ -67,23 +67,32 @@ public class CoveragePreservationJudge extends DeterministicJudge {
 			return Judgment.abstain("No baselineCoverage in metadata");
 		}
 
-		if (!(baselineObj instanceof CoverageMetrics baseline)) {
-			return Judgment.abstain("baselineCoverage is not CoverageMetrics: " + baselineObj.getClass().getName());
+		double baselineLineCoverage;
+		if (baselineObj instanceof CoverageMetrics baseline) {
+			baselineLineCoverage = baseline.lineCoverage();
+		}
+		else {
+			try {
+				baselineLineCoverage = Double.parseDouble(baselineObj.toString());
+			}
+			catch (NumberFormatException e) {
+				return Judgment.abstain("Invalid baselineCoverage value: " + baselineObj);
+			}
 		}
 
 		CoverageMetrics current = JaCoCoReportParser.parse(context.workspace());
 		if (current.linesTotal() == 0 && current.summary().contains("not found")) {
-			return Judgment.abstain("No JaCoCo report found in workspace");
+			return Judgment.fail("No JaCoCo report found in workspace — coverage cannot be verified");
 		}
 
-		double drop = baseline.lineCoverage() - current.lineCoverage();
+		double drop = baselineLineCoverage - current.lineCoverage();
 		boolean pass = drop <= threshold;
 
 		String reasoning = pass
 				? String.format("Line coverage drop %.1f%% (%.1f%% → %.1f%%) within threshold of %.1f%%", drop,
-						baseline.lineCoverage(), current.lineCoverage(), threshold)
+						baselineLineCoverage, current.lineCoverage(), threshold)
 				: String.format("Line coverage drop %.1f%% (%.1f%% → %.1f%%) exceeds threshold of %.1f%%", drop,
-						baseline.lineCoverage(), current.lineCoverage(), threshold);
+						baselineLineCoverage, current.lineCoverage(), threshold);
 
 		Check coverageCheck = pass
 				? Check.pass("line_coverage_preserved",
@@ -96,7 +105,7 @@ public class CoveragePreservationJudge extends DeterministicJudge {
 			.status(pass ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
 			.reasoning(reasoning)
 			.checks(java.util.List.of(coverageCheck))
-			.metadata("baselineLineCoverage", baseline.lineCoverage())
+			.metadata("baselineLineCoverage", baselineLineCoverage)
 			.metadata("currentLineCoverage", current.lineCoverage())
 			.metadata("coverageDrop", drop)
 			.metadata("threshold", threshold)

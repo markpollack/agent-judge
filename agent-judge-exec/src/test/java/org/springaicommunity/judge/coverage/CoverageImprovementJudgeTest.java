@@ -98,13 +98,23 @@ class CoverageImprovementJudgeTest {
 	}
 
 	@Test
-	void noReportReturnsAbstain() {
+	void noReportReturnsFail() {
 		CoverageMetrics baseline = new CoverageMetrics(80.0, 0, 0, 80, 100, 0, 0, 0, 0, "baseline");
 
 		Judgment judgment = judge.judge(contextWithBaseline(baseline));
 
-		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.reasoning()).contains("No JaCoCo report");
+	}
+
+	@Test
+	void stringBaselineIsAccepted() throws IOException {
+		writeJacocoReport(80, 20); // 80% coverage — improvement from 70%
+		JudgmentContext context = contextWithMetadata(Map.of("baselineCoverage", "70.0"));
+
+		Judgment judgment = judge.judge(context);
+
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	@Test
