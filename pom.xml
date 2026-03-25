@@ -46,6 +46,7 @@
     <modules>
         <module>agent-judge-core</module>
         <module>agent-judge-exec</module>
+        <module>agent-judge-file</module>
         <module>agent-judge-llm</module>
     </modules>
 
@@ -91,6 +92,10 @@
         <spring-boot.version>4.0.1</spring-boot.version>
         <reactor.version>2024.0.5</reactor.version>
         <slf4j.version>2.0.9</slf4j.version>
+
+        <!-- File comparison -->
+        <javaparser.version>3.26.3</javaparser.version>
+        <maven-model.version>3.9.6</maven-model.version>
 
         <!-- JSON processing -->
         <jackson.version>2.17.2</jackson.version>
@@ -187,8 +192,25 @@
             </dependency>
             <dependency>
                 <groupId>org.springaicommunity</groupId>
+                <artifactId>agent-judge-file</artifactId>
+                <version>${agent-judge.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springaicommunity</groupId>
                 <artifactId>agent-judge-llm</artifactId>
                 <version>${agent-judge.version}</version>
+            </dependency>
+
+            <!-- File comparison dependencies -->
+            <dependency>
+                <groupId>com.github.javaparser</groupId>
+                <artifactId>javaparser-core</artifactId>
+                <version>${javaparser.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-model</artifactId>
+                <version>${maven-model.version}</version>
             </dependency>
 
             <!-- Testing dependencies -->
