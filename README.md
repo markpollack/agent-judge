@@ -15,9 +15,9 @@ Agent-agnostic evaluation framework with deterministic, command, and LLM judges.
 
 ```xml
 <dependency>
-    <groupId>org.springaicommunity</groupId>
+    <groupId>io.github.markpollack</groupId>
     <artifactId>agent-judge-core</artifactId>
-    <version>0.9.1</version>
+    <version>0.9.2</version>
 </dependency>
 ```
 
@@ -49,8 +49,12 @@ Verdict verdict = jury.vote(context);
 ## Documentation
 
 Full API reference, built-in judges, jury system, and voting strategies:
-https://springaicommunity.mintlify.app/projects/incubating/agent-judge
+https://lab.pollack.ai/projects/agent-judge
 
-## License
+## Licensing
 
-Apache License 2.0
+This project originated from earlier Apache-licensed work in the Spring AI Community.
+
+Beginning with version 0.9.2, new development is licensed under the Business Source License 1.1 (BSL).
+
+Historical Apache-licensed portions remain available under their original terms. See [LICENSE](LICENSE) and [LICENSE-APACHE.txt](LICENSE-APACHE.txt) for details.
