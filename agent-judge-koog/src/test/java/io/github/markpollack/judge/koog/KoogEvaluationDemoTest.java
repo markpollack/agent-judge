@@ -41,7 +41,7 @@ class KoogEvaluationDemoTest {
 		};
 
 		// One-liner evaluation
-		Judgment judgment = KoogSupport.evaluate(agent, "Explain dependency injection", containsKeyConceptJudge);
+		Judgment judgment = KoogEvaluator.evaluate(agent, "Explain dependency injection", containsKeyConceptJudge);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.reasoning()).isEqualTo("Answer correctly describes DI");

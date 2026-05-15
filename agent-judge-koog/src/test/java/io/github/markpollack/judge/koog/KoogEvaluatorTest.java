@@ -15,9 +15,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests for {@link KoogSupport} one-liner convenience methods.
+ * Tests for {@link KoogEvaluator} one-liner convenience methods.
  */
-class KoogSupportTest {
+class KoogEvaluatorTest {
 
 	@SuppressWarnings("unchecked")
 	private AIAgent<String, String> mockAgent() {
@@ -32,7 +32,7 @@ class KoogSupportTest {
 		AIAgent<String, String> agent = mockAgent();
 		Judge judge = (JudgmentContext ctx) -> Judgment.pass("Output looks good");
 
-		Judgment result = KoogSupport.evaluate(agent, "Build a REST API", judge);
+		Judgment result = KoogEvaluator.evaluate(agent, "Build a REST API", judge);
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(result.reasoning()).isEqualTo("Output looks good");
@@ -52,7 +52,7 @@ class KoogSupportTest {
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		Verdict verdict = KoogSupport.evaluate(agent, "Build a REST API", jury);
+		Verdict verdict = KoogEvaluator.evaluate(agent, "Build a REST API", jury);
 
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individual()).hasSize(3);

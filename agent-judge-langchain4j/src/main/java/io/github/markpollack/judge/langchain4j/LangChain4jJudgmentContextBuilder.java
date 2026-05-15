@@ -75,11 +75,49 @@ public final class LangChain4jJudgmentContextBuilder {
 	 * @return a fully populated JudgmentContext
 	 */
 	public static <T> JudgmentContext execute(String goal, Function<String, Result<T>> serviceCall) {
+		return execute(goal, serviceCall, Map.of());
+	}
+
+	/**
+	 * Execute a function, capture the result, and build a {@link JudgmentContext} with
+	 * extra metadata.
+	 * @param goal the task description
+	 * @param serviceCall the LangChain4j service invocation
+	 * @param extraMetadata additional metadata to attach (e.g., run ID, experiment tag)
+	 * @return a fully populated JudgmentContext
+	 */
+	public static <T> JudgmentContext execute(String goal, Function<String, Result<T>> serviceCall,
+			Map<String, Object> extraMetadata) {
 		Instant startedAt = Instant.now();
 		try {
 			Result<T> result = serviceCall.apply(goal);
+			if (result == null) {
+				Duration elapsed = Duration.between(startedAt, Instant.now());
+				return JudgmentContext.builder()
+					.goal(goal)
+					.status(ExecutionStatus.FAILED)
+					.startedAt(startedAt)
+					.executionTime(elapsed)
+					.error(new NullPointerException("Service call returned null Result"))
+					.metadata(extraMetadata)
+					.build();
+			}
 			Duration elapsed = Duration.between(startedAt, Instant.now());
-			return from(result, goal, startedAt, elapsed);
+			JudgmentContext context = from(result, goal, startedAt, elapsed);
+			if (!extraMetadata.isEmpty()) {
+				Map<String, Object> merged = new HashMap<>(context.metadata());
+				merged.putAll(extraMetadata);
+				context = JudgmentContext.builder()
+					.goal(context.goal())
+					.workspace(context.workspace())
+					.status(context.status())
+					.startedAt(context.startedAt())
+					.executionTime(context.executionTime())
+					.agentOutput(context.agentOutput().orElse(null))
+					.metadata(merged)
+					.build();
+			}
+			return context;
 		}
 		catch (Exception ex) {
 			Duration elapsed = Duration.between(startedAt, Instant.now());
@@ -89,6 +127,7 @@ public final class LangChain4jJudgmentContextBuilder {
 				.startedAt(startedAt)
 				.executionTime(elapsed)
 				.error(ex)
+				.metadata(extraMetadata)
 				.build();
 		}
 	}
@@ -101,7 +140,7 @@ public final class LangChain4jJudgmentContextBuilder {
 			case STOP -> ExecutionStatus.SUCCESS;
 			case LENGTH -> ExecutionStatus.SUCCESS;
 			case TOOL_EXECUTION -> ExecutionStatus.SUCCESS;
-			case CONTENT_FILTER -> ExecutionStatus.FAILED;
+			case CONTENT_FILTER -> ExecutionStatus.REFUSED;
 			case OTHER -> ExecutionStatus.UNKNOWN;
 		};
 	}

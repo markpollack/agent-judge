@@ -6,7 +6,7 @@ Demonstrates evaluating a LangChain4j AI Service result with agent-judge.
 
 ```java
 import dev.langchain4j.service.Result;
-import io.github.markpollack.judge.langchain4j.LangChain4jSupport;
+import io.github.markpollack.judge.langchain4j.LangChain4jEvaluator;
 import io.github.markpollack.judge.rag.FaithfulnessJudge;
 import io.github.markpollack.judge.result.Judgment;
 
@@ -21,7 +21,7 @@ var assistant = AiServices.builder(Assistant.class)
     .build();
 
 // One-liner evaluation
-Judgment judgment = LangChain4jSupport.evaluate(
+Judgment judgment = LangChain4jEvaluator.evaluate(
     "What are the key features of Spring Boot?",
     assistant::chat,
     faithfulnessJudge

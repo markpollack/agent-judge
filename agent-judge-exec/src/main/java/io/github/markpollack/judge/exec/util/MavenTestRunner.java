@@ -18,10 +18,10 @@ package io.github.markpollack.judge.exec.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springaicommunity.sandbox.ExecResult;
-import org.springaicommunity.sandbox.ExecSpec;
-import org.springaicommunity.sandbox.LocalSandbox;
-import org.springaicommunity.sandbox.Sandbox;
+import io.github.markpollack.sandbox.ExecResult;
+import io.github.markpollack.sandbox.ExecSpec;
+import io.github.markpollack.sandbox.LocalSandbox;
+import io.github.markpollack.sandbox.Sandbox;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

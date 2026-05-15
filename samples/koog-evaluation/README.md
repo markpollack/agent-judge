@@ -6,7 +6,7 @@ Demonstrates evaluating a JetBrains Koog agent with agent-judge.
 
 ```java
 import ai.koog.agents.core.agent.AIAgent;
-import io.github.markpollack.judge.koog.KoogSupport;
+import io.github.markpollack.judge.koog.KoogEvaluator;
 import io.github.markpollack.judge.rag.FaithfulnessJudge;
 import io.github.markpollack.judge.result.Judgment;
 
@@ -21,7 +21,7 @@ var agent = AIAgent.builder()
     .build();
 
 // One-liner evaluation
-Judgment judgment = KoogSupport.evaluate(agent, "Explain dependency injection", faithfulnessJudge);
+Judgment judgment = KoogEvaluator.evaluate(agent, "Explain dependency injection", faithfulnessJudge);
 
 System.out.println(judgment.status());    // PASS or FAIL
 System.out.println(judgment.reasoning()); // Why
@@ -31,7 +31,7 @@ System.out.println(judgment.reasoning()); // Why
 
 ```kotlin
 import ai.koog.agents.core.agent.AIAgent
-import io.github.markpollack.judge.koog.KoogSupport
+import io.github.markpollack.judge.koog.KoogEvaluator
 import io.github.markpollack.judge.rag.FaithfulnessJudge
 
 // Build agent with Kotlin DSL
@@ -44,7 +44,7 @@ val agent = AIAgent.builder()
     .build()
 
 // Same Java bridge, callable from Kotlin
-val judgment = KoogSupport.evaluate(agent, "Explain dependency injection", faithfulnessJudge)
+val judgment = KoogEvaluator.evaluate(agent, "Explain dependency injection", faithfulnessJudge)
 
 println("${judgment.status()}: ${judgment.reasoning()}")
 ```

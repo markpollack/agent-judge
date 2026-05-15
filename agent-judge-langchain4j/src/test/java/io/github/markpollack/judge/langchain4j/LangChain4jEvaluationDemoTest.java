@@ -35,7 +35,7 @@ class LangChain4jEvaluationDemoTest {
 		};
 
 		// Simulate a LangChain4j service call that returns a Result
-		Judgment judgment = LangChain4jSupport.evaluate("What is Spring Boot?", goal -> Result.<String>builder()
+		Judgment judgment = LangChain4jEvaluator.evaluate("What is Spring Boot?", goal -> Result.<String>builder()
 			.content("Spring Boot is a framework that simplifies creating production-ready Spring applications.")
 			.finishReason(FinishReason.STOP)
 			.tokenUsage(new TokenUsage(50, 30))
@@ -68,7 +68,7 @@ class LangChain4jEvaluationDemoTest {
 			.result("Found 3 relevant docs")
 			.build();
 
-		Judgment judgment = LangChain4jSupport.evaluate("Search for Spring Boot docs",
+		Judgment judgment = LangChain4jEvaluator.evaluate("Search for Spring Boot docs",
 				goal -> Result.<String>builder()
 					.content("Based on the docs...")
 					.finishReason(FinishReason.STOP)

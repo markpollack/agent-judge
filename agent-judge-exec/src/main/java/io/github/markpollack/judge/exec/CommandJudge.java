@@ -22,10 +22,10 @@ import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
 import io.github.markpollack.judge.score.BooleanScore;
-import org.springaicommunity.sandbox.ExecResult;
-import org.springaicommunity.sandbox.ExecSpec;
-import org.springaicommunity.sandbox.LocalSandbox;
-import org.springaicommunity.sandbox.Sandbox;
+import io.github.markpollack.sandbox.ExecResult;
+import io.github.markpollack.sandbox.ExecSpec;
+import io.github.markpollack.sandbox.LocalSandbox;
+import io.github.markpollack.sandbox.Sandbox;
 
 import java.nio.file.Path;
 import java.time.Duration;

@@ -14,15 +14,15 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for {@link LangChain4jSupport} one-liner convenience methods.
+ * Tests for {@link LangChain4jEvaluator} one-liner convenience methods.
  */
-class LangChain4jSupportTest {
+class LangChain4jEvaluatorTest {
 
 	@Test
 	void shouldEvaluateServiceCallWithJudge() {
 		Judge judge = (JudgmentContext ctx) -> Judgment.pass("Output is correct");
 
-		Judgment result = LangChain4jSupport.evaluate("Summarize", goal -> Result.<String>builder()
+		Judgment result = LangChain4jEvaluator.evaluate("Summarize", goal -> Result.<String>builder()
 			.content("A concise summary")
 			.finishReason(FinishReason.STOP)
 			.build(), judge);
@@ -43,7 +43,7 @@ class LangChain4jSupportTest {
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		Verdict verdict = LangChain4jSupport.evaluate("Summarize", goal -> Result.<String>builder()
+		Verdict verdict = LangChain4jEvaluator.evaluate("Summarize", goal -> Result.<String>builder()
 			.content("A summary")
 			.finishReason(FinishReason.STOP)
 			.build(), jury);

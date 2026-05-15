@@ -45,6 +45,11 @@ public enum ExecutionStatus {
 	CANCELLED,
 
 	/**
+	 * Agent ran but the model refused to produce output (e.g., content filter).
+	 */
+	REFUSED,
+
+	/**
 	 * Agent execution status is unknown.
 	 */
 	UNKNOWN

@@ -40,7 +40,7 @@ class LangChain4jJudgmentContextBuilderTest {
 	}
 
 	@Test
-	void shouldMapContentFilterToFailed() {
+	void shouldMapContentFilterToRefused() {
 		Result<String> result = Result.<String>builder()
 			.content("")
 			.finishReason(FinishReason.CONTENT_FILTER)
@@ -49,7 +49,7 @@ class LangChain4jJudgmentContextBuilderTest {
 		JudgmentContext context = LangChain4jJudgmentContextBuilder.from(result, "Generate something",
 				Instant.now(), Duration.ofSeconds(1));
 
-		assertThat(context.status()).isEqualTo(ExecutionStatus.FAILED);
+		assertThat(context.status()).isEqualTo(ExecutionStatus.REFUSED);
 	}
 
 	@Test
