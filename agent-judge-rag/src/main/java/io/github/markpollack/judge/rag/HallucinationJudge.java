@@ -1,5 +1,7 @@
 package io.github.markpollack.judge.rag;
 
+import java.util.Optional;
+
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.llm.LLMJudge;
 import io.github.markpollack.judge.result.Judgment;
@@ -18,24 +20,43 @@ import org.springframework.ai.chat.client.ChatClient;
  * This is typically the most expensive RAG judge (requires careful claim-by-claim
  * analysis), making it a natural final-tier judge in a CascadedJury.
  * <p>
- * Works against any (question, context, answer) triple regardless of retrieval source.
+ * Returns {@link JudgmentStatus#ABSTAIN} when context or answer is empty, or when
+ * the LLM response cannot be parsed.
  *
  * @author Mark Pollack
  * @since 0.10.0
  */
 public class HallucinationJudge extends LLMJudge {
 
+	private static final java.util.regex.Pattern ANSWER_PATTERN = java.util.regex.Pattern
+		.compile("(?mi)^\\s*Answer:\\s*(YES|NO)");
+
 	public HallucinationJudge(ChatClient.Builder chatClientBuilder) {
 		super("Hallucination", "Detects claims in the answer not supported by the context", chatClientBuilder);
 	}
 
 	@Override
+	public Judgment judge(JudgmentContext context) {
+		Optional<String> ctx = RagContext.context(context);
+		Optional<String> ans = RagContext.answer(context);
+		if (ctx.isEmpty()) {
+			return Judgment.abstain("No context provided — cannot detect hallucinations");
+		}
+		if (ans.isEmpty()) {
+			return Judgment.abstain("No answer provided — cannot detect hallucinations");
+		}
+		return super.judge(context);
+	}
+
+	@Override
 	protected String buildPrompt(JudgmentContext context) {
 		String question = RagContext.question(context);
-		String retrievedContext = RagContext.context(context);
-		String answer = RagContext.answer(context);
+		String retrievedContext = RagContext.context(context).orElse("");
+		String answer = RagContext.answer(context).orElse("");
 
 		return String.format("""
+				Begin your response with the line "Answer: YES" or "Answer: NO".
+
 				You are a hallucination detector. Your job is to identify claims in the \
 				answer that are NOT supported by the provided context.
 
@@ -58,9 +79,12 @@ public class HallucinationJudge extends LLMJudge {
 
 	@Override
 	protected Judgment parseResponse(String response, JudgmentContext context) {
-		boolean pass = response.toUpperCase().contains("ANSWER: YES")
-				|| (response.toUpperCase().contains("YES") && !response.toUpperCase().contains("ANSWER: NO"));
+		var matcher = ANSWER_PATTERN.matcher(response);
+		if (!matcher.find()) {
+			return Judgment.abstain("Could not parse LLM response: " + response);
+		}
 
+		boolean pass = "YES".equalsIgnoreCase(matcher.group(1));
 		String reasoning = extractAfter(response, "Reasoning:");
 		if (reasoning.isEmpty()) {
 			reasoning = response;

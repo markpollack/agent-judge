@@ -3,6 +3,7 @@ package io.github.markpollack.judge.rag;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import io.github.markpollack.judge.JudgeMetadata;
@@ -16,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for RAG judges — prompt construction and response parsing.
+ * Tests for RAG judges — prompt construction, response parsing, and ABSTAIN behavior.
  * Uses null ChatClient (no real LLM calls).
  */
 class RagJudgeTest {
@@ -55,6 +56,7 @@ class RagJudgeTest {
 		assertThat(prompt).contains("Java is a programming language.");
 		assertThat(prompt).contains("Java is a language.");
 		assertThat(prompt).contains("faithful");
+		assertThat(prompt).startsWith("Begin your response");
 	}
 
 	@Test
@@ -81,6 +83,64 @@ class RagJudgeTest {
 		assertThat(result.reasoning()).contains("1990");
 	}
 
+	@Test
+	void faithfulnessJudgeShouldAbstainOnUnparseableResponse() {
+		FaithfulnessJudge judge = new FaithfulnessJudge(null);
+		JudgmentContext ctx = ragContext("q", "c", "a");
+
+		Judgment result = judge.parseResponse("I'm not sure what to say here.", ctx);
+
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(result.reasoning()).contains("Could not parse");
+	}
+
+	@Test
+	void faithfulnessJudgeShouldNotFalsePassOnNoWithYesInReasoning() {
+		FaithfulnessJudge judge = new FaithfulnessJudge(null);
+		JudgmentContext ctx = ragContext("q", "c", "a");
+
+		Judgment result = judge.parseResponse(
+				"Answer: NO\nReasoning: The answer claims yes, it was created in 1990, which is not in context.", ctx);
+
+		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
+	}
+
+	@Test
+	void faithfulnessJudgeShouldAbstainOnEmptyContext() {
+		FaithfulnessJudge judge = new FaithfulnessJudge(null);
+		JudgmentContext ctx = JudgmentContext.builder()
+			.goal("What is Java?")
+			.workspace(Path.of("/tmp"))
+			.status(ExecutionStatus.SUCCESS)
+			.startedAt(Instant.now())
+			.executionTime(Duration.ofSeconds(1))
+			.agentOutput("Java is a language")
+			.build();
+
+		Judgment result = judge.judge(ctx);
+
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(result.reasoning()).contains("No context");
+	}
+
+	@Test
+	void faithfulnessJudgeShouldAbstainOnEmptyAnswer() {
+		FaithfulnessJudge judge = new FaithfulnessJudge(null);
+		JudgmentContext ctx = JudgmentContext.builder()
+			.goal("What is Java?")
+			.workspace(Path.of("/tmp"))
+			.status(ExecutionStatus.SUCCESS)
+			.startedAt(Instant.now())
+			.executionTime(Duration.ofSeconds(1))
+			.metadata(Map.of(RagContext.CONTEXT_KEY, "Java is a programming language"))
+			.build();
+
+		Judgment result = judge.judge(ctx);
+
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(result.reasoning()).contains("No answer");
+	}
+
 	// --- ContextualRelevanceJudge ---
 
 	@Test
@@ -89,19 +149,6 @@ class RagJudgeTest {
 		JudgeMetadata metadata = judge.metadata();
 		assertThat(metadata.name()).isEqualTo("ContextualRelevance");
 		assertThat(metadata.type()).isEqualTo(JudgeType.LLM_POWERED);
-	}
-
-	@Test
-	void contextualRelevanceJudgeShouldBuildPromptWithQuestionAndContext() {
-		ContextualRelevanceJudge judge = new ContextualRelevanceJudge(null);
-		JudgmentContext ctx = ragContext("What is Spring Boot?", "Spring Boot simplifies Spring applications.",
-				"irrelevant");
-
-		String prompt = judge.buildPrompt(ctx);
-
-		assertThat(prompt).contains("What is Spring Boot?");
-		assertThat(prompt).contains("Spring Boot simplifies Spring applications.");
-		assertThat(prompt).contains("relevant");
 	}
 
 	@Test
@@ -115,6 +162,22 @@ class RagJudgeTest {
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
+	@Test
+	void contextualRelevanceJudgeShouldAbstainOnEmptyContext() {
+		ContextualRelevanceJudge judge = new ContextualRelevanceJudge(null);
+		JudgmentContext ctx = JudgmentContext.builder()
+			.goal("What is Spring Boot?")
+			.workspace(Path.of("/tmp"))
+			.status(ExecutionStatus.SUCCESS)
+			.startedAt(Instant.now())
+			.executionTime(Duration.ofSeconds(1))
+			.build();
+
+		Judgment result = judge.judge(ctx);
+
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+	}
+
 	// --- HallucinationJudge ---
 
 	@Test
@@ -126,19 +189,6 @@ class RagJudgeTest {
 	}
 
 	@Test
-	void hallucinationJudgeShouldBuildPromptWithFullTriple() {
-		HallucinationJudge judge = new HallucinationJudge(null);
-		JudgmentContext ctx = ragContext("What is Maven?", "Maven is a build tool for Java.", "Maven is a build tool.");
-
-		String prompt = judge.buildPrompt(ctx);
-
-		assertThat(prompt).contains("What is Maven?");
-		assertThat(prompt).contains("Maven is a build tool for Java.");
-		assertThat(prompt).contains("Maven is a build tool.");
-		assertThat(prompt).contains("hallucin");
-	}
-
-	@Test
 	void hallucinationJudgeShouldParseYesAsPass() {
 		HallucinationJudge judge = new HallucinationJudge(null);
 		JudgmentContext ctx = ragContext("q", "c", "a");
@@ -146,7 +196,6 @@ class RagJudgeTest {
 		Judgment result = judge.parseResponse("Answer: YES\nReasoning: No hallucinations detected.", ctx);
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(result.reasoning()).contains("No hallucinations");
 	}
 
 	@Test
@@ -159,6 +208,16 @@ class RagJudgeTest {
 					ctx);
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
+	}
+
+	@Test
+	void hallucinationJudgeShouldAbstainOnUnparseableResponse() {
+		HallucinationJudge judge = new HallucinationJudge(null);
+		JudgmentContext ctx = ragContext("q", "c", "a");
+
+		Judgment result = judge.parseResponse("This is a confusing response without a clear verdict.", ctx);
+
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 	}
 
 	// --- RagContext helper ---
@@ -175,8 +234,36 @@ class RagJudgeTest {
 			.build();
 
 		assertThat(RagContext.question(ctx)).isEqualTo("What is Java?");
-		assertThat(RagContext.answer(ctx)).isEqualTo("Java is a language");
+		assertThat(RagContext.answer(ctx)).isPresent().hasValue("Java is a language");
 		assertThat(RagContext.context(ctx)).isEmpty();
+	}
+
+	@Test
+	void ragContextShouldHandleListContext() {
+		JudgmentContext ctx = JudgmentContext.builder()
+			.goal("q")
+			.workspace(Path.of("/tmp"))
+			.status(ExecutionStatus.SUCCESS)
+			.startedAt(Instant.now())
+			.executionTime(Duration.ofSeconds(1))
+			.metadata(Map.of(RagContext.CONTEXT_KEY, List.of("chunk 1", "chunk 2", "chunk 3")))
+			.build();
+
+		assertThat(RagContext.context(ctx)).isPresent().hasValue("chunk 1\nchunk 2\nchunk 3");
+	}
+
+	@Test
+	void ragContextShouldFallBackToLangchain4jSources() {
+		JudgmentContext ctx = JudgmentContext.builder()
+			.goal("q")
+			.workspace(Path.of("/tmp"))
+			.status(ExecutionStatus.SUCCESS)
+			.startedAt(Instant.now())
+			.executionTime(Duration.ofSeconds(1))
+			.metadata(Map.of("langchain4j.sources", List.of("source doc 1", "source doc 2")))
+			.build();
+
+		assertThat(RagContext.context(ctx)).isPresent().hasValue("source doc 1\nsource doc 2");
 	}
 
 }

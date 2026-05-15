@@ -1,5 +1,7 @@
 package io.github.markpollack.judge.rag;
 
+import java.util.Optional;
+
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.llm.LLMJudge;
 import io.github.markpollack.judge.result.Judgment;
@@ -16,11 +18,17 @@ import org.springframework.ai.chat.client.ChatClient;
  * <p>
  * Works against any (question, context, answer) triple regardless of how the context
  * was retrieved — vector store, tool call, agentic CLI browsing, or manual curation.
+ * <p>
+ * Returns {@link JudgmentStatus#ABSTAIN} when context or answer is empty, or when
+ * the LLM response cannot be parsed.
  *
  * @author Mark Pollack
  * @since 0.10.0
  */
 public class FaithfulnessJudge extends LLMJudge {
+
+	private static final java.util.regex.Pattern ANSWER_PATTERN = java.util.regex.Pattern
+		.compile("(?mi)^\\s*Answer:\\s*(YES|NO)");
 
 	public FaithfulnessJudge(ChatClient.Builder chatClientBuilder) {
 		super("Faithfulness", "Evaluates whether the answer is grounded in the provided context",
@@ -28,12 +36,27 @@ public class FaithfulnessJudge extends LLMJudge {
 	}
 
 	@Override
+	public Judgment judge(JudgmentContext context) {
+		Optional<String> ctx = RagContext.context(context);
+		Optional<String> ans = RagContext.answer(context);
+		if (ctx.isEmpty()) {
+			return Judgment.abstain("No context provided — cannot evaluate faithfulness");
+		}
+		if (ans.isEmpty()) {
+			return Judgment.abstain("No answer provided — cannot evaluate faithfulness");
+		}
+		return super.judge(context);
+	}
+
+	@Override
 	protected String buildPrompt(JudgmentContext context) {
 		String question = RagContext.question(context);
-		String retrievedContext = RagContext.context(context);
-		String answer = RagContext.answer(context);
+		String retrievedContext = RagContext.context(context).orElse("");
+		String answer = RagContext.answer(context).orElse("");
 
 		return String.format("""
+				Begin your response with the line "Answer: YES" or "Answer: NO".
+
 				You are evaluating whether an answer is faithful to the provided context.
 
 				Question: %s
@@ -55,9 +78,12 @@ public class FaithfulnessJudge extends LLMJudge {
 
 	@Override
 	protected Judgment parseResponse(String response, JudgmentContext context) {
-		boolean pass = response.toUpperCase().contains("ANSWER: YES")
-				|| (response.toUpperCase().contains("YES") && !response.toUpperCase().contains("ANSWER: NO"));
+		var matcher = ANSWER_PATTERN.matcher(response);
+		if (!matcher.find()) {
+			return Judgment.abstain("Could not parse LLM response: " + response);
+		}
 
+		boolean pass = "YES".equalsIgnoreCase(matcher.group(1));
 		String reasoning = extractAfter(response, "Reasoning:");
 		if (reasoning.isEmpty()) {
 			reasoning = response;
