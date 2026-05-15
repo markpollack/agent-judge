@@ -43,6 +43,7 @@
         <module>agent-judge-koog</module>
         <module>agent-judge-langchain4j</module>
         <module>agent-judge-rag</module>
+        <module>agent-judge-agent-client</module>
     </modules>
 
     <properties>
@@ -54,6 +55,9 @@
 
         <!-- Agent Judge project version -->
         <agent-judge.version>${project.version}</agent-judge.version>
+
+        <!-- AgentClient version -->
+        <agent-client.version>0.18.0-SNAPSHOT</agent-client.version>
 
         <!-- Core dependency versions - aligned with Spring AI 2.0 -->
         <agent-sandbox-core.version>0.9.2-SNAPSHOT</agent-sandbox-core.version>
@@ -146,6 +150,13 @@
                 <groupId>io.github.markpollack</groupId>
                 <artifactId>agent-sandbox-core</artifactId>
                 <version>${agent-sandbox-core.version}</version>
+            </dependency>
+
+            <!-- AgentClient for CLI-delegated agent bridge -->
+            <dependency>
+                <groupId>io.github.markpollack</groupId>
+                <artifactId>agent-client-core</artifactId>
+                <version>${agent-client.version}</version>
             </dependency>
 
             <!-- Slf4j API -->
