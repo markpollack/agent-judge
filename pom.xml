@@ -42,6 +42,7 @@
         <module>agent-judge-llm</module>
         <module>agent-judge-koog</module>
         <module>agent-judge-langchain4j</module>
+        <module>agent-judge-rag</module>
     </modules>
 
     <properties>
