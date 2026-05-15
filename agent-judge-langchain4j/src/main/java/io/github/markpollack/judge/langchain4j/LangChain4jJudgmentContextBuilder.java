@@ -132,6 +132,15 @@ public final class LangChain4jJudgmentContextBuilder {
 		}
 	}
 
+	/**
+	 * Map LangChain4j finish reasons to execution status.
+	 * <p>
+	 * Note: {@code LENGTH} maps to {@code SUCCESS} because the model completed its
+	 * response (albeit truncated). However, judges evaluating a truncated answer may
+	 * produce misleading verdicts. Callers should check
+	 * {@code metadata.get("langchain4j.finishReason")} and consider ABSTAIN logic
+	 * for LENGTH responses.
+	 */
 	private static ExecutionStatus mapFinishReason(FinishReason reason) {
 		if (reason == null) {
 			return ExecutionStatus.UNKNOWN;
