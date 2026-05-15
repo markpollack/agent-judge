@@ -44,6 +44,7 @@
         <module>agent-judge-langchain4j</module>
         <module>agent-judge-rag</module>
         <module>agent-judge-agent-client</module>
+        <module>agent-judge-spring-ai</module>
     </modules>
 
     <properties>
