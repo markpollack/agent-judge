@@ -24,6 +24,12 @@
             <artifactId>agent-judge-core</artifactId>
         </dependency>
 
+        <!-- AI-backed judge infrastructure -->
+        <dependency>
+            <groupId>io.github.markpollack</groupId>
+            <artifactId>agent-judge-ai-core</artifactId>
+        </dependency>
+
         <!-- AgentClient (provided - users bring their own version) -->
         <dependency>
             <groupId>io.github.markpollack</groupId>

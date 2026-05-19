@@ -43,6 +43,7 @@
         <module>agent-judge-koog</module>
         <module>agent-judge-langchain4j</module>
         <module>agent-judge-rag</module>
+        <module>agent-judge-ai-core</module>
         <module>agent-judge-agent-client</module>
         <module>agent-judge-spring-ai</module>
     </modules>
@@ -186,6 +187,11 @@
             <dependency>
                 <groupId>io.github.markpollack</groupId>
                 <artifactId>agent-judge-llm</artifactId>
+                <version>${agent-judge.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.markpollack</groupId>
+                <artifactId>agent-judge-ai-core</artifactId>
                 <version>${agent-judge.version}</version>
             </dependency>
 
