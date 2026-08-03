@@ -573,6 +573,44 @@ class VotingStrategyCharacterizationTest {
 		}
 
 		@Test
+		@DisplayName("CHANGED: every strategy's default policy propagates rather than voting")
+		void defaultPolicyPropagatesOnEveryStrategy() {
+			// Only Majority had an ErrorPolicy before the migration, defaulting to an
+			// implicit TREAT_AS_FAIL; the other four silently scored an error as 0.0. The
+			// gap that let that go unnoticed was the absence of a case exercising the
+			// default constructor, so the default is now pinned on all five.
+			List<Judgment> judgments = List.of(booleanJudgment(true), Judgment.error("boom"));
+			List<VotingStrategy> strategies = List.of(new MajorityVotingStrategy(), new ConsensusStrategy(),
+					new AverageVotingStrategy(), new MedianVotingStrategy(), new WeightedAverageStrategy());
+
+			for (VotingStrategy strategy : strategies) {
+				Judgment result = strategy.aggregate(judgments, Map.of());
+
+				assertThat(result.status()).as("default policy for %s", strategy.getName())
+					.isEqualTo(JudgmentStatus.ERROR);
+				assertThat(evidence(result)).as("evidence for %s", strategy.getName())
+					.containsEntry(AggregationEvidence.ERROR_POLICY, "propagate");
+			}
+		}
+
+		@Test
+		@DisplayName("CHANGED: IGNORE releases an errored judgment's weight instead of consuming it")
+		void ignoreReleasesWeightInWeightedAggregation() {
+			// DELTA-3: IGNORE must remove the judgment from the population entirely —
+			// weight included — rather than zeroing its contribution while still dividing
+			// by its weight. Consuming the weight would drag the mean toward zero, which
+			// is the silent negative vote the migration exists to remove.
+			Judgment result = new WeightedAverageStrategy(ErrorPolicy.IGNORE)
+				.aggregate(List.of(numeric(0.8, JudgmentStatus.PASS), Judgment.error("boom")),
+						Map.of("0", 1.0, "1", 3.0));
+
+			assertThat(result.score()).isCloseTo(0.8, within());
+			assertThat(evidence(result)).containsEntry(AggregationEvidence.INPUT_WEIGHT, 4.0)
+				.containsEntry(AggregationEvidence.ELIGIBLE_WEIGHT, 1.0)
+				.containsEntry(AggregationEvidence.IGNORED_ERROR_COUNT, 1);
+		}
+
+		@Test
 		@DisplayName("all-ignored and all-abstained-by-error give different reasoning")
 		void noResultReasoningNamesTheCause() {
 			List<Judgment> allErrored = List.of(Judgment.error("boom"), Judgment.error("boom"));

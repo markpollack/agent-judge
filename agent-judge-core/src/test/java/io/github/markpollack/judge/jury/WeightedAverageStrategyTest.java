@@ -87,29 +87,32 @@ class WeightedAverageStrategyTest {
 	}
 
 	@Test
-	void shouldFallbackToAverageWhenNoWeights() {
+	void emptyWeightsResolveToOneAndComputeInStrategy() {
 		WeightedAverageStrategy strategy = new WeightedAverageStrategy();
 
 		List<Judgment> judgments = List.of(passJudgment(0.8), passJudgment(0.6));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// No weights → simple average: (0.8 + 0.6) / 2 = 0.7
+		// DELTA-10: equal weights reduce to the simple mean, but the computation stays in
+		// this strategy rather than delegating to AverageVotingStrategy, so the evidence
+		// names the strategy the caller actually chose.
 		double score = result.score();
 		assertThat(score).isEqualTo(0.7);
+		assertThat(evidence(result)).containsEntry(AggregationEvidence.STRATEGY, "weightedAverage");
 	}
 
 	@Test
-	void shouldFallbackToAverageWhenNullWeights() {
+	void nullWeightsResolveToOneAndComputeInStrategy() {
 		WeightedAverageStrategy strategy = new WeightedAverageStrategy();
 
 		List<Judgment> judgments = List.of(passJudgment(0.8), passJudgment(0.6));
 
 		Judgment result = strategy.aggregate(judgments, null);
 
-		// Null weights → simple average
 		double score = result.score();
 		assertThat(score).isEqualTo(0.7);
+		assertThat(evidence(result)).containsEntry(AggregationEvidence.STRATEGY, "weightedAverage");
 	}
 
 	@Test
@@ -209,7 +212,7 @@ class WeightedAverageStrategyTest {
 	}
 
 	@Test
-	void allZeroWeightsShouldResultInNaN() {
+	void allZeroWeightsAreRejectedAsInvalidConfiguration() {
 		WeightedAverageStrategy strategy = new WeightedAverageStrategy();
 
 		List<Judgment> judgments = List.of(passJudgment(0.8), passJudgment(0.6));

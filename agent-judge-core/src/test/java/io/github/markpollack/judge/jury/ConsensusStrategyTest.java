@@ -103,29 +103,23 @@ class ConsensusStrategyTest {
 	void shouldReachConsensusOverScoredJudgments() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		List<Judgment> judgments = List.of(passJudgment(0.8), // >= 0.5 → pass
-				passJudgment(0.9), // >= 0.5 → pass
-				passJudgment(0.6) // >= 0.5 → pass
-		);
+		List<Judgment> judgments = List.of(passJudgment(0.8), passJudgment(0.9), passJudgment(0.6));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// All numerical scores >= 0.5 → unanimous pass
+		// DELTA-1: the scores are along for the ride. Consensus reads status, so what makes
+		// this unanimous is that all three judges passed, not where their scores sit.
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	@Test
-	void shouldTreatNumericalBelowThresholdAsFail() {
+	void unanimousFailAmongScoredJudgments() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		List<Judgment> judgments = List.of(failJudgment(0.3), // < 0.5 → fail
-				failJudgment(0.2), // < 0.5 → fail
-				failJudgment(0.1) // < 0.5 → fail
-		);
+		List<Judgment> judgments = List.of(failJudgment(0.3), failJudgment(0.2), failJudgment(0.1));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// All numerical scores < 0.5 → unanimous fail
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(result.reasoning()).contains("all 3 applicable judge(s) failed");
 	}
@@ -134,25 +128,19 @@ class ConsensusStrategyTest {
 	void shouldHandleMixedNumericalAndBoolean() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		List<Judgment> judgments = List.of(booleanPass("Judge 1"), // pass
-				passJudgment(0.8), // >= 0.5 → pass
-				booleanPass("Judge 3") // pass
-		);
+		List<Judgment> judgments = List.of(booleanPass("Judge 1"), passJudgment(0.8), booleanPass("Judge 3"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// All convert to pass → unanimous
+		// A scored judgment and a status-only one are substitutable here: both declare PASS.
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	@Test
-	void shouldFailWhenMixedNumericalAndBooleanDisagree() {
+	void disagreementAcrossScoredAndStatusOnlyJudgmentsAbstains() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		List<Judgment> judgments = List.of(booleanPass("Judge 1"), // pass
-				failJudgment(0.3), // < 0.5 → fail
-				booleanPass("Judge 3") // pass
-		);
+		List<Judgment> judgments = List.of(booleanPass("Judge 1"), failJudgment(0.3), booleanPass("Judge 3"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
@@ -163,15 +151,17 @@ class ConsensusStrategyTest {
 	}
 
 	@Test
-	void shouldHandleExactThresholdAsPass() {
+	void lowScoresDoNotOverrideAPassingStatus() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		List<Judgment> judgments = List.of(passJudgment(0.5), // exactly 0.5 → pass
-				passJudgment(0.5));
+		// Both judges passed while scoring at the bottom of the range. The removed
+		// implementation thresholded the score at 0.5 and would have called this a
+		// unanimous FAIL; reading status is what makes it a PASS.
+		List<Judgment> judgments = List.of(Judgment.scored(0.1).withStatus(JudgmentStatus.PASS).because("low but ok").build(),
+				Judgment.scored(0.2).withStatus(JudgmentStatus.PASS).because("low but ok").build());
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// 0.5 >= 0.5 → pass for both → unanimous
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 	}
 

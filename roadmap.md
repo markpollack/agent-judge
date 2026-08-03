@@ -405,72 +405,199 @@ totals are recorded in Step 2.4.
 
 ---
 
-### Step 2.3: Contract and Obsolete-API Audit
+### Step 2.3: Contract and Obsolete-API Audit — BLOCKED on one decision
 
 **Entry criteria**:
 
-- [ ] Step 2.2 complete
+- [x] Step 2.2 complete
 
 **Work items**:
 
-- [ ] DECIDE whether to remove the unused ReactiveJudge API and optional Reactor dependency; current evidence shows no implementation, test, production caller, or sample. Do not retain it merely because it has existed since 0.1.0.
-- [ ] SEARCH all active production and test sources for obsolete references to:
-  - Score
-  - BooleanScore
-  - NumericalScore
-  - CategoricalScore
-  - ScoreType
-  - Scores
-  - old builder reasoning(...) calls
-- [ ] ALLOW historical references in design and review documents
-- [ ] VERIFY Judgment remains status + optional normalized score + optional label
-- [ ] VERIFY score is refused for ABSTAIN and ERROR
-- [ ] VERIFY label is permitted for ABSTAIN and refused for ERROR
-- [ ] VERIFY lower-case wire statuses and strict upper-case rejection
-- [ ] VERIFY absent optionals are omitted and no type metadata is emitted
-- [ ] VERIFY Judgment contains no Throwable
-- [ ] VERIFY metadata.aggregation is reserved and deeply immutable
-- [ ] VERIFY all five strategies expose an ErrorPolicy defaulting to PROPAGATE
-- [ ] VERIFY IGNORE and TREAT_AS_ABSTAIN remain observably distinct
-- [ ] VERIFY Consensus disagreement and unanimous failure remain distinct
-- [ ] VERIFY all-zero configured weights are rejected before aggregation
-- [ ] VERIFY strategy names are stable lower-camel-case identifiers
+- [ ] DECIDE whether to remove the unused ReactiveJudge API and optional Reactor dependency
+      — **AWAITING OWNER DECISION.** Evidence gathered and recorded below; no production code
+      changed pending confirmation.
+- [x] SEARCH all active production and test sources for obsolete references
+- [x] ALLOW historical references in design and review documents
+- [x] VERIFY Judgment remains status + optional normalized score + optional label
+- [x] VERIFY score is refused for ABSTAIN and ERROR
+- [x] VERIFY label is permitted for ABSTAIN and refused for ERROR
+- [x] VERIFY lower-case wire statuses and strict upper-case rejection
+- [x] VERIFY absent optionals are omitted and no type metadata is emitted
+- [x] VERIFY Judgment contains no Throwable
+- [x] VERIFY metadata.aggregation is reserved and deeply immutable
+- [x] VERIFY all five strategies expose an ErrorPolicy defaulting to PROPAGATE
+- [x] VERIFY IGNORE and TREAT_AS_ABSTAIN remain observably distinct
+- [x] VERIFY Consensus disagreement and unanimous failure remain distinct
+- [x] VERIFY all-zero configured weights are rejected before aggregation
+- [x] VERIFY strategy names are stable lower-camel-case identifiers
+
+#### ReactiveJudge — evidence for the pending decision
+
+The 2026-08-03 review's finding is confirmed exactly as written. `ReactiveJudge` is a single
+one-method interface returning `Mono<Judgment>`, and it is the *only* reason `agent-judge-core`
+declares `reactor-core`. Across all ten modules and the samples tree there is no implementation, no
+test, no production caller, and no sample using it; a search for `reactor`, `Mono`, or `Flux` in
+Java sources returns that one file and a `@see ReactiveJudge` tag in `AsyncJudge`. `AsyncJudge` uses
+only JDK `CompletableFuture` and is unaffected either way.
+
+The only external footprint is documentation: `~/projects/docs/docs/agent-judge/api-reference.mdx`
+lists it. Removal is source- and binary-breaking for any unknown external implementor, which is
+permitted at the 0.14 pre-1.0 boundary but owes the consumer handoff an entry.
+
+No production code has been changed for this item. Resolving it is the only thing standing between
+this step and completion.
+
+#### Obsolete-API search result
+
+No obsolete API reference remains in active code. Specifically:
+
+- the `io.github.markpollack.judge.score` package no longer exists;
+- no active Java source references `Score`, `BooleanScore`, `NumericalScore`, `CategoricalScore`,
+  `ScoreType`, or `Scores` as a type;
+- no source calls the removed builder `reasoning(...)`, `status(...)`, `score(Score)`,
+  `Judgment.error(String, Throwable)`, or the `Throwable error()` accessor;
+- `samples/` contains no Java sources, so it cannot hold a stale reference.
+
+Five surviving mentions of `BooleanScore` are prose inside `@DisplayName` strings and one comment in
+`VotingStrategyCharacterizationTest`, of the form "was BooleanScore(false), a real 0.0". These name
+the removed model in order to record what changed, which is that file's purpose. They are retained
+deliberately.
+
+#### Stale-semantics repairs made during the audit
+
+The type search was clean, but several active tests still *described* mechanisms the migration
+removed. Names and comments were corrected; no assertion was weakened.
+
+| Location | Problem | Repair |
+|---|---|---|
+| `WeightedAverageStrategyTest.allZeroWeightsShouldResultInNaN` | Name asserted the [DELTA-10] defect; the body already asserted rejection | renamed `allZeroWeightsAreRejectedAsInvalidConfiguration` |
+| `WeightedAverageStrategyTest.shouldFallbackToAverageWhenNoWeights` / `...WhenNullWeights` | Named a delegation to `AverageVotingStrategy` that [DELTA-10] removed | renamed to `emptyWeightsResolveToOneAndComputeInStrategy` / `nullWeightsResolveToOneAndComputeInStrategy`, each now also asserting `"strategy": "weightedAverage"` evidence |
+| `ConsensusStrategyTest.shouldFailWhenMixedNumericalAndBooleanDisagree` | Name said FAIL while the body asserted `ABSTAIN` | renamed `disagreementAcrossScoredAndStatusOnlyJudgmentsAbstains` |
+| `ConsensusStrategyTest.shouldTreatNumericalBelowThresholdAsFail` and neighbours | Comments described the removed 0.5 score-thresholding in `ConsensusStrategy.toBoolean` | renamed `unanimousFailAmongScoredJudgments`; stale "≥ 0.5 → pass" comments removed across the numeric cases |
+| `ConsensusStrategyTest.shouldHandleExactThresholdAsPass` | Tested a construction threshold, not strategy behavior, and duplicated an existing case | replaced by `lowScoresDoNotOverrideAPassingStatus`, which pins [DELTA-1] in a case the removed implementation would have decided the other way |
+
+#### Contract-coverage gaps closed
+
+Two contracts this step requires were verified in source but had no executable test. Both are now
+covered in `VotingStrategyCharacterizationTest.ErrorPolicyAccounting`:
+
+- `defaultPolicyPropagatesOnEveryStrategy` — the default `ErrorPolicy` was pinned only for
+  `MajorityVotingStrategy`. The other four constructed a default and were never exercised with an
+  `ERROR` input. This is the same shape of gap that left Majority's own pre-migration default
+  uncharacterized, per design-normalized-judgment.md §7. All five defaults now assert aggregate
+  `ERROR` plus `"errorPolicy": "propagate"` evidence.
+- `ignoreReleasesWeightInWeightedAggregation` — design-normalized-judgment.md §7 requires showing
+  that weighted aggregation renormalizes over `eligibleWeight` after an `IGNORE` rather than
+  consuming the ignored weight. No test exercised `IGNORE` on any numeric strategy. The new case
+  weights an errored judgment at 3.0 against a passing 0.8 weighted 1.0 and asserts the result is
+  0.8 with `inputWeight` 4.0 and `eligibleWeight` 1.0.
+
+#### Contract-to-test map
+
+| Contract | Executable coverage |
+|---|---|
+| status + optional normalized score + optional label | `JudgmentTest.Invariants.scoreBoundaries`, `scoreRejected`, `labelNonBlank` |
+| score refused for ABSTAIN and ERROR | `JudgmentTest.Invariants.noScoreForNonMeasurements` |
+| label permitted for ABSTAIN, refused for ERROR | `JudgmentTest.Invariants.labelAllowedOnAbstainOnly` |
+| lower-case wire statuses, upper case rejected | `JudgmentTest.Serialization.statusWireNames` |
+| absent optionals omitted, no type metadata | `JudgmentTest.Serialization.booleanWire`, `noNullsOrTypeTags` |
+| no Throwable in Judgment | `JudgmentTest.Serialization.errorWire` |
+| metadata.aggregation reserved and deeply immutable | `JudgmentTest.ReservedNamespace.callersRefused`, `unrelatedKeysFine`, `evidenceDeeplyImmutable` |
+| all five strategies default to PROPAGATE | `ErrorPolicyAccounting.defaultPolicyPropagatesOnEveryStrategy` **(new)** |
+| IGNORE distinct from TREAT_AS_ABSTAIN | `ErrorPolicyAccounting.ignoreVersusTreatAsAbstain`, `noResultReasoningNamesTheCause`, `ignoreReleasesWeightInWeightedAggregation` **(new)** |
+| Consensus disagreement distinct from unanimous failure | `ConsensusStrategyTest.disagreementYieldsAbstainAndIsDistinctFromUnanimousFail` |
+| all-zero configured weights rejected | `WeightedAverageStrategyTest.allZeroWeightsAreRejectedAsInvalidConfiguration`, characterization `allZeroWeightsRejected` |
+| strategy names are stable lower-camel-case | `nameIsTheStableTokenUsedInEvidence` in each strategy test; `universalKeysAlwaysPresent` cross-checks all five |
+
+#### Compatibility consequences for the consumer handoff
+
+Carried forward to Step 3.1 in addition to the items the roadmap already lists:
+
+1. `ReactiveJudge` and the optional `reactor-core` dependency — pending the decision above.
+2. `~/projects/docs/docs/agent-judge/api-reference.mdx` still documents the removed Score hierarchy
+   and `ReactiveJudge`. Documentation reconciliation is outside this roadmap's stages; recorded so it
+   is not mistaken for done.
 
 **Exit criteria**:
 
-- [ ] No obsolete API reference remains in active code
-- [ ] Every public contract above is covered by an executable test
-- [ ] Any unavoidable compatibility consequence is listed for the consumer handoff
-- [ ] Update this roadmap's checkboxes
+- [x] No obsolete API reference remains in active code
+- [x] Every public contract above is covered by an executable test
+- [x] Any unavoidable compatibility consequence is listed for the consumer handoff
+- [x] Update this roadmap's checkboxes
+
+**Step remains open** until the ReactiveJudge decision is recorded.
 
 ---
 
-### Step 2.4: JaCoCo and Full-Reactor Gate
+### Step 2.4: JaCoCo and Full-Reactor Gate — COMPLETE, subject to the Step 2.3 decision
 
 **Entry criteria**:
 
-- [ ] Steps 2.1-2.3 complete
+- [x] Steps 2.1-2.3 complete — 2.3 complete except the ReactiveJudge decision, which if answered
+      "remove" requires this gate to be re-run
 
 **Work items**:
 
-- [ ] RUN:
+- [x] RUN:
 
       ./mvnw clean verify
 
-- [ ] VERIFY agent-judge-core line coverage is at least 80%
-- [ ] VERIFY agent-judge-core branch coverage is at least 75%
-- [ ] VERIFY all configured modules reached their expected lifecycle phases
-- [ ] RECORD exact reactor summary and aggregate test totals
-- [ ] INVESTIGATE suspiciously fast modules or stale output rather than accepting them
+- [x] VERIFY agent-judge-core line coverage is at least 80%
+- [x] VERIFY agent-judge-core branch coverage is at least 75%
+- [x] VERIFY all configured modules reached their expected lifecycle phases
+- [x] RECORD exact reactor summary and aggregate test totals
+- [x] INVESTIGATE suspiciously fast modules or stale output rather than accepting them
+
+#### Reactor summary — `./mvnw clean verify`, BUILD SUCCESS, 16.131 s
+
+| Module | Result | Time | Tests | Failures | Errors | Skipped |
+|---|---|---|---|---|---|---|
+| Agent Judge (parent) | SUCCESS | 0.030 s | — | — | — | — |
+| Agent Judge Core | SUCCESS | 3.521 s | 284 | 0 | 0 | 0 |
+| Agent Judge Exec | SUCCESS | 1.456 s | 40 | 0 | 0 | 0 |
+| Agent Judge File Comparison | SUCCESS | 1.311 s | 11 | 0 | 0 | 0 |
+| Agent Judge AI Core | SUCCESS | 0.987 s | 33 | 0 | 0 | 0 |
+| Agent Judge LLM | SUCCESS | 2.186 s | 13 | 0 | 0 | 0 |
+| Agent Judge Koog | SUCCESS | 1.979 s | 5 | 0 | 0 | 0 |
+| Agent Judge LangChain4j | SUCCESS | 0.927 s | 9 | 0 | 0 | 0 |
+| Agent Judge RAG | SUCCESS | 0.871 s | 18 | 0 | 0 | 0 |
+| Agent Judge AgentClient | SUCCESS | 1.830 s | 10 | 0 | 0 | 0 |
+| Agent Judge Spring AI | SUCCESS | 0.943 s | 10 | 0 | 0 | 0 |
+| **Aggregate** | | | **433** | **0** | **0** | **0** |
+
+#### JaCoCo — agent-judge-core
+
+| Counter | Covered | Total | Ratio | Gate | Result |
+|---|---|---|---|---|---|
+| LINE | 686 | 732 | 93.72% | 80% | PASS |
+| BRANCH | 269 | 291 | 92.44% | 75% | PASS |
+
+Plugin output: bundle `agent-judge-core` analyzed with 39 classes, `All coverage checks have been
+met`.
+
+#### Fast-module and stale-output investigation
+
+Every module was checked rather than accepted on elapsed time. The reactor emits no
+`Tests are skipped` or `No tests to run` line anywhere. Each of the ten code modules ran surefire
+and reported a non-zero test count; the fastest, Koog at 1.979 s with 5 tests, has exactly three
+test sources, and its count matches. No module was under-executed:
+
+- the run began with `clean`, so every `target` was deleted and rebuilt — no stale classes or
+  surefire reports could be read;
+- module test counts equal the sum of their per-class counts in the same log;
+- the three modules that had never executed before this session — LLM, RAG, AgentClient — all ran
+  and passed;
+- no integration-test phase was silently skipped: the repository contains no `*IT.java` and the
+  `failsafe` profile was not active.
 
 **Exit criteria**:
 
-- [ ] Full clean reactor passes
-- [ ] 0 unexpected failures or errors
-- [ ] JaCoCo line and branch gates pass
-- [ ] Exact test totals, skipped tests, and reactor result are recorded in this roadmap
-- [ ] Update this roadmap's checkboxes
-- [ ] COMMIT verification-related changes if any
+- [x] Full clean reactor passes
+- [x] 0 unexpected failures or errors — 0 failures and 0 errors of any kind
+- [x] JaCoCo line and branch gates pass
+- [x] Exact test totals, skipped tests, and reactor result are recorded in this roadmap
+- [x] Update this roadmap's checkboxes
+- [x] COMMIT verification-related changes if any
 
 ---
 
