@@ -41,3 +41,6 @@ logs/
 # Claude Code / local project docs
 CLAUDE.md
 plans/
+
+# Generated project-status cache (GitHub-derived; no authored content)
+.campus/
