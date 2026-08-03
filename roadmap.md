@@ -3,10 +3,11 @@
 > **Created**: 2026-08-03T00:00-04:00
 > **Last updated**: 2026-08-03T16:00-04:00
 > **Design version**: design-normalized-judgment.md r6
-> **Implementation checkpoint**: c7d445c — Stage 2 verified; Stage 3 is next
+> **Status**: **COMPLETE** — all four stages verified
 > **Active branch**: normalized-judgment-api
 > **Current state**: clean full reactor passes across all eleven modules — 433 tests, 0 failures,
 > 0 errors, 0 skipped; agent-judge-core at 93.72% line / 92.44% branch coverage
+> **Consumer repositories**: reviewed read-only, unchanged
 
 ## Overview
 
@@ -895,53 +896,191 @@ identifier changes — none of which any inventoried consumer uses.
 
 ## Stage 4: Final Project Checkpoint
 
-### Step 4.1: Final Clean Verification
+### Step 4.1: Final Clean Verification — COMPLETE
 
 **Entry criteria**:
 
-- [ ] Stages 2 and 3 complete
+- [x] Stages 2 and 3 complete
 
 **Work items**:
 
-- [ ] RUN:
+- [x] RUN:
 
       ./mvnw clean verify
 
-- [ ] RECORD exact reactor summary, test totals, skipped tests, and JaCoCo result
-- [ ] RUN git status and inspect every remaining path
-- [ ] VERIFY .campus/ is the only expected untracked content
-- [ ] VERIFY no licensing/header changes entered the migration diff
-- [ ] VERIFY roadmap, design status, and consumer handoff agree
+- [x] RECORD exact reactor summary, test totals, skipped tests, and JaCoCo result
+- [x] RUN git status and inspect every remaining path
+- [x] VERIFY .campus/ is the only expected untracked content
+- [x] VERIFY no licensing/header changes entered the migration diff
+- [x] VERIFY roadmap, design status, and consumer handoff agree
+
+#### Final reactor — BUILD SUCCESS, 15.226 s
+
+| Module | Result | Tests | Failures | Errors | Skipped |
+|---|---|---|---|---|---|
+| Agent Judge (parent) | SUCCESS | — | — | — | — |
+| Agent Judge Core | SUCCESS | 284 | 0 | 0 | 0 |
+| Agent Judge Exec | SUCCESS | 40 | 0 | 0 | 0 |
+| Agent Judge File Comparison | SUCCESS | 11 | 0 | 0 | 0 |
+| Agent Judge AI Core | SUCCESS | 33 | 0 | 0 | 0 |
+| Agent Judge LLM | SUCCESS | 13 | 0 | 0 | 0 |
+| Agent Judge Koog | SUCCESS | 5 | 0 | 0 | 0 |
+| Agent Judge LangChain4j | SUCCESS | 9 | 0 | 0 | 0 |
+| Agent Judge RAG | SUCCESS | 18 | 0 | 0 | 0 |
+| Agent Judge AgentClient | SUCCESS | 10 | 0 | 0 | 0 |
+| Agent Judge Spring AI | SUCCESS | 10 | 0 | 0 | 0 |
+| **Aggregate** | | **433** | **0** | **0** | **0** |
+
+JaCoCo on agent-judge-core: LINE 686/732 = **93.72%** (gate 80%), BRANCH 269/291 = **92.44%**
+(gate 75%). Plugin reports `All coverage checks have been met`. Totals and coverage are identical to
+the Step 2.4 gate, as expected — Stages 3 and 4 changed no code.
+
+#### Working-tree inspection
+
+`git status --porcelain --untracked-files=all` lists exactly one path: `.campus/status.json`. It is
+the user's file, was present at session start, and appears in no commit on any branch. There are no
+modified or staged paths and no other untracked content.
+
+#### Licensing and header verification
+
+The full branch diff against main was inspected, not sampled:
+
+- no path matching `LICENSE`, `NOTICE`, `REUSE`, `.spdx`, `sbom`, `bom.json`, `COPYING`, `dep5`, or
+  `.reuse` was touched;
+- copyright and license-header lines show +3 / −9 across the branch. Every one of those is a whole
+  file being added or deleted — 9 deleted Java files (the 6 score types, 2 score tests, and
+  `ReactiveJudge`) and 3 added ones (`AggregationEvidence`, `AggregationPopulation`,
+  `VotingStrategyCharacterizationTest`);
+- header lines changed inside **modified** files: **0**, confirmed by
+  `git diff --diff-filter=M main..HEAD -- '*.java'`.
+
+No licensing, REUSE, SBOM, or copyright-header work entered this branch.
+
+#### Document agreement
+
+roadmap.md and design-normalized-judgment.md both state 433 tests and 93.72% / 92.44%, matching the
+run above. VISION.md and DESIGN.md carried stale status text describing the migration as in progress
+and were corrected in the completion commit. consumer-handoff-normalized-judgment.md states no test
+totals and contradicts nothing.
+
+CLAUDE.md was also stale and was corrected, but it is gitignored in this repository and therefore
+not part of any commit. That edit is local only and will not reach a fresh clone.
 
 **Exit criteria**:
 
-- [ ] Full reactor passes from clean state
-- [ ] JaCoCo gates pass
-- [ ] No unexplained working-tree changes remain
-- [ ] All migration documentation is current
-- [ ] Update this roadmap's checkboxes
+- [x] Full reactor passes from clean state
+- [x] JaCoCo gates pass
+- [x] No unexplained working-tree changes remain
+- [x] All migration documentation is current
+- [x] Update this roadmap's checkboxes
 
 ---
 
-### Step 4.K: Completion Record
+### Step 4.K: Completion Record — COMPLETE
 
 **Entry criteria**:
 
-- [ ] Step 4.1 complete
+- [x] Step 4.1 complete
 
 **Work items**:
 
-- [ ] MARK this roadmap complete with final commit IDs and verification totals
-- [ ] UPDATE design-normalized-judgment.md status to implemented and verified
-- [ ] SUMMARIZE intentional semantic changes separately from mechanical API changes
-- [ ] STATE that consumer repositories remain unchanged unless separately authorized
-- [ ] COMMIT the completion record
+- [x] MARK this roadmap complete with final commit IDs and verification totals
+- [x] UPDATE design-normalized-judgment.md status to implemented and verified
+- [x] SUMMARIZE intentional semantic changes separately from mechanical API changes
+- [x] STATE that consumer repositories remain unchanged unless separately authorized
+- [x] COMMIT the completion record
+
+#### Commit record
+
+| Commit | Stage | Content |
+|---|---|---|
+| 49a6c73 | 0.1 | DDD review and normalized-Judgment design proposal |
+| a5b15f8 | 0.2 | Pre-change characterization baseline, 36 cases |
+| dc6ca2d | 1 | Score hierarchy replaced by three facts on Judgment |
+| 76a34ab | — | Completion roadmap |
+| 9325ef3 | 2.1-2.2 | Remaining downstream tests migrated |
+| 014a779 | 2.3 | Contract-coverage gaps closed, stale test prose retired |
+| c7d445c | 2.3 | ReactiveJudge and the Reactor dependency removed |
+| fbbd48f | 2.K | Verified state recorded on disk |
+| aa2b3c9 | 3.1-3.2 | Consumer migration handoff written and reviewed |
+| this commit | 4.K | Completion record |
+
+**Final verification**: `./mvnw clean verify` from clean — BUILD SUCCESS, eleven modules, 433 tests,
+0 failures, 0 errors, 0 skipped; agent-judge-core at 93.72% line and 92.44% branch coverage.
+
+#### Intentional semantic changes
+
+These change what a judgment or verdict *means*. Each is a deliberate domain correction with an
+evidenced rationale, and each is named in the consumer handoff.
+
+1. **Abstention is no longer a negative vote.** `ABSTAIN` leaves the aggregation population entirely
+   — numerator, denominator, vote count, and weight. It previously carried `BooleanScore(false)`, so
+   a judge that declined to assess cast the strongest possible negative vote.
+2. **Errors follow an explicit policy, defaulting to `PROPAGATE`.** Previously `Majority` defaulted
+   to an implicit `TREAT_AS_FAIL` and the other four silently scored an error as `0.0`.
+3. **`IGNORE` genuinely filters.** It removes an errored judgment from the population rather than
+   mapping it to an abstention, making it observably distinct from `TREAT_AS_ABSTAIN`.
+4. **Consensus reads status, not score, and reports disagreement as `ABSTAIN`.** Unanimous failure
+   and an undecided panel are no longer the same outcome.
+5. **Nothing eligible yields `ABSTAIN`** rather than a manufactured failing score.
+6. **`Majority` and `Consensus` emit no score.** They aggregate outcomes, not quantities.
+7. **An all-zero weight map is rejected** as invalid configuration; it previously produced a `NaN`
+   score that slipped past range validation. A valid configuration whose eligible weight vanishes
+   after filtering abstains instead.
+8. **`WeightedAverage` no longer delegates to `Average`** for empty weights; the number is unchanged
+   but the evidence now names the strategy the caller chose.
+9. **A missing JaCoCo report abstains rather than fails.** Absence of a report is not a finding about
+   coverage. This is fail-open for anyone relying on "no report ⇒ gate closed".
+10. **`CommandJudge` and `FileContentJudge` report a caught exception as `ERROR`**, conforming to the
+    seven judges that already did.
+11. **A degenerate score range (`max <= min`) is rejected** rather than special-cased.
+
+#### Mechanical API changes
+
+These change how the same meaning is expressed.
+
+- `Score`, `BooleanScore`, `NumericalScore`, `CategoricalScore`, `ScoreType`, and `Scores` deleted;
+  the whole `judge.score` package is gone.
+- `Judgment` carries required `status`, optional normalized `score`, optional `label`, with all
+  invariants in the compact constructor.
+- Staged factories replace the free-for-all builder; `because(String)` replaces `reasoning(String)`.
+- `effectiveScore()` added as the single derived numeric view.
+- Throwable transport removed: no `error(String, Throwable)`, no `Throwable error()` accessor, no
+  `"error"` metadata convention.
+- Stable lower-case status wire names with case-sensitive parsing; absent optionals omitted.
+- `AggregationEvidence` and `AggregationPopulation` added; `metadata.aggregation` reserved and deeply
+  immutable.
+- `VotingStrategy.getName()` identifiers normalized to lower-camel-case.
+- `ReactiveJudge` and `agent-judge-core`'s optional `reactor-core` dependency removed. This one is an
+  owner decision about scope rather than a consequence of the value model.
+
+#### Consumer repositories
+
+`agent-workflow` and `agentworks-pr-review` were reviewed **read-only** and **remain unchanged**.
+Their local working-tree modifications predate this session. Migrating them is separate work that
+requires its own authorization; consumer-handoff-normalized-judgment.md is written so it can be done
+without reading this branch's diff.
+
+#### Work deliberately not done
+
+- Public documentation at `docs/agent-judge/` still describes the Score hierarchy and
+  `ReactiveJudge`.
+- Licensing, REUSE, SPDX, SBOM, and copyright-header work — a separate workstream, explicitly out of
+  scope here and verified absent from this branch.
+- No merge, rebase, push, release, or publish.
 
 **Exit criteria**:
 
-- [ ] A cold session can establish final state entirely from repository files and commits
-- [ ] No required work remains in the normalized-Judgment migration
-- [ ] Branch is ready for review and a separately authorized merge
+- [x] A cold session can establish final state entirely from repository files and commits
+- [x] No required work remains in the normalized-Judgment migration
+- [x] Branch is ready for review and a separately authorized merge
+
+---
+
+## Roadmap status: COMPLETE
+
+Every stopping condition below is satisfied. The branch is ready for review and a separately
+authorized merge.
 
 ---
 
@@ -1000,3 +1139,5 @@ evidence, and safe next action. Do not mark the corresponding exit criterion com
 |---|---|---|
 | 2026-08-03T00:00-04:00 | Initial normalized-Judgment completion roadmap | Core checkpoint dc6ca2d completed; fresh-session handoff required |
 | 2026-08-03T16:00-04:00 | Stage 2 completed and recorded: reactor result, failure classification, downstream repairs, contract audit, ReactiveJudge removal, and final gate | Full-reactor verification executed; owner decided the ReactiveJudge question |
+| 2026-08-03T16:15-04:00 | Stage 3 completed: read-only consumer inventory and the reviewed consumer handoff | Stage 2 gates passed |
+| 2026-08-03T16:20-04:00 | Stage 4 completed; roadmap marked COMPLETE | Final clean verification passed and the completion record was written |

@@ -61,10 +61,15 @@ Design changes made after r6, on owner decision rather than new evidence about t
   not touch the judgment or aggregation contract; it removes an unused published API. Recorded here
   because DESIGN.md's core dependency boundary changed with it.
 
-Still pending:
+The consumer migration handoff is written and reviewed:
+[consumer-handoff-normalized-judgment.md](consumer-handoff-normalized-judgment.md). Its Java
+examples were compiled against the built classes rather than reviewed by eye.
 
-1. A written consumer migration handoff for `agent-workflow` and other consumers.
-2. Public documentation reconciliation for 0.14, which is outside the roadmap's stages.
+Still pending, outside this design's scope:
+
+1. Migrating `agent-workflow` and `agentworks-pr-review`, which were reviewed read-only and remain
+   unchanged. That work requires its own authorization.
+2. Public documentation reconciliation for 0.14.
 
 The active execution plan is [roadmap.md](roadmap.md). The Phase 0 section below is retained as the
 historical verification protocol that produced a5b15f8; it is complete and must not be repeated.

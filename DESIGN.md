@@ -1,7 +1,8 @@
 # Design: Agent Judge
 
 > **Reviewed**: 2026-08-03
-> **Status**: Current architecture with normalized-Judgment migration at core checkpoint
+> **Status**: Current architecture; the normalized-Judgment migration is implemented and verified
+> against a clean full reactor
 > **Normative judgment detail**: design-normalized-judgment.md
 > **Execution plan**: roadmap.md
 

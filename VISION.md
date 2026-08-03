@@ -122,8 +122,10 @@ Released through 0.13.0:
 - CI dependency-vulnerability gates.
 
 The 0.14.0 development line replaces the former Score hierarchy with the normalized Judgment model.
-The core checkpoint is committed; full-reactor verification and consumer migration remain in
-progress. See roadmap.md.
+That migration is implemented and verified: a clean full reactor passes across all eleven modules
+with 433 tests and no failures, errors, or skips, and agent-judge-core holds 93.72% line and 92.44%
+branch coverage. The consumer migration handoff is written and reviewed. Downstream consumers are
+deliberately unchanged. See roadmap.md and consumer-handoff-normalized-judgment.md.
 
 ## Modules
 
@@ -157,8 +159,9 @@ Progress is measured by outcomes rather than document or commit count:
 
 ## Near-Term Direction
 
-1. Complete normalized-Judgment full-reactor verification.
-2. Publish the consumer migration handoff and update downstream consumers separately.
+1. ~~Complete normalized-Judgment full-reactor verification.~~ Done.
+2. ~~Publish the consumer migration handoff.~~ Done; updating downstream consumers remains separate
+   work requiring its own authorization.
 3. Reconcile public documentation and examples for 0.14.
 4. Complete the separate licensing/SBOM workstream.
 5. Release 0.14 only after those gates are satisfied.
