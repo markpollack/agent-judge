@@ -697,101 +697,199 @@ the test still pinned behavior the settled design had deliberately changed.
 
 ## Stage 3: Consumer Migration Handoff
 
-### Step 3.0: Consumer Surface Inventory
+### Step 3.0: Consumer Surface Inventory — COMPLETE
 
 **Entry criteria**:
 
-- [ ] Stage 2 complete
-- [ ] Full reactor and JaCoCo gates pass
+- [x] Stage 2 complete
+- [x] Full reactor and JaCoCo gates pass
 
 **Work items**:
 
-- [ ] REVIEW agent-workflow read-only for Agent Judge API consumption
-- [ ] REVIEW agentworks-pr-review read-only if present and relevant
-- [ ] IDENTIFY dependency coordinates and version bumps
-- [ ] IDENTIFY source and binary compatibility breaks
-- [ ] IDENTIFY score extraction, threshold, error-policy, consensus, and coverage-gate consumers
-- [ ] DO NOT edit either consumer repository in this stage
+- [x] REVIEW agent-workflow read-only for Agent Judge API consumption
+- [x] REVIEW agentworks-pr-review read-only if present and relevant
+- [x] IDENTIFY dependency coordinates and version bumps
+- [x] IDENTIFY source and binary compatibility breaks
+- [x] IDENTIFY score extraction, threshold, error-policy, consensus, and coverage-gate consumers
+- [x] DO NOT edit either consumer repository in this stage
 
 **Known required findings to confirm**:
 
-- [ ] JudgeGate.extractScore and TieredGate.extractScore currently consume NumericalScore.value()
-- [ ] Their gate thresholds are normalized while the old value could be raw-range
-- [ ] Consumers must distinguish optional stored score from effectiveScore()
-- [ ] Missing JaCoCo reports now yield ABSTAIN rather than FAIL
-- [ ] VotingStrategy.getName() identifiers changed
-- [ ] ErrorPolicy defaults changed to PROPAGATE
+- [x] JudgeGate.extractScore and TieredGate.extractScore currently consume NumericalScore.value()
+      — **confirmed**, `JudgeGate.java:90` and `TieredGate.java:71`
+- [x] Their gate thresholds are normalized while the old value could be raw-range — **confirmed**
+- [x] Consumers must distinguish optional stored score from effectiveScore() — **confirmed, and
+      sharper than stated**; see the consensus finding below
+- [x] Missing JaCoCo reports now yield ABSTAIN rather than FAIL — **no impact on either consumer**;
+      neither depends on agent-judge-exec, so no coverage judge is reachable. `BuildSuccessJudge`
+      appears only in agent-workflow Javadoc examples.
+- [x] VotingStrategy.getName() identifiers changed — **no impact**; neither repository calls
+      `getName()` on a strategy
+- [x] ErrorPolicy defaults changed to PROPAGATE — **confirmed as a silent behavioral change**;
+      neither repository configures an `ErrorPolicy`, so both inherit the new default
+
+#### Consumer coordinates
+
+| Repository | Branch | HEAD | Depends on | Pinned version |
+|---|---|---|---|---|
+| agent-workflow | v3 | b10144a | agent-judge-core (api, core, flows) | 0.12.0 |
+| agentworks-pr-review | v3-serving | 03fc68f | agent-judge-core | 0.11.0-SNAPSHOT |
+
+Both must move to 0.14.0. Neither was modified; both were read only.
+
+#### agent-workflow — named migration actions
+
+| Location | Removed API | Action |
+|---|---|---|
+| `SpringAiJuryAdapter:113,165`, `TerminationStrategy:158`, `TurnLimitedResult:56`, `JuryTerminationStrategy:97`, `StateMachineLoop:261`, `EvaluatorOptimizerLoop:251`, `JuryPassedException:68,75`, `TurnLimitedLoop:317` | `Scores.toNormalized(verdict.aggregated().score(), Map.of())` — 10 call sites in 8 files | replace with `effectiveScore()` and state an explicit policy for an absent score |
+| `JudgeGate.java:89-93` | `Score` + `instanceof NumericalScore` + `ns.value()` | replace with `effectiveScore()`; this also fixes the raw-versus-normalized defect |
+| `TieredGate.java:70-74` | same | same |
+| `GateTest.java:408,425` | `Judgment.builder().score(new NumericalScore(...)).status(...)` | rebuild via `Judgment.scored(...).withStatus(...)` |
+| `GateTest.java:410,429` | builder `reasoning(String)` | `because(String)` |
+
+> **`Scores` was not dead code.** ddd-review.md Warning 1 called `Scores.toNormalized` dead,
+> "referenced only by its own unit test — verified by grep across all modules". That grep covered
+> agent-judge's modules only. It is the single most-used Agent Judge API in agent-workflow, at 10
+> call sites. Deleting it is correct, but the blast radius recorded in design-normalized-judgment.md
+> §6 understated the consumer cost, and the handoff must lead with this.
+
+> **The consensus trap — the most dangerous finding in this inventory.** Under 0.13, an aggregate
+> from `ConsensusStrategy` or `MajorityVotingStrategy` carried a `BooleanScore`, so
+> `Scores.toNormalized(...)` returned 1.0 or 0.0 and threshold gates worked. Under 0.14 those two
+> strategies **emit no score at all**, by design. A consumer that ports
+> `Scores.toNormalized(x.score(), Map.of())` to the visually obvious `x.score()` gets `null` on
+> every verdict. Worse, the old `Scores.toNormalized` mapped `null` to 0.0 and both gates already
+> return 0.0 for a null score — so the port compiles, runs, and silently fails every gate including
+> unanimous passes. `agent-workflow` wires exactly this combination in `GateTest:413`
+> (`ConsensusStrategy` behind a score gate). The correct port is `effectiveScore()`.
+
+#### agentworks-pr-review — named migration actions
+
+| Location | Removed API | Action |
+|---|---|---|
+| `VersionPatternJudge:58,86` | `.score(new BooleanScore(...))` + `.status(...)` + `.reasoning(...)` | `Judgment.verdict(boolean).because(...)` — the Boolean score was always a duplicate of the status |
+| `BuildJudge:59` | `.score(new BooleanScore(allPassed))` | `Judgment.verdict(allPassed).because(...)` |
+| `QualityJudge:78` | `.score(NumericalScore.normalized(score))` | `Judgment.scored(score).withStatus(...)` or `.passingAt(...)` |
+| `TestAssessments:64,79,90,106` | same builder shape in test fixtures | same |
+
+Its `CascadedJury`, `TierConfig`, and `TierPolicy` usage is structurally unaffected: tier policies
+read individual judgments, which [DELTA-2] deliberately left untouched.
+
+#### Explicit no-impact findings
+
+- `Judgment.elapsed()` — not consumed by either repository. Every `elapsed()` hit in agent-workflow
+  is `LoopState.elapsed()`, an unrelated type.
+- `Judgment.error(String, Throwable)` and the `Throwable error()` accessor — no call site in either
+  repository, so removing the Throwable transport breaks neither.
+- `VotingStrategy.getName()` — no consumer.
+- Coverage judges and `agent-judge-exec` — not a dependency of either repository.
+- agent-workflow's own `workflow-spec/.../v3/envelope/Judgment.java` DTO
+  (`String memberId, @Nullable Double score, ...`) is unaffected: it is a hand-rolled wire type that
+  never referenced the Score hierarchy. It remains the strongest evidence the 0.14 shape is right.
 
 **Exit criteria**:
 
-- [ ] Every known consumer has a named migration action or an explicit no-impact finding
-- [ ] No downstream repository was modified
-- [ ] Update this roadmap's checkboxes
+- [x] Every known consumer has a named migration action or an explicit no-impact finding
+- [x] No downstream repository was modified
+- [x] Update this roadmap's checkboxes
 
 ---
 
-### Step 3.1: Write the Consumer Handoff
+### Step 3.1: Write the Consumer Handoff — COMPLETE
 
 **Entry criteria**:
 
-- [ ] Step 3.0 complete
+- [x] Step 3.0 complete
 
 **Work items**:
 
-- [ ] CREATE consumer-handoff-normalized-judgment.md in this repository
-- [ ] INCLUDE the required Agent Judge dependency/version bump
-- [ ] INCLUDE before/after construction examples for:
-  - boolean verdicts;
-  - normalized numeric scores;
-  - raw-range normalization;
-  - classifications;
-  - abstentions;
-  - errors.
-- [ ] EXPLAIN that Judgment.score(), when present, is already normalized to [0,1]
-- [ ] EXPLAIN when to use the optional stored score and when effectiveScore() is appropriate
-- [ ] REQUIRE JudgeGate.extractScore and TieredGate.extractScore to stop reading a raw NumericalScore
-- [ ] EXPLAIN the missing-JaCoCo-report change from FAIL to ABSTAIN
-- [ ] EXPLAIN how a fail-closed consumer can add an explicit report-existence judge or gate
-- [ ] LIST stable lower-camel-case strategy identifiers
-- [ ] LIST the PROPAGATE default and all ErrorPolicy choices
-- [ ] EXPLAIN Consensus disagreement ABSTAIN versus unanimous FAIL
-- [ ] EXPLAIN that ERROR no longer transports Throwable
-- [ ] EXPLAIN metadata.aggregation and its stable evidence keys
-- [ ] LIST removed classes and incompatible methods
-- [ ] LIST any release-note-worthy behavior changes discovered during Stage 2
+- [x] CREATE consumer-handoff-normalized-judgment.md in this repository
+- [x] INCLUDE the required Agent Judge dependency/version bump
+- [x] INCLUDE before/after construction examples for boolean verdicts, normalized numeric scores,
+      raw-range normalization, classifications, abstentions, and errors
+- [x] EXPLAIN that Judgment.score(), when present, is already normalized to [0,1]
+- [x] EXPLAIN when to use the optional stored score and when effectiveScore() is appropriate
+- [x] REQUIRE JudgeGate.extractScore and TieredGate.extractScore to stop reading a raw NumericalScore
+- [x] EXPLAIN the missing-JaCoCo-report change from FAIL to ABSTAIN
+- [x] EXPLAIN how a fail-closed consumer can add an explicit report-existence judge or gate
+- [x] LIST stable lower-camel-case strategy identifiers
+- [x] LIST the PROPAGATE default and all ErrorPolicy choices
+- [x] EXPLAIN Consensus disagreement ABSTAIN versus unanimous FAIL
+- [x] EXPLAIN that ERROR no longer transports Throwable
+- [x] EXPLAIN metadata.aggregation and its stable evidence keys
+- [x] LIST removed classes and incompatible methods
+- [x] LIST any release-note-worthy behavior changes discovered during Stage 2
+
+The document leads with the two changes that fail **silently**, because everything else in this
+migration is a compile error and therefore self-announcing. Those two are the consensus/majority
+score-absence trap found in Step 3.0 and the `ErrorPolicy` default moving to `PROPAGATE`.
 
 **Exit criteria**:
 
-- [ ] A consumer can migrate without reading the implementation diff
-- [ ] Score semantics and threshold semantics cannot be confused
-- [ ] Every deliberate DELTA that affects consumers is named
-- [ ] The handoff does not authorize downstream edits
-- [ ] Update this roadmap's checkboxes
-- [ ] COMMIT
+- [x] A consumer can migrate without reading the implementation diff
+- [x] Score semantics and threshold semantics cannot be confused
+- [x] Every deliberate DELTA that affects consumers is named
+- [x] The handoff does not authorize downstream edits — stated in its header and §9
+- [x] Update this roadmap's checkboxes
+- [x] COMMIT
 
 ---
 
-### Step 3.2: Handoff Review
+### Step 3.2: Handoff Review — COMPLETE
 
 **Entry criteria**:
 
-- [ ] Step 3.1 complete
+- [x] Step 3.1 complete
 
 **Work items**:
 
-- [ ] CROSS-CHECK the handoff against design-normalized-judgment.md
-- [ ] CROSS-CHECK it against the implemented public API
-- [ ] VERIFY every code example compiles or is covered by an equivalent test
-- [ ] VERIFY every named consumer location still exists
-- [ ] REMOVE no migration warning merely because there is no current production consumer
+- [x] CROSS-CHECK the handoff against design-normalized-judgment.md
+- [x] CROSS-CHECK it against the implemented public API
+- [x] VERIFY every code example compiles or is covered by an equivalent test
+- [x] VERIFY every named consumer location still exists
+- [x] REMOVE no migration warning merely because there is no current production consumer
+
+#### Code examples compile
+
+Every Java example in the handoff was extracted into a single scratch compilation unit and compiled
+with `javac` against `agent-judge-core/target/classes`, `agent-judge-ai-core/target/classes`, and
+the resolved Maven classpath. **Exit code 0.** The file lives in the session scratchpad, not in the
+repository.
+
+This covers the correct and the deliberately-wrong port in §1.1, the explicit `ErrorPolicy`
+construction, `score()`/`effectiveScore()`/`hasError()`, all six construction forms, the
+`LabelJudgmentClassifier` declared-score builder, the fail-closed report-existence judge, and
+evidence access through `Judgment.AGGREGATION_KEY`. Compiling the *wrong* port is the point: it is
+what makes the §1.1 warning necessary.
+
+#### Facts verified against source rather than against the design document
+
+| Claim | Verification |
+|---|---|
+| Exact JSON in §7 | Character-identical to the strings asserted in `JudgmentTest.Serialization` |
+| Evidence key names in §5.4 | Match the `AggregationEvidence` constants |
+| `ErrorPolicy` tokens | Match the enum's stable token fields |
+| 0.13 `getName()` values in §5.5 | Read from `dc6ca2d^`: `majority`, `Consensus`, `AverageVoting`, `WeightedAverage`, `MedianVoting` |
+| `Scores.toNormalized` mapped null to 0.0 | Read from the deleted source at `dc6ca2d^` |
+| §1.1's claim that the null case was unreachable in 0.13 | Confirmed: `MajorityVotingStrategy:116` and `ConsensusStrategy:80` at `dc6ca2d^` always attached a `BooleanScore` to the aggregate |
+| §6.2's FAIL-to-ERROR change | Confirmed at `CommandJudge:166` and `FileContentJudge:111`, both now `Judgment.erroring()` |
+| All 14 named consumer locations | Every file still exists; the `Scores.toNormalized` count re-verified at 10 call sites across 8 files |
+
+#### Warnings deliberately retained despite no current consumer
+
+Per the roadmap's instruction not to drop a warning merely because nothing consumes it today, the
+handoff still documents the removal of `ReactiveJudge`, `Judgment.error(String, Throwable)`, the
+`Throwable error()` accessor, the `"error"` metadata convention, and the `VotingStrategy.getName()`
+identifier changes — none of which any inventoried consumer uses.
 
 **Exit criteria**:
 
-- [ ] Handoff and implementation agree
-- [ ] Handoff examples are valid
-- [ ] Consumer risks are explicit and actionable
-- [ ] Update this roadmap's checkboxes
-- [ ] COMMIT if review changes were required
+- [x] Handoff and implementation agree
+- [x] Handoff examples are valid — compiled, not merely reviewed
+- [x] Consumer risks are explicit and actionable
+- [x] Update this roadmap's checkboxes
+- [x] COMMIT if review changes were required — no corrections were needed; the review confirmed the
+      document as written
 
 ---
 
