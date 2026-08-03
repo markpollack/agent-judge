@@ -38,8 +38,12 @@ The historical claim that agent-judge-core has zero external dependencies is fal
 implementation. Core currently depends on:
 
 - Jackson Databind for configuration and JSON projection support;
-- SLF4J API for logging;
-- optional Reactor for ReactiveJudge.
+- SLF4J API for logging.
+
+The optional Reactor dependency was removed in 0.14 along with ReactiveJudge, which had no
+implementation, test, caller, or sample in this repository. A reactive consumer can wrap Judge
+directly; a dedicated adapter can be added if a real consumer asks for one. AsyncJudge is unaffected
+because it uses only JDK CompletableFuture.
 
 The enforced architectural property is narrower and more useful:
 

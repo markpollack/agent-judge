@@ -24,13 +24,6 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
-        <!-- Reactor for ReactiveJudge (optional) -->
-        <dependency>
-            <groupId>io.projectreactor</groupId>
-            <artifactId>reactor-core</artifactId>
-            <optional>true</optional>
-        </dependency>
-
         <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>

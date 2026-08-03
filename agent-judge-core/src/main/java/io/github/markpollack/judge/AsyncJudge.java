@@ -69,7 +69,6 @@ import io.github.markpollack.judge.result.Judgment;
  * @author Mark Pollack
  * @since 0.1.0
  * @see Judge
- * @see ReactiveJudge
  */
 public interface AsyncJudge {
 

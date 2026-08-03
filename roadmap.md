@@ -405,7 +405,7 @@ totals are recorded in Step 2.4.
 
 ---
 
-### Step 2.3: Contract and Obsolete-API Audit — BLOCKED on one decision
+### Step 2.3: Contract and Obsolete-API Audit — COMPLETE
 
 **Entry criteria**:
 
@@ -413,9 +413,9 @@ totals are recorded in Step 2.4.
 
 **Work items**:
 
-- [ ] DECIDE whether to remove the unused ReactiveJudge API and optional Reactor dependency
-      — **AWAITING OWNER DECISION.** Evidence gathered and recorded below; no production code
-      changed pending confirmation.
+- [x] DECIDE whether to remove the unused ReactiveJudge API and optional Reactor dependency
+      — **DECIDED: remove.** Owner decision, 2026-08-03: "Remove ReactiveJudge. If someone needs it,
+      they will ask." Applied and verified; see below.
 - [x] SEARCH all active production and test sources for obsolete references
 - [x] ALLOW historical references in design and review documents
 - [x] VERIFY Judgment remains status + optional normalized score + optional label
@@ -431,21 +431,46 @@ totals are recorded in Step 2.4.
 - [x] VERIFY all-zero configured weights are rejected before aggregation
 - [x] VERIFY strategy names are stable lower-camel-case identifiers
 
-#### ReactiveJudge — evidence for the pending decision
+#### ReactiveJudge — decided and removed
 
-The 2026-08-03 review's finding is confirmed exactly as written. `ReactiveJudge` is a single
-one-method interface returning `Mono<Judgment>`, and it is the *only* reason `agent-judge-core`
-declares `reactor-core`. Across all ten modules and the samples tree there is no implementation, no
-test, no production caller, and no sample using it; a search for `reactor`, `Mono`, or `Flux` in
-Java sources returns that one file and a `@see ReactiveJudge` tag in `AsyncJudge`. `AsyncJudge` uses
-only JDK `CompletableFuture` and is unaffected either way.
+The 2026-08-03 review's finding was confirmed exactly as written before the decision was taken.
+`ReactiveJudge` was a single one-method interface returning `Mono<Judgment>`, and it was the only
+reason `agent-judge-core` declared `reactor-core`. Across all ten modules and the samples tree there
+was no implementation, test, production caller, or sample; a search for `reactor`, `Mono`, or `Flux`
+in Java sources returned that one file plus a `@see ReactiveJudge` tag in `AsyncJudge`.
 
-The only external footprint is documentation: `~/projects/docs/docs/agent-judge/api-reference.mdx`
-lists it. Removal is source- and binary-breaking for any unknown external implementor, which is
-permitted at the 0.14 pre-1.0 boundary but owes the consumer handoff an entry.
+Owner decision: remove. A reactive consumer can wrap `Judge` directly, and a dedicated adapter can
+be introduced when a real consumer asks for one.
 
-No production code has been changed for this item. Resolving it is the only thing standing between
-this step and completion.
+Applied:
+
+- deleted `agent-judge-core/src/main/java/io/github/markpollack/judge/ReactiveJudge.java`;
+- removed the optional `reactor-core` dependency from `agent-judge-core/pom.xml`;
+- removed the now-unreferenced `reactor-bom` import and `reactor.version` property from the root pom;
+- removed the dangling `@see ReactiveJudge` tag from `AsyncJudge`;
+- corrected DESIGN.md's core dependency boundary and VISION.md's architecture principle, both of
+  which asserted the optional reactive dependency as current fact.
+
+`AsyncJudge` is untouched in substance: it uses only JDK `CompletableFuture`.
+
+**Resolution evidence.** `./mvnw dependency:tree -Dincludes='io.projectreactor:*'` was captured
+before and after. The only delta is the removal of core's own entry; every other module's transitive
+`reactor-core` is unchanged in both version and scope:
+
+| Module | Before | After |
+|---|---|---|
+| agent-judge-core | reactor-core 3.8.6 compile | **absent** |
+| agent-judge-llm | reactor-core 3.8.6 compile | reactor-core 3.8.6 compile |
+| agent-judge-koog | reactor-core 3.8.6 provided | reactor-core 3.8.6 provided |
+| agent-judge-rag | reactor-core 3.8.6 compile | reactor-core 3.8.6 compile |
+| agent-judge-agent-client | reactor-core 3.8.6 provided | reactor-core 3.8.6 provided |
+| agent-judge-spring-ai | reactor-core 3.8.6 provided | reactor-core 3.8.6 provided |
+
+Removing the `reactor-bom` import was provably inert: `spring-boot-dependencies` is imported first
+and already governed `reactor-core` at 3.8.6, which is why the declared BOM version (2024.0.5) was
+never the one in effect. Reactor therefore remains in the build as a transitive Spring AI dependency
+of the provider modules — what was removed is core's own declared dependency and the published
+`Mono`-shaped API coupling, not Reactor from the reactor as a whole.
 
 #### Obsolete-API search result
 
@@ -513,8 +538,14 @@ covered in `VotingStrategyCharacterizationTest.ErrorPolicyAccounting`:
 
 Carried forward to Step 3.1 in addition to the items the roadmap already lists:
 
-1. `ReactiveJudge` and the optional `reactor-core` dependency — pending the decision above.
-2. `~/projects/docs/docs/agent-judge/api-reference.mdx` still documents the removed Score hierarchy
+1. `ReactiveJudge` is removed. This is source- and binary-breaking for any external implementor,
+   permitted at the 0.14 pre-1.0 boundary but owed a migration note: a reactive consumer should wrap
+   `Judge` itself, for example
+   `Mono.fromCallable(() -> judge.judge(context)).subscribeOn(Schedulers.boundedElastic())`.
+2. `agent-judge-core` no longer declares `reactor-core`, not even optionally. A consumer that
+   relied on inheriting Reactor from agent-judge-core — which optional scope already prevented for
+   transitive users — must declare it directly.
+3. `~/projects/docs/docs/agent-judge/api-reference.mdx` still documents the removed Score hierarchy
    and `ReactiveJudge`. Documentation reconciliation is outside this roadmap's stages; recorded so it
    is not mistaken for done.
 
@@ -529,12 +560,16 @@ Carried forward to Step 3.1 in addition to the items the roadmap already lists:
 
 ---
 
-### Step 2.4: JaCoCo and Full-Reactor Gate — COMPLETE, subject to the Step 2.3 decision
+### Step 2.4: JaCoCo and Full-Reactor Gate — COMPLETE
 
 **Entry criteria**:
 
-- [x] Steps 2.1-2.3 complete — 2.3 complete except the ReactiveJudge decision, which if answered
-      "remove" requires this gate to be re-run
+- [x] Steps 2.1-2.3 complete
+
+The gate was run twice. The first run passed before the ReactiveJudge decision was taken; the
+decision then changed production code, so the gate was re-run afterwards and is recorded below in
+its final form. Both runs produced identical totals and coverage, which is the expected result of
+deleting an interface that had no implementation, test, or caller.
 
 **Work items**:
 
@@ -548,21 +583,21 @@ Carried forward to Step 3.1 in addition to the items the roadmap already lists:
 - [x] RECORD exact reactor summary and aggregate test totals
 - [x] INVESTIGATE suspiciously fast modules or stale output rather than accepting them
 
-#### Reactor summary — `./mvnw clean verify`, BUILD SUCCESS, 16.131 s
+#### Reactor summary — `./mvnw clean verify`, BUILD SUCCESS, 16.491 s
 
 | Module | Result | Time | Tests | Failures | Errors | Skipped |
 |---|---|---|---|---|---|---|
-| Agent Judge (parent) | SUCCESS | 0.030 s | — | — | — | — |
-| Agent Judge Core | SUCCESS | 3.521 s | 284 | 0 | 0 | 0 |
-| Agent Judge Exec | SUCCESS | 1.456 s | 40 | 0 | 0 | 0 |
-| Agent Judge File Comparison | SUCCESS | 1.311 s | 11 | 0 | 0 | 0 |
-| Agent Judge AI Core | SUCCESS | 0.987 s | 33 | 0 | 0 | 0 |
-| Agent Judge LLM | SUCCESS | 2.186 s | 13 | 0 | 0 | 0 |
-| Agent Judge Koog | SUCCESS | 1.979 s | 5 | 0 | 0 | 0 |
-| Agent Judge LangChain4j | SUCCESS | 0.927 s | 9 | 0 | 0 | 0 |
-| Agent Judge RAG | SUCCESS | 0.871 s | 18 | 0 | 0 | 0 |
-| Agent Judge AgentClient | SUCCESS | 1.830 s | 10 | 0 | 0 | 0 |
-| Agent Judge Spring AI | SUCCESS | 0.943 s | 10 | 0 | 0 | 0 |
+| Agent Judge (parent) | SUCCESS | 0.031 s | — | — | — | — |
+| Agent Judge Core | SUCCESS | 3.838 s | 284 | 0 | 0 | 0 |
+| Agent Judge Exec | SUCCESS | 1.499 s | 40 | 0 | 0 | 0 |
+| Agent Judge File Comparison | SUCCESS | 1.391 s | 11 | 0 | 0 | 0 |
+| Agent Judge AI Core | SUCCESS | 0.996 s | 33 | 0 | 0 | 0 |
+| Agent Judge LLM | SUCCESS | 2.129 s | 13 | 0 | 0 | 0 |
+| Agent Judge Koog | SUCCESS | 1.901 s | 5 | 0 | 0 | 0 |
+| Agent Judge LangChain4j | SUCCESS | 0.920 s | 9 | 0 | 0 | 0 |
+| Agent Judge RAG | SUCCESS | 0.851 s | 18 | 0 | 0 | 0 |
+| Agent Judge AgentClient | SUCCESS | 1.906 s | 10 | 0 | 0 | 0 |
+| Agent Judge Spring AI | SUCCESS | 0.920 s | 10 | 0 | 0 | 0 |
 | **Aggregate** | | | **433** | **0** | **0** | **0** |
 
 #### JaCoCo — agent-judge-core

@@ -84,9 +84,9 @@ air-gapped use without requiring evaluation data to leave the environment.
 
 ## Architecture Principle
 
-Framework-neutral does not mean dependency-free. The core currently uses general-purpose JSON,
-logging, and optional reactive libraries, but it has no dependency on an agent framework or model
-provider. The durable boundary is framework independence, not a dependency-count slogan.
+Framework-neutral does not mean dependency-free. The core currently uses general-purpose JSON and
+logging libraries, but it has no dependency on an agent framework or model provider. The durable
+boundary is framework independence, not a dependency-count slogan.
 
     Spring AI     LangChain4j     Koog     AgentClient     Custom runtime
         \              |           |           /               /
