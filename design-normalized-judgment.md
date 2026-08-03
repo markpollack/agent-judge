@@ -1,6 +1,6 @@
 # Design proposal — normalized `Judgment` API
 
-> **Status**: **all eight decisions resolved; contract-hardening review applied — cleared for implementation**
+> **Status**: **implemented through the core checkpoint; full-reactor verification and consumer handoff pending**
 > **Date**: 2026-08-03
 > **Revision**: r6. r3 incorporated the design review's six contract-hardening points (constructor
 > invariants, stable evidence keys, corrected removal count, cascade reconciliation, qualified
@@ -18,8 +18,32 @@
 > where marked **[DELTA]**; adopts it unchanged everywhere else
 > **Evidence base**: `ddd-review.md` (this repo) and
 > `agent-judge-core/src/test/java/io/github/markpollack/judge/jury/VotingStrategyCharacterizationTest.java`
-> (35 characterization cases — 16 `INTENDED`, 19 `DEFECT` — all green against current `main`; current behaviour
-> is pinned except for `Majority`'s default `ErrorPolicy`, an uncovered gap identified in §7)
+> (36 characterization cases — 16 `INTENDED`, 19 `DEFECT`, 1 `BASELINE` — preserved before
+> migration in a5b15f8 and migrated in dc6ca2d)
+
+---
+
+## Implementation checkpoint — 2026-08-03
+
+The design is no longer awaiting implementation.
+
+- **49a6c73** committed this design and the DDD review.
+- **a5b15f8** preserved the pre-change characterization baseline, including the previously uncovered
+  default-`ErrorPolicy` behavior.
+- **dc6ca2d** replaced the Score hierarchy, migrated the producers and strategies, and updated the
+  core tests to demonstrate the intended semantic distinctions.
+- A clean `agent-judge-core` test run completed with **282 tests and 0 failures**.
+- All modules reached main and test compilation at that checkpoint.
+
+Still pending:
+
+1. Full clean Maven-reactor verification, including every downstream module suite.
+2. The 80% line / 75% branch JaCoCo gate.
+3. A written consumer migration handoff for `agent-workflow` and other consumers.
+4. Final on-disk completion status after those gates pass.
+
+The active execution plan is [roadmap.md](roadmap.md). The Phase 0 section below is retained as the
+historical verification protocol that produced a5b15f8; it is complete and must not be repeated.
 
 ---
 
@@ -846,26 +870,24 @@ Per handoff §7, plus what the DDD review added:
   **one `INTENDED` case flips (`emptyWeightsDelegate`), and one newly characterized current behaviour
   deliberately changes (`Majority`'s default error policy).**
 
-### Phase 0 — establish the baseline before any production change
+### Phase 0 — COMPLETE: baseline established before production change
 
-The implementation order must not place the missing characterization case after the value model and
-strategies have been replaced. A test written against code that has already changed proves only that
-the new code agrees with itself. Phase 0 therefore runs **first**, against untouched production code:
+This protocol was executed against untouched production code and preserved in **a5b15f8** before the
+migration in **dc6ca2d**:
 
 1. Add a case exercising `new MajorityVotingStrategy()` — the **default** constructor — with an
    `ERROR` judgment among the inputs.
 2. Assert that current `main` produces `FAIL`, demonstrating the implicit `TREAT_AS_FAIL` default.
 3. Run it green against the unmodified implementation.
 4. **Preserve that checkpoint in its own commit**, before deleting any score type or touching any
-   strategy. `VotingStrategyCharacterizationTest.java` is currently *untracked*, so the claimed
-   baseline is not yet part of the repository at all — Phase 0 is what makes it real.
+   strategy. Completed in a5b15f8.
 5. Only then begin the migration. After the default changes, flip the assertion to `ERROR`.
 
 **Label it `BASELINE`, not `INTENDED`.** The existing behaviour is demonstrable but there is no
 evidence it was deliberately chosen — no test, no Javadoc, and a constructor comment that says merely
 "safest default". Marking it `INTENDED` would assert a design intent nobody recorded.
 
-This makes a third marker and a 36th case:
+This created a third marker and a 36th case:
 
 | Marker | Cases | Meaning |
 |---|---|---|
