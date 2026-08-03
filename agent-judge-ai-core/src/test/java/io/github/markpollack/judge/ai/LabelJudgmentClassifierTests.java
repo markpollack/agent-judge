@@ -48,13 +48,33 @@ class LabelJudgmentClassifierTests {
 	}
 
 	@Test
-	void categoricalScoreOnMatch() {
+	void matchRecordsTheLabelAndNoScore() {
 		var classifier = LabelJudgmentClassifier.passFail("good", "bad");
 
 		Judgment judgment = classifier.classify(response("good"));
 
-				double score = judgment.score();
-		assertThat(score.value()).isEqualTo("good");
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(judgment.label()).isEqualTo("good");
+		assertThat(judgment.score()).isNull();
+	}
+
+	/**
+	 * A label is not implicitly a number. It acquires one only where the classifier that owns
+	 * the vocabulary declares it, which is the contrast this pair pins.
+	 */
+	@Test
+	void declaredNumericMeaningIsRecordedAlongsideTheLabel() {
+		var classifier = LabelJudgmentClassifier.builder()
+			.pass("excellent", 1.0)
+			.pass("good", 0.6)
+			.fail("poor", 0.0)
+			.build();
+
+		Judgment judgment = classifier.classify(response("good"));
+
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(judgment.label()).isEqualTo("good");
+		assertThat(judgment.score()).isEqualTo(0.6);
 	}
 
 	@Test

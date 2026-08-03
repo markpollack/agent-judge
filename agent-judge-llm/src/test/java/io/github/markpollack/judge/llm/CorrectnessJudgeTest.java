@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -75,7 +76,10 @@ class CorrectnessJudgeTest {
 		Judgment judgment = judge.testParseResponse(response, null);
 
 		assertThat(judgment.pass()).isTrue();
-				assertThat(((BooleanScore) judgment.score()).value()).isTrue();
+		// The judge reached a Boolean verdict, so its outcome is the status. It measured
+		// nothing, so it stores no score; 1.0 is only the derived projection of PASS.
+		assertThat(judgment.score()).isNull();
+		assertThat(judgment.effectiveScore()).hasValue(1.0);
 		assertThat(judgment.reasoning()).contains("successfully created the file");
 	}
 
@@ -91,7 +95,11 @@ class CorrectnessJudgeTest {
 		Judgment judgment = judge.testParseResponse(response, null);
 
 		assertThat(judgment.pass()).isFalse();
-				assertThat(((BooleanScore) judgment.score()).value()).isFalse();
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
+		// A completed negative finding, not an absent one: FAIL stores no score either, and
+		// 0.0 is the derived projection rather than a measurement of zero quality.
+		assertThat(judgment.score()).isNull();
+		assertThat(judgment.effectiveScore()).hasValue(0.0);
 		assertThat(judgment.reasoning()).contains("file was not created");
 	}
 

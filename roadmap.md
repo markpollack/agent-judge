@@ -163,100 +163,245 @@ repeated.
 
 ## Stage 2: Full-Reactor Verification
 
-### Step 2.0: Fresh-Session Context Load
+### Step 2.0: Fresh-Session Context Load — COMPLETE
 
 **Entry criteria**:
 
-- [ ] Work in /home/mark/projects/agent-judge
-- [ ] Confirm branch is normalized-judgment-api
-- [ ] Confirm HEAD is dc6ca2d or a documented descendant
-- [ ] Confirm the only expected untracked content is .campus/
-- [ ] Read CLAUDE.md completely
-- [ ] Read this roadmap completely
-- [ ] Read VISION.md completely
-- [ ] Read DESIGN.md completely
-- [ ] Read vision-design-review.md completely
-- [ ] Read design-normalized-judgment.md completely
-- [ ] Read ddd-review.md completely
-- [ ] Read the full dc6ca2d commit message
-- [ ] Inspect the dc6ca2d diff at least by module and public API
+- [x] Work in /home/mark/projects/agent-judge
+- [x] Confirm branch is normalized-judgment-api
+- [x] Confirm HEAD is dc6ca2d or a documented descendant — HEAD is 76a34ab, the documented
+      descendant that added this roadmap
+- [x] Confirm the only expected untracked content is .campus/
+- [x] Read CLAUDE.md completely
+- [x] Read this roadmap completely
+- [x] Read VISION.md completely
+- [x] Read DESIGN.md completely
+- [x] Read vision-design-review.md completely
+- [x] Read design-normalized-judgment.md completely
+- [x] Read ddd-review.md completely
+- [x] Read the full dc6ca2d commit message
+- [x] Inspect the dc6ca2d diff at least by module and public API
 
 **Work items**:
 
-- [ ] VERIFY the implementation checkpoint agrees with the design; do not assume it
-- [ ] IDENTIFY Maven profiles, test exclusions, integration requirements, and JaCoCo configuration
-- [ ] RECORD any environmental prerequisites before running the reactor
-- [ ] PRESERVE .campus/ without modification
+- [x] VERIFY the implementation checkpoint agrees with the design; do not assume it
+- [x] IDENTIFY Maven profiles, test exclusions, integration requirements, and JaCoCo configuration
+- [x] RECORD any environmental prerequisites before running the reactor
+- [x] PRESERVE .campus/ without modification
+
+**Checkpoint verification result**:
+
+`Judgment` and `JudgmentStatus` implement the normative design as written: the compact constructor
+enforces every invariant in design-normalized-judgment.md §2, `score`/`label` are refused per the
+status table, `effectiveScore()` is derived rather than stored, no `Throwable` is present,
+`AGGREGATION_KEY` is reserved against `Builder.metadata(...)`, and wire names come from stable
+explicit fields with case-sensitive parsing.
+
+One checkpoint claim does not hold. dc6ca2d and design-normalized-judgment.md both state that all
+modules reached main **and test** compilation. `agent-judge-llm` test sources still reference the
+deleted `BooleanScore` and the removed `Judgment.builder().status(...)`/`.score(Score)` API:
+
+- `agent-judge-llm/src/test/java/.../llm/LLMJudgeTest.java:117`
+- `agent-judge-llm/src/test/java/.../llm/CorrectnessJudgeTest.java:78,94`
+
+Predicted as an expected API-migration failure before the reactor run; confirmed in Step 2.1.
+
+**Build configuration inventory**:
+
+| Item | Finding |
+|---|---|
+| Reactor modules | 10, all listed in the root pom; samples/ and scripts/ are not modules |
+| Profiles | `owasp` (CVE gate), `failsafe` (integration tests), `release` (flatten/GPG/sources/javadoc) — none active by default |
+| Integration tests | No `*IT.java` sources exist; the `failsafe` profile is inert for this migration |
+| Surefire | 3.5.2, no includes/excludes/skips; passes `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` through |
+| JaCoCo | agent-judge-core only: `prepare-agent`, `report` at `test`, `check` with BUNDLE limits LINE 0.80 / BRANCH 0.75 |
+| Test-count baseline | 45 test source files: core 18, ai-core 5, exec 5, agent-client 3, koog 3, langchain4j 3, llm 3, file 2, spring-ai 2, rag 1 |
+
+**Environmental prerequisites**:
+
+- Java 21 (GraalVM CE 21.0.2) and the Maven wrapper (3.8.6) are present; `./mvnw` is used per CLAUDE.md.
+- No `SNAPSHOT` dependency other than the project's own `0.14.0-SNAPSHOT`.
+- No test declares `@EnabledIfEnvironmentVariable`, `@Disabled`, or an API-key guard, so no test is
+  silently skipped for a missing credential. Surefire's key pass-through is inert here.
+- `agent-judge-exec` tests exercise Maven build/coverage runners, so a populated `~/.m2` is needed
+  for those to run offline-clean.
 
 **Exit criteria**:
 
-- [ ] Current repository state and remaining scope are understood
-- [ ] No production or test file has been changed during context load
-- [ ] Exact full-reactor command is stated before execution
-- [ ] Update this roadmap's checkboxes
+- [x] Current repository state and remaining scope are understood
+- [x] No production or test file has been changed during context load
+- [x] Exact full-reactor command is stated before execution — `./mvnw clean verify` from the
+      repository root, per Step 2.1
+- [x] Update this roadmap's checkboxes
 
 ---
 
-### Step 2.1: Establish the Full-Reactor Result
+### Step 2.1: Establish the Full-Reactor Result — COMPLETE
 
 **Entry criteria**:
 
-- [ ] Step 2.0 complete
-- [ ] Working tree contains no new changes
+- [x] Step 2.0 complete
+- [x] Working tree contains no new changes
 
 **Work items**:
 
-- [ ] RUN from the repository root:
+- [x] RUN from the repository root:
 
       ./mvnw clean verify
 
-- [ ] DO NOT substitute an incremental build
-- [ ] CAPTURE every module's test count, failures, errors, and skipped tests
-- [ ] CAPTURE the JaCoCo line and branch result for agent-judge-core
-- [ ] CLASSIFY every failure before editing:
-  - expected API migration;
-  - expected DELTA semantic change;
-  - unexpected regression;
-  - environmental or integration failure;
-  - flaky or nondeterministic failure.
-- [ ] VERIFY the build actually executed downstream modules rather than stopping or skipping them
+- [x] DO NOT substitute an incremental build
+- [x] CAPTURE every module's test count, failures, errors, and skipped tests
+- [x] CAPTURE the JaCoCo line and branch result for agent-judge-core
+- [x] CLASSIFY every failure before editing
+- [x] VERIFY the build actually executed downstream modules rather than stopping or skipping them
+
+#### Run 1 — `./mvnw clean verify` (authoritative gate)
+
+**BUILD FAILURE.** Total time 5.833 s.
+
+| Module | Result | Tests |
+|---|---|---|
+| Agent Judge (parent) | SUCCESS | — |
+| Agent Judge Core | SUCCESS | 282 run, 0 failures, 0 errors, 0 skipped |
+| Agent Judge Exec | **FAILURE** | 38 run, 2 failures, 0 errors, 0 skipped |
+| File, AI Core, LLM, Koog, LangChain4j, RAG, AgentClient, Spring AI | SKIPPED | not executed |
+
+JaCoCo on agent-judge-core: bundle analyzed with 39 classes, `All coverage checks have been met`
+against LINE 0.80 / BRANCH 0.75.
+
+Default fail-fast stopped the reactor at the third module, so run 1 alone does not satisfy "the
+build actually executed downstream modules". A second run was therefore made for classification
+visibility only.
+
+#### Run 2 — `./mvnw clean verify -fae` (classification visibility)
+
+**BUILD FAILURE.** Total time 10.649 s.
+
+| Module | Result | Tests |
+|---|---|---|
+| Agent Judge (parent) | SUCCESS | — |
+| Agent Judge Core | SUCCESS | 282 run, 0 failures, 0 errors, 0 skipped |
+| Agent Judge Exec | **FAILURE** | 38 run, 2 failures, 0 errors, 0 skipped |
+| Agent Judge File Comparison | SUCCESS | 11 run, 0 failures, 0 errors, 0 skipped |
+| Agent Judge AI Core | **FAILURE** | test compilation failed; no tests run |
+| Agent Judge LLM | SKIPPED | banned after the AI Core failure |
+| Agent Judge Koog | SUCCESS | 5 run, 0 failures, 0 errors, 0 skipped |
+| Agent Judge LangChain4j | SUCCESS | 9 run, 0 failures, 0 errors, 0 skipped |
+| Agent Judge RAG | SKIPPED | depends on the banned LLM module |
+| Agent Judge AgentClient | SKIPPED | depends on the failed AI Core module |
+| Agent Judge Spring AI | SUCCESS | 10 run, 0 failures, 0 errors, 0 skipped |
+
+Executed total across both runs: 355 tests, 2 failures, 0 errors, 0 skipped. Three modules — LLM,
+RAG, AgentClient — have still never executed a test suite on this branch. That gap is closed in
+Step 2.4, not here.
+
+#### Failure classification
+
+Every failure below is supported by test output plus source inspection of the production code it
+covers. None was dismissed for merely resembling the migration.
+
+**F1 — `CoveragePreservationJudgeTest.noReportReturnsFail:87`** — `expected: FAIL but was: ABSTAIN`.
+*Expected DELTA semantic change.* design-normalized-judgment.md [DELTA-4a] decided that a missing
+JaCoCo report is `ABSTAIN`: absence of a report is not a completed negative finding about coverage.
+`CoveragePreservationJudge.java:85` implements that decision correctly. The test still pins the
+pre-migration behavior; [DELTA-4a] names this exact test as one that flips and is renamed to
+`noReportReturnsAbstain`. dc6ca2d did not touch this test file at all.
+
+**F2 — `CoverageImprovementJudgeTest.noReportReturnsFail:105`** — `expected: FAIL but was: ABSTAIN`.
+*Expected DELTA semantic change.* Identical to F1, against `CoverageImprovementJudge.java:109`.
+dc6ca2d edited this file but left this test method unmigrated.
+
+**F3 — `agent-judge-ai-core` test compilation:
+`LabelJudgmentClassifierTests.java:[57,33] double cannot be dereferenced`.**
+*Expected API migration, applied incorrectly at the checkpoint.* The method `categoricalScoreOnMatch`
+previously read `((CategoricalScore) judgment.score()).value()`. dc6ca2d rewrote the declaration to
+`double score = judgment.score();` but left the following line calling `score.value()` on a
+primitive. Beyond not compiling, the assertion is now semantically wrong: under [DELTA-6] a label is
+not a score, and `LabelJudgmentClassifier.passFail(...)` declares no numeric mapping, so a matching
+classification carries a label and **no** score.
+
+**F4 — `agent-judge-llm` test sources reference deleted types.** *Expected API migration; predicted
+from source, not yet executed.* `LLMJudgeTest.java:115-117` calls the removed
+`Judgment.builder().status(...).score(new BooleanScore(true))`, and
+`CorrectnessJudgeTest.java:78,94` cast `judgment.score()` to `BooleanScore`. `BooleanScore` no
+longer exists and the builder has no public `status(...)` or `score(...)`. This module will fail
+test compilation as soon as AI Core stops blocking it. It also falsifies the dc6ca2d and
+design-normalized-judgment.md claim that all modules reached main **and test** compilation.
+
+**F5 — `agent-judge-rag` and `agent-judge-agent-client` never executed.** *Not a failure; blocked
+transitively.* RAG depends on LLM, AgentClient on AI Core. A source scan for removed API
+(`Score` and its subtypes, `ScoreType`, `Scores`, `Judgment.builder().status/.score`, builder
+`reasoning(...)`, `Judgment.error(String, Throwable)`, `Judgment.error()`) finds no hit in either
+module, so neither is predicted to fail. Prediction only — their suites must actually run in
+Step 2.4.
+
+No failure classified as an unexpected regression, an environmental or integration failure, or a
+flaky or nondeterministic failure. Both runs produced identical failures, so nothing observed is
+order- or timing-dependent.
 
 **Exit criteria**:
 
-- [ ] A complete reactor result exists
-- [ ] Every failure has a classification supported by test output and source inspection
-- [ ] No failure has been dismissed solely because it appears related to the migration
-- [ ] Update this roadmap's checkboxes
+- [x] A complete reactor result exists — for the eight modules that executed; the three blocked
+      modules are recorded above as unexecuted rather than counted as passing
+- [x] Every failure has a classification supported by test output and source inspection
+- [x] No failure has been dismissed solely because it appears related to the migration
+- [x] Update this roadmap's checkboxes
 
 ---
 
-### Step 2.2: Repair Downstream Consequences
+### Step 2.2: Repair Downstream Consequences — COMPLETE
 
 **Entry criteria**:
 
-- [ ] Step 2.1 complete
-- [ ] Every observed failure is classified
+- [x] Step 2.1 complete
+- [x] Every observed failure is classified
 
 **Work items**:
 
-- [ ] UPDATE downstream tests to assert settled semantics, not merely new constants
-- [ ] UPDATE production code only where the settled contract requires it
-- [ ] ADD contrast cases when an old test collapsed two domain outcomes
-- [ ] PRESERVE FAIL as a completed negative finding
-- [ ] PRESERVE ERROR as inability to complete because of an execution error
-- [ ] PRESERVE ABSTAIN as no applicable finding
-- [ ] VERIFY CascadedJury policies still read individual judgments where designed
-- [ ] VERIFY provider bridge tests do not manufacture scores for status-only judgments
-- [ ] RUN focused clean module tests after each repair
-- [ ] COMMIT a coherent downstream repair only after its exit criteria pass
+- [x] UPDATE downstream tests to assert settled semantics, not merely new constants
+- [x] UPDATE production code only where the settled contract requires it — **no production change
+      was required.** Every repair was to test code. In all four cases the production code already
+      implemented the settled contract and the test still pinned pre-migration behavior.
+- [x] ADD contrast cases when an old test collapsed two domain outcomes
+- [x] PRESERVE FAIL as a completed negative finding
+- [x] PRESERVE ERROR as inability to complete because of an execution error
+- [x] PRESERVE ABSTAIN as no applicable finding
+- [x] VERIFY CascadedJury policies still read individual judgments where designed
+- [x] VERIFY provider bridge tests do not manufacture scores for status-only judgments
+- [x] RUN focused clean module tests after each repair
+- [x] COMMIT a coherent downstream repair only after its exit criteria pass
+
+**Repairs applied**:
+
+| Failure | Repair | Domain distinction now asserted |
+|---|---|---|
+| F1 | `CoveragePreservationJudgeTest.noReportReturnsFail` renamed to `noReportReturnsAbstain`, asserting `ABSTAIN` | plus new `missingReportAbstainsWhereMeasuredDropFails`: no measurement versus a measured drop past threshold |
+| F2 | `CoverageImprovementJudgeTest.noReportReturnsFail` renamed to `noReportReturnsAbstain`, asserting `ABSTAIN` | plus new `missingReportAbstainsWithoutScoreWhereMeasuredRegressionFailsAtZero`: absent score versus a measured zero |
+| F3 | `LabelJudgmentClassifierTests.categoricalScoreOnMatch` replaced by `matchRecordsTheLabelAndNoScore` | plus new `declaredNumericMeaningIsRecordedAlongsideTheLabel`: a label is a number only under a declared policy, per [DELTA-6] |
+| F4 | `LLMJudgeTest.TestLLMJudge.parseResponse` now uses `Judgment.passing()`; `CorrectnessJudgeTest` structured YES/NO cases assert stored score absent and `effectiveScore()` projecting 1.0/0.0 | a Boolean verdict's outcome is its status; the numeric view is derived, never a measurement |
+
+The two coverage contrast cases are the executable form of [DELTA-4a]; the classifier pair is the
+executable form of [DELTA-6]; the `CorrectnessJudge` pair discharges the "bridges must not
+manufacture scores for status-only judgments" check on the module that actually produces them.
+
+`CascadedJury` was verified by inspection and by its passing suite: `hasAnyFail` and `allPassed`
+still read `tierVerdict.individual()`, so tier escalation continues to read individual judgments
+rather than the aggregate, exactly as [DELTA-2] requires.
+
+**Focused clean run** — `./mvnw clean test -pl agent-judge-exec,agent-judge-ai-core,agent-judge-llm -am`:
+BUILD SUCCESS. Core 282, Exec 40, AI Core 33, LLM 13; 0 failures, 0 errors, 0 skipped.
+
+**Full clean reactor** — `./mvnw clean verify`: BUILD SUCCESS, all 11 modules, 16.196 s. This is the
+first execution of the LLM, RAG, and AgentClient suites on this branch; all three pass. Detailed
+totals are recorded in Step 2.4.
 
 **Exit criteria**:
 
-- [ ] All downstream module suites pass in focused clean runs
-- [ ] No test merely duplicates implementation without asserting a domain distinction
-- [ ] No settled design decision has been reopened without a written, evidenced contradiction
-- [ ] Update this roadmap's checkboxes
-- [ ] COMMIT if production or test changes were required
+- [x] All downstream module suites pass in focused clean runs
+- [x] No test merely duplicates implementation without asserting a domain distinction
+- [x] No settled design decision has been reopened without a written, evidenced contradiction
+- [x] Update this roadmap's checkboxes
+- [x] COMMIT if production or test changes were required
 
 ---
 

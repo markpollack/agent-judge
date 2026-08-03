@@ -112,11 +112,7 @@ class LLMJudgeTest {
 
 		@Override
 		protected Judgment parseResponse(String response, JudgmentContext context) {
-			return Judgment.builder()
-				.status(JudgmentStatus.PASS)
-				.score(new BooleanScore(true))
-				.because("Parsed from LLM: " + response)
-				.build();
+			return Judgment.passing().because("Parsed from LLM: " + response).build();
 		}
 
 	}
