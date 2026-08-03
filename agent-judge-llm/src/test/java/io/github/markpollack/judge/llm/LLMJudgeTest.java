@@ -23,7 +23,6 @@ import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 import org.springframework.ai.chat.client.ChatClient;
 
 import java.nio.file.Path;
@@ -116,7 +115,7 @@ class LLMJudgeTest {
 			return Judgment.builder()
 				.status(JudgmentStatus.PASS)
 				.score(new BooleanScore(true))
-				.reasoning("Parsed from LLM: " + response)
+				.because("Parsed from LLM: " + response)
 				.build();
 		}
 

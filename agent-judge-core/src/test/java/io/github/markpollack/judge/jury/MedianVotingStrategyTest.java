@@ -19,7 +19,6 @@ package io.github.markpollack.judge.jury;
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.NumericalScore;
 
 import java.util.List;
 import java.util.Map;
@@ -46,9 +45,8 @@ class MedianVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(result.score()).isInstanceOf(NumericalScore.class);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.7);
+				double score = result.score();
+		assertThat(score).isEqualTo(0.7);
 	}
 
 	@Test
@@ -64,8 +62,8 @@ class MedianVotingStrategyTest {
 
 		// Median of even count: (0.5 + 0.7) / 2 = 0.6
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.6);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.6);
 	}
 
 	@Test
@@ -78,8 +76,8 @@ class MedianVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		// After sorting: [0.3, 0.7, 0.9] → median = 0.7
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.7);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.7);
 	}
 
 	@Test
@@ -95,12 +93,12 @@ class MedianVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		// Sorted: [0.0, 0.5, 0.6, 1.0] → median = (0.5 + 0.6) / 2 = 0.55
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isCloseTo(0.55, org.assertj.core.data.Offset.offset(0.01));
+		double score = result.score();
+		assertThat(score).isCloseTo(0.55, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test
-	void shouldHandleBooleanScores() {
+	void shouldHandleBooleanVerdicts() {
 		MedianVotingStrategy strategy = new MedianVotingStrategy();
 
 		List<Judgment> judgments = List.of(booleanFail("Judge 1"), // 0.0
@@ -111,8 +109,8 @@ class MedianVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		// Sorted: [0.0, 1.0, 1.0] → median = 1.0
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(1.0);
+		double score = result.score();
+		assertThat(score).isEqualTo(1.0);
 	}
 
 	@Test
@@ -126,8 +124,8 @@ class MedianVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		// Sorted: [0.0, 0.6, 1.0] → median = 0.6
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.6);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.6);
 	}
 
 	@Test
@@ -140,8 +138,8 @@ class MedianVotingStrategyTest {
 
 		// Median = 0.3 < 0.5 → FAIL
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.3);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.3);
 	}
 
 	@Test
@@ -154,8 +152,8 @@ class MedianVotingStrategyTest {
 
 		// Median = 0.5 >= 0.5 → PASS
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.5);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.5);
 	}
 
 	@Test
@@ -170,8 +168,8 @@ class MedianVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, weights);
 
 		// Median calculation ignores weights → 0.7
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.7);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.7);
 	}
 
 	// ==================== Edge Cases ====================
@@ -198,8 +196,8 @@ class MedianVotingStrategyTest {
 		Judgment result = strategy.aggregate(List.of(passJudgment(0.8)), Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.8);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.8);
 	}
 
 	@Test
@@ -211,8 +209,8 @@ class MedianVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		// Even count: (0.4 + 0.8) / 2 = 0.6
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isCloseTo(0.6, org.assertj.core.data.Offset.offset(0.01));
+		double score = result.score();
+		assertThat(score).isCloseTo(0.6, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test
@@ -223,34 +221,41 @@ class MedianVotingStrategyTest {
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.7);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.7);
 	}
 
 	@Test
 	void shouldHandleNullScoresAsZero() {
 		MedianVotingStrategy strategy = new MedianVotingStrategy();
 
-		List<Judgment> judgments = List.of(passJudgment(0.8), Judgment.abstain("Cannot evaluate"), // null
-																									// score
-																									// →
-																									// 0.0
-				passJudgment(0.6));
+		List<Judgment> judgments = List.of(passJudgment(0.8), Judgment.abstain("Cannot evaluate"), passJudgment(0.6));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// Sorted: [0.0, 0.6, 0.8] → median = 0.6
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.6);
+		// DELTA-1: the abstention does not sort into the sample as a zero. The median is
+		// over {0.6, 0.8} = 0.70, not over {0.0, 0.6, 0.8} = 0.60.
+		assertThat(result.score()).isCloseTo(0.70, org.assertj.core.data.Offset.offset(1e-9));
+		assertThat(evidence(result)).containsEntry(AggregationEvidence.ELIGIBLE_COUNT, 2);
 	}
 
 	// ==================== Metadata Tests ====================
 
 	@Test
-	void shouldReturnCorrectName() {
+	void nameIsTheStableTokenUsedInEvidence() {
 		MedianVotingStrategy strategy = new MedianVotingStrategy();
 
-		assertThat(strategy.getName()).isEqualTo("MedianVoting");
+		// DELTA-3: names are stable lower-camel-case tokens, so the identifier used in
+		// diagnostics is the same one recorded in the aggregation evidence.
+		assertThat(strategy.getName()).isEqualTo("median");
+		assertThat(evidence(strategy.aggregate(List.of(passJudgment(0.8)), Map.of())))
+			.containsEntry(AggregationEvidence.STRATEGY, "median");
+	}
+
+
+	@SuppressWarnings("unchecked")
+	private static Map<String, Object> evidence(Judgment judgment) {
+		return (Map<String, Object>) judgment.metadata().get(Judgment.AGGREGATION_KEY);
 	}
 
 }

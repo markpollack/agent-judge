@@ -16,32 +16,37 @@
 
 package io.github.markpollack.judge.jury;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
-import io.github.markpollack.judge.score.NumericalScore;
-import io.github.markpollack.judge.score.Score;
-
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
+import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
+
 /**
- * Majority voting strategy for boolean judgments.
+ * Majority voting strategy: the outcome held by most applicable judges wins.
  *
  * <p>
- * Counts the number of passing vs failing judgments and returns the majority verdict.
- * Supports both boolean and numerical scores (numerical scores are converted to boolean
- * using a threshold of 0.5).
+ * A status-counting strategy. It reads {@link Judgment#status()}, the outcome of record,
+ * and does not consult scores — a judge that passed casts one pass vote regardless of how
+ * confidently it passed.
  * </p>
  *
  * <p>
- * Handles edge cases via configurable policies:
+ * Edge cases are governed by explicit policies rather than buried conditionals:
  * </p>
  * <ul>
- * <li>Ties: Resolved using TiePolicy (default: FAIL)</li>
- * <li>Errors: Handled using ErrorPolicy (default: TREAT_AS_FAIL)</li>
- * <li>All ABSTAIN: Returns ABSTAIN status</li>
+ * <li>Ties: resolved by {@link TiePolicy} (default {@code FAIL}).</li>
+ * <li>Errors: resolved by {@link ErrorPolicy} (default {@code PROPAGATE}).</li>
+ * <li>Abstentions: excluded — a judge that does not apply casts no vote.</li>
+ * <li>Nothing eligible: {@code ABSTAIN}, with evidence naming the cause.</li>
  * </ul>
+ *
+ * <p>
+ * The aggregate carries no score. A majority verdict's meaning is its outcome; the vote
+ * counts are evidence and live in the {@link AggregationEvidence} block, not in a
+ * manufactured number a threshold could mistake for a quality assessment.
+ * </p>
  *
  * <p>
  * Example usage:
@@ -57,8 +62,6 @@ import java.util.Map;
  */
 public class MajorityVotingStrategy implements VotingStrategy {
 
-	private static final double THRESHOLD = 0.5;
-
 	private final TiePolicy tiePolicy;
 
 	private final ErrorPolicy errorPolicy;
@@ -67,7 +70,7 @@ public class MajorityVotingStrategy implements VotingStrategy {
 	 * Create majority voting strategy with default policies.
 	 */
 	public MajorityVotingStrategy() {
-		this(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
+		this(TiePolicy.FAIL, ErrorPolicy.PROPAGATE);
 	}
 
 	/**
@@ -82,90 +85,48 @@ public class MajorityVotingStrategy implements VotingStrategy {
 
 	@Override
 	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
-		if (judgments == null || judgments.isEmpty()) {
-			throw new IllegalArgumentException("Cannot aggregate empty judgment list");
+		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy);
+
+		if (population.propagateError()) {
+			return population.propagatedError(getName());
+		}
+		if (population.isEmpty()) {
+			return population.noResult(getName(), Map.of());
 		}
 
-		// Apply error policy first
-		List<Judgment> processedJudgments = applyErrorPolicy(judgments);
+		int passCount = (int) population.eligible().stream().filter(j -> j.status() == JudgmentStatus.PASS).count();
+		int failCount = (int) population.eligible().stream().filter(j -> j.status() == JudgmentStatus.FAIL).count();
 
-		// Check if all are abstain after policy application
-		long abstainCount = processedJudgments.stream().filter(j -> j.status() == JudgmentStatus.ABSTAIN).count();
-
-		if (abstainCount == processedJudgments.size()) {
-			return Judgment.abstain("All judges abstained or were ignored");
-		}
-
-		// Count pass/fail (excluding abstentions)
-		long passCount = processedJudgments.stream().filter(j -> j.status() == JudgmentStatus.PASS).count();
-
-		long failCount = processedJudgments.stream().filter(j -> j.status() == JudgmentStatus.FAIL).count();
-
-		// Check for tie
+		JudgmentStatus status;
+		String reasoning;
 		if (passCount == failCount) {
-			return applyTiePolicy(passCount, failCount);
+			status = switch (this.tiePolicy) {
+				case PASS -> JudgmentStatus.PASS;
+				case FAIL -> JudgmentStatus.FAIL;
+				case ABSTAIN -> JudgmentStatus.ABSTAIN;
+			};
+			reasoning = String.format("Tie vote: %d passed, %d failed (tie resolved as %s)", passCount, failCount,
+					this.tiePolicy.name().toLowerCase(Locale.ROOT));
+		}
+		else {
+			boolean majorityPass = passCount > failCount;
+			status = majorityPass ? JudgmentStatus.PASS : JudgmentStatus.FAIL;
+			reasoning = String.format("Majority vote: %d passed, %d failed (majority %s)", passCount, failCount,
+					majorityPass ? "pass" : "fail");
 		}
 
-		// Determine majority
-		boolean majorityPass = passCount > failCount;
-		JudgmentStatus status = majorityPass ? JudgmentStatus.PASS : JudgmentStatus.FAIL;
-
-		String reasoning = String.format("Majority vote: %d passed, %d failed (majority %s)", passCount, failCount,
-				majorityPass ? "pass" : "fail");
-
-		return Judgment.builder().score(new BooleanScore(majorityPass)).status(status).reasoning(reasoning).build();
+		return Judgment.withStatus(status)
+			.because(reasoning)
+			.aggregationEvidence(population.evidence(getName())
+				.put(AggregationEvidence.PASS_COUNT, passCount)
+				.put(AggregationEvidence.FAIL_COUNT, failCount)
+				.build())
+			.build();
 	}
 
 	@Override
 	public String getName() {
 		return "majority";
-	}
-
-	/**
-	 * Apply error policy to judgments.
-	 * @param judgments original judgments
-	 * @return processed judgments with error policy applied
-	 */
-	private List<Judgment> applyErrorPolicy(List<Judgment> judgments) {
-		return judgments.stream().map(j -> {
-			if (j.status() == JudgmentStatus.ERROR) {
-				return switch (errorPolicy) {
-					case TREAT_AS_FAIL -> Judgment.fail("Error treated as failure: " + j.reasoning());
-					case TREAT_AS_ABSTAIN -> Judgment.abstain("Error treated as abstention: " + j.reasoning());
-					case IGNORE -> Judgment.abstain("Error ignored: " + j.reasoning());
-				};
-			}
-			return j;
-		}).toList();
-	}
-
-	/**
-	 * Apply tie policy when vote counts are equal.
-	 * @param passCount number of passing votes
-	 * @param failCount number of failing votes
-	 * @return judgment based on tie policy
-	 */
-	private Judgment applyTiePolicy(long passCount, long failCount) {
-		String reasoning = String.format("Tie vote: %d passed, %d failed (tie resolved as %s)", passCount, failCount,
-				tiePolicy.name().toLowerCase());
-
-		return switch (tiePolicy) {
-			case PASS -> Judgment.builder()
-				.score(new BooleanScore(true))
-				.status(JudgmentStatus.PASS)
-				.reasoning(reasoning)
-				.build();
-			case FAIL -> Judgment.builder()
-				.score(new BooleanScore(false))
-				.status(JudgmentStatus.FAIL)
-				.reasoning(reasoning)
-				.build();
-			case ABSTAIN -> Judgment.builder()
-				.score(new BooleanScore(false))
-				.status(JudgmentStatus.ABSTAIN)
-				.reasoning(reasoning)
-				.build();
-		};
 	}
 
 }

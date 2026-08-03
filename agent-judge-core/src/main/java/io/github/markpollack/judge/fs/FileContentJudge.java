@@ -22,11 +22,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 
 /**
  * Judge that verifies file content matches expected criteria.
@@ -68,6 +69,8 @@ import io.github.markpollack.judge.score.BooleanScore;
  */
 public class FileContentJudge extends DeterministicJudge {
 
+	private static final Logger logger = LoggerFactory.getLogger(FileContentJudge.class);
+
 	private final String filePath;
 
 	private final String expectedContent;
@@ -90,28 +93,25 @@ public class FileContentJudge extends DeterministicJudge {
 	public Judgment judge(JudgmentContext context) {
 		Path targetFile = context.workspace().resolve(filePath);
 
-		// Check file exists
+		// A missing file is a completed evaluation with a negative result: FAIL.
 		if (!Files.exists(targetFile)) {
-			return Judgment.builder()
-				.score(new BooleanScore(false))
-				.status(JudgmentStatus.FAIL)
-				.reasoning(String.format("File not found at %s", filePath))
-				.check(Check.fail("file_exists", "File not found: " + filePath))
+			return Judgment.failing()
+				.because(String.format("File not found at %s", filePath))
+				.withCheck(Check.fail("file_exists", "File not found: " + filePath))
 				.build();
 		}
 
-		// Read content
+		// An unreadable file means the judge could not evaluate at all: ERROR, not FAIL.
 		String actualContent;
 		try {
 			actualContent = Files.readString(targetFile);
 		}
-		catch (Exception e) {
-			return Judgment.builder()
-				.score(new BooleanScore(false))
-				.status(JudgmentStatus.FAIL)
-				.reasoning(String.format("Failed to read file: %s", e.getMessage()))
-				.check(Check.pass("file_exists", "File exists"))
-				.check(Check.fail("file_readable", "Failed to read: " + e.getMessage()))
+		catch (Exception ex) {
+			logger.error("Failed to read file {}", targetFile, ex);
+			return Judgment.erroring()
+				.because(String.format("Failed to read file: %s", ex.getMessage()))
+				.withCheck(Check.pass("file_exists", "File exists"))
+				.withCheck(Check.fail("file_readable", "Failed to read: " + ex.getMessage()))
 				.build();
 		}
 
@@ -122,14 +122,12 @@ public class FileContentJudge extends DeterministicJudge {
 			case REGEX -> Pattern.compile(expectedContent).matcher(actualContent).find();
 		};
 
-		return Judgment.builder()
-			.score(new BooleanScore(matches))
-			.status(matches ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-			.reasoning(matches ? String.format("Content %s matches in %s", matchMode.name().toLowerCase(), filePath)
+		return Judgment.verdict(matches)
+			.because(matches ? String.format("Content %s matches in %s", matchMode.name().toLowerCase(), filePath)
 					: String.format("Content does not %s match in %s", matchMode.name().toLowerCase(), filePath))
-			.check(Check.pass("file_exists", "File found"))
-			.check(Check.pass("file_readable", "File readable"))
-			.check(matches ? Check.pass("content_match", String.format("%s match successful", matchMode))
+			.withCheck(Check.pass("file_exists", "File found"))
+			.withCheck(Check.pass("file_readable", "File readable"))
+			.withCheck(matches ? Check.pass("content_match", String.format("%s match successful", matchMode))
 					: Check.fail("content_match", String.format("%s match failed", matchMode)))
 			.build();
 	}

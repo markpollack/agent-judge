@@ -19,7 +19,6 @@ package io.github.markpollack.judge.jury;
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.NumericalScore;
 
 import java.util.List;
 import java.util.Map;
@@ -45,9 +44,8 @@ class AverageVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(result.score()).isInstanceOf(NumericalScore.class);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isCloseTo(0.7, org.assertj.core.data.Offset.offset(0.01)); // (0.8
+				double score = result.score();
+		assertThat(score).isCloseTo(0.7, org.assertj.core.data.Offset.offset(0.01)); // (0.8
 																									// +
 																									// 0.7
 																									// +
@@ -66,9 +64,8 @@ class AverageVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(result.score()).isInstanceOf(NumericalScore.class);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isCloseTo(0.2, org.assertj.core.data.Offset.offset(0.01)); // (0.3
+				double score = result.score();
+		assertThat(score).isCloseTo(0.2, org.assertj.core.data.Offset.offset(0.01)); // (0.3
 																									// +
 																									// 0.2
 																									// +
@@ -91,8 +88,8 @@ class AverageVotingStrategyTest {
 
 		// (1.0 + 0.0 + 1.0) / 3 = 0.67 > 0.5 → PASS
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isCloseTo(0.67, org.assertj.core.data.Offset.offset(0.01));
+		double score = result.score();
+		assertThat(score).isCloseTo(0.67, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test
@@ -108,8 +105,8 @@ class AverageVotingStrategyTest {
 
 		// (1.0 + 0.6 + 0.0) / 3 = 0.53 > 0.5 → PASS
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isCloseTo(0.53, org.assertj.core.data.Offset.offset(0.01));
+		double score = result.score();
+		assertThat(score).isCloseTo(0.53, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test
@@ -125,25 +122,26 @@ class AverageVotingStrategyTest {
 
 		// (1.0 + 0.0) / 2 = 0.5 >= 0.5 → PASS
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.5);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.5);
 	}
 
 	@Test
 	void shouldHandleNullScoreAsZero() {
 		AverageVotingStrategy strategy = new AverageVotingStrategy();
 
-		// Create judgments with null scores (ABSTAIN/ERROR status)
-		List<Judgment> judgments = List.of(passJudgment(0.8), Judgment.abstain("Cannot evaluate"), // null
-																									// score
-																									// →
-																									// 0.0
-				passJudgment(0.6));
+		List<Judgment> judgments = List.of(passJudgment(0.8), Judgment.abstain("Cannot evaluate"), passJudgment(0.6));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// (0.8 + 0.0 + 0.6) / 3 = 0.47 < 0.5 → FAIL
-		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
+		// DELTA-1: the abstention leaves numerator AND denominator, so the mean is over
+		// the two judges that actually assessed: (0.8 + 0.6) / 2 = 0.70.
+		// Previously it scored 0.0 and stayed in the denominator, giving 0.47 and
+		// flipping a passing pair to FAIL.
+		assertThat(result.score()).isCloseTo(0.70, org.assertj.core.data.Offset.offset(1e-9));
+		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(evidence(result)).containsEntry(AggregationEvidence.INPUT_COUNT, 3)
+			.containsEntry(AggregationEvidence.ELIGIBLE_COUNT, 2);
 	}
 
 	@Test
@@ -158,8 +156,8 @@ class AverageVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, weights);
 
 		// Simple average: (0.8 + 0.6) / 2 = 0.7 (weights ignored)
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.7);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.7);
 	}
 
 	// ==================== Edge Cases ====================
@@ -186,8 +184,8 @@ class AverageVotingStrategyTest {
 		Judgment result = strategy.aggregate(List.of(passJudgment(0.8)), Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.8);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.8);
 	}
 
 	@Test
@@ -199,8 +197,8 @@ class AverageVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.0);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.0);
 	}
 
 	@Test
@@ -212,17 +210,27 @@ class AverageVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(1.0);
+		double score = result.score();
+		assertThat(score).isEqualTo(1.0);
 	}
 
 	// ==================== Metadata Tests ====================
 
 	@Test
-	void shouldReturnCorrectName() {
+	void nameIsTheStableTokenUsedInEvidence() {
 		AverageVotingStrategy strategy = new AverageVotingStrategy();
 
-		assertThat(strategy.getName()).isEqualTo("AverageVoting");
+		// DELTA-3: names are stable lower-camel-case tokens, so the identifier used in
+		// diagnostics is the same one recorded in the aggregation evidence.
+		assertThat(strategy.getName()).isEqualTo("average");
+		assertThat(evidence(strategy.aggregate(List.of(passJudgment(0.8)), Map.of())))
+			.containsEntry(AggregationEvidence.STRATEGY, "average");
+	}
+
+
+	@SuppressWarnings("unchecked")
+	private static Map<String, Object> evidence(Judgment judgment) {
+		return (Map<String, Object>) judgment.metadata().get(Judgment.AGGREGATION_KEY);
 	}
 
 }

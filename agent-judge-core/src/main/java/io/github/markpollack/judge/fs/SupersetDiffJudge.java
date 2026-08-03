@@ -26,12 +26,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.github.markpollack.judge.DeterministicJudge;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.NumericalScore;
 
 /**
  * Judge that verifies the workspace is a file-level superset of a reference directory.
@@ -75,6 +77,8 @@ import io.github.markpollack.judge.score.NumericalScore;
  * @since 0.9.1
  */
 public class SupersetDiffJudge extends DeterministicJudge {
+
+	private static final Logger logger = LoggerFactory.getLogger(SupersetDiffJudge.class);
 
 	static final String EXPECTED_DIR_KEY = "expectedDir";
 
@@ -132,7 +136,8 @@ public class SupersetDiffJudge extends DeterministicJudge {
 			});
 		}
 		catch (IOException ex) {
-			return Judgment.error("Failed to walk reference directory: " + ex.getMessage(), ex);
+			logger.error("Failed to walk reference directory {}", expectedDir, ex);
+			return Judgment.error("Failed to walk reference directory: " + ex.getMessage());
 		}
 
 		if (checks.isEmpty()) {
@@ -144,12 +149,11 @@ public class SupersetDiffJudge extends DeterministicJudge {
 		double score = (double) passed / total;
 		boolean allMatch = passed == total;
 
-		return Judgment.builder()
-			.score(NumericalScore.normalized(score))
-			.status(allMatch ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-			.reasoning(allMatch ? String.format("All %d reference files matched", total)
+		return Judgment.scored(score)
+			.withStatus(allMatch ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
+			.because(allMatch ? String.format("All %d reference files matched", total)
 					: String.format("%d of %d reference files matched", passed, total))
-			.checks(checks)
+			.withChecks(checks)
 			.metadata(EXPECTED_DIR_KEY, expectedDir.toString())
 			.metadata("matchedFiles", passed)
 			.metadata("totalFiles", total)

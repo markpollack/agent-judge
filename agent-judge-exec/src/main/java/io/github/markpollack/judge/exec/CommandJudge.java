@@ -17,11 +17,13 @@
 package io.github.markpollack.judge.exec;
 
 import io.github.markpollack.judge.DeterministicJudge;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 import io.github.markpollack.sandbox.ExecResult;
 import io.github.markpollack.sandbox.ExecSpec;
 import io.github.markpollack.sandbox.LocalSandbox;
@@ -76,6 +78,8 @@ import java.util.function.Function;
  * @see LocalSandbox
  */
 public class CommandJudge extends DeterministicJudge {
+
+	private static final Logger logger = LoggerFactory.getLogger(CommandJudge.class);
 
 	private final String command;
 
@@ -148,21 +152,20 @@ public class CommandJudge extends DeterministicJudge {
 			String reasoning = pass ? String.format("Command succeeded with exit code %d", result.exitCode()) : String
 				.format("Command failed. Expected exit code %d but got %d", expectedExitCode, result.exitCode());
 
-			return Judgment.builder()
-				.score(new BooleanScore(pass))
-				.status(pass ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-				.reasoning(reasoning)
-				.check(pass ? Check.pass("command_execution", "Command executed successfully")
+			// The command ran; a disallowed exit code is a completed negative finding.
+			return Judgment.verdict(pass)
+				.because(reasoning)
+				.withCheck(pass ? Check.pass("command_execution", "Command executed successfully")
 						: Check.fail("command_execution", "Command execution failed"))
 				.metadata(metadata)
 				.build();
 		}
-		catch (Exception e) {
-			return Judgment.builder()
-				.score(new BooleanScore(false))
-				.status(JudgmentStatus.FAIL)
-				.reasoning("Command execution failed: " + e.getMessage())
-				.check(Check.fail("command_execution", "Execution error: " + e.getMessage()))
+		catch (Exception ex) {
+			// The command could not be run at all, so the judge reached no finding: ERROR.
+			logger.error("Command execution failed: {}", command, ex);
+			return Judgment.erroring()
+				.because("Command execution failed: " + ex.getMessage())
+				.withCheck(Check.fail("command_execution", "Execution error: " + ex.getMessage()))
 				.build();
 		}
 	}

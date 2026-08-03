@@ -26,11 +26,13 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import io.github.markpollack.judge.DeterministicJudge;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 
 /**
  * Judge that verifies compiled {@code .class} files have the expected major version.
@@ -49,6 +51,8 @@ import io.github.markpollack.judge.score.BooleanScore;
  * @since 0.9.0
  */
 public class ClassVersionJudge extends DeterministicJudge {
+
+	private static final Logger logger = LoggerFactory.getLogger(ClassVersionJudge.class);
 
 	private static final int CLASS_MAGIC = 0xCAFEBABE;
 
@@ -84,7 +88,8 @@ public class ClassVersionJudge extends DeterministicJudge {
 			classFiles = walk.filter(p -> p.toString().endsWith(".class")).toList();
 		}
 		catch (IOException ex) {
-			return Judgment.error("Failed to walk target/classes: " + ex.getMessage(), ex);
+			logger.error("Failed to walk target/classes at {}", classesDir, ex);
+			return Judgment.error("Failed to walk target/classes: " + ex.getMessage());
 		}
 
 		if (classFiles.isEmpty()) {
@@ -120,12 +125,7 @@ public class ClassVersionJudge extends DeterministicJudge {
 				: String.format("%d of %d .class files have wrong version: %s", mismatches.size(), classFiles.size(),
 						String.join(", ", mismatches));
 
-		return Judgment.builder()
-			.score(new BooleanScore(pass))
-			.status(pass ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-			.reasoning(reasoning)
-			.checks(checks)
-			.build();
+		return Judgment.verdict(pass).because(reasoning).withChecks(checks).build();
 	}
 
 	/**

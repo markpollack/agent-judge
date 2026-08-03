@@ -16,26 +16,50 @@
 
 package io.github.markpollack.judge.jury;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
-import io.github.markpollack.judge.score.NumericalScore;
-import io.github.markpollack.judge.score.Score;
-
 import java.util.List;
 import java.util.Map;
 
+import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
+
 /**
- * Consensus voting strategy requiring unanimous agreement.
+ * Consensus voting strategy: every applicable judge must reach the same verdict.
  *
  * <p>
- * All judges must agree (all pass or all fail) for the verdict to pass. If any judge
- * disagrees, the result is a failing judgment. This is the strictest voting strategy.
+ * A status-counting strategy. It reads {@link Judgment#status()}, the outcome of record.
  * </p>
  *
  * <p>
- * Boolean scores are used directly. Numerical scores are converted to boolean using a
- * threshold of 0.5.
+ * {@link JudgmentStatus#ABSTAIN} means "not applicable to this run" — it is not a vote at
+ * all, so it is excluded from the population and consensus is computed over the applicable
+ * judges. A judge added precisely because it cannot evaluate every case must not be able to
+ * break unanimity by declining.
+ * </p>
+ *
+ * <table border="1">
+ * <caption>Outcomes</caption>
+ * <tr><th>Inputs</th><th>Result</th></tr>
+ * <tr><td>all PASS</td><td>PASS</td></tr>
+ * <tr><td>all FAIL</td><td>FAIL</td></tr>
+ * <tr><td>PASS + ABSTAIN</td><td>PASS</td></tr>
+ * <tr><td>FAIL + ABSTAIN</td><td>FAIL</td></tr>
+ * <tr><td>PASS + FAIL</td><td>ABSTAIN — the applicable judges disagree</td></tr>
+ * <tr><td>all ABSTAIN</td><td>ABSTAIN</td></tr>
+ * <tr><td>any ERROR</td><td>per {@link ErrorPolicy}, default PROPAGATE</td></tr>
+ * </table>
+ *
+ * <p>
+ * Disagreement yields {@code ABSTAIN} rather than {@code FAIL}: "we could not agree" is not
+ * a finding that the subject failed. Whether disagreement <em>ought</em> to block is a
+ * downstream policy decision, and folding it into the consensus calculation would obscure
+ * the fact being computed. That is also why there is no {@code ConsensusPolicy} — consensus
+ * has a definite meaning.
+ * </p>
+ *
+ * <p>
+ * Note this is independent of {@link CascadedJury} escalation, which inspects a tier's
+ * <em>individual</em> judgments rather than its aggregate. A tier using
+ * {@link TierPolicy#ACCEPT_ON_ALL_PASS} still escalates when any judge abstains.
  * </p>
  *
  * <p>
@@ -51,56 +75,66 @@ import java.util.Map;
  */
 public class ConsensusStrategy implements VotingStrategy {
 
-	private static final double THRESHOLD = 0.5;
+	private final ErrorPolicy errorPolicy;
+
+	/**
+	 * Create a consensus strategy with the default error policy.
+	 */
+	public ConsensusStrategy() {
+		this(ErrorPolicy.PROPAGATE);
+	}
+
+	/**
+	 * Create a consensus strategy with a custom error policy.
+	 * @param errorPolicy policy for handling errors
+	 */
+	public ConsensusStrategy(ErrorPolicy errorPolicy) {
+		this.errorPolicy = errorPolicy;
+	}
 
 	@Override
 	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
-		if (judgments == null || judgments.isEmpty()) {
-			throw new IllegalArgumentException("Cannot aggregate empty judgment list");
+		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy);
+
+		if (population.propagateError()) {
+			return population.propagatedError(getName());
+		}
+		if (population.isEmpty()) {
+			return population.noResult(getName(), Map.of());
 		}
 
-		long passCount = judgments.stream().filter(j -> toBoolean(j.score())).count();
+		int eligibleCount = population.eligible().size();
+		int passCount = (int) population.eligible().stream().filter(j -> j.status() == JudgmentStatus.PASS).count();
+		int failCount = (int) population.eligible().stream().filter(j -> j.status() == JudgmentStatus.FAIL).count();
 
-		long failCount = judgments.size() - passCount;
-
-		// Consensus requires all judges to agree
-		boolean consensus = (passCount == judgments.size()) || (failCount == judgments.size());
-		boolean pass = consensus && passCount == judgments.size();
-
+		JudgmentStatus status;
 		String reasoning;
-		if (!consensus) {
-			reasoning = String.format("No consensus: %d passed, %d failed (consensus required)", passCount, failCount);
+		if (passCount == eligibleCount) {
+			status = JudgmentStatus.PASS;
+			reasoning = String.format("Unanimous consensus: all %d applicable judge(s) passed", eligibleCount);
+		}
+		else if (failCount == eligibleCount) {
+			status = JudgmentStatus.FAIL;
+			reasoning = String.format("Unanimous consensus: all %d applicable judge(s) failed", eligibleCount);
 		}
 		else {
-			reasoning = String.format("Unanimous consensus: all %d judges %s", judgments.size(),
-					pass ? "passed" : "failed");
+			status = JudgmentStatus.ABSTAIN;
+			reasoning = String.format("No consensus: %d passed, %d failed among %d applicable judge(s)", passCount,
+					failCount, eligibleCount);
 		}
 
-		return Judgment.builder()
-			.score(new BooleanScore(pass))
-			.status(pass ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-			.reasoning(reasoning)
+		return Judgment.withStatus(status)
+			.because(reasoning)
+			.aggregationEvidence(population.evidence(getName())
+				.put(AggregationEvidence.PASS_COUNT, passCount)
+				.put(AggregationEvidence.FAIL_COUNT, failCount)
+				.build())
 			.build();
 	}
 
 	@Override
 	public String getName() {
-		return "Consensus";
-	}
-
-	/**
-	 * Convert any score type to boolean.
-	 * @param score the score to convert
-	 * @return true if score represents a pass
-	 */
-	private boolean toBoolean(Score score) {
-		if (score instanceof BooleanScore bs) {
-			return bs.value();
-		}
-		else if (score instanceof NumericalScore ns) {
-			return ns.normalized() >= THRESHOLD;
-		}
-		return false;
+		return "consensus";
 	}
 
 }

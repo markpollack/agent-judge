@@ -3,11 +3,13 @@ package io.github.markpollack.judge.file;
 import io.github.markpollack.judge.file.comparator.XmlSemanticComparator;
 import io.github.markpollack.judge.file.comparator.XmlSemanticComparator.ComparisonResult;
 import io.github.markpollack.judge.DeterministicJudge;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -17,6 +19,8 @@ import java.nio.file.Path;
  * Judge that compares non-POM XML files using DOM-based semantic comparison.
  */
 public class XmlSemanticJudge extends DeterministicJudge {
+
+	private static final Logger logger = LoggerFactory.getLogger(XmlSemanticJudge.class);
 
 	private final XmlSemanticComparator comparator = new XmlSemanticComparator();
 
@@ -41,25 +45,22 @@ public class XmlSemanticJudge extends DeterministicJudge {
 			ComparisonResult result = comparator.compare(expected, actual);
 
 			if (result.equivalent()) {
-				return Judgment.builder()
-					.score(new BooleanScore(true))
-					.status(JudgmentStatus.PASS)
-					.reasoning("XML semantically matches")
-					.check(Check.pass(filePath))
+				return Judgment.verdict(true)
+					.because("XML semantically matches")
+					.withCheck(Check.pass(filePath))
 					.build();
 			}
 
 			String diff = String.join("\n", result.differences());
-			return Judgment.builder()
-				.score(new BooleanScore(false))
-				.status(JudgmentStatus.FAIL)
-				.reasoning("XML semantic differences: " + diff)
-				.check(Check.fail(filePath, diff))
+			return Judgment.verdict(false)
+				.because("XML semantic differences: " + diff)
+				.withCheck(Check.fail(filePath, diff))
 				.build();
 
 		}
 		catch (IOException e) {
-			return Judgment.error("Failed to read files: " + e.getMessage(), e);
+			logger.error("File comparison failed", e);
+			return Judgment.error("Failed to read files: " + e.getMessage());
 		}
 	}
 

@@ -5,7 +5,6 @@ import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,10 +32,8 @@ class KoogEvaluationDemoTest {
 			String output = ctx.agentOutput().orElse("");
 			boolean mentionsDI = output.toLowerCase().contains("dependencies")
 					&& output.toLowerCase().contains("external");
-			return Judgment.builder()
-				.score(new BooleanScore(mentionsDI))
-				.status(mentionsDI ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-				.reasoning(mentionsDI ? "Answer correctly describes DI" : "Answer missing key DI concepts")
+			return Judgment.verdict(mentionsDI)
+				.because(mentionsDI ? "Answer correctly describes DI" : "Answer missing key DI concepts")
 				.build();
 		};
 

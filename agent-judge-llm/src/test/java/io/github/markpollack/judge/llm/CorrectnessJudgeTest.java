@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.score.BooleanScore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -76,8 +75,7 @@ class CorrectnessJudgeTest {
 		Judgment judgment = judge.testParseResponse(response, null);
 
 		assertThat(judgment.pass()).isTrue();
-		assertThat(judgment.score()).isInstanceOf(BooleanScore.class);
-		assertThat(((BooleanScore) judgment.score()).value()).isTrue();
+				assertThat(((BooleanScore) judgment.score()).value()).isTrue();
 		assertThat(judgment.reasoning()).contains("successfully created the file");
 	}
 
@@ -93,8 +91,7 @@ class CorrectnessJudgeTest {
 		Judgment judgment = judge.testParseResponse(response, null);
 
 		assertThat(judgment.pass()).isFalse();
-		assertThat(judgment.score()).isInstanceOf(BooleanScore.class);
-		assertThat(((BooleanScore) judgment.score()).value()).isFalse();
+				assertThat(((BooleanScore) judgment.score()).value()).isFalse();
 		assertThat(judgment.reasoning()).contains("file was not created");
 	}
 

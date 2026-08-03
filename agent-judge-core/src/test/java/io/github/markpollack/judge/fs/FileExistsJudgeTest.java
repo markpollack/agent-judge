@@ -22,8 +22,6 @@ import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.score.BooleanScore;
-import io.github.markpollack.judge.score.ScoreType;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -57,9 +55,8 @@ class FileExistsJudgeTest {
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.pass()).isTrue();
-		assertThat(judgment.score()).isInstanceOf(BooleanScore.class);
-		assertThat(((BooleanScore) judgment.score()).value()).isTrue();
-		assertThat(judgment.score().type()).isEqualTo(ScoreType.BOOLEAN);
+		assertThat(judgment.score()).isNull();
+		assertThat(judgment.effectiveScore()).hasValue(1.0);
 		assertThat(judgment.reasoning()).contains("File exists");
 		assertThat(judgment.checks()).hasSize(1);
 		assertThat(judgment.checks().get(0).passed()).isTrue();
@@ -80,8 +77,7 @@ class FileExistsJudgeTest {
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.pass()).isFalse();
-		assertThat(judgment.score()).isInstanceOf(BooleanScore.class);
-		assertThat(((BooleanScore) judgment.score()).value()).isFalse();
+		assertThat(judgment.effectiveScore()).hasValue(0.0);
 		assertThat(judgment.reasoning()).contains("File not found");
 		assertThat(judgment.checks()).hasSize(1);
 		assertThat(judgment.checks().get(0).passed()).isFalse();

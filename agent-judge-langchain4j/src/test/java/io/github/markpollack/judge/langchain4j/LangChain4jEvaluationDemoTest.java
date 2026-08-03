@@ -10,7 +10,6 @@ import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,10 +26,8 @@ class LangChain4jEvaluationDemoTest {
 		Judge relevanceCheck = (JudgmentContext ctx) -> {
 			String output = ctx.agentOutput().orElse("");
 			boolean relevant = !output.isEmpty() && output.toLowerCase().contains("spring boot");
-			return Judgment.builder()
-				.score(new BooleanScore(relevant))
-				.status(relevant ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-				.reasoning(relevant ? "Answer addresses Spring Boot" : "Answer does not address Spring Boot")
+			return Judgment.verdict(relevant)
+				.because(relevant ? "Answer addresses Spring Boot" : "Answer does not address Spring Boot")
 				.build();
 		};
 
@@ -53,10 +50,8 @@ class LangChain4jEvaluationDemoTest {
 			@SuppressWarnings("unchecked")
 			List<ToolExecution> tools = (List<ToolExecution>) ctx.metadata().get("langchain4j.toolExecutions");
 			boolean hasTools = tools != null && !tools.isEmpty();
-			return Judgment.builder()
-				.score(new BooleanScore(hasTools))
-				.status(hasTools ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-				.reasoning(hasTools ? "Tool executions captured" : "No tool executions found")
+			return Judgment.verdict(hasTools)
+				.because(hasTools ? "Tool executions captured" : "No tool executions found")
 				.build();
 		};
 

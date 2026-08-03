@@ -6,7 +6,6 @@ import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.llm.LLMJudge;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 import org.springframework.ai.chat.client.ChatClient;
 
 /**
@@ -81,11 +80,7 @@ public class ContextualRelevanceJudge extends LLMJudge {
 			reasoning = response;
 		}
 
-		return Judgment.builder()
-			.score(new BooleanScore(pass))
-			.status(pass ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-			.reasoning(reasoning)
-			.build();
+		return Judgment.verdict(pass).because(reasoning).build();
 	}
 
 	private static String extractAfter(String text, String marker) {

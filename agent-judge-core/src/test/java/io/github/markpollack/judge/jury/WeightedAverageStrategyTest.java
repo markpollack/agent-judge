@@ -19,7 +19,6 @@ package io.github.markpollack.judge.jury;
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.NumericalScore;
 
 import java.util.List;
 import java.util.Map;
@@ -50,9 +49,8 @@ class WeightedAverageStrategyTest {
 
 		// (0.8 * 0.3 + 0.6 * 0.7) / (0.3 + 0.7) = (0.24 + 0.42) / 1.0 = 0.66
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(result.score()).isInstanceOf(NumericalScore.class);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isCloseTo(0.66, org.assertj.core.data.Offset.offset(0.01));
+				double score = result.score();
+		assertThat(score).isCloseTo(0.66, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test
@@ -67,8 +65,8 @@ class WeightedAverageStrategyTest {
 		Judgment result = strategy.aggregate(judgments, weights);
 
 		// (0.8 * 3.0 + 0.6 * 7.0) / (3.0 + 7.0) = (2.4 + 4.2) / 10.0 = 0.66
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isCloseTo(0.66, org.assertj.core.data.Offset.offset(0.01));
+		double score = result.score();
+		assertThat(score).isCloseTo(0.66, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test
@@ -84,8 +82,8 @@ class WeightedAverageStrategyTest {
 
 		// (0.8 * 2.0 + 0.6 * 1.0 + 0.4 * 1.0) / (2.0 + 1.0 + 1.0) = (1.6 + 0.6 + 0.4) /
 		// 4.0 = 0.65
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isCloseTo(0.65, org.assertj.core.data.Offset.offset(0.01));
+		double score = result.score();
+		assertThat(score).isCloseTo(0.65, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test
@@ -97,8 +95,8 @@ class WeightedAverageStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		// No weights → simple average: (0.8 + 0.6) / 2 = 0.7
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.7);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.7);
 	}
 
 	@Test
@@ -110,12 +108,12 @@ class WeightedAverageStrategyTest {
 		Judgment result = strategy.aggregate(judgments, null);
 
 		// Null weights → simple average
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.7);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.7);
 	}
 
 	@Test
-	void shouldHandleBooleanScores() {
+	void shouldHandleBooleanVerdicts() {
 		WeightedAverageStrategy strategy = new WeightedAverageStrategy();
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), // 1.0
@@ -127,8 +125,8 @@ class WeightedAverageStrategyTest {
 		Judgment result = strategy.aggregate(judgments, weights);
 
 		// (1.0 * 0.7 + 0.0 * 0.3) / (0.7 + 0.3) = 0.7 / 1.0 = 0.7
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.7);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.7);
 	}
 
 	@Test
@@ -143,8 +141,8 @@ class WeightedAverageStrategyTest {
 		Judgment result = strategy.aggregate(judgments, weights);
 
 		// (0.8 * 1.0 + 0.2 * 0.0) / (1.0 + 0.0) = 0.8 / 1.0 = 0.8
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.8);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.8);
 	}
 
 	@Test
@@ -161,8 +159,8 @@ class WeightedAverageStrategyTest {
 
 		// (0.8 * 0.2 + 0.2 * 0.8) / (0.2 + 0.8) = (0.16 + 0.16) / 1.0 = 0.32 < 0.5
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isCloseTo(0.32, org.assertj.core.data.Offset.offset(0.01));
+		double score = result.score();
+		assertThat(score).isCloseTo(0.32, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test
@@ -178,8 +176,8 @@ class WeightedAverageStrategyTest {
 
 		// 0.5 >= 0.5 → PASS
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.5);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.5);
 	}
 
 	// ==================== Edge Cases ====================
@@ -206,8 +204,8 @@ class WeightedAverageStrategyTest {
 		Judgment result = strategy.aggregate(List.of(passJudgment(0.8)), Map.of("0", 5.0));
 
 		// Single judgment with any weight → same score
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isEqualTo(0.8);
+		double score = result.score();
+		assertThat(score).isEqualTo(0.8);
 	}
 
 	@Test
@@ -218,20 +216,52 @@ class WeightedAverageStrategyTest {
 
 		Map<String, Double> weights = Map.of("0", 0.0, "1", 0.0);
 
-		Judgment result = strategy.aggregate(judgments, weights);
+		// DELTA-10: this test previously pinned the defect as correct behaviour — 0/0
+		// produced NaN, which slipped past range validation because every comparison
+		// against NaN is false, yielding a FAIL whose reasoning read "NaN". A weight map
+		// in which no judge can influence the result is a caller error, so it now fails
+		// loudly at the call rather than producing a garbage score.
+		assertThatThrownBy(() -> strategy.aggregate(judgments, weights))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("All weights are zero");
+	}
 
-		// All zero weights → 0/0 results in NaN
-		NumericalScore score = (NumericalScore) result.score();
-		assertThat(score.normalized()).isNaN();
+	/**
+	 * DELTA-10: distinct from the case above. Here the configuration is valid — some
+	 * judge carries positive weight — but every positively weighted judge abstained, so
+	 * there is genuinely nothing to average. That is a runtime no-result, not a caller
+	 * error, and it abstains rather than throwing.
+	 */
+	@Test
+	void positiveInputWeightButNoEligibleWeightAbstains() {
+		WeightedAverageStrategy strategy = new WeightedAverageStrategy();
+
+		Judgment result = strategy.aggregate(List.of(Judgment.abstain("Cannot evaluate"), passJudgment(0.8)),
+				Map.of("0", 1.0, "1", 0.0));
+
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(result.score()).isNull();
+		assertThat(evidence(result)).containsEntry(AggregationEvidence.INPUT_WEIGHT, 1.0)
+			.containsEntry(AggregationEvidence.ELIGIBLE_WEIGHT, 0.0);
 	}
 
 	// ==================== Metadata Tests ====================
 
 	@Test
-	void shouldReturnCorrectName() {
+	void nameIsTheStableTokenUsedInEvidence() {
 		WeightedAverageStrategy strategy = new WeightedAverageStrategy();
 
-		assertThat(strategy.getName()).isEqualTo("WeightedAverage");
+		// DELTA-3: names are stable lower-camel-case tokens, so the identifier used in
+		// diagnostics is the same one recorded in the aggregation evidence.
+		assertThat(strategy.getName()).isEqualTo("weightedAverage");
+		assertThat(evidence(strategy.aggregate(List.of(passJudgment(0.8)), Map.of())))
+			.containsEntry(AggregationEvidence.STRATEGY, "weightedAverage");
+	}
+
+
+	@SuppressWarnings("unchecked")
+	private static Map<String, Object> evidence(Judgment judgment) {
+		return (Map<String, Object>) judgment.metadata().get(Judgment.AGGREGATION_KEY);
 	}
 
 }

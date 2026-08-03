@@ -31,7 +31,6 @@ import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.NumericalScore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -271,8 +270,7 @@ class SupersetDiffJudgeTest {
 	}
 
 	private static void assertScore(Judgment judgment, double expected) {
-		assertThat(judgment.score()).isInstanceOf(NumericalScore.class);
-		assertThat(((NumericalScore) judgment.score()).normalized()).isCloseTo(expected,
+		assertThat(judgment.score()).isCloseTo(expected,
 				org.assertj.core.data.Offset.offset(0.001));
 	}
 

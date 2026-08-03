@@ -1,11 +1,13 @@
 package io.github.markpollack.judge.file;
 
 import io.github.markpollack.judge.DeterministicJudge;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,6 +22,8 @@ import java.util.stream.Stream;
  * the appropriate sub-judge based on file type.
  */
 public class FileComparisonJudge extends DeterministicJudge {
+
+	private static final Logger logger = LoggerFactory.getLogger(FileComparisonJudge.class);
 
 	private final MavenSemanticJudge mavenJudge = new MavenSemanticJudge();
 
@@ -70,24 +74,21 @@ public class FileComparisonJudge extends DeterministicJudge {
 			}
 
 			if (failures.isEmpty()) {
-				return Judgment.builder()
-					.score(new BooleanScore(true))
-					.status(JudgmentStatus.PASS)
-					.reasoning("All " + checks.size() + " files match")
-					.checks(checks)
+				return Judgment.verdict(true)
+					.because("All " + checks.size() + " files match")
+					.withChecks(checks)
 					.build();
 			}
 
-			return Judgment.builder()
-				.score(new BooleanScore(false))
-				.status(JudgmentStatus.FAIL)
-				.reasoning(failures.size() + " file(s) differ: " + String.join("; ", failures))
-				.checks(checks)
+			return Judgment.verdict(false)
+				.because(failures.size() + " file(s) differ: " + String.join("; ", failures))
+				.withChecks(checks)
 				.build();
 
 		}
 		catch (IOException e) {
-			return Judgment.error("Failed to walk expected directory: " + e.getMessage(), e);
+			logger.error("File comparison failed", e);
+			return Judgment.error("Failed to walk expected directory: " + e.getMessage());
 		}
 	}
 

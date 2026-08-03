@@ -16,29 +16,30 @@
 
 package io.github.markpollack.judge.jury;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
-import io.github.markpollack.judge.score.NumericalScore;
-import io.github.markpollack.judge.score.Score;
-
 import java.util.List;
 import java.util.Map;
 
+import io.github.markpollack.judge.result.Judgment;
+
 /**
- * Median voting strategy for numerical judgments.
+ * Median voting strategy: the middle assessment among the applicable judges.
  *
  * <p>
- * Computes the median of all judgment scores, which is robust to outliers. Boolean scores
- * are converted to numerical (true=1.0, false=0.0) before computing the median.
+ * A numeric strategy, robust to outliers. It reduces over
+ * {@link Judgment#effectiveScore()}, which yields an explicit score where the judge
+ * measured one and {@code 1.0}/{@code 0.0} for a Boolean {@code PASS}/{@code FAIL}.
  * </p>
  *
  * <p>
- * For an even number of judgments, the median is the average of the two middle values.
+ * Abstentions leave the population entirely rather than participating as zero — under the
+ * old behaviour two abstentions could drag the median to zero and flip the verdict. Errors
+ * are governed by {@link ErrorPolicy} (default {@code PROPAGATE}). If nothing is eligible
+ * the result is {@code ABSTAIN}.
  * </p>
  *
  * <p>
- * The judgment passes if the median score is >= 0.5.
+ * For an even number of eligible judgments the median is the mean of the two middle values.
+ * The judgment passes if the median is greater than or equal to 0.5.
  * </p>
  *
  * <p>
@@ -56,56 +57,55 @@ public class MedianVotingStrategy implements VotingStrategy {
 
 	private static final double THRESHOLD = 0.5;
 
+	private final ErrorPolicy errorPolicy;
+
+	/**
+	 * Create a median strategy with the default error policy.
+	 */
+	public MedianVotingStrategy() {
+		this(ErrorPolicy.PROPAGATE);
+	}
+
+	/**
+	 * Create a median strategy with a custom error policy.
+	 * @param errorPolicy policy for handling errors
+	 */
+	public MedianVotingStrategy(ErrorPolicy errorPolicy) {
+		this.errorPolicy = errorPolicy;
+	}
+
 	@Override
 	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
-		if (judgments == null || judgments.isEmpty()) {
-			throw new IllegalArgumentException("Cannot aggregate empty judgment list");
+		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy);
+
+		if (population.propagateError()) {
+			return population.propagatedError(getName());
+		}
+		if (population.isEmpty()) {
+			return population.noResult(getName(), Map.of());
 		}
 
-		List<Double> scores = judgments.stream().map(j -> toNumerical(j.score())).sorted().toList();
+		// Every eligible judgment is PASS or FAIL, so effectiveScore is always present.
+		double[] scores = population.eligible()
+			.stream()
+			.mapToDouble(j -> j.effectiveScore().orElseThrow())
+			.sorted()
+			.toArray();
 
-		double median;
-		int size = scores.size();
+		int size = scores.length;
+		double median = (size % 2 == 0) ? (scores[size / 2 - 1] + scores[size / 2]) / 2.0 : scores[size / 2];
 
-		if (size % 2 == 0) {
-			// Even number: average of two middle values
-			median = (scores.get(size / 2 - 1) + scores.get(size / 2)) / 2.0;
-		}
-		else {
-			// Odd number: middle value
-			median = scores.get(size / 2);
-		}
-
-		boolean pass = median >= THRESHOLD;
-
-		String reasoning = String.format("Median score: %.2f (threshold: %.2f, result: %s)", median, THRESHOLD,
-				pass ? "pass" : "fail");
-
-		return Judgment.builder()
-			.score(new NumericalScore(median, 0.0, 1.0))
-			.status(pass ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-			.reasoning(reasoning)
+		return Judgment.scored(median)
+			.passingAt(THRESHOLD)
+			.because(String.format("Median score: %.2f across %d applicable judge(s) (threshold: %.2f, result: %s)",
+					median, size, THRESHOLD, median >= THRESHOLD ? "pass" : "fail"))
+			.aggregationEvidence(population.evidence(getName()).build())
 			.build();
 	}
 
 	@Override
 	public String getName() {
-		return "MedianVoting";
-	}
-
-	/**
-	 * Convert any score type to numerical [0.0, 1.0].
-	 * @param score the score to convert
-	 * @return numerical value
-	 */
-	private double toNumerical(Score score) {
-		if (score instanceof BooleanScore bs) {
-			return bs.value() ? 1.0 : 0.0;
-		}
-		else if (score instanceof NumericalScore ns) {
-			return ns.normalized();
-		}
-		return 0.0;
+		return "median";
 	}
 
 }

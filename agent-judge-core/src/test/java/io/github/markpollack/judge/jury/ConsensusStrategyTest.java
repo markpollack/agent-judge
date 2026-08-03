@@ -19,7 +19,6 @@ package io.github.markpollack.judge.jury;
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 
 import java.util.List;
 import java.util.Map;
@@ -45,11 +44,10 @@ class ConsensusStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(result.score()).isInstanceOf(BooleanScore.class);
-		BooleanScore score = (BooleanScore) result.score();
-		assertThat(score.value()).isTrue();
+		assertThat(result.score()).isNull();
+		assertThat(result.effectiveScore()).hasValue(1.0);
 		assertThat(result.reasoning()).contains("Unanimous consensus");
-		assertThat(result.reasoning()).contains("all 3 judges passed");
+		assertThat(result.reasoning()).contains("all 3 applicable judge(s) passed");
 	}
 
 	@Test
@@ -61,25 +59,33 @@ class ConsensusStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
-		BooleanScore score = (BooleanScore) result.score();
-		assertThat(score.value()).isFalse();
+		assertThat(result.score()).isNull();
+		assertThat(result.effectiveScore()).hasValue(0.0);
 		assertThat(result.reasoning()).contains("Unanimous consensus");
-		assertThat(result.reasoning()).contains("all 3 judges failed");
+		assertThat(result.reasoning()).contains("all 3 applicable judge(s) failed");
 	}
 
+	/**
+	 * DELTA-2: disagreement yields ABSTAIN, not FAIL. "We could not agree" is not a
+	 * finding that the subject failed, and the two must be distinguishable — previously
+	 * both returned FAIL and the difference survived only in the reasoning string.
+	 */
 	@Test
-	void shouldFailWhenNoConsensus() {
+	void disagreementYieldsAbstainAndIsDistinctFromUnanimousFail() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		List<Judgment> judgments = List.of(booleanPass("Judge 1"), booleanPass("Judge 2"), booleanFail("Judge 3"));
+		Judgment disagreed = strategy
+			.aggregate(List.of(booleanPass("Judge 1"), booleanPass("Judge 2"), booleanFail("Judge 3")), Map.of());
+		Judgment unanimouslyFailed = strategy
+			.aggregate(List.of(booleanFail("Judge 1"), booleanFail("Judge 2")), Map.of());
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		assertThat(disagreed.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(disagreed.reasoning()).contains("No consensus").contains("2 passed, 1 failed");
 
-		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
-		BooleanScore score = (BooleanScore) result.score();
-		assertThat(score.value()).isFalse();
-		assertThat(result.reasoning()).contains("No consensus");
-		assertThat(result.reasoning()).contains("2 passed, 1 failed");
+		assertThat(unanimouslyFailed.status()).isEqualTo(JudgmentStatus.FAIL);
+
+		// The distinction the strategy exists to report is now in the status itself.
+		assertThat(disagreed.status()).isNotEqualTo(unanimouslyFailed.status());
 	}
 
 	@Test
@@ -90,11 +96,11 @@ class ConsensusStrategyTest {
 
 		// Single judge → unanimous → pass
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(result.reasoning()).contains("all 1 judges passed");
+		assertThat(result.reasoning()).contains("all 1 applicable judge(s) passed");
 	}
 
 	@Test
-	void shouldConvertNumericalScoresToBoolean() {
+	void shouldReachConsensusOverScoredJudgments() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
 		List<Judgment> judgments = List.of(passJudgment(0.8), // >= 0.5 → pass
@@ -121,7 +127,7 @@ class ConsensusStrategyTest {
 
 		// All numerical scores < 0.5 → unanimous fail
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(result.reasoning()).contains("all 3 judges failed");
+		assertThat(result.reasoning()).contains("all 3 applicable judge(s) failed");
 	}
 
 	@Test
@@ -150,8 +156,8 @@ class ConsensusStrategyTest {
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// Mixed → no consensus → fail
-		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
+		// DELTA-2: mixed applicable verdicts → no consensus → ABSTAIN, not FAIL.
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.reasoning()).contains("No consensus");
 		assertThat(result.reasoning()).contains("2 passed, 1 failed");
 	}
@@ -169,21 +175,39 @@ class ConsensusStrategyTest {
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
+	/**
+	 * DELTA-2: an abstention is not a vote. It leaves the population rather than
+	 * counting as a fail, so it cannot break the unanimity of the applicable judges.
+	 * This is the case a judge that legitimately does not apply to every run depends on.
+	 */
 	@Test
-	void shouldHandleNullScoreAsFail() {
+	void abstentionDoesNotBreakUnanimity() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		List<Judgment> judgments = List.of(booleanPass("Judge 1"), Judgment.abstain("Cannot evaluate"), // null
-																										// score
-																										// →
-																										// false
-				booleanPass("Judge 3"));
+		Judgment result = strategy.aggregate(
+				List.of(booleanPass("Judge 1"), Judgment.abstain("Cannot evaluate"), booleanPass("Judge 3")), Map.of());
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		// Was FAIL: the abstention's absent score fell through to a fail vote.
+		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(result.reasoning()).contains("all 2 applicable judge(s) passed");
+		assertThat(evidence(result)).containsEntry(AggregationEvidence.ELIGIBLE_COUNT, 2)
+			.containsEntry(AggregationEvidence.EXPLICIT_ABSTAIN_COUNT, 1);
+	}
 
-		// 2 pass, 1 null→fail → no consensus
+	/**
+	 * DELTA-2: an abstention alongside a fail is still a unanimous fail among the
+	 * applicable judges — previously this reported "Unanimous consensus" only because
+	 * the abstention had been miscounted as a second fail vote.
+	 */
+	@Test
+	void abstentionAlongsideFailIsUnanimousFail() {
+		ConsensusStrategy strategy = new ConsensusStrategy();
+
+		Judgment result = strategy.aggregate(List.of(booleanFail("Judge 1"), Judgment.abstain("Cannot evaluate")),
+				Map.of());
+
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(result.reasoning()).contains("No consensus");
+		assertThat(result.reasoning()).contains("all 1 applicable judge(s) failed");
 	}
 
 	@Test
@@ -227,8 +251,9 @@ class ConsensusStrategyTest {
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// Consensus requires ALL to agree
-		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
+		// DELTA-2: consensus requires ALL applicable judges to agree; failing that is
+		// ABSTAIN, which is a different claim from "the subject failed".
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 	}
 
 	@Test
@@ -240,17 +265,29 @@ class ConsensusStrategyTest {
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
+		// DELTA-2: a fail-leaning majority is still not consensus.
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.reasoning()).contains("No consensus");
 	}
 
 	// ==================== Metadata Tests ====================
 
+	/**
+	 * DELTA-3: strategy names are stable lower-camel-case tokens, so the identifier in
+	 * diagnostics is the same one recorded in the aggregation evidence.
+	 */
 	@Test
-	void shouldReturnCorrectName() {
+	void nameIsTheStableTokenUsedInEvidence() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		assertThat(strategy.getName()).isEqualTo("Consensus");
+		assertThat(strategy.getName()).isEqualTo("consensus");
+		assertThat(evidence(strategy.aggregate(List.of(booleanPass("Judge 1")), Map.of())))
+			.containsEntry(AggregationEvidence.STRATEGY, "consensus");
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Map<String, Object> evidence(Judgment judgment) {
+		return (Map<String, Object>) judgment.metadata().get(Judgment.AGGREGATION_KEY);
 	}
 
 }

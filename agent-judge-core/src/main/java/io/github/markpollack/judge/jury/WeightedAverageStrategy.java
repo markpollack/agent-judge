@@ -16,31 +16,50 @@
 
 package io.github.markpollack.judge.jury;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
-import io.github.markpollack.judge.score.NumericalScore;
-import io.github.markpollack.judge.score.Score;
-
 import java.util.List;
 import java.util.Map;
 
+import io.github.markpollack.judge.result.Judgment;
+
 /**
- * Weighted average voting strategy for numerical judgments.
+ * Weighted average voting strategy: the mean of the applicable judges' assessments,
+ * weighted by judge.
  *
  * <p>
- * Computes a weighted average of judgment scores using the provided weights map. If no
- * weights are provided, falls back to equal weights (simple average). Boolean scores are
- * converted to numerical (true=1.0, false=0.0) before weighting.
+ * A numeric strategy. It reduces over {@link Judgment#effectiveScore()}, which yields an
+ * explicit score where the judge measured one and {@code 1.0}/{@code 0.0} for a Boolean
+ * {@code PASS}/{@code FAIL}.
  * </p>
  *
  * <p>
- * Weights are indexed by judge position (0, 1, 2, ...) as strings in the map. Weights do
- * not need to sum to 1.0 - they will be normalized automatically.
+ * Weights are keyed by judge position ({@code "0"}, {@code "1"}, ...) as strings. A missing
+ * weight resolves to {@code 1.0}, so an empty weight map computes a simple mean — this
+ * strategy does <em>not</em> delegate to {@link AverageVotingStrategy}, which would
+ * misattribute the aggregation evidence to a strategy the caller did not use. Weights need
+ * not sum to 1.0; they are normalized over the eligible population.
+ * </p>
+ *
+ * <h2>Weight validation</h2>
+ * <p>
+ * An invalid weight configuration is a caller error and fails loudly; a valid configuration
+ * whose usable weight disappears after filtering is a runtime no-result:
+ * </p>
+ * <ul>
+ * <li>negative, NaN, or infinite weight — {@link IllegalArgumentException};</li>
+ * <li>all weights explicitly zero — {@link IllegalArgumentException}, since no judge could
+ * influence the result;</li>
+ * <li>an individual zero weight — legal, meaning "this judge does not count";</li>
+ * <li>positive input weight but zero eligible weight, because every positively weighted
+ * judge abstained or was ignored — {@code ABSTAIN}, with the evidence to prove it.</li>
+ * </ul>
+ * <p>
+ * Previously an all-zero configuration divided by zero and produced a {@code NaN} score,
+ * which passed range validation because every IEEE 754 comparison against {@code NaN} is
+ * false.
  * </p>
  *
  * <p>
- * The judgment passes if the weighted average is >= 0.5.
+ * The judgment passes if the weighted mean is greater than or equal to 0.5.
  * </p>
  *
  * <p>
@@ -59,61 +78,92 @@ public class WeightedAverageStrategy implements VotingStrategy {
 
 	private static final double THRESHOLD = 0.5;
 
+	private final ErrorPolicy errorPolicy;
+
+	/**
+	 * Create a weighted average strategy with the default error policy.
+	 */
+	public WeightedAverageStrategy() {
+		this(ErrorPolicy.PROPAGATE);
+	}
+
+	/**
+	 * Create a weighted average strategy with a custom error policy.
+	 * @param errorPolicy policy for handling errors
+	 */
+	public WeightedAverageStrategy(ErrorPolicy errorPolicy) {
+		this.errorPolicy = errorPolicy;
+	}
+
 	@Override
 	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
-		if (judgments == null || judgments.isEmpty()) {
-			throw new IllegalArgumentException("Cannot aggregate empty judgment list");
+		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy);
+
+		double[] resolved = resolveWeights(population.inputCount(), weights);
+		double inputWeight = 0.0;
+		for (double weight : resolved) {
+			inputWeight += weight;
+		}
+		if (inputWeight == 0.0) {
+			throw new IllegalArgumentException(
+					"All weights are zero, so no judge could influence the result; check the weight configuration");
 		}
 
-		// If no weights provided, use equal weights
-		if (weights == null || weights.isEmpty()) {
-			return new AverageVotingStrategy().aggregate(judgments, weights);
+		if (population.propagateError()) {
+			return population.propagatedError(getName());
 		}
 
 		double weightedSum = 0.0;
-		double weightSum = 0.0;
-
-		for (int i = 0; i < judgments.size(); i++) {
-			String key = String.valueOf(i);
-			double weight = weights.getOrDefault(key, 1.0);
-			double score = toNumerical(judgments.get(i).score());
-
-			weightedSum += score * weight;
-			weightSum += weight;
+		double eligibleWeight = 0.0;
+		for (int i = 0; i < population.eligible().size(); i++) {
+			double weight = resolved[population.eligibleIndices().get(i)];
+			// Every eligible judgment is PASS or FAIL, so effectiveScore is always present.
+			weightedSum += population.eligible().get(i).effectiveScore().orElseThrow() * weight;
+			eligibleWeight += weight;
 		}
 
-		double weightedAverage = weightedSum / weightSum;
+		Map<String, Object> weightEvidence = Map.of(AggregationEvidence.INPUT_WEIGHT, inputWeight,
+				AggregationEvidence.ELIGIBLE_WEIGHT, eligibleWeight);
 
-		boolean pass = weightedAverage >= THRESHOLD;
+		if (population.isEmpty() || eligibleWeight == 0.0) {
+			return population.noResult(getName(), weightEvidence);
+		}
 
-		String reasoning = String.format("Weighted average: %.2f (threshold: %.2f, result: %s)", weightedAverage,
-				THRESHOLD, pass ? "pass" : "fail");
+		double weightedAverage = weightedSum / eligibleWeight;
 
-		return Judgment.builder()
-			.score(new NumericalScore(weightedAverage, 0.0, 1.0))
-			.status(pass ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-			.reasoning(reasoning)
+		return Judgment.scored(weightedAverage)
+			.passingAt(THRESHOLD)
+			.because(String.format(
+					"Weighted average: %.2f across %d applicable judge(s) (threshold: %.2f, result: %s)",
+					weightedAverage, population.eligible().size(), THRESHOLD,
+					weightedAverage >= THRESHOLD ? "pass" : "fail"))
+			.aggregationEvidence(population.evidence(getName())
+				.put(AggregationEvidence.INPUT_WEIGHT, inputWeight)
+				.put(AggregationEvidence.ELIGIBLE_WEIGHT, eligibleWeight)
+				.build())
 			.build();
+	}
+
+	private static double[] resolveWeights(int count, Map<String, Double> weights) {
+		double[] resolved = new double[count];
+		for (int i = 0; i < count; i++) {
+			double weight = (weights == null) ? 1.0 : weights.getOrDefault(String.valueOf(i), 1.0);
+			if (!Double.isFinite(weight)) {
+				throw new IllegalArgumentException(
+						String.format("Weight for judge %d must be finite, but was %s", i, weight));
+			}
+			if (weight < 0.0) {
+				throw new IllegalArgumentException(
+						String.format("Weight for judge %d must not be negative, but was %s", i, weight));
+			}
+			resolved[i] = weight;
+		}
+		return resolved;
 	}
 
 	@Override
 	public String getName() {
-		return "WeightedAverage";
-	}
-
-	/**
-	 * Convert any score type to numerical [0.0, 1.0].
-	 * @param score the score to convert
-	 * @return numerical value
-	 */
-	private double toNumerical(Score score) {
-		if (score instanceof BooleanScore bs) {
-			return bs.value() ? 1.0 : 0.0;
-		}
-		else if (score instanceof NumericalScore ns) {
-			return ns.normalized();
-		}
-		return 0.0;
+		return "weightedAverage";
 	}
 
 }

@@ -4,7 +4,6 @@ import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.model.Usage;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.CategoricalScore;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,8 +53,7 @@ class LabelJudgmentClassifierTests {
 
 		Judgment judgment = classifier.classify(response("good"));
 
-		assertThat(judgment.score()).isInstanceOf(CategoricalScore.class);
-		CategoricalScore score = (CategoricalScore) judgment.score();
+				double score = judgment.score();
 		assertThat(score.value()).isEqualTo("good");
 	}
 

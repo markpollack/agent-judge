@@ -21,8 +21,6 @@ import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
-import io.github.markpollack.judge.score.NumericalScore;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -84,7 +82,7 @@ public final class JudgeTestFixtures {
 	 * @return always-error judge
 	 */
 	public static Judge alwaysError(String name) {
-		return Judges.named(ctx -> Judgment.error("Evaluation error", new RuntimeException("Test error")), name, null,
+		return Judges.named(ctx -> Judgment.error("Evaluation error"), name, null,
 				JudgeType.DETERMINISTIC);
 	}
 
@@ -96,11 +94,8 @@ public final class JudgeTestFixtures {
 	 */
 	public static Judge withScore(String name, double score) {
 		JudgmentStatus status = score >= 0.5 ? JudgmentStatus.PASS : JudgmentStatus.FAIL;
-		return Judges.named(ctx -> Judgment.builder()
-			.score(new NumericalScore(score, 0.0, 1.0))
-			.status(status)
-			.reasoning("Score: " + score)
-			.build(), name, null, JudgeType.DETERMINISTIC);
+		return Judges.named(ctx -> Judgment.scored(score).withStatus(status).because("Score: " + score).build(), name,
+				null, JudgeType.DETERMINISTIC);
 	}
 
 	/**
@@ -127,7 +122,7 @@ public final class JudgeTestFixtures {
 			}
 			catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
-				return Judgment.error("Interrupted", e);
+				return Judgment.error("Interrupted");
 			}
 			return result;
 		}, name, null, JudgeType.DETERMINISTIC);
@@ -190,10 +185,9 @@ public final class JudgeTestFixtures {
 	 * @return passing judgment
 	 */
 	public static Judgment passJudgment(double score) {
-		return Judgment.builder()
-			.score(new NumericalScore(score, 0.0, 1.0))
-			.status(JudgmentStatus.PASS)
-			.reasoning("Test passed with score " + score)
+		return Judgment.scored(score)
+			.withStatus(JudgmentStatus.PASS)
+			.because("Test passed with score " + score)
 			.build();
 	}
 
@@ -203,10 +197,9 @@ public final class JudgeTestFixtures {
 	 * @return failing judgment
 	 */
 	public static Judgment failJudgment(double score) {
-		return Judgment.builder()
-			.score(new NumericalScore(score, 0.0, 1.0))
-			.status(JudgmentStatus.FAIL)
-			.reasoning("Test failed with score " + score)
+		return Judgment.scored(score)
+			.withStatus(JudgmentStatus.FAIL)
+			.because("Test failed with score " + score)
 			.build();
 	}
 
@@ -216,11 +209,7 @@ public final class JudgeTestFixtures {
 	 * @return passing judgment
 	 */
 	public static Judgment booleanPass(String reasoning) {
-		return Judgment.builder()
-			.score(new BooleanScore(true))
-			.status(JudgmentStatus.PASS)
-			.reasoning(reasoning)
-			.build();
+		return Judgment.verdict(true).because(reasoning).build();
 	}
 
 	/**
@@ -229,11 +218,7 @@ public final class JudgeTestFixtures {
 	 * @return failing judgment
 	 */
 	public static Judgment booleanFail(String reasoning) {
-		return Judgment.builder()
-			.score(new BooleanScore(false))
-			.status(JudgmentStatus.FAIL)
-			.reasoning(reasoning)
-			.build();
+		return Judgment.verdict(false).because(reasoning).build();
 	}
 
 	// ==================== Sample Verdicts ====================

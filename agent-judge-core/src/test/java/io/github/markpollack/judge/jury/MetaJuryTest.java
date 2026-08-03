@@ -172,8 +172,28 @@ class MetaJuryTest {
 		JudgmentContext context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
-		// One failure breaks consensus
+		// DELTA-2: one sub-jury passing and one failing is disagreement, not a finding
+		// that the subject failed, so consensus over them yields ABSTAIN.
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(verdict.aggregated().reasoning()).contains("No consensus");
+	}
+
+	/**
+	 * DELTA-2: the contrast that gives the case above its meaning. When every sub-jury
+	 * agrees on failure the consensus is FAIL — a status the disagreement case can no
+	 * longer be confused with.
+	 */
+	@Test
+	void shouldFailConsensusWhenAllSubJuriesFail() {
+		Jury jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J1"), alwaysFail("J2"));
+		Jury jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"), alwaysFail("J4"));
+
+		MetaJury metaJury = new MetaJury(List.of(jury1, jury2), new ConsensusStrategy());
+
+		Verdict verdict = metaJury.vote(simpleContext("Test goal"));
+
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(verdict.aggregated().reasoning()).contains("Unanimous consensus");
 	}
 
 	// ==================== Constructor Validation Tests ====================

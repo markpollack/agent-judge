@@ -57,8 +57,16 @@ class CascadedJuryTest {
 
 		Verdict verdict = jury.vote(context);
 
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
+		// The cascade decision is unchanged: REJECT_ON_ANY_FAIL inspects the tier's
+		// INDIVIDUAL judgments, sees Migration's FAIL, and stops without escalating.
 		assertThat(verdict.subVerdicts()).hasSize(1); // only tier1 executed
+		assertThat(verdict.individual()).anyMatch(j -> j.status() == JudgmentStatus.FAIL);
+
+		// DELTA-2: the tier's AGGREGATE is a separate fact, produced by ConsensusStrategy
+		// over judges that disagreed — so it is ABSTAIN, not FAIL. This is precisely the
+		// aggregate-versus-individual distinction: consensus semantics changed, cascade
+		// escalation did not.
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 	}
 
 	@Test

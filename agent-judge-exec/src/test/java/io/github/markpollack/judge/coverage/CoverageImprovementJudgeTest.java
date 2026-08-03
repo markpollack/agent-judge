@@ -23,7 +23,6 @@ import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.coverage.JaCoCoReportParser.CoverageMetrics;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.NumericalScore;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -55,9 +54,9 @@ class CoverageImprovementJudgeTest {
 		Judgment judgment = judge.judge(contextWithBaseline(baseline));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) judgment.score();
+		double score = judgment.score();
 		// 30pp improvement / 50pp max = 0.6
-		assertThat(score.normalized()).isCloseTo(0.6, org.assertj.core.data.Offset.offset(0.01));
+		assertThat(score).isCloseTo(0.6, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test
@@ -68,8 +67,8 @@ class CoverageImprovementJudgeTest {
 		Judgment judgment = judge.judge(contextWithBaseline(baseline));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
-		NumericalScore score = (NumericalScore) judgment.score();
-		assertThat(score.normalized()).isCloseTo(0.0, org.assertj.core.data.Offset.offset(0.01));
+		double score = judgment.score();
+		assertThat(score).isCloseTo(0.0, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test
@@ -80,8 +79,8 @@ class CoverageImprovementJudgeTest {
 		Judgment judgment = judge.judge(contextWithBaseline(baseline));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
-		NumericalScore score = (NumericalScore) judgment.score();
-		assertThat(score.normalized()).isCloseTo(0.0, org.assertj.core.data.Offset.offset(0.01));
+		double score = judgment.score();
+		assertThat(score).isCloseTo(0.0, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test
@@ -92,9 +91,9 @@ class CoverageImprovementJudgeTest {
 		Judgment judgment = judge.judge(contextWithBaseline(baseline));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) judgment.score();
+		double score = judgment.score();
 		// 50pp improvement / 50pp max = 1.0
-		assertThat(score.normalized()).isCloseTo(1.0, org.assertj.core.data.Offset.offset(0.01));
+		assertThat(score).isCloseTo(1.0, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test
@@ -136,9 +135,9 @@ class CoverageImprovementJudgeTest {
 		Judgment judgment = custom.judge(contextWithBaseline(baseline));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
-		NumericalScore score = (NumericalScore) judgment.score();
+		double score = judgment.score();
 		// 10pp improvement / 20pp max = 0.5
-		assertThat(score.normalized()).isCloseTo(0.5, org.assertj.core.data.Offset.offset(0.01));
+		assertThat(score).isCloseTo(0.5, org.assertj.core.data.Offset.offset(0.01));
 	}
 
 	@Test

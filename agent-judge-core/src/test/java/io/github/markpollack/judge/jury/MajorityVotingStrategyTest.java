@@ -105,8 +105,8 @@ class MajorityVotingStrategyTest {
 	void allErrorsShouldTreatAsFailWhenConfigured() {
 		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
 
-		List<Judgment> judgments = List.of(Judgment.error("Error 1", new RuntimeException()),
-				Judgment.error("Error 2", new RuntimeException()));
+		List<Judgment> judgments = List.of(Judgment.error("Error 1"),
+				Judgment.error("Error 2"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
@@ -119,34 +119,42 @@ class MajorityVotingStrategyTest {
 	void allErrorsShouldTreatAsAbstainWhenConfigured() {
 		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN);
 
-		List<Judgment> judgments = List.of(Judgment.error("Error 1", new RuntimeException()),
-				Judgment.error("Error 2", new RuntimeException()));
+		List<Judgment> judgments = List.of(Judgment.error("Error 1"),
+				Judgment.error("Error 2"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
+		// DELTA-3: TREAT_AS_ABSTAIN converts the errors into non-votes, and the reasoning
+		// says so — distinguishing it from IGNORE, which reaches the same ABSTAIN status.
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
-		assertThat(result.reasoning()).contains("All judges abstained");
+		assertThat(result.reasoning()).contains("abstained because of evaluation errors");
+		assertThat(evidence(result)).containsEntry(AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT, 2)
+			.containsEntry(AggregationEvidence.IGNORED_ERROR_COUNT, 0);
 	}
 
 	@Test
 	void allErrorsShouldBeIgnoredWhenConfigured() {
 		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.IGNORE);
 
-		List<Judgment> judgments = List.of(Judgment.error("Error 1", new RuntimeException()),
-				Judgment.error("Error 2", new RuntimeException()));
+		List<Judgment> judgments = List.of(Judgment.error("Error 1"),
+				Judgment.error("Error 2"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// All ignored → no valid judgments → ABSTAIN
+		// DELTA-3: IGNORE removes the errors from the population entirely. Same ABSTAIN
+		// status as TREAT_AS_ABSTAIN above, but different accounting — which is the whole
+		// reason both policies exist and why a status-only assertion cannot tell them apart.
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
-		assertThat(result.reasoning()).contains("All judges abstained");
+		assertThat(result.reasoning()).contains("2 error(s) ignored");
+		assertThat(evidence(result)).containsEntry(AggregationEvidence.IGNORED_ERROR_COUNT, 2)
+			.containsEntry(AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT, 0);
 	}
 
 	@Test
 	void mixedErrorsAndPassesShouldRespectErrorPolicy() {
 		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
 
-		List<Judgment> judgments = List.of(booleanPass("Judge 1"), Judgment.error("Error", new RuntimeException()),
+		List<Judgment> judgments = List.of(booleanPass("Judge 1"), Judgment.error("Error"),
 				booleanPass("Judge 3"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
@@ -166,8 +174,11 @@ class MajorityVotingStrategyTest {
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
+		// A judge's own abstention is reported separately from an error converted into one.
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
-		assertThat(result.reasoning()).contains("All judges abstained");
+		assertThat(result.reasoning()).contains("All 2 judge(s) abstained");
+		assertThat(evidence(result)).containsEntry(AggregationEvidence.EXPLICIT_ABSTAIN_COUNT, 2)
+			.containsEntry(AggregationEvidence.ERROR_COUNT, 0);
 	}
 
 	@Test
@@ -189,7 +200,7 @@ class MajorityVotingStrategyTest {
 		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.IGNORE);
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), booleanFail("Judge 2"), Judgment.abstain("Judge 3"),
-				Judgment.error("Judge 4", new RuntimeException()));
+				Judgment.error("Judge 4"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
@@ -224,6 +235,12 @@ class MajorityVotingStrategyTest {
 		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
 
 		assertThat(strategy.getName()).isEqualTo("majority");
+	}
+
+
+	@SuppressWarnings("unchecked")
+	private static Map<String, Object> evidence(Judgment judgment) {
+		return (Map<String, Object>) judgment.metadata().get(Judgment.AGGREGATION_KEY);
 	}
 
 }

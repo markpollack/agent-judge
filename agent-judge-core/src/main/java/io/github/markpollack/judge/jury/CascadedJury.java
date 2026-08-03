@@ -142,8 +142,8 @@ public class CascadedJury implements Jury {
 
 	private Verdict buildErrorVerdict(String tierName, Exception ex, List<Verdict> allTierVerdicts,
 			List<String> tiersExecuted) {
-		Judgment errorJudgment = Judgment.error("Final tier '" + tierName + "' threw exception: " + ex.getMessage(),
-				ex);
+		logger.error("Final tier '{}' threw exception", tierName, ex);
+		Judgment errorJudgment = Judgment.error("Final tier '" + tierName + "' threw exception: " + ex.getMessage());
 		return Verdict.builder().aggregated(errorJudgment).subVerdicts(allTierVerdicts).build();
 	}
 

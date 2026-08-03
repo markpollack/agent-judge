@@ -1,11 +1,13 @@
 package io.github.markpollack.judge.file;
 
 import io.github.markpollack.judge.DeterministicJudge;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.score.BooleanScore;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -15,6 +17,8 @@ import java.nio.file.Path;
  * Judge that compares text files using whitespace-normalized string comparison.
  */
 public class TextFileJudge extends DeterministicJudge {
+
+	private static final Logger logger = LoggerFactory.getLogger(TextFileJudge.class);
 
 	public TextFileJudge() {
 		super("TextFileJudge", "Compares text files using whitespace-normalized string comparison");
@@ -39,25 +43,22 @@ public class TextFileJudge extends DeterministicJudge {
 			String normalizedActual = actual.replaceAll("\\s+", " ").trim();
 
 			if (normalizedExpected.equals(normalizedActual)) {
-				return Judgment.builder()
-					.score(new BooleanScore(true))
-					.status(JudgmentStatus.PASS)
-					.reasoning("Text file matches (whitespace-normalized)")
-					.check(Check.pass(filePath))
+				return Judgment.verdict(true)
+					.because("Text file matches (whitespace-normalized)")
+					.withCheck(Check.pass(filePath))
 					.build();
 			}
 
 			String diff = generateDiff(expected, actual);
-			return Judgment.builder()
-				.score(new BooleanScore(false))
-				.status(JudgmentStatus.FAIL)
-				.reasoning("Text file differs: " + filePath)
-				.check(Check.fail(filePath, diff))
+			return Judgment.verdict(false)
+				.because("Text file differs: " + filePath)
+				.withCheck(Check.fail(filePath, diff))
 				.build();
 
 		}
 		catch (IOException e) {
-			return Judgment.error("Failed to read files: " + e.getMessage(), e);
+			logger.error("File comparison failed", e);
+			return Judgment.error("Failed to read files: " + e.getMessage());
 		}
 	}
 
