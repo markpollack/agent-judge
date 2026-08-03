@@ -1,10 +1,12 @@
 # Roadmap: Complete the Normalized Judgment API Migration — Agent Judge
 
 > **Created**: 2026-08-03T00:00-04:00
-> **Last updated**: 2026-08-03T00:00-04:00
+> **Last updated**: 2026-08-03T16:00-04:00
 > **Design version**: design-normalized-judgment.md r6
-> **Implementation checkpoint**: dc6ca2d
+> **Implementation checkpoint**: c7d445c — Stage 2 verified; Stage 3 is next
 > **Active branch**: normalized-judgment-api
+> **Current state**: clean full reactor passes across all eleven modules — 433 tests, 0 failures,
+> 0 errors, 0 skipped; agent-judge-core at 93.72% line / 92.44% branch coverage
 
 ## Overview
 
@@ -636,25 +638,60 @@ test sources, and its count matches. No module was under-executed:
 
 ---
 
-### Step 2.K: Stage 2 Consolidation
+### Step 2.K: Stage 2 Consolidation — COMPLETE
 
 **Entry criteria**:
 
-- [ ] Steps 2.0-2.4 complete
+- [x] Steps 2.0-2.4 complete
 
 **Work items**:
 
-- [ ] UPDATE the implementation-status section in design-normalized-judgment.md
-- [ ] RECORD downstream findings and final clean-build evidence in this roadmap
-- [ ] CONFIRM no accidental files were created or committed
-- [ ] CONFIRM .campus/ remains untouched
+- [x] UPDATE the implementation-status section in design-normalized-judgment.md
+- [x] RECORD downstream findings and final clean-build evidence in this roadmap
+- [x] CONFIRM no accidental files were created or committed
+- [x] CONFIRM .campus/ remains untouched
+
+#### Stage 2 commits
+
+| Commit | Content |
+|---|---|
+| 9325ef3 | Migrated the five remaining downstream test files (Steps 2.1-2.2) |
+| 014a779 | Closed two contract-coverage gaps, retired stale aggregation test prose (Step 2.3) |
+| c7d445c | Removed ReactiveJudge and the Reactor dependency from core (Step 2.3 decision) |
+| this commit | Stage 2 consolidation (Step 2.K) |
+
+Stage 2 changed **no production behavior**. The only production change was deleting an unused
+interface on an explicit owner decision. Every other repair was to test code, in each case because
+the test still pinned behavior the settled design had deliberately changed.
+
+#### Findings worth carrying forward
+
+1. **The dc6ca2d checkpoint overstated its own verification.** It claimed all modules reached main
+   and test compilation; two modules' test sources did not compile, and three module suites had
+   never run. Corrected in design-normalized-judgment.md rather than silently fixed.
+2. **Two required contracts held only in source.** The default `ErrorPolicy` was pinned for one
+   strategy of five, and `IGNORE` was never exercised on a numeric strategy. Both are now executable.
+3. **Stale prose outlived the code it described.** Test names and comments still narrated a weighted
+   delegation, a NaN result, and a 0.5 consensus threshold that no longer exist — the same defect
+   shape ddd-review.md Issue 4 raised against `MajorityVotingStrategy`'s Javadoc.
+4. **Public documentation is not yet reconciled.** `~/projects/docs/docs/agent-judge/api-reference.mdx`
+   still documents the Score hierarchy and `ReactiveJudge`. Outside this roadmap's stages.
+
+#### Repository hygiene
+
+- `git status` shows `.campus/` as the only untracked entry, exactly as at session start.
+- `.campus/` appears in no commit on any branch; it was never added, edited, or removed.
+- No accidental files were created in the repository. Build logs and dependency-tree captures were
+  written to the session scratchpad outside the working tree.
+- No licensing, REUSE, SBOM, or copyright-header change entered any Stage 2 commit.
+- No downstream repository was read or modified.
 
 **Exit criteria**:
 
-- [ ] On-disk status matches the verified implementation
-- [ ] Stage 3 can begin without relying on conversation history
-- [ ] Update this roadmap's checkboxes
-- [ ] COMMIT documentation consolidation
+- [x] On-disk status matches the verified implementation
+- [x] Stage 3 can begin without relying on conversation history
+- [x] Update this roadmap's checkboxes
+- [x] COMMIT documentation consolidation
 
 ---
 
@@ -864,3 +901,4 @@ evidence, and safe next action. Do not mark the corresponding exit criterion com
 | Timestamp | Change | Trigger |
 |---|---|---|
 | 2026-08-03T00:00-04:00 | Initial normalized-Judgment completion roadmap | Core checkpoint dc6ca2d completed; fresh-session handoff required |
+| 2026-08-03T16:00-04:00 | Stage 2 completed and recorded: reactor result, failure classification, downstream repairs, contract audit, ReactiveJudge removal, and final gate | Full-reactor verification executed; owner decided the ReactiveJudge question |

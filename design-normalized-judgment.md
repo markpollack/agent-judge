@@ -1,6 +1,6 @@
 # Design proposal — normalized `Judgment` API
 
-> **Status**: **implemented through the core checkpoint; full-reactor verification and consumer handoff pending**
+> **Status**: **implemented and verified against a clean full reactor; consumer handoff pending**
 > **Date**: 2026-08-03
 > **Revision**: r6. r3 incorporated the design review's six contract-hardening points (constructor
 > invariants, stable evidence keys, corrected removal count, cascade reconciliation, qualified
@@ -23,24 +23,48 @@
 
 ---
 
-## Implementation checkpoint — 2026-08-03
+## Implementation status — verified 2026-08-03
 
-The design is no longer awaiting implementation.
+The design is implemented and verified against a clean full Maven reactor.
 
 - **49a6c73** committed this design and the DDD review.
 - **a5b15f8** preserved the pre-change characterization baseline, including the previously uncovered
   default-`ErrorPolicy` behavior.
 - **dc6ca2d** replaced the Score hierarchy, migrated the producers and strategies, and updated the
   core tests to demonstrate the intended semantic distinctions.
-- A clean `agent-judge-core` test run completed with **282 tests and 0 failures**.
-- All modules reached main and test compilation at that checkpoint.
+- **9325ef3** migrated the five remaining downstream test files that still pinned pre-migration
+  behavior.
+- **014a779** closed two contract-coverage gaps and retired stale aggregation test prose.
+- **c7d445c** removed `ReactiveJudge` and the Reactor dependency from core.
+
+**Verified result** — `./mvnw clean verify` from a clean state, BUILD SUCCESS across all eleven
+reactor modules: **433 tests, 0 failures, 0 errors, 0 skipped**. `agent-judge-core` covers
+**93.72% of lines** (gate 80%) and **92.44% of branches** (gate 75%).
+
+> **Correction to the dc6ca2d checkpoint claim.** That checkpoint stated that all modules reached
+> main *and test* compilation. They did not. `agent-judge-ai-core` and `agent-judge-llm` test
+> sources still referenced deleted types and did not compile, which also meant the LLM, RAG, and
+> AgentClient suites had never executed on this branch. Only `agent-judge-core` had actually been
+> run. This is recorded rather than quietly fixed, because the claim is what made the remaining work
+> look smaller than it was.
+
+Verification added beyond the §7 plan below, both closing gaps where a contract held in source but
+in no test:
+
+- the default `ErrorPolicy` is now pinned on **all five** strategies, not only `Majority`;
+- `IGNORE` is shown to release an ignored judgment's weight in `WeightedAverageStrategy` rather than
+  consuming it.
+
+Design changes made after r6, on owner decision rather than new evidence about the value model:
+
+- `ReactiveJudge` and `agent-judge-core`'s optional `reactor-core` dependency are removed. This does
+  not touch the judgment or aggregation contract; it removes an unused published API. Recorded here
+  because DESIGN.md's core dependency boundary changed with it.
 
 Still pending:
 
-1. Full clean Maven-reactor verification, including every downstream module suite.
-2. The 80% line / 75% branch JaCoCo gate.
-3. A written consumer migration handoff for `agent-workflow` and other consumers.
-4. Final on-disk completion status after those gates pass.
+1. A written consumer migration handoff for `agent-workflow` and other consumers.
+2. Public documentation reconciliation for 0.14, which is outside the roadmap's stages.
 
 The active execution plan is [roadmap.md](roadmap.md). The Phase 0 section below is retained as the
 historical verification protocol that produced a5b15f8; it is complete and must not be repeated.
