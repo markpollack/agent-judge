@@ -1,12 +1,17 @@
+<!--
+Copyright (c) 2026 Mark Pollack
+See LICENSE.txt in the repository root for license terms.
+-->
+
 # Roadmap: Complete the Normalized Judgment API Migration — Agent Judge
 
 > **Created**: 2026-08-03T00:00-04:00
-> **Last updated**: 2026-08-03T16:00-04:00
-> **Design version**: design-normalized-judgment.md r6
-> **Status**: **COMPLETE** — all four stages verified
+> **Last updated**: 2026-08-04T13:41-04:00
+> **Design version**: design-normalized-judgment.md r10
+> **Status**: **COMPLETE** — all five stages verified
 > **Active branch**: normalized-judgment-api
-> **Current state**: clean full reactor passes across all eleven modules — 433 tests, 0 failures,
-> 0 errors, 0 skipped; agent-judge-core at 93.72% line / 92.44% branch coverage
+> **Current state**: clean full reactor passes across all eleven modules — 487 tests, 0 failures,
+> 0 errors, 0 skipped; agent-judge-core at 95.29% line / 93.67% branch coverage
 > **Consumer repositories**: reviewed read-only, unchanged
 
 ## Overview
@@ -47,7 +52,7 @@ repeated.
 ## Protected Repository State
 
 - Branch: normalized-judgment-api
-- Expected HEAD at handoff: dc6ca2d
+- Baseline HEAD for the post-review refinement: 5584f9a
 - The pre-existing untracked .campus/ directory belongs to the user.
 - Do not add, edit, remove, or commit .campus/.
 - Do not merge, rebase, push, or modify a downstream repository unless explicitly authorized.
@@ -1077,6 +1082,53 @@ without reading this branch's diff.
 
 ---
 
+## Stage 5: Post-review API and Verdict Refinement — COMPLETE
+
+### Step 5.1: Restore concise derived-outcome construction — COMPLETE
+
+**Work completed**:
+
+- [x] Kept `builder().pass()/fail()/abstain()/error()` as the general outcome-first grammar
+- [x] Added `Judgment.verdict(boolean)` without storing a duplicate Boolean score
+- [x] Added `Judgment.scored(normalized).passingAt(threshold)`
+- [x] Added raw-range normalization through `Judgment.scored(value, minimum, maximum)`
+- [x] Rejected non-finite values, out-of-range values, invalid ranges, and invalid thresholds
+- [x] Pinned below, exact-threshold, and above-threshold outcomes
+
+### Step 5.2: Make every Verdict complete — COMPLETE
+
+**Work completed**:
+
+- [x] Required a non-null aggregate in the `Verdict` compact constructor
+- [x] Replaced the former null-aggregate characterization with a rejection test
+- [x] Added `Verdict.single(name, judgment)` for a complete one-member jury
+- [x] Preserved both roles of the one judgment: aggregate conclusion and named/ordered evidence
+- [x] Rejected blank identities and null judgments in the convenience factory
+
+### Step 5.3: Reconcile documentation and verify — COMPLETE
+
+**Work completed**:
+
+- [x] Removed nonexistent `because`, `withStatus`, and `classified` APIs from the active design and
+  consumer-handoff examples
+- [x] Documented the distinction between a complete one-member verdict and an aggregate-free result
+- [x] Recorded M1 and M4 as implemented in the 2026-08-04 Agent Workflow integration review packet
+- [x] Ran `./mvnw clean verify` from a clean reactor state
+
+**Verified result**:
+
+- Eleven reactor modules: SUCCESS
+- 487 tests, 0 failures, 0 errors, 0 skipped
+- agent-judge-core line coverage: 729/765 = 95.29% (gate 80%)
+- agent-judge-core branch coverage: 296/316 = 93.67% (gate 75%)
+
+**Still outside this scoped stage**: the remaining Agent Workflow integration-review items—portable
+metadata, schema-visible optionality, the consensus-disagreement decision, status-first consumer
+gates, journal projection, and cross-repository conformance fixtures. This stage does not mark those
+separate integration tasks complete.
+
+---
+
 ## Roadmap status: COMPLETE
 
 Every stopping condition below is satisfied. The branch is ready for review and a separately
@@ -1141,3 +1193,4 @@ evidence, and safe next action. Do not mark the corresponding exit criterion com
 | 2026-08-03T16:00-04:00 | Stage 2 completed and recorded: reactor result, failure classification, downstream repairs, contract audit, ReactiveJudge removal, and final gate | Full-reactor verification executed; owner decided the ReactiveJudge question |
 | 2026-08-03T16:15-04:00 | Stage 3 completed: read-only consumer inventory and the reviewed consumer handoff | Stage 2 gates passed |
 | 2026-08-03T16:20-04:00 | Stage 4 completed; roadmap marked COMPLETE | Final clean verification passed and the completion record was written |
+| 2026-08-04T13:41-04:00 | Stage 5 completed: concise verdict/scored helpers, mandatory aggregate, one-member factory, documentation reconciliation, and clean verification | Agent Workflow integration review M1/M4 accepted for implementation |

@@ -1,8 +1,13 @@
+<!--
+Copyright (c) 2026 Mark Pollack
+See LICENSE.txt in the repository root for license terms.
+-->
+
 # Design proposal — normalized `Judgment` API
 
-> **Status**: **implemented and verified against a clean full reactor; consumer handoff pending**
+> **Status**: **implemented and verified against a clean full reactor; consumer handoff updated**
 > **Date**: 2026-08-03
-> **Revision**: r6. r3 incorporated the design review's six contract-hardening points (constructor
+> **Revision**: r10. r3 incorporated the design review's six contract-hardening points (constructor
 > invariants, stable evidence keys, corrected removal count, cascade reconciliation, qualified
 > metadata guarantee, pinned property order) plus two consequences it opened (`label` permitted on
 > `ABSTAIN` but not `ERROR`; evidence split universal versus strategy-specific). r4 moved the evidence
@@ -13,7 +18,11 @@
 > weight configuration (reject) from a valid one whose usable weight vanishes after filtering
 > (`ABSTAIN`). r6 corrects the characterization bookkeeping: the counts were 16/19, not 14/13, and
 > exactly **one** `INTENDED` assertion flips — §7 now enumerates every affected test by name and
-> records that `Majority`'s default `ErrorPolicy` change is an uncovered gap rather than a flip.
+> records that `Majority`'s default `ErrorPolicy` change is an uncovered gap rather than a flip. r10
+> records the post-implementation API refinement: the outcome-first builder remains canonical;
+> `verdict(boolean)` and the threshold-driven `scored(...)` stages restore concise common cases;
+> every `Verdict` requires an aggregate; and `Verdict.single(...)` constructs a complete one-member
+> jury result without caller repetition.
 > **Supersedes**: `agent-workflow/plans/v3/inbox/HANDOFF-agent-judge-normalized-judgment-api-2026-08-03.md`
 > where marked **[DELTA]**; adopts it unchanged everywhere else
 > **Evidence base**: `ddd-review.md` (this repo) and
@@ -37,9 +46,9 @@ The design is implemented and verified against a clean full Maven reactor.
 - **014a779** closed two contract-coverage gaps and retired stale aggregation test prose.
 - **c7d445c** removed `ReactiveJudge` and the Reactor dependency from core.
 
-**Verified result** — `./mvnw clean verify` from a clean state, BUILD SUCCESS across all eleven
-reactor modules: **433 tests, 0 failures, 0 errors, 0 skipped**. `agent-judge-core` covers
-**93.72% of lines** (gate 80%) and **92.44% of branches** (gate 75%).
+**Latest verified result — 2026-08-04** — `./mvnw clean verify`, BUILD SUCCESS across all eleven
+reactor modules: **487 tests, 0 failures, 0 errors, 0 skipped**. `agent-judge-core` covers
+**95.29% of lines** (729/765; gate 80%) and **93.67% of branches** (296/316; gate 75%).
 
 > **Correction to the dc6ca2d checkpoint claim.** That checkpoint stated that all modules reached
 > main *and test* compilation. They did not. `agent-judge-ai-core` and `agent-judge-llm` test
@@ -108,15 +117,15 @@ These are settled; listed so the delta section is unambiguous.
   `[0.0, 1.0]`, optional non-blank `label`.
 - Invariants refuse at construction: null status, NaN, ±infinity, out-of-range score, blank label.
 - `checks` and `metadata` stay immutable copies.
-- Intent-specific entry points: `verdict(boolean)`, `passing()`, `failing()`, `scored(...)`,
-  `classified(...)`, `abstaining()`, `error(...)`; direct conveniences `pass(String)`, `fail(String)`,
-  `abstain(String)`, `error(String)` retained and delegating through the same invariants.
-  (The handoff's `Throwable`-carrying error overloads are **not** adopted — see [DELTA-9].)
-- Staged builders: `scored(...)` returns a stage with **no** `build()`, forcing `.passingAt(t)` or
-  `.withStatus(s)`; `classified(...)` forces `.as(status)`. `Judgment.scored(0.82).build()` must not
-  compile.
-- `because(String)` is the primary fluent spelling; `withCheck` / `withChecks`;
-  `metadata(String, Object)` / `metadata(Map)`.
+- The general entry point is `builder()`, followed by `pass()`, `fail()`, `abstain()`, or `error()`.
+  Each choice exposes only the facts legal for that outcome.
+- Two intent helpers cover common derived outcomes without creating a second model:
+  `verdict(boolean)` selects PASS/FAIL without storing a duplicate Boolean score, while
+  `scored(...)` requires `.passingAt(threshold)` before a build-capable stage is returned. The scored
+  helper accepts either a normalized value or a raw value with a finite declared range.
+- Direct conveniences `pass(String)`, `fail(String)`, `abstain(String)`, and `error(String)` delegate
+  through the same invariants. The fluent vocabulary is `reasoning`, `score`, `label`, `check`,
+  `checks`, and `metadata`; there are no `because`, `withStatus`, or `classified` variants.
 - One central `effectiveScore()` returning `OptionalDouble` — `score` if present, else `1.0`/`0.0`
   for `PASS`/`FAIL`, else empty for `ABSTAIN`/`ERROR`. Derived view, never stored.
 - No `instanceof` score dispatch anywhere in the jury package.
@@ -590,7 +599,7 @@ catch (Exception ex) {
 }
 
 public static Judgment error(String reasoning) {
-    return Judgment.withStatus(JudgmentStatus.ERROR).because(reasoning).build();
+    return Judgment.builder().error().reasoning(reasoning).build();
 }
 
 // consumption — predicate replaces the Throwable accessor
@@ -639,12 +648,11 @@ this constraint.
 > `elapsed()` is left as-is and recorded in the consumer handoff as a named follow-up, along with the
 > question of whether `metadata` should be narrowed to the value algebra above in a later act.
 
-### [DELTA-8] `reasoning(String)` is removed outright, not deprecated
+### [DELTA-8] Keep conventional builder vocabulary
 
-The handoff permits `reasoning(String)` as a deprecated bridge for one release. Every in-repo caller
-is being migrated anyway, and every external consumer must recompile against the new `Judgment`
-regardless — so the bridge buys nothing and preserves two spellings for a vocabulary the redesign is
-trying to make univocal. `because(String)` only.
+The implemented builder keeps `reasoning(String)`, `check`, and `checks`. These names are
+conventional and match the record vocabulary. The proposed `because` and `withCheck(s)` spellings
+were not retained; one spelling per concept is still the rule.
 
 ---
 
@@ -793,7 +801,7 @@ Three consequences worth stating plainly:
 | **D2** | ~~`Consensus` and `ABSTAIN`?~~ | **DECIDED — `ABSTAIN` is not a vote; exclude it and compute consensus over the applicable judges.** `(PASS, ABSTAIN)` → `PASS`; `(FAIL, ABSTAIN)` → `FAIL`; `(PASS, FAIL)` → `ABSTAIN`. Grounded in `plans/inbox/abstain-aware-consensus.md` and a real consumer. No `ConsensusPolicy`. Truth table in [DELTA-2]. |
 | **D3** | ~~Remove `ErrorPolicy.IGNORE`?~~ | **DECIDED — keep it and fix it.** Four policies: `PROPAGATE` (new default for all five strategies), `TREAT_AS_FAIL`, `TREAT_AS_ABSTAIN`, `IGNORE`. `IGNORE` filters from the population — numerator, denominator, vote count, weight — retaining the `ERROR` in `Verdict.individual`. See [DELTA-3]. |
 | **D4** | ~~Caught exception → `ERROR` instead of `FAIL`?~~ | **DECIDED — yes, for `CommandJudge` and `FileContentJudge`,** the only two of nine catch sites that deviate from the convention. Focused boundary tests in each class. JaCoCo guard explicitly excluded pending separate adjudication. See [DELTA-4]. |
-| **D5** | ~~Keep `reasoning(String)` as a deprecated bridge?~~ | **DECIDED — no.** Everyone recompiles anyway; two spellings undercut the vocabulary fix. `because(String)` only. |
+| **D5** | ~~Builder vocabulary?~~ | **DECIDED — keep conventional names.** `reasoning`, `check`, and `checks` are the sole spellings; no `because`/`withCheck` aliases. |
 | **D6** | ~~Should `Majority`/`Consensus` store the vote ratio as `score`?~~ | **DECIDED — no.** Vote counts and participation/error counts stay as aggregation evidence in `reasoning`/`metadata`; `effectiveScore()` remains the derived `1.0`/`0.0` compatibility projection. Storing the ratio would make a configured `0.8` mean "quality ≥ 0.8" under `Average` but "80% of judges agreed" under `Majority`. |
 | **D7** | ~~`@JsonInclude(NON_NULL)` on `Judgment`?~~ | **DECIDED — yes.** Required to meet the "omitted, never null" contract without pushing global mapper config onto every consumer. |
 | **D8** | ~~Enum casing on the wire?~~ | **DECIDED — lower case: `pass`, `fail`, `abstain`, `error`.** Explicit stable wire-name fields, not `name().toLowerCase()`. Parsing exact and case-sensitive; upper case refused. See §2. |
@@ -836,11 +844,10 @@ Per handoff §7, plus what the DDD review added:
   `ABSTAIN`; reject a label on `ERROR`; **accept** a label on `ABSTAIN`; label absent / non-blank;
   reject blank label; reject null status, reasoning, checks, metadata; reject blank reasoning on
   `ERROR` and `ABSTAIN` while permitting it elsewhere; `checks` and `metadata` immutable.
-- **Fluent API** — `verdict(true|false)` derives only the status and no score; `passing()`/`failing()`;
-  `passingAt` below / above / **exactly at** threshold (`>=` passes); raw-range normalization;
-  invalid ranges rejected including `max == min` (DELTA-5); explicit status on a scored judgment
-  restricted to `PASS`/`FAIL`; `classified(...)` unbuildable before `.as(...)`; abstain/error carry
-  no manufactured score; direct factories delegate to the same invariants.
+- **Fluent API** — `verdict(true|false)` derives only the status and no score; `passingAt` below /
+  above / **exactly at** threshold (`>=` passes); raw-range normalization; invalid ranges rejected
+  including `max == min` (DELTA-5); `scored(...)` has no `build()` before `.passingAt(...)`;
+  abstain/error carry no manufactured score; direct factories delegate to the same invariants.
 - **Aggregation** — the full matrix in §4 for all five strategies: boolean-only, numeric-only, mixed,
   labelled with and without a declared numeric mapping, abstain among valid, error among valid,
   nothing eligible, empty input.

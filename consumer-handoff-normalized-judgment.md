@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 Mark Pollack
+See LICENSE.txt in the repository root for license terms.
+-->
+
 # Consumer migration handoff — normalized `Judgment` (0.13.0 → 0.14.0)
 
 > **Status**: written against the verified 0.14.0-SNAPSHOT implementation
@@ -148,9 +153,8 @@ is a statement about the outcome, not about quality being perfect.
 
 | Removed | Replacement |
 |---|---|
-| `Judgment.Builder.status(JudgmentStatus)` | an intent-specific entry point — `verdict`, `passing`, `failing`, `abstaining`, `erroring`, `withStatus`, `scored`, `classified` |
-| `Judgment.Builder.score(Score)` | `Judgment.scored(...)` staged builder, or `withNormalizedScore(double)` to refine a decided outcome |
-| `Judgment.Builder.reasoning(String)` | `because(String)` |
+| `Judgment.Builder.status(JudgmentStatus)` | `Judgment.builder().pass()` / `.fail()` / `.abstain()` / `.error()`, or `verdict(boolean)` |
+| `Judgment.Builder.score(Score)` | `score(double)` after selecting PASS/FAIL, or `scored(...).passingAt(...)` when a threshold derives the outcome |
 | `Judgment.error(String, Throwable)` | `Judgment.error(String)` — log the exception where you catch it |
 | `Throwable Judgment.error()` accessor | `boolean hasError()`, or `status() == ERROR` |
 | `"error"` metadata key convention | none — a `Judgment` is not an exception transport |
@@ -168,7 +172,9 @@ Judgment.builder().score(new BooleanScore(passed)).status(passed ? PASS : FAIL)
         .reasoning("Build " + (passed ? "succeeded" : "failed")).build();
 
 // 0.14
-Judgment.verdict(passed).because("Build " + (passed ? "succeeded" : "failed")).build();
+Judgment.verdict(passed)
+        .reasoning("Build " + (passed ? "succeeded" : "failed"))
+        .build();
 ```
 
 **Normalized numeric score.** The staged builder has no `build()` until you state the outcome, so a
@@ -179,10 +185,13 @@ score without a stated outcome policy will not compile.
 Judgment.builder().score(NumericalScore.normalized(0.82)).status(PASS).reasoning("...").build();
 
 // 0.14 — threshold-derived outcome
-Judgment.scored(0.82).passingAt(0.7).because("Quality exceeded the acceptance threshold").build();
+Judgment.scored(0.82)
+        .passingAt(0.7)
+        .reasoning("Quality exceeded the acceptance threshold")
+        .build();
 
 // 0.14 — independently decided outcome
-Judgment.scored(0.82).withStatus(JudgmentStatus.PASS).because("...").build();
+Judgment.builder().pass().score(0.82).reasoning("...").build();
 ```
 
 **Raw-range score.** Normalization happens at construction; the raw value and range are not retained.
@@ -192,7 +201,7 @@ Judgment.scored(0.82).withStatus(JudgmentStatus.PASS).because("...").build();
 Judgment.builder().score(new NumericalScore(8.5, 0.0, 10.0)).status(PASS).build();
 
 // 0.14 — normalizes to 0.85 at construction
-Judgment.scored(8.5, 0.0, 10.0).passingAt(0.7).because("...").build();
+Judgment.scored(8.5, 0.0, 10.0).passingAt(0.7).reasoning("...").build();
 ```
 
 A degenerate range where `max <= min` is now rejected rather than special-cased.
@@ -205,10 +214,10 @@ Judgment.builder().score(new CategoricalScore("relevant", List.of("relevant", "i
         .status(PASS).reasoning("...").build();
 
 // 0.14
-Judgment.classified("relevant").as(JudgmentStatus.PASS).because("...").build();
+Judgment.builder().pass().label("relevant").reasoning("...").build();
 
 // with a declared numeric meaning, where a policy owner declares it
-Judgment.classified("good").as(JudgmentStatus.PASS).withNormalizedScore(0.6).because("...").build();
+Judgment.builder().pass().label("good").score(0.6).reasoning("...").build();
 ```
 
 If you map labels to numbers, `LabelJudgmentClassifier` now owns that policy:
@@ -222,6 +231,17 @@ LabelJudgmentClassifier.builder()
 ```
 
 Labels declared without a score record a label and no score. Unmatched output abstains with neither.
+
+**One-member jury.** A `Verdict` still represents both the jury's conclusion and its evidence, even
+when the jury has only one member. Use the factory to avoid repeating the same immutable judgment:
+
+```java
+Judgment individual = Judgment.pass("File exists");
+Verdict verdict = Verdict.single("file-exists", individual);
+```
+
+This is equivalent to setting `aggregated`, `individual`, and `individualByName` explicitly. A
+`Verdict` without `aggregated` is rejected because it has evidence but no jury conclusion.
 
 **Abstention and error.** Neither carries a manufactured score any more.
 
@@ -464,7 +484,7 @@ Recorded from a read-only inventory. **No consumer repository was modified.**
 - `VersionPatternJudge` (2 sites), `BuildJudge`, and `QualityJudge` construct judgments through the
   removed builder with `BooleanScore`/`NumericalScore`. `TestAssessments` does the same in 4 test
   fixtures.
-- The Boolean-score sites are the clean case: `Judgment.verdict(passed).because(...)` replaces a
+- The Boolean-score sites are the clean case: `Judgment.verdict(passed).reasoning(...)` replaces a
   score that only ever duplicated the status.
 - `CascadedJury`, `TierConfig`, and `TierPolicy` usage is structurally unaffected — tier policies
   read individual judgments.

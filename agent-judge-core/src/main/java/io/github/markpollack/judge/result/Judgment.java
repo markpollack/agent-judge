@@ -1,17 +1,6 @@
 /*
- * Copyright 2024 Spring AI Community
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright (c) 2026 Mark Pollack
+ * See LICENSE.txt in the repository root for license terms.
  */
 
 package io.github.markpollack.judge.result;
@@ -264,6 +253,72 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 		return builder().error().reasoning(reasoning).build();
 	}
 
+	/**
+	 * Begin a Boolean judgment whose outcome is already represented as a value.
+	 * <p>
+	 * This is the concise counterpart to selecting {@link OutcomeStage#pass()} or
+	 * {@link OutcomeStage#fail()} explicitly. It records only the outcome; no duplicate
+	 * {@code 1.0}/{@code 0.0} score is stored.
+	 * </p>
+	 * @param passed whether the subject satisfied the judge
+	 * @return a finding builder with PASS or FAIL selected
+	 */
+	public static FindingBuilder verdict(boolean passed) {
+		return passed ? builder().pass() : builder().fail();
+	}
+
+	/**
+	 * Begin a quantitative judgment from an already-normalized score.
+	 * <p>
+	 * The returned stage deliberately has no {@code build()} method: a score does not
+	 * determine an outcome until the caller supplies the acceptance threshold through
+	 * {@link ScoredJudgment#passingAt(double)}.
+	 * </p>
+	 * @param normalizedScore score in [0.0, 1.0]
+	 * @return a stage requiring an acceptance threshold
+	 */
+	public static ScoredJudgment scored(double normalizedScore) {
+		requireNormalized("score", normalizedScore);
+		return new ScoredStage(normalizedScore);
+	}
+
+	/**
+	 * Begin a quantitative judgment from a raw value on a declared finite scale.
+	 * <p>
+	 * The raw value is normalized once here and is not retained as a second competing score.
+	 * The caller must still state the normalized acceptance threshold through
+	 * {@link ScoredJudgment#passingAt(double)}.
+	 * </p>
+	 * @param value the raw value, within [minimum, maximum]
+	 * @param minimum the inclusive minimum of the source scale
+	 * @param maximum the inclusive maximum of the source scale; greater than minimum
+	 * @return a stage requiring an acceptance threshold
+	 */
+	public static ScoredJudgment scored(double value, double minimum, double maximum) {
+		if (!Double.isFinite(value) || !Double.isFinite(minimum) || !Double.isFinite(maximum)) {
+			throw new IllegalArgumentException("value, minimum and maximum must all be finite");
+		}
+		if (maximum <= minimum) {
+			throw new IllegalArgumentException("maximum must be greater than minimum");
+		}
+		if (value < minimum || value > maximum) {
+			throw new IllegalArgumentException("value must be between minimum and maximum, but was " + value);
+		}
+		double range = maximum - minimum;
+		if (!Double.isFinite(range)) {
+			throw new IllegalArgumentException("maximum - minimum must be finite");
+		}
+		double normalizedScore = (value - minimum) / range;
+		requireNormalized("normalized score", normalizedScore);
+		return new ScoredStage(normalizedScore);
+	}
+
+	private static void requireNormalized(String name, double value) {
+		if (!Double.isFinite(value) || value < 0.0 || value > 1.0) {
+			throw new IllegalArgumentException(name + " must be finite and between 0.0 and 1.0, but was " + value);
+		}
+	}
+
 	// ==================== General construction ====================
 
 	/**
@@ -310,6 +365,29 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 		RequiredAbstainReason abstain();
 
 		RequiredErrorReason error();
+
+	}
+
+	/** A normalized score awaiting the threshold that determines its outcome. */
+	public interface ScoredJudgment {
+
+		/**
+		 * Derive PASS when the score is greater than or equal to the supplied threshold,
+		 * otherwise derive FAIL.
+		 * @param normalizedThreshold threshold in [0.0, 1.0]
+		 * @return a finding builder carrying both the score and derived outcome
+		 */
+		FindingBuilder passingAt(double normalizedThreshold);
+
+	}
+
+	private record ScoredStage(double normalizedScore) implements ScoredJudgment {
+
+		@Override
+		public FindingBuilder passingAt(double normalizedThreshold) {
+			requireNormalized("threshold", normalizedThreshold);
+			return verdict(this.normalizedScore >= normalizedThreshold).score(this.normalizedScore);
+		}
 
 	}
 

@@ -1,17 +1,6 @@
 /*
- * Copyright 2024 Spring AI Community
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright (c) 2026 Mark Pollack
+ * See LICENSE.txt in the repository root for license terms.
  */
 
 package io.github.markpollack.judge.jury;
@@ -22,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Verdict from a jury of judges.
@@ -43,6 +33,7 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 		Map<String, Double> weights, List<Verdict> subVerdicts) {
 
 	public Verdict {
+		Objects.requireNonNull(aggregated, "aggregated judgment must not be null");
 		// Defensive copy for immutability
 		individual = individual != null ? List.copyOf(individual) : List.of();
 		individualByName = individualByName != null ? Map.copyOf(individualByName) : Map.of();
@@ -56,6 +47,26 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 	 */
 	public static Builder builder() {
 		return new Builder();
+	}
+
+	/**
+	 * Create the complete verdict of a one-member jury without making the caller repeat the
+	 * same immutable judgment in its aggregate and evidence roles.
+	 * @param name non-blank identity of the sole judge
+	 * @param judgment the judge's result and therefore the jury's aggregate
+	 * @return a complete one-member verdict
+	 */
+	public static Verdict single(String name, Judgment judgment) {
+		Objects.requireNonNull(name, "name must not be null");
+		Objects.requireNonNull(judgment, "judgment must not be null");
+		if (name.isBlank()) {
+			throw new IllegalArgumentException("name must be non-blank");
+		}
+		return builder()
+			.aggregated(judgment)
+			.individual(List.of(judgment))
+			.individualByName(Map.of(name, judgment))
+			.build();
 	}
 
 	/**
@@ -74,7 +85,7 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 		private List<Verdict> subVerdicts = new ArrayList<>();
 
 		public Builder aggregated(Judgment aggregated) {
-			this.aggregated = aggregated;
+			this.aggregated = Objects.requireNonNull(aggregated, "aggregated judgment must not be null");
 			return this;
 		}
 

@@ -1,17 +1,6 @@
 /*
- * Copyright 2024 Spring AI Community
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright (c) 2026 Mark Pollack
+ * See LICENSE.txt in the repository root for license terms.
  */
 
 package io.github.markpollack.judge.result;
@@ -160,6 +149,49 @@ class JudgmentTest {
 	@Nested
 	@DisplayName("Fluent API")
 	class Fluent {
+
+		@Test
+		@DisplayName("verdict(boolean) derives only the corresponding status")
+		void verdictDerivesStatusWithoutDuplicateScore() {
+			Judgment passed = Judgment.verdict(true).reasoning("matched").build();
+			Judgment failed = Judgment.verdict(false).reasoning("differed").build();
+
+			assertThat(passed.status()).isEqualTo(JudgmentStatus.PASS);
+			assertThat(failed.status()).isEqualTo(JudgmentStatus.FAIL);
+			assertThat(passed.score()).isNull();
+			assertThat(failed.score()).isNull();
+		}
+
+		@Test
+		@DisplayName("scored judgment derives its status at, above, and below the threshold")
+		void scoredThresholdBoundaries() {
+			assertThat(Judgment.scored(0.69).passingAt(0.70).reasoning("x").build().status())
+				.isEqualTo(JudgmentStatus.FAIL);
+			assertThat(Judgment.scored(0.70).passingAt(0.70).reasoning("x").build().status())
+				.isEqualTo(JudgmentStatus.PASS);
+			assertThat(Judgment.scored(0.71).passingAt(0.70).reasoning("x").build().status())
+				.isEqualTo(JudgmentStatus.PASS);
+		}
+
+		@Test
+		@DisplayName("raw-range scoring normalizes once and rejects invalid scales")
+		void rawRangeScoring() {
+			Judgment judgment = Judgment.scored(82.0, 0.0, 100.0)
+				.passingAt(0.80)
+				.reasoning("quality")
+				.build();
+
+			assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
+			assertThat(judgment.score()).isEqualTo(0.82);
+			assertThatThrownBy(() -> Judgment.scored(1.0, 1.0, 1.0))
+				.isInstanceOf(IllegalArgumentException.class);
+			assertThatThrownBy(() -> Judgment.scored(11.0, 0.0, 10.0))
+				.isInstanceOf(IllegalArgumentException.class);
+			assertThatThrownBy(() -> Judgment.scored(Double.NaN))
+				.isInstanceOf(IllegalArgumentException.class);
+			assertThatThrownBy(() -> Judgment.scored(0.5).passingAt(Double.NaN))
+				.isInstanceOf(IllegalArgumentException.class);
+		}
 
 		@Test
 		@DisplayName("builder requires an explicit outcome selection")
