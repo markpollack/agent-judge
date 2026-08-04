@@ -53,8 +53,9 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  * <h2>Invariants</h2>
  * <p>
  * Every rule below is enforced in the compact constructor, so it holds for <em>any</em>
- * construction path including the canonical constructor. The staged builders make invalid
- * combinations hard to express; the constructor is what makes them impossible.
+ * construction path including the canonical constructor. The outcome-specific builder stages
+ * make incomplete or contradictory construction unavailable in ordinary autocomplete; the
+ * constructor independently enforces every cross-field combination.
  * </p>
  * <table border="1">
  * <caption>Which facts each status may carry</caption>
@@ -117,9 +118,10 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 	/**
 	 * Metadata key reserved for aggregation evidence written by voting strategies.
 	 * <p>
-	 * Callers cannot write this key through {@link Builder#metadata(String, Object)};
-	 * strategies write it through {@link Builder#aggregationEvidence(Map)}. Reserving it
-	 * means a consumer reading {@code metadata.aggregation} can trust what it finds.
+	 * Callers cannot write this key through the ordinary metadata builder methods; voting
+	 * strategies write it through their package-local aggregation helper. This prevents
+	 * accidental collision on the ordinary builder path; it is not a provenance or
+	 * authenticity guarantee for values received through the public constructor or JSON.
 	 * </p>
 	 */
 	public static final String AGGREGATION_KEY = "aggregation";
@@ -224,7 +226,7 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 	 * @return passing judgment
 	 */
 	public static Judgment pass(String reasoning) {
-		return passing().because(reasoning).build();
+		return builder().pass().reasoning(reasoning).build();
 	}
 
 	/**
@@ -233,7 +235,7 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 	 * @return failing judgment
 	 */
 	public static Judgment fail(String reasoning) {
-		return failing().because(reasoning).build();
+		return builder().fail().reasoning(reasoning).build();
 	}
 
 	/**
@@ -246,7 +248,7 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 	 * @return abstaining judgment
 	 */
 	public static Judgment abstain(String reasoning) {
-		return abstaining().because(reasoning).build();
+		return builder().abstain().reasoning(reasoning).build();
 	}
 
 	/**
@@ -259,207 +261,152 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 	 * @return error judgment
 	 */
 	public static Judgment error(String reasoning) {
-		return erroring().because(reasoning).build();
+		return builder().error().reasoning(reasoning).build();
 	}
 
-	// ==================== Intent-specific entry points ====================
+	// ==================== General construction ====================
 
 	/**
-	 * Begin a Boolean judgment whose outcome is already decided.
-	 * @param passed whether the subject satisfied the judge
-	 * @return a builder with the corresponding status set
-	 */
-	public static Builder verdict(boolean passed) {
-		return new Builder(passed ? JudgmentStatus.PASS : JudgmentStatus.FAIL);
-	}
-
-	/**
-	 * Begin a passing judgment.
+	 * Begin a judgment by selecting its required outcome.
 	 * <p>
-	 * Named {@code passing()} rather than {@code pass()} because the no-argument
-	 * {@code pass()} signature is occupied by the instance predicate {@link #pass()}.
+	 * The selected outcome narrows the methods offered by the next stage. In particular,
+	 * ABSTAIN cannot carry a score, ERROR can carry neither a score nor a label, and both
+	 * require reasoning before {@code build()} is available.
 	 * </p>
-	 * @return a builder with PASS set
+	 * @return the outcome-selection stage
 	 */
-	public static Builder passing() {
-		return new Builder(JudgmentStatus.PASS);
+	public static OutcomeStage builder() {
+		return new Builder();
 	}
 
 	/**
-	 * Begin a failing judgment.
-	 * @return a builder with FAIL set
-	 */
-	public static Builder failing() {
-		return new Builder(JudgmentStatus.FAIL);
-	}
-
-	/**
-	 * Begin an abstaining judgment.
-	 * @return a builder with ABSTAIN set
-	 */
-	public static Builder abstaining() {
-		return new Builder(JudgmentStatus.ABSTAIN);
-	}
-
-	/**
-	 * Begin an error judgment.
-	 * @return a builder with ERROR set
-	 */
-	public static Builder erroring() {
-		return new Builder(JudgmentStatus.ERROR);
-	}
-
-	/**
-	 * Begin a judgment whose status is chosen dynamically.
-	 * @param status the status; must not be null
-	 * @return a builder with that status set
-	 */
-	public static Builder withStatus(JudgmentStatus status) {
-		return new Builder(Objects.requireNonNull(status, "status must not be null"));
-	}
-
-	/**
-	 * Begin a quantitative judgment from an already-normalized value.
+	 * Copy this judgment into a builder for immutable enrichment.
 	 * <p>
-	 * The returned stage has no {@code build()}: the caller must state whether the outcome
-	 * is threshold-derived via {@link ScoredJudgment#passingAt(double)} or independently
-	 * decided via {@link ScoredJudgment#withStatus(JudgmentStatus)}. A score without a
-	 * stated outcome policy is not representable.
+	 * All six value components are preserved. Subsequent metadata calls accumulate entries
+	 * and replace only matching keys.
 	 * </p>
-	 * @param normalized the score, in [0.0, 1.0]
-	 * @return a staged builder
+	 * @return a builder initialized from this judgment
 	 */
-	public static ScoredJudgment scored(double normalized) {
-		if (!Double.isFinite(normalized)) {
-			throw new IllegalArgumentException("score must be finite, but was " + normalized);
-		}
-		if (normalized < 0.0 || normalized > 1.0) {
-			throw new IllegalArgumentException("score must be between 0.0 and 1.0, but was " + normalized);
-		}
-		return new ScoredStage(normalized);
+	public EnrichmentBuilder toBuilder() {
+		Builder builder = new Builder();
+		builder.status = this.status;
+		builder.score = this.score;
+		builder.label = this.label;
+		builder.reasoning = this.reasoning;
+		builder.checks = new ArrayList<>(this.checks);
+		builder.metadata = new HashMap<>(this.metadata);
+		return builder;
 	}
 
 	/**
-	 * Begin a quantitative judgment from a raw value on a declared scale, normalizing at
-	 * construction.
-	 * <p>
-	 * The raw value and its range are not retained: a judge that needs them for review
-	 * should record them in typed output or metadata. Publishing both a raw and a
-	 * normalized number on the same object makes the wrong one easy to read by accident.
-	 * </p>
-	 * @param value the raw value, within [min, max]
-	 * @param min the minimum of the scale
-	 * @param max the maximum of the scale; must be strictly greater than min
-	 * @return a staged builder
+	 * Select the judgment outcome. This stage deliberately has no {@code build()} method.
 	 */
-	public static ScoredJudgment scored(double value, double min, double max) {
-		if (!Double.isFinite(value) || !Double.isFinite(min) || !Double.isFinite(max)) {
-			throw new IllegalArgumentException(
-					String.format("value, min and max must all be finite, but were %s, %s and %s", value, min, max));
-		}
-		if (max <= min) {
-			throw new IllegalArgumentException(String.format("max must be greater than min, but were %s and %s", max, min));
-		}
-		if (value < min || value > max) {
-			throw new IllegalArgumentException(
-					String.format("value %s must be between %s and %s", value, min, max));
-		}
-		return new ScoredStage((value - min) / (max - min));
-	}
+	public interface OutcomeStage {
 
-	/**
-	 * Begin a categorical judgment.
-	 * <p>
-	 * The returned stage has no {@code build()}: a label is not implicitly an outcome, so
-	 * the caller must state one via {@link ClassifiedJudgment#as(JudgmentStatus)}. Nor is
-	 * a label implicitly a number — attach one only under a declared policy, via
-	 * {@link Builder#withNormalizedScore(double)}.
-	 * </p>
-	 * @param label the classification; must be non-blank
-	 * @return a staged builder
-	 */
-	public static ClassifiedJudgment classified(String label) {
-		Objects.requireNonNull(label, "label must not be null");
-		if (label.isBlank()) {
-			throw new IllegalArgumentException("label must be non-blank when present");
-		}
-		return status -> new Builder(status).label(label);
-	}
+		FindingBuilder pass();
 
-	/**
-	 * Staged builder for a quantitative judgment, requiring the outcome to be stated.
-	 */
-	public interface ScoredJudgment {
+		FindingBuilder fail();
 
-		/**
-		 * Derive the outcome by comparing the score against a threshold.
-		 * @param normalizedThreshold the acceptance threshold; a score greater than or
-		 * equal to it passes
-		 * @return a builder with score and derived status set
-		 */
-		Builder passingAt(double normalizedThreshold);
+		RequiredAbstainReason abstain();
 
-		/**
-		 * State the outcome independently of the score.
-		 * @param status must be PASS or FAIL; ABSTAIN and ERROR carry no measurement
-		 * @return a builder with score and status set
-		 */
-		Builder withStatus(JudgmentStatus status);
+		RequiredErrorReason error();
 
 	}
 
-	/**
-	 * Staged builder for a categorical judgment, requiring the outcome to be stated.
-	 */
-	@FunctionalInterface
-	public interface ClassifiedJudgment {
+	/** Common enrichment operations that are legal for every outcome. */
+	public interface EnrichmentBuilder {
 
-		/**
-		 * State the outcome this classification represents.
-		 * @param status the outcome
-		 * @return a builder with label and status set
-		 */
-		Builder as(JudgmentStatus status);
+		EnrichmentBuilder check(Check check);
+
+		EnrichmentBuilder checks(Collection<Check> checks);
+
+		EnrichmentBuilder metadata(String key, Object value);
+
+		EnrichmentBuilder metadata(Map<String, Object> metadata);
+
+		Judgment build();
 
 	}
 
-	private record ScoredStage(double normalized) implements ScoredJudgment {
+	/** Builder for completed PASS and FAIL findings. */
+	public interface FindingBuilder extends EnrichmentBuilder {
+
+		FindingBuilder reasoning(String reasoning);
+
+		FindingBuilder score(double score);
+
+		FindingBuilder label(String label);
 
 		@Override
-		public Builder passingAt(double normalizedThreshold) {
-			if (!Double.isFinite(normalizedThreshold) || normalizedThreshold < 0.0 || normalizedThreshold > 1.0) {
-				throw new IllegalArgumentException(
-						"threshold must be finite and between 0.0 and 1.0, but was " + normalizedThreshold);
-			}
-			return withStatus(normalized >= normalizedThreshold ? JudgmentStatus.PASS : JudgmentStatus.FAIL);
-		}
+		FindingBuilder check(Check check);
 
 		@Override
-		public Builder withStatus(JudgmentStatus status) {
-			Objects.requireNonNull(status, "status must not be null");
-			if (status != JudgmentStatus.PASS && status != JudgmentStatus.FAIL) {
-				throw new IllegalArgumentException(
-						status + " represents no completed measurement, so it cannot carry a score");
-			}
-			return new Builder(status).withNormalizedScore(normalized);
-		}
+		FindingBuilder checks(Collection<Check> checks);
+
+		@Override
+		FindingBuilder metadata(String key, Object value);
+
+		@Override
+		FindingBuilder metadata(Map<String, Object> metadata);
 
 	}
 
-	public static Builder builder() {
-		return new Builder(null);
+	/** Required reasoning step for an ABSTAIN outcome. */
+	public interface RequiredAbstainReason {
+
+		AbstainBuilder reasoning(String reasoning);
+
 	}
 
-	/**
-	 * Builder for {@link Judgment}.
-	 * <p>
-	 * Obtained from one of the intent-specific entry points, which set the status once,
-	 * atomically, at the point where intent is known. There is deliberately no public
-	 * {@code status(...)} setter: keeping coupled facts consistent is the value's job, not
-	 * every caller's.
-	 * </p>
-	 */
-	public static class Builder {
+	/** Builder for a reasoned ABSTAIN outcome. */
+	public interface AbstainBuilder extends EnrichmentBuilder {
+
+		AbstainBuilder reasoning(String reasoning);
+
+		AbstainBuilder label(String label);
+
+		@Override
+		AbstainBuilder check(Check check);
+
+		@Override
+		AbstainBuilder checks(Collection<Check> checks);
+
+		@Override
+		AbstainBuilder metadata(String key, Object value);
+
+		@Override
+		AbstainBuilder metadata(Map<String, Object> metadata);
+
+	}
+
+	/** Required reasoning step for an ERROR outcome. */
+	public interface RequiredErrorReason {
+
+		ErrorBuilder reasoning(String reasoning);
+
+	}
+
+	/** Builder for a reasoned ERROR outcome. */
+	public interface ErrorBuilder extends EnrichmentBuilder {
+
+		ErrorBuilder reasoning(String reasoning);
+
+		@Override
+		ErrorBuilder check(Check check);
+
+		@Override
+		ErrorBuilder checks(Collection<Check> checks);
+
+		@Override
+		ErrorBuilder metadata(String key, Object value);
+
+		@Override
+		ErrorBuilder metadata(Map<String, Object> metadata);
+
+	}
+
+	private static final class Builder implements OutcomeStage, FindingBuilder, RequiredAbstainReason, AbstainBuilder,
+			RequiredErrorReason, ErrorBuilder {
 
 		private JudgmentStatus status;
 
@@ -473,12 +420,27 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 
 		private Map<String, Object> metadata = new HashMap<>();
 
-		private Builder(JudgmentStatus status) {
-			this.status = status;
+		@Override
+		public Builder pass() {
+			this.status = JudgmentStatus.PASS;
+			return this;
 		}
 
-		private Builder label(String label) {
-			this.label = label;
+		@Override
+		public Builder fail() {
+			this.status = JudgmentStatus.FAIL;
+			return this;
+		}
+
+		@Override
+		public Builder abstain() {
+			this.status = JudgmentStatus.ABSTAIN;
+			return this;
+		}
+
+		@Override
+		public Builder error() {
+			this.status = JudgmentStatus.ERROR;
 			return this;
 		}
 
@@ -487,7 +449,11 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 		 * @param reasoning human-readable explanation
 		 * @return this builder
 		 */
-		public Builder because(String reasoning) {
+		public Builder reasoning(String reasoning) {
+			Objects.requireNonNull(reasoning, "reasoning must not be null");
+			if ((status == JudgmentStatus.ABSTAIN || status == JudgmentStatus.ERROR) && reasoning.isBlank()) {
+				throw new IllegalArgumentException(status + " requires non-blank reasoning");
+			}
 			this.reasoning = reasoning;
 			return this;
 		}
@@ -497,8 +463,28 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 		 * @param score normalized score in [0.0, 1.0]
 		 * @return this builder
 		 */
-		public Builder withNormalizedScore(double score) {
+		public Builder score(double score) {
+			if (!Double.isFinite(score)) {
+				throw new IllegalArgumentException("score must be finite, but was " + score);
+			}
+			if (score < 0.0 || score > 1.0) {
+				throw new IllegalArgumentException("score must be between 0.0 and 1.0, but was " + score);
+			}
 			this.score = score;
+			return this;
+		}
+
+		/**
+		 * Attach a classification label.
+		 * @param label the non-blank classification
+		 * @return this builder
+		 */
+		public Builder label(String label) {
+			Objects.requireNonNull(label, "label must not be null");
+			if (label.isBlank()) {
+				throw new IllegalArgumentException("label must be non-blank when present");
+			}
+			this.label = label;
 			return this;
 		}
 
@@ -507,8 +493,8 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 		 * @param check the check
 		 * @return this builder
 		 */
-		public Builder withCheck(Check check) {
-			this.checks.add(check);
+		public Builder check(Check check) {
+			this.checks.add(Objects.requireNonNull(check, "check must not be null"));
 			return this;
 		}
 
@@ -517,8 +503,8 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 		 * @param checks the checks
 		 * @return this builder
 		 */
-		public Builder withChecks(Collection<Check> checks) {
-			this.checks.addAll(checks);
+		public Builder checks(Collection<Check> checks) {
+			this.checks.addAll(List.copyOf(Objects.requireNonNull(checks, "checks must not be null")));
 			return this;
 		}
 
@@ -530,6 +516,8 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 		 * @return this builder
 		 */
 		public Builder metadata(String key, Object value) {
+			Objects.requireNonNull(key, "metadata key must not be null");
+			Objects.requireNonNull(value, "metadata value must not be null");
 			requireNotReserved(key);
 			this.metadata.put(key, value);
 			return this;
@@ -537,35 +525,22 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 
 		/**
 		 * Add several metadata entries.
+		 * Existing entries are retained; values in this map replace entries with the same
+		 * key.
 		 * @param metadata the entries; must not contain the reserved
 		 * {@value Judgment#AGGREGATION_KEY} key
 		 * @return this builder
 		 */
 		public Builder metadata(Map<String, Object> metadata) {
+			Objects.requireNonNull(metadata, "metadata must not be null");
 			metadata.keySet().forEach(Builder::requireNotReserved);
-			this.metadata.putAll(metadata);
-			return this;
-		}
-
-		/**
-		 * Record aggregation evidence under the reserved
-		 * {@value Judgment#AGGREGATION_KEY} key.
-		 * <p>
-		 * Intended for {@code VotingStrategy} implementations. The map is copied
-		 * immutably, since the enclosing {@code Map.copyOf} is only a shallow copy.
-		 * </p>
-		 * @param evidence the evidence block
-		 * @return this builder
-		 */
-		public Builder aggregationEvidence(Map<String, Object> evidence) {
-			this.metadata.put(AGGREGATION_KEY, Map.copyOf(evidence));
+			this.metadata.putAll(Map.copyOf(metadata));
 			return this;
 		}
 
 		private static void requireNotReserved(String key) {
 			if (AGGREGATION_KEY.equals(key)) {
-				throw new IllegalArgumentException("'" + AGGREGATION_KEY
-						+ "' is reserved for aggregation evidence; use aggregationEvidence(Map) instead");
+				throw new IllegalArgumentException("'" + AGGREGATION_KEY + "' is reserved for aggregation evidence");
 			}
 		}
 

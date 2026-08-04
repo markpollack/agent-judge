@@ -16,6 +16,8 @@
 
 package io.github.markpollack.judge.result;
 
+import java.util.Objects;
+
 /**
  * Individual check within a judgment.
  *
@@ -31,6 +33,14 @@ package io.github.markpollack.judge.result;
  * @since 0.1.0
  */
 public record Check(String name, boolean passed, String message) {
+
+	public Check {
+		Objects.requireNonNull(name, "name must not be null");
+		Objects.requireNonNull(message, "message must not be null");
+		if (name.isBlank()) {
+			throw new IllegalArgumentException("name must be non-blank");
+		}
+	}
 
 	public static Check pass(String name) {
 		return new Check(name, true, "");

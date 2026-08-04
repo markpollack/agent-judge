@@ -33,7 +33,6 @@ import io.github.markpollack.judge.DeterministicJudge;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
 
 /**
  * Judge that verifies the workspace is a file-level superset of a reference directory.
@@ -149,11 +148,11 @@ public class SupersetDiffJudge extends DeterministicJudge {
 		double score = (double) passed / total;
 		boolean allMatch = passed == total;
 
-		return Judgment.scored(score)
-			.withStatus(allMatch ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-			.because(allMatch ? String.format("All %d reference files matched", total)
+		return (allMatch ? Judgment.builder().pass() : Judgment.builder().fail())
+			.score(score)
+			.reasoning(allMatch ? String.format("All %d reference files matched", total)
 					: String.format("%d of %d reference files matched", passed, total))
-			.withChecks(checks)
+			.checks(checks)
 			.metadata(EXPECTED_DIR_KEY, expectedDir.toString())
 			.metadata("matchedFiles", passed)
 			.metadata("totalFiles", total)

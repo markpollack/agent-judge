@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -43,16 +42,16 @@ public class TextFileJudge extends DeterministicJudge {
 			String normalizedActual = actual.replaceAll("\\s+", " ").trim();
 
 			if (normalizedExpected.equals(normalizedActual)) {
-				return Judgment.verdict(true)
-					.because("Text file matches (whitespace-normalized)")
-					.withCheck(Check.pass(filePath))
+				return Judgment.builder().pass()
+					.reasoning("Text file matches (whitespace-normalized)")
+					.check(Check.pass(filePath))
 					.build();
 			}
 
 			String diff = generateDiff(expected, actual);
-			return Judgment.verdict(false)
-				.because("Text file differs: " + filePath)
-				.withCheck(Check.fail(filePath, diff))
+			return Judgment.builder().fail()
+				.reasoning("Text file differs: " + filePath)
+				.check(Check.fail(filePath, diff))
 				.build();
 
 		}

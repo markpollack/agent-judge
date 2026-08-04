@@ -127,7 +127,7 @@ class AverageVotingStrategyTest {
 	}
 
 	@Test
-	void shouldHandleNullScoreAsZero() {
+	void abstentionIsExcludedFromNumeratorAndDenominator() {
 		AverageVotingStrategy strategy = new AverageVotingStrategy();
 
 		List<Judgment> judgments = List.of(passJudgment(0.8), Judgment.abstain("Cannot evaluate"), passJudgment(0.6));

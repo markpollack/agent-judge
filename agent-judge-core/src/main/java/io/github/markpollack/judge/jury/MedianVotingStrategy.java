@@ -95,12 +95,12 @@ public class MedianVotingStrategy implements VotingStrategy {
 		int size = scores.length;
 		double median = (size % 2 == 0) ? (scores[size / 2 - 1] + scores[size / 2]) / 2.0 : scores[size / 2];
 
-		return Judgment.scored(median)
-			.passingAt(THRESHOLD)
-			.because(String.format("Median score: %.2f across %d applicable judge(s) (threshold: %.2f, result: %s)",
+		Judgment aggregate = (median >= THRESHOLD ? Judgment.builder().pass() : Judgment.builder().fail())
+			.score(median)
+			.reasoning(String.format("Median score: %.2f across %d applicable judge(s) (threshold: %.2f, result: %s)",
 					median, size, THRESHOLD, median >= THRESHOLD ? "pass" : "fail"))
-			.aggregationEvidence(population.evidence(getName()).build())
 			.build();
+		return AggregationEvidence.attach(aggregate, population.evidence(getName()).build());
 	}
 
 	@Override

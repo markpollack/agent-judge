@@ -26,8 +26,8 @@ class LangChain4jEvaluationDemoTest {
 		Judge relevanceCheck = (JudgmentContext ctx) -> {
 			String output = ctx.agentOutput().orElse("");
 			boolean relevant = !output.isEmpty() && output.toLowerCase().contains("spring boot");
-			return Judgment.verdict(relevant)
-				.because(relevant ? "Answer addresses Spring Boot" : "Answer does not address Spring Boot")
+			return (relevant ? Judgment.builder().pass() : Judgment.builder().fail())
+				.reasoning(relevant ? "Answer addresses Spring Boot" : "Answer does not address Spring Boot")
 				.build();
 		};
 
@@ -50,8 +50,8 @@ class LangChain4jEvaluationDemoTest {
 			@SuppressWarnings("unchecked")
 			List<ToolExecution> tools = (List<ToolExecution>) ctx.metadata().get("langchain4j.toolExecutions");
 			boolean hasTools = tools != null && !tools.isEmpty();
-			return Judgment.verdict(hasTools)
-				.because(hasTools ? "Tool executions captured" : "No tool executions found")
+			return (hasTools ? Judgment.builder().pass() : Judgment.builder().fail())
+				.reasoning(hasTools ? "Tool executions captured" : "No tool executions found")
 				.build();
 		};
 

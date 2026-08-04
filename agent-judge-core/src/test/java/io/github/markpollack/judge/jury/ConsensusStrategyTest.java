@@ -66,12 +66,11 @@ class ConsensusStrategyTest {
 	}
 
 	/**
-	 * DELTA-2: disagreement yields ABSTAIN, not FAIL. "We could not agree" is not a
-	 * finding that the subject failed, and the two must be distinguishable — previously
-	 * both returned FAIL and the difference survived only in the reasoning string.
+	 * Disagreement fails the unanimity requirement. Evidence and reasoning distinguish it
+	 * from unanimous failure without overloading ABSTAIN.
 	 */
 	@Test
-	void disagreementYieldsAbstainAndIsDistinctFromUnanimousFail() {
+	void disagreementFailsAndIsDistinguishedFromUnanimousFailByEvidence() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
 		Judgment disagreed = strategy
@@ -79,13 +78,12 @@ class ConsensusStrategyTest {
 		Judgment unanimouslyFailed = strategy
 			.aggregate(List.of(booleanFail("Judge 1"), booleanFail("Judge 2")), Map.of());
 
-		assertThat(disagreed.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(disagreed.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(disagreed.reasoning()).contains("No consensus").contains("2 passed, 1 failed");
-
 		assertThat(unanimouslyFailed.status()).isEqualTo(JudgmentStatus.FAIL);
-
-		// The distinction the strategy exists to report is now in the status itself.
-		assertThat(disagreed.status()).isNotEqualTo(unanimouslyFailed.status());
+		assertThat(unanimouslyFailed.reasoning()).contains("Unanimous consensus");
+		assertThat(evidence(disagreed)).containsEntry(AggregationEvidence.PASS_COUNT, 2)
+			.containsEntry(AggregationEvidence.FAIL_COUNT, 1);
 	}
 
 	@Test
@@ -137,15 +135,14 @@ class ConsensusStrategyTest {
 	}
 
 	@Test
-	void disagreementAcrossScoredAndStatusOnlyJudgmentsAbstains() {
+	void disagreementAcrossScoredAndStatusOnlyJudgmentsFails() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), failJudgment(0.3), booleanPass("Judge 3"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// DELTA-2: mixed applicable verdicts → no consensus → ABSTAIN, not FAIL.
-		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(result.reasoning()).contains("No consensus");
 		assertThat(result.reasoning()).contains("2 passed, 1 failed");
 	}
@@ -157,8 +154,9 @@ class ConsensusStrategyTest {
 		// Both judges passed while scoring at the bottom of the range. The removed
 		// implementation thresholded the score at 0.5 and would have called this a
 		// unanimous FAIL; reading status is what makes it a PASS.
-		List<Judgment> judgments = List.of(Judgment.scored(0.1).withStatus(JudgmentStatus.PASS).because("low but ok").build(),
-				Judgment.scored(0.2).withStatus(JudgmentStatus.PASS).because("low but ok").build());
+		List<Judgment> judgments = List.of(
+				Judgment.builder().pass().score(0.1).reasoning("low but ok").build(),
+				Judgment.builder().pass().score(0.2).reasoning("low but ok").build());
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
@@ -241,9 +239,7 @@ class ConsensusStrategyTest {
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// DELTA-2: consensus requires ALL applicable judges to agree; failing that is
-		// ABSTAIN, which is a different claim from "the subject failed".
-		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 	}
 
 	@Test
@@ -255,8 +251,8 @@ class ConsensusStrategyTest {
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// DELTA-2: a fail-leaning majority is still not consensus.
-		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		// A fail-leaning majority still fails the unanimity requirement.
+		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(result.reasoning()).contains("No consensus");
 	}
 

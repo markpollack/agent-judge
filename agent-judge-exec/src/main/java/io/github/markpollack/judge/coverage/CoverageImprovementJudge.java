@@ -23,7 +23,6 @@ import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.coverage.JaCoCoReportParser.CoverageMetrics;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
 
 /**
  * Judge that measures test coverage improvement as a numerical score.
@@ -105,9 +104,10 @@ public class CoverageImprovementJudge extends DeterministicJudge {
 
 		CoverageMetrics current = JaCoCoReportParser.parse(context.workspace());
 		if (current.linesTotal() == 0 && current.summary().contains("not found")) {
-			// A missing report is an absence of evidence, not a finding about coverage:
-			// the judge has no measurement, so it abstains rather than rejecting.
-			return Judgment.abstain("No JaCoCo report found in workspace — coverage cannot be verified");
+			// The required input to this evaluation is missing, so the judge could not
+			// complete. ERROR lets the jury's ErrorPolicy decide whether to propagate,
+			// convert, or ignore the infrastructure failure.
+			return Judgment.error("No JaCoCo report found in workspace — coverage evaluation could not complete");
 		}
 
 		double improvement = current.lineCoverage() - baselineLineCoverage;
@@ -145,10 +145,10 @@ public class CoverageImprovementJudge extends DeterministicJudge {
 							String.format("%.1f%% < %.1f%% minimum", current.lineCoverage(), minimumLineCoverage)));
 		}
 
-		return Judgment.scored(normalizedScore)
-			.withStatus(pass ? JudgmentStatus.PASS : JudgmentStatus.FAIL)
-			.because(reasoning)
-			.withChecks(checks)
+		return (pass ? Judgment.builder().pass() : Judgment.builder().fail())
+			.score(normalizedScore)
+			.reasoning(reasoning)
+			.checks(checks)
 			.metadata("baselineLineCoverage", baselineLineCoverage)
 			.metadata("currentLineCoverage", current.lineCoverage())
 			.metadata("improvementPp", improvement)

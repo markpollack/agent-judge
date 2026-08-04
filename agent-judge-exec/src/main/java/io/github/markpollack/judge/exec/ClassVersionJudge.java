@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
 
 /**
  * Judge that verifies compiled {@code .class} files have the expected major version.
@@ -125,7 +124,7 @@ public class ClassVersionJudge extends DeterministicJudge {
 				: String.format("%d of %d .class files have wrong version: %s", mismatches.size(), classFiles.size(),
 						String.join(", ", mismatches));
 
-		return Judgment.verdict(pass).because(reasoning).withChecks(checks).build();
+		return (pass ? Judgment.builder().pass() : Judgment.builder().fail()).reasoning(reasoning).checks(checks).build();
 	}
 
 	/**

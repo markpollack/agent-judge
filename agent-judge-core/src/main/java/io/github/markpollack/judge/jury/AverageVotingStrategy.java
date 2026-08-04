@@ -91,12 +91,12 @@ public class AverageVotingStrategy implements VotingStrategy {
 			.average()
 			.orElseThrow();
 
-		return Judgment.scored(average)
-			.passingAt(THRESHOLD)
-			.because(String.format("Average score: %.2f across %d applicable judge(s) (threshold: %.2f, result: %s)",
+		Judgment aggregate = (average >= THRESHOLD ? Judgment.builder().pass() : Judgment.builder().fail())
+			.score(average)
+			.reasoning(String.format("Average score: %.2f across %d applicable judge(s) (threshold: %.2f, result: %s)",
 					average, population.eligible().size(), THRESHOLD, average >= THRESHOLD ? "pass" : "fail"))
-			.aggregationEvidence(population.evidence(getName()).build())
 			.build();
+		return AggregationEvidence.attach(aggregate, population.evidence(getName()).build());
 	}
 
 	@Override

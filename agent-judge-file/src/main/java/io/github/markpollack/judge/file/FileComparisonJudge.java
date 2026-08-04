@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -74,15 +73,15 @@ public class FileComparisonJudge extends DeterministicJudge {
 			}
 
 			if (failures.isEmpty()) {
-				return Judgment.verdict(true)
-					.because("All " + checks.size() + " files match")
-					.withChecks(checks)
+				return Judgment.builder().pass()
+					.reasoning("All " + checks.size() + " files match")
+					.checks(checks)
 					.build();
 			}
 
-			return Judgment.verdict(false)
-				.because(failures.size() + " file(s) differ: " + String.join("; ", failures))
-				.withChecks(checks)
+			return Judgment.builder().fail()
+				.reasoning(failures.size() + " file(s) differ: " + String.join("; ", failures))
+				.checks(checks)
 				.build();
 
 		}

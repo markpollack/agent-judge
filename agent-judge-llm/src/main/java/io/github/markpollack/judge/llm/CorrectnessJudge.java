@@ -18,7 +18,6 @@ package io.github.markpollack.judge.llm;
 
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
 import org.springframework.ai.chat.client.ChatClient;
 
 /**
@@ -120,7 +119,7 @@ public class CorrectnessJudge extends LLMJudge {
 		// Extract reasoning (everything after "Reasoning:")
 		String reasoning = extractReasoning(response);
 
-		return Judgment.verdict(pass).because(reasoning).build();
+		return (pass ? Judgment.builder().pass() : Judgment.builder().fail()).reasoning(reasoning).build();
 	}
 
 	private String extractReasoning(String response) {

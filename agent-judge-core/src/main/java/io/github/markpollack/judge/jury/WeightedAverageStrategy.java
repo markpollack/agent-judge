@@ -131,17 +131,17 @@ public class WeightedAverageStrategy implements VotingStrategy {
 
 		double weightedAverage = weightedSum / eligibleWeight;
 
-		return Judgment.scored(weightedAverage)
-			.passingAt(THRESHOLD)
-			.because(String.format(
+		Judgment aggregate = (weightedAverage >= THRESHOLD ? Judgment.builder().pass() : Judgment.builder().fail())
+			.score(weightedAverage)
+			.reasoning(String.format(
 					"Weighted average: %.2f across %d applicable judge(s) (threshold: %.2f, result: %s)",
 					weightedAverage, population.eligible().size(), THRESHOLD,
 					weightedAverage >= THRESHOLD ? "pass" : "fail"))
-			.aggregationEvidence(population.evidence(getName())
-				.put(AggregationEvidence.INPUT_WEIGHT, inputWeight)
-				.put(AggregationEvidence.ELIGIBLE_WEIGHT, eligibleWeight)
-				.build())
 			.build();
+		return AggregationEvidence.attach(aggregate, population.evidence(getName())
+			.put(AggregationEvidence.INPUT_WEIGHT, inputWeight)
+			.put(AggregationEvidence.ELIGIBLE_WEIGHT, eligibleWeight)
+			.build());
 	}
 
 	private static double[] resolveWeights(int count, Map<String, Double> weights) {

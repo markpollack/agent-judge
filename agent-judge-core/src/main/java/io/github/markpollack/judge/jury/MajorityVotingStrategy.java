@@ -115,13 +115,16 @@ public class MajorityVotingStrategy implements VotingStrategy {
 					majorityPass ? "pass" : "fail");
 		}
 
-		return Judgment.withStatus(status)
-			.because(reasoning)
-			.aggregationEvidence(population.evidence(getName())
+		Judgment aggregate = switch (status) {
+			case PASS -> Judgment.builder().pass().reasoning(reasoning).build();
+			case FAIL -> Judgment.builder().fail().reasoning(reasoning).build();
+			case ABSTAIN -> Judgment.builder().abstain().reasoning(reasoning).build();
+			case ERROR -> throw new IllegalStateException("Majority cannot produce ERROR after population resolution");
+		};
+		return AggregationEvidence.attach(aggregate, population.evidence(getName())
 				.put(AggregationEvidence.PASS_COUNT, passCount)
 				.put(AggregationEvidence.FAIL_COUNT, failCount)
-				.build())
-			.build();
+				.build());
 	}
 
 	@Override

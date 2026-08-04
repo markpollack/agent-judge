@@ -102,6 +102,13 @@ public final class AggregationEvidence {
 		return new Builder();
 	}
 
+	static Judgment attach(Judgment judgment, Map<String, Object> evidence) {
+		Map<String, Object> metadata = new LinkedHashMap<>(judgment.metadata());
+		metadata.put(Judgment.AGGREGATION_KEY, Map.copyOf(evidence));
+		return new Judgment(judgment.status(), judgment.score(), judgment.label(), judgment.reasoning(), judgment.checks(),
+				metadata);
+	}
+
 	/**
 	 * Accumulates evidence entries and produces an immutable map.
 	 */

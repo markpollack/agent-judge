@@ -88,7 +88,7 @@ public class FaithfulnessJudge extends LLMJudge {
 			reasoning = response;
 		}
 
-		return Judgment.verdict(pass).because(reasoning).build();
+		return (pass ? Judgment.builder().pass() : Judgment.builder().fail()).reasoning(reasoning).build();
 	}
 
 	private static String extractAfter(String text, String marker) {

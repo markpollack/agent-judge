@@ -9,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -52,16 +51,16 @@ public class JavaSemanticJudge extends DeterministicJudge {
 			ComparisonResult result = comparator.compare(expected, actual);
 
 			if (result.equivalent()) {
-				return Judgment.verdict(true)
-					.because("Java semantically matches")
-					.withCheck(Check.pass(filePath))
+				return Judgment.builder().pass()
+					.reasoning("Java semantically matches")
+					.check(Check.pass(filePath))
 					.build();
 			}
 
 			String diff = String.join("\n", result.differences());
-			return Judgment.verdict(false)
-				.because("Java semantic differences: " + diff)
-				.withCheck(Check.fail(filePath, diff))
+			return Judgment.builder().fail()
+				.reasoning("Java semantic differences: " + diff)
+				.check(Check.fail(filePath, diff))
 				.build();
 
 		}

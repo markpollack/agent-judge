@@ -22,6 +22,7 @@ import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.fs.FileContentJudge.MatchMode;
 import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -58,10 +59,24 @@ class FileContentJudgeTest {
 		FileContentJudge judge = new FileContentJudge("test.txt", "Goodbye World", MatchMode.EXACT);
 		Judgment judgment = judge.judge(createContext());
 
-		assertThat(judgment.pass()).isFalse();
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.checks()).hasSize(3);
 		assertThat(judgment.checks().get(2).passed()).isFalse();
 		assertThat(judgment.checks().get(2).name()).isEqualTo("content_match");
+	}
+
+	@Test
+	void readFailureProducesErrorRatherThanFail() throws IOException {
+		Files.createDirectory(tempDir.resolve("directory.txt"));
+		FileContentJudge judge = new FileContentJudge("directory.txt", "content", MatchMode.EXACT);
+
+		Judgment judgment = judge.judge(createContext());
+
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(judgment.reasoning()).contains("Failed to read file");
+		assertThat(judgment.checks()).extracting("name").containsExactly("file_exists", "file_readable");
+		assertThat(judgment.checks().get(0).passed()).isTrue();
+		assertThat(judgment.checks().get(1).passed()).isFalse();
 	}
 
 	@Test

@@ -20,7 +20,6 @@ import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -93,9 +92,10 @@ public final class JudgeTestFixtures {
 	 * @return score-based judge
 	 */
 	public static Judge withScore(String name, double score) {
-		JudgmentStatus status = score >= 0.5 ? JudgmentStatus.PASS : JudgmentStatus.FAIL;
-		return Judges.named(ctx -> Judgment.scored(score).withStatus(status).because("Score: " + score).build(), name,
-				null, JudgeType.DETERMINISTIC);
+		return Judges.named(ctx -> (score >= 0.5 ? Judgment.builder().pass() : Judgment.builder().fail())
+			.score(score)
+			.reasoning("Score: " + score)
+			.build(), name, null, JudgeType.DETERMINISTIC);
 	}
 
 	/**
@@ -185,9 +185,9 @@ public final class JudgeTestFixtures {
 	 * @return passing judgment
 	 */
 	public static Judgment passJudgment(double score) {
-		return Judgment.scored(score)
-			.withStatus(JudgmentStatus.PASS)
-			.because("Test passed with score " + score)
+		return Judgment.builder().pass()
+			.score(score)
+			.reasoning("Test passed with score " + score)
 			.build();
 	}
 
@@ -197,9 +197,9 @@ public final class JudgeTestFixtures {
 	 * @return failing judgment
 	 */
 	public static Judgment failJudgment(double score) {
-		return Judgment.scored(score)
-			.withStatus(JudgmentStatus.FAIL)
-			.because("Test failed with score " + score)
+		return Judgment.builder().fail()
+			.score(score)
+			.reasoning("Test failed with score " + score)
 			.build();
 	}
 
@@ -209,7 +209,7 @@ public final class JudgeTestFixtures {
 	 * @return passing judgment
 	 */
 	public static Judgment booleanPass(String reasoning) {
-		return Judgment.verdict(true).because(reasoning).build();
+		return Judgment.builder().pass().reasoning(reasoning).build();
 	}
 
 	/**
@@ -218,7 +218,7 @@ public final class JudgeTestFixtures {
 	 * @return failing judgment
 	 */
 	public static Judgment booleanFail(String reasoning) {
-		return Judgment.verdict(false).because(reasoning).build();
+		return Judgment.builder().fail().reasoning(reasoning).build();
 	}
 
 	// ==================== Sample Verdicts ====================

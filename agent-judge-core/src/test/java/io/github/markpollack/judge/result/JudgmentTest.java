@@ -19,9 +19,10 @@ package io.github.markpollack.judge.result;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -70,9 +71,9 @@ class JudgmentTest {
 		@DisplayName("score accepts absent, 0.0, 1.0 and interior values")
 		void scoreBoundaries() {
 			assertThat(Judgment.pass("ok").score()).isNull();
-			assertThat(Judgment.scored(0.0).withStatus(JudgmentStatus.FAIL).because("x").build().score()).isZero();
-			assertThat(Judgment.scored(1.0).withStatus(JudgmentStatus.PASS).because("x").build().score()).isOne();
-			assertThat(Judgment.scored(0.42).withStatus(JudgmentStatus.PASS).because("x").build().score())
+			assertThat(Judgment.builder().fail().score(0.0).reasoning("x").build().score()).isZero();
+			assertThat(Judgment.builder().pass().score(1.0).reasoning("x").build().score()).isOne();
+			assertThat(Judgment.builder().pass().score(0.42).reasoning("x").build().score())
 				.isEqualTo(0.42);
 		}
 
@@ -83,6 +84,16 @@ class JudgmentTest {
 					Double.NEGATIVE_INFINITY }) {
 				assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, bad, null, "x", List.of(), Map.of()))
 					.as("score %s", bad)
+					.isInstanceOf(IllegalArgumentException.class);
+			}
+		}
+
+		@Test
+		@DisplayName("builder rejects out-of-range and non-finite scores when supplied")
+		void builderScoreRejected() {
+			for (double bad : new double[] { -0.1, 1.1, Double.NaN, Double.POSITIVE_INFINITY,
+					Double.NEGATIVE_INFINITY }) {
+				assertThatThrownBy(() -> Judgment.builder().pass().score(bad).build()).as("score %s", bad)
 					.isInstanceOf(IllegalArgumentException.class);
 			}
 		}
@@ -101,7 +112,7 @@ class JudgmentTest {
 		@Test
 		@DisplayName("label must be non-blank when present")
 		void labelNonBlank() {
-			assertThat(Judgment.classified("relevant").as(JudgmentStatus.PASS).because("x").build().label())
+			assertThat(Judgment.builder().pass().label("relevant").reasoning("x").build().label())
 				.isEqualTo("relevant");
 			assertThat(Judgment.pass("ok").label()).isNull();
 			assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, null, "  ", "x", List.of(), Map.of()))
@@ -151,74 +162,20 @@ class JudgmentTest {
 	class Fluent {
 
 		@Test
-		@DisplayName("verdict(boolean) derives only the status, with no score")
-		void verdictDerivesStatusOnly() {
-			assertThat(Judgment.verdict(true).because("x").build().status()).isEqualTo(JudgmentStatus.PASS);
-			assertThat(Judgment.verdict(false).because("x").build().status()).isEqualTo(JudgmentStatus.FAIL);
-			assertThat(Judgment.verdict(true).because("x").build().score()).isNull();
+		@DisplayName("builder requires an explicit outcome selection")
+		void outcomeFirstBuilder() {
+			assertThat(Judgment.builder()).isInstanceOf(Judgment.OutcomeStage.class);
+			assertThat(Judgment.builder().pass().build().status()).isEqualTo(JudgmentStatus.PASS);
+			assertThat(Judgment.builder().fail().build().status()).isEqualTo(JudgmentStatus.FAIL);
 		}
 
 		@Test
-		@DisplayName("passing()/failing()/abstaining()/erroring()")
-		void namedEntryPoints() {
-			assertThat(Judgment.passing().because("x").build().status()).isEqualTo(JudgmentStatus.PASS);
-			assertThat(Judgment.failing().because("x").build().status()).isEqualTo(JudgmentStatus.FAIL);
-			assertThat(Judgment.abstaining().because("x").build().status()).isEqualTo(JudgmentStatus.ABSTAIN);
-			assertThat(Judgment.erroring().because("x").build().status()).isEqualTo(JudgmentStatus.ERROR);
-		}
-
-		@Test
-		@DisplayName("passingAt: below, above, and exactly at the threshold")
-		void thresholdBoundaries() {
-			assertThat(Judgment.scored(0.69).passingAt(0.70).because("x").build().status())
-				.isEqualTo(JudgmentStatus.FAIL);
-			assertThat(Judgment.scored(0.71).passingAt(0.70).because("x").build().status())
-				.isEqualTo(JudgmentStatus.PASS);
-			// Exactly at the threshold passes: the comparison is >=.
-			assertThat(Judgment.scored(0.70).passingAt(0.70).because("x").build().status())
-				.isEqualTo(JudgmentStatus.PASS);
-		}
-
-		@Test
-		@DisplayName("raw-range input normalizes at construction")
-		void rawRangeNormalizes() {
-			assertThat(Judgment.scored(82.0, 0.0, 100.0).passingAt(0.7).because("x").build().score())
-				.isCloseTo(0.82, Offset.offset(1e-9));
-			assertThat(Judgment.scored(8.5, 0.0, 10.0).passingAt(0.7).because("x").build().score())
-				.isCloseTo(0.85, Offset.offset(1e-9));
-		}
-
-		@Test
-		@DisplayName("invalid ranges are rejected, including max == min")
-		void invalidRanges() {
-			assertThatThrownBy(() -> Judgment.scored(5.0, 5.0, 5.0)).isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("max must be greater than min");
-			assertThatThrownBy(() -> Judgment.scored(5.0, 10.0, 0.0)).isInstanceOf(IllegalArgumentException.class);
-			assertThatThrownBy(() -> Judgment.scored(20.0, 0.0, 10.0)).isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("must be between");
-			assertThatThrownBy(() -> Judgment.scored(Double.NaN, 0.0, 10.0))
-				.isInstanceOf(IllegalArgumentException.class);
-		}
-
-		@Test
-		@DisplayName("a scored judgment's explicit status is restricted to PASS/FAIL")
-		void scoredStatusRestricted() {
-			assertThat(Judgment.scored(0.5).withStatus(JudgmentStatus.PASS).because("x").build().status())
-				.isEqualTo(JudgmentStatus.PASS);
-			assertThatThrownBy(() -> Judgment.scored(0.5).withStatus(JudgmentStatus.ABSTAIN))
-				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("cannot carry a score");
-			assertThatThrownBy(() -> Judgment.scored(0.5).withStatus(JudgmentStatus.ERROR))
-				.isInstanceOf(IllegalArgumentException.class);
-		}
-
-		@Test
-		@DisplayName("a classified judgment can add a declared normalized score")
-		void classifiedWithDeclaredScore() {
-			Judgment judgment = Judgment.classified("excellent")
-				.as(JudgmentStatus.PASS)
-				.withNormalizedScore(1.0)
-				.because("all criteria satisfied")
+		@DisplayName("one builder composes scored and classified judgments")
+		void conventionalBuilder() {
+			Judgment judgment = Judgment.builder().pass()
+				.label("excellent")
+				.score(1.0)
+				.reasoning("all criteria satisfied")
 				.build();
 
 			assertThat(judgment.label()).isEqualTo("excellent");
@@ -226,10 +183,16 @@ class JudgmentTest {
 		}
 
 		@Test
-		@DisplayName("classified rejects a blank label")
-		void classifiedRejectsBlank() {
-			assertThatThrownBy(() -> Judgment.classified("  ")).isInstanceOf(IllegalArgumentException.class)
+		@DisplayName("outcome stages expose only legal next operations")
+		void outcomeStagesNarrowTheApi() {
+			assertThatThrownBy(() -> Judgment.builder().pass().label("  ").build())
+				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("non-blank");
+
+			assertThat(methodNames(Judgment.RequiredAbstainReason.class)).containsExactly("reasoning");
+			assertThat(methodNames(Judgment.RequiredErrorReason.class)).containsExactly("reasoning");
+			assertThat(methodNames(Judgment.AbstainBuilder.class)).doesNotContain("score");
+			assertThat(methodNames(Judgment.ErrorBuilder.class)).doesNotContain("score", "label");
 		}
 
 		@Test
@@ -250,7 +213,7 @@ class JudgmentTest {
 			assertThat(Judgment.fail("x").effectiveScore()).hasValue(0.0);
 			assertThat(Judgment.abstain("x").effectiveScore()).isEmpty();
 			assertThat(Judgment.error("x").effectiveScore()).isEmpty();
-			assertThat(Judgment.scored(0.3).withStatus(JudgmentStatus.FAIL).because("x").build().effectiveScore())
+			assertThat(Judgment.builder().fail().score(0.3).reasoning("x").build().effectiveScore())
 				.hasValue(0.3);
 		}
 
@@ -266,10 +229,10 @@ class JudgmentTest {
 		@Test
 		@DisplayName("checks and metadata accumulate")
 		void checksAndMetadata() {
-			Judgment judgment = Judgment.verdict(true)
-				.because("x")
-				.withCheck(Check.pass("a"))
-				.withChecks(List.of(Check.pass("b"), Check.fail("c", "bad")))
+			Judgment judgment = Judgment.builder().pass()
+				.reasoning("x")
+				.check(Check.pass("a"))
+				.checks(List.of(Check.pass("b"), Check.fail("c", "bad")))
 				.metadata("model", "gpt")
 				.metadata(Map.of("usage", 12))
 				.build();
@@ -279,11 +242,35 @@ class JudgmentTest {
 		}
 
 		@Test
+		@DisplayName("toBuilder preserves every component and supports enrichment")
+		void copyAndEnrich() {
+			Judgment original = Judgment.builder().pass()
+				.label("relevant")
+				.score(0.8)
+				.reasoning("matched")
+				.check(Check.pass("shape"))
+				.metadata("source", "model")
+				.build();
+
+			Judgment enriched = original.toBuilder().metadata("traceId", "abc").build();
+
+			assertThat(enriched.status()).isEqualTo(original.status());
+			assertThat(enriched.score()).isEqualTo(original.score());
+			assertThat(enriched.label()).isEqualTo(original.label());
+			assertThat(enriched.reasoning()).isEqualTo(original.reasoning());
+			assertThat(enriched.checks()).isEqualTo(original.checks());
+			assertThat(enriched.metadata()).containsEntry("source", "model").containsEntry("traceId", "abc");
+		}
+
+		@Test
 		@DisplayName("elapsed() reads the metadata convention")
 		void elapsed() {
 			assertThat(Judgment.pass("x").elapsed()).isNull();
 
-			Judgment timed = Judgment.verdict(true).because("x").metadata("elapsed", Duration.ofMillis(100)).build();
+			Judgment timed = Judgment.builder().pass()
+				.reasoning("x")
+				.metadata("elapsed", Duration.ofMillis(100))
+				.build();
 			assertThat(timed.elapsed()).isEqualTo(Duration.ofMillis(100));
 		}
 
@@ -294,38 +281,35 @@ class JudgmentTest {
 	class ReservedNamespace {
 
 		@Test
-		@DisplayName("callers cannot write the reserved key")
-		void callersRefused() {
-			assertThatThrownBy(() -> Judgment.verdict(true).metadata(Judgment.AGGREGATION_KEY, "mine"))
+		@DisplayName("ordinary metadata methods reject the reserved key")
+		void ordinaryMetadataMethodsRefuseReservedKey() {
+			assertThatThrownBy(() -> Judgment.builder().pass().metadata(Judgment.AGGREGATION_KEY, "mine"))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("reserved");
-			assertThatThrownBy(() -> Judgment.verdict(true).metadata(Map.of(Judgment.AGGREGATION_KEY, "mine")))
+			assertThatThrownBy(() -> Judgment.builder().pass()
+				.metadata(Map.of(Judgment.AGGREGATION_KEY, "mine")))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("reserved");
+		}
+
+		@Test
+		@DisplayName("reservation is namespacing, not provenance authentication")
+		void publicConstructionDoesNotAuthenticateEvidence() {
+			Judgment direct = new Judgment(JudgmentStatus.PASS, null, null, "x", List.of(),
+					Map.of(Judgment.AGGREGATION_KEY, Map.of("strategy", "caller")));
+
+			assertThat(direct.metadata()).containsKey(Judgment.AGGREGATION_KEY);
 		}
 
 		@Test
 		@DisplayName("an unrelated caller key is unaffected")
 		void unrelatedKeysFine() {
-			Judgment judgment = Judgment.verdict(true).because("x").metadata("aggregations", "mine").build();
-
-			assertThat(judgment.metadata()).containsEntry("aggregations", "mine");
-		}
-
-		@Test
-		@DisplayName("the evidence block is deeply immutable")
-		void evidenceDeeplyImmutable() {
-			Judgment judgment = Judgment.verdict(true)
-				.because("x")
-				.aggregationEvidence(Map.of("inputCount", 2))
+			Judgment judgment = Judgment.builder().pass()
+				.reasoning("x")
+				.metadata("aggregations", "mine")
 				.build();
 
-			@SuppressWarnings("unchecked")
-			Map<String, Object> block = (Map<String, Object>) judgment.metadata().get(Judgment.AGGREGATION_KEY);
-
-			// Map.copyOf on the Judgment is shallow, so the nested block needs its own
-			// immutability or a caller could mutate it through the returned metadata.
-			assertThatThrownBy(() -> block.put("inputCount", 99)).isInstanceOf(UnsupportedOperationException.class);
+			assertThat(judgment.metadata()).containsEntry("aggregations", "mine");
 		}
 
 	}
@@ -344,9 +328,9 @@ class JudgmentTest {
 		@Test
 		@DisplayName("quantitative verdict includes score")
 		void scoredWire() throws Exception {
-			Judgment judgment = Judgment.scored(0.82)
-				.passingAt(0.70)
-				.because("Quality exceeded the acceptance threshold")
+			Judgment judgment = Judgment.builder().pass()
+				.score(0.82)
+				.reasoning("Quality exceeded the acceptance threshold")
 				.build();
 
 			assertThat(MAPPER.writeValueAsString(judgment)).isEqualTo("{\"status\":\"pass\",\"score\":0.82,"
@@ -356,9 +340,9 @@ class JudgmentTest {
 		@Test
 		@DisplayName("categorical verdict includes label")
 		void classifiedWire() throws Exception {
-			Judgment judgment = Judgment.classified("relevant")
-				.as(JudgmentStatus.PASS)
-				.because("The document directly supports the claim")
+			Judgment judgment = Judgment.builder().pass()
+				.label("relevant")
+				.reasoning("The document directly supports the claim")
 				.build();
 
 			assertThat(MAPPER.writeValueAsString(judgment)).isEqualTo("{\"status\":\"pass\",\"label\":\"relevant\","
@@ -399,10 +383,10 @@ class JudgmentTest {
 		@Test
 		@DisplayName("round-trips through deserialization")
 		void roundTrip() throws Exception {
-			Judgment original = Judgment.scored(0.42)
-				.withStatus(JudgmentStatus.FAIL)
-				.because("below bar")
-				.withCheck(Check.fail("c", "bad"))
+			Judgment original = Judgment.builder().fail()
+				.score(0.42)
+				.reasoning("below bar")
+				.check(Check.fail("c", "bad"))
 				.build();
 
 			assertThat(MAPPER.readValue(MAPPER.writeValueAsString(original), Judgment.class)).isEqualTo(original);
@@ -413,13 +397,22 @@ class JudgmentTest {
 		void nonPortableMetadata() {
 			// The declared fields are unconditionally serializable; the whole judgment is
 			// portable only when every metadata value belongs to the JSON value algebra.
-			Judgment judgment = Judgment.verdict(true).because("x").metadata("elapsed", Duration.ofMillis(100)).build();
+			Judgment judgment = Judgment.builder().pass()
+				.reasoning("x")
+				.metadata("elapsed", Duration.ofMillis(100))
+				.build();
 
 			assertThatThrownBy(() -> MAPPER.readValue(MAPPER.writeValueAsString(judgment), Judgment.class))
 				.as("a Duration does not round-trip under a plain ObjectMapper")
 				.isInstanceOf(Exception.class);
 		}
 
+	}
+
+	private static Set<String> methodNames(Class<?> type) {
+		return java.util.Arrays.stream(type.getDeclaredMethods())
+			.map(java.lang.reflect.Method::getName)
+			.collect(Collectors.toSet());
 	}
 
 }

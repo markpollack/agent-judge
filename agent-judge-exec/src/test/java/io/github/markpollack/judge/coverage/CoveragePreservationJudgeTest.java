@@ -79,22 +79,21 @@ class CoveragePreservationJudgeTest {
 	}
 
 	@Test
-	void noReportReturnsAbstain() {
+	void noReportReturnsError() {
 		CoverageMetrics baseline = new CoverageMetrics(80.0, 0, 0, 80, 100, 0, 0, 0, 0, "baseline");
 
 		Judgment judgment = judge.judge(contextWithBaseline(baseline));
 
-		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).contains("No JaCoCo report");
 	}
 
 	/**
-	 * A missing report and a measured drop are different facts, and the judge must not
-	 * collapse them: with no report it has no measurement of coverage at all, whereas a
-	 * measured drop past the threshold is a completed negative finding.
+	 * A missing required report means the evaluation could not complete; a measured drop
+	 * is a completed negative finding.
 	 */
 	@Test
-	void missingReportAbstainsWhereMeasuredDropFails() throws IOException {
+	void missingReportErrorsWhereMeasuredDropFails() throws IOException {
 		CoverageMetrics baseline = new CoverageMetrics(80.0, 0, 0, 80, 100, 0, 0, 0, 0, "baseline");
 
 		Judgment withoutReport = judge.judge(contextWithBaseline(baseline));
@@ -102,7 +101,7 @@ class CoveragePreservationJudgeTest {
 		writeJacocoReport(70, 30); // 70% — a 10pp drop, actually measured
 		Judgment withMeasuredDrop = judge.judge(contextWithBaseline(baseline));
 
-		assertThat(withoutReport.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(withoutReport.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(withMeasuredDrop.status()).isEqualTo(JudgmentStatus.FAIL);
 	}
 

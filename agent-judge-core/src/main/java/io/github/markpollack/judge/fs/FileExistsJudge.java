@@ -24,7 +24,6 @@ import java.nio.file.Path;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
 
 /**
  * Judge that verifies file existence in the workspace.
@@ -63,10 +62,10 @@ public class FileExistsJudge extends DeterministicJudge {
 		Path targetFile = context.workspace().resolve(filePath);
 		boolean exists = Files.exists(targetFile);
 
-		return Judgment.verdict(exists)
-			.because(exists ? String.format("File exists at %s", filePath)
+		return (exists ? Judgment.builder().pass() : Judgment.builder().fail())
+			.reasoning(exists ? String.format("File exists at %s", filePath)
 					: String.format("File not found at %s", filePath))
-			.withCheck(exists ? Check.pass("file_exists", "File found at " + filePath)
+			.check(exists ? Check.pass("file_exists", "File found at " + filePath)
 					: Check.fail("file_exists", "File not found at " + filePath))
 			.build();
 	}

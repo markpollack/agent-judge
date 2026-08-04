@@ -172,16 +172,14 @@ class MetaJuryTest {
 		JudgmentContext context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
-		// DELTA-2: one sub-jury passing and one failing is disagreement, not a finding
-		// that the subject failed, so consensus over them yields ABSTAIN.
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		// One sub-jury passing and one failing does not meet the unanimity contract.
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(verdict.aggregated().reasoning()).contains("No consensus");
 	}
 
 	/**
-	 * DELTA-2: the contrast that gives the case above its meaning. When every sub-jury
-	 * agrees on failure the consensus is FAIL — a status the disagreement case can no
-	 * longer be confused with.
+	 * When every sub-jury agrees on failure the status is also FAIL, while reasoning and
+	 * vote evidence distinguish it from disagreement.
 	 */
 	@Test
 	void shouldFailConsensusWhenAllSubJuriesFail() {

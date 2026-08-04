@@ -84,10 +84,6 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 
 			if (status == JudgmentStatus.ERROR) {
 				errorCount++;
-				if (errorPolicy == ErrorPolicy.PROPAGATE) {
-					return new AggregationPopulation(List.of(), List.of(), judgments.size(), explicitAbstainCount,
-							countErrors(judgments), errorPolicy, true);
-				}
 				if (errorPolicy == ErrorPolicy.TREAT_AS_FAIL) {
 					// Participates as a FAIL, preserving why it errored.
 					eligible.add(Judgment.fail("Error treated as failure: " + judgment.reasoning()));
@@ -102,12 +98,16 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 			eligibleIndices.add(index);
 		}
 
+		// PROPAGATE decides the aggregate after the complete population has been
+		// inspected. Returning at the first error made evidence such as
+		// explicitAbstainCount depend on input order.
+		if (errorPolicy == ErrorPolicy.PROPAGATE && errorCount > 0) {
+			return new AggregationPopulation(List.of(), List.of(), judgments.size(), explicitAbstainCount, errorCount,
+					errorPolicy, true);
+		}
+
 		return new AggregationPopulation(List.copyOf(eligible), List.copyOf(eligibleIndices), judgments.size(),
 				explicitAbstainCount, errorCount, errorPolicy, false);
-	}
-
-	private static int countErrors(List<Judgment> judgments) {
-		return (int) judgments.stream().filter(j -> j.status() == JudgmentStatus.ERROR).count();
 	}
 
 	boolean isEmpty() {
@@ -142,11 +142,11 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @return an error judgment carrying the evidence
 	 */
 	Judgment propagatedError(String strategyToken) {
-		return Judgment.erroring()
-			.because(String.format("%d of %d judgments errored and the error policy is propagate", this.errorCount,
+		Judgment aggregate = Judgment.builder().error()
+			.reasoning(String.format("%d of %d judgments errored and the error policy is propagate", this.errorCount,
 					this.inputCount))
-			.aggregationEvidence(evidence(strategyToken).build())
 			.build();
+		return AggregationEvidence.attach(aggregate, evidence(strategyToken).build());
 	}
 
 	/**
@@ -169,7 +169,8 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 			}
 		});
 
-		return Judgment.abstaining().because(noResultReasoning()).aggregationEvidence(evidence.build()).build();
+		Judgment aggregate = Judgment.builder().abstain().reasoning(noResultReasoning()).build();
+		return AggregationEvidence.attach(aggregate, evidence.build());
 	}
 
 	private String noResultReasoning() {

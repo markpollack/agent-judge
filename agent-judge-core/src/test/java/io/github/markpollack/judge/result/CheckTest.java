@@ -19,6 +19,7 @@ package io.github.markpollack.judge.result;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Tests for {@link Check}.
@@ -113,6 +114,13 @@ class CheckTest {
 		Check check = new Check("Test", true, "");
 
 		assertThat(check.message()).isEmpty();
+	}
+
+	@Test
+	void shouldRejectInvalidRecordComponents() {
+		assertThatThrownBy(() -> new Check(null, true, "message")).isInstanceOf(NullPointerException.class);
+		assertThatThrownBy(() -> new Check("  ", true, "message")).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> new Check("name", true, null)).isInstanceOf(NullPointerException.class);
 	}
 
 }

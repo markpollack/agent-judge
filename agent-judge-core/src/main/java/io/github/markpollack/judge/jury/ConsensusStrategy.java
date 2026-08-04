@@ -43,17 +43,16 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * <tr><td>all FAIL</td><td>FAIL</td></tr>
  * <tr><td>PASS + ABSTAIN</td><td>PASS</td></tr>
  * <tr><td>FAIL + ABSTAIN</td><td>FAIL</td></tr>
- * <tr><td>PASS + FAIL</td><td>ABSTAIN — the applicable judges disagree</td></tr>
+ * <tr><td>PASS + FAIL</td><td>FAIL — unanimity was not reached</td></tr>
  * <tr><td>all ABSTAIN</td><td>ABSTAIN</td></tr>
  * <tr><td>any ERROR</td><td>per {@link ErrorPolicy}, default PROPAGATE</td></tr>
  * </table>
  *
  * <p>
- * Disagreement yields {@code ABSTAIN} rather than {@code FAIL}: "we could not agree" is not
- * a finding that the subject failed. Whether disagreement <em>ought</em> to block is a
- * downstream policy decision, and folding it into the consensus calculation would obscure
- * the fact being computed. That is also why there is no {@code ConsensusPolicy} — consensus
- * has a definite meaning.
+ * Disagreement yields {@code FAIL}: every applicable judge completed, but the unanimity
+ * requirement was not met. The reasoning and pass/fail evidence distinguish disagreement
+ * from unanimous failure. {@code ABSTAIN} remains reserved for a population with no
+ * applicable finding.
  * </p>
  *
  * <p>
@@ -118,18 +117,20 @@ public class ConsensusStrategy implements VotingStrategy {
 			reasoning = String.format("Unanimous consensus: all %d applicable judge(s) failed", eligibleCount);
 		}
 		else {
-			status = JudgmentStatus.ABSTAIN;
+			status = JudgmentStatus.FAIL;
 			reasoning = String.format("No consensus: %d passed, %d failed among %d applicable judge(s)", passCount,
 					failCount, eligibleCount);
 		}
 
-		return Judgment.withStatus(status)
-			.because(reasoning)
-			.aggregationEvidence(population.evidence(getName())
+		Judgment aggregate = switch (status) {
+			case PASS -> Judgment.builder().pass().reasoning(reasoning).build();
+			case FAIL -> Judgment.builder().fail().reasoning(reasoning).build();
+			case ABSTAIN, ERROR -> throw new IllegalStateException("Consensus produced an unexpected status: " + status);
+		};
+		return AggregationEvidence.attach(aggregate, population.evidence(getName())
 				.put(AggregationEvidence.PASS_COUNT, passCount)
 				.put(AggregationEvidence.FAIL_COUNT, failCount)
-				.build())
-			.build();
+				.build());
 	}
 
 	@Override

@@ -21,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir;
 import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentStatus;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,9 +61,25 @@ class CommandJudgeTest {
 		CommandJudge judge = new CommandJudge("nonexistentcommand123");
 		Judgment judgment = judge.judge(createContext());
 
-		assertThat(judgment.pass()).isFalse();
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.checks()).hasSize(1);
 		assertThat(judgment.checks().get(0).passed()).isFalse();
+	}
+
+	@Test
+	void executionFailureProducesErrorRatherThanFail() {
+		CommandJudge judge = new CommandJudge("echo never-runs", 0, Duration.ofSeconds(5), path -> {
+			throw new IllegalStateException("sandbox unavailable");
+		});
+
+		Judgment judgment = judge.judge(createContext());
+
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(judgment.reasoning()).contains("sandbox unavailable");
+		assertThat(judgment.checks()).singleElement().satisfies(check -> {
+			assertThat(check.name()).isEqualTo("command_execution");
+			assertThat(check.passed()).isFalse();
+		});
 	}
 
 	@Test

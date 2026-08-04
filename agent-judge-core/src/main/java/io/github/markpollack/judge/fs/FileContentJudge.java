@@ -95,9 +95,9 @@ public class FileContentJudge extends DeterministicJudge {
 
 		// A missing file is a completed evaluation with a negative result: FAIL.
 		if (!Files.exists(targetFile)) {
-			return Judgment.failing()
-				.because(String.format("File not found at %s", filePath))
-				.withCheck(Check.fail("file_exists", "File not found: " + filePath))
+			return Judgment.builder().fail()
+				.reasoning(String.format("File not found at %s", filePath))
+				.check(Check.fail("file_exists", "File not found: " + filePath))
 				.build();
 		}
 
@@ -108,10 +108,10 @@ public class FileContentJudge extends DeterministicJudge {
 		}
 		catch (Exception ex) {
 			logger.error("Failed to read file {}", targetFile, ex);
-			return Judgment.erroring()
-				.because(String.format("Failed to read file: %s", ex.getMessage()))
-				.withCheck(Check.pass("file_exists", "File exists"))
-				.withCheck(Check.fail("file_readable", "Failed to read: " + ex.getMessage()))
+			return Judgment.builder().error()
+				.reasoning(String.format("Failed to read file: %s", ex.getMessage()))
+				.check(Check.pass("file_exists", "File exists"))
+				.check(Check.fail("file_readable", "Failed to read: " + ex.getMessage()))
 				.build();
 		}
 
@@ -122,12 +122,12 @@ public class FileContentJudge extends DeterministicJudge {
 			case REGEX -> Pattern.compile(expectedContent).matcher(actualContent).find();
 		};
 
-		return Judgment.verdict(matches)
-			.because(matches ? String.format("Content %s matches in %s", matchMode.name().toLowerCase(), filePath)
+		return (matches ? Judgment.builder().pass() : Judgment.builder().fail())
+			.reasoning(matches ? String.format("Content %s matches in %s", matchMode.name().toLowerCase(), filePath)
 					: String.format("Content does not %s match in %s", matchMode.name().toLowerCase(), filePath))
-			.withCheck(Check.pass("file_exists", "File found"))
-			.withCheck(Check.pass("file_readable", "File readable"))
-			.withCheck(matches ? Check.pass("content_match", String.format("%s match successful", matchMode))
+			.check(Check.pass("file_exists", "File found"))
+			.check(Check.pass("file_readable", "File readable"))
+			.check(matches ? Check.pass("content_match", String.format("%s match successful", matchMode))
 					: Check.fail("content_match", String.format("%s match failed", matchMode)))
 			.build();
 	}

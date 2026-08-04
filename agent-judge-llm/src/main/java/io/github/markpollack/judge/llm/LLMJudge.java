@@ -68,11 +68,12 @@ import org.springframework.ai.chat.client.ChatClient;
 
 &#64;Override
  *     protected Judgment parseResponse(String response, JudgmentContext context) {
- *         // Extract score and reasoning from LLM response, normalizing the 0-10
- *         // scale at construction so the judgment carries one comparable number.
- *         return Judgment.scored(extractScore(response), 0.0, 10.0)
- *             .passingAt(0.7)
- *             .because(response)
+ *         // Extract score and reasoning from LLM response and normalize its 0-10
+ *         // scale before building the judgment.
+ *         double score = extractScore(response) / 10.0;
+ *         return (score >= 0.7 ? Judgment.builder().pass() : Judgment.builder().fail())
+ *             .score(score)
+ *             .reasoning(response)
  *             .build();
  *     }
  * }

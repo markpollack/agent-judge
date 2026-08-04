@@ -32,8 +32,8 @@ class KoogEvaluationDemoTest {
 			String output = ctx.agentOutput().orElse("");
 			boolean mentionsDI = output.toLowerCase().contains("dependencies")
 					&& output.toLowerCase().contains("external");
-			return Judgment.verdict(mentionsDI)
-				.because(mentionsDI ? "Answer correctly describes DI" : "Answer missing key DI concepts")
+			return (mentionsDI ? Judgment.builder().pass() : Judgment.builder().fail())
+				.reasoning(mentionsDI ? "Answer correctly describes DI" : "Answer missing key DI concepts")
 				.build();
 		};
 

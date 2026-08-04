@@ -97,22 +97,21 @@ class CoverageImprovementJudgeTest {
 	}
 
 	@Test
-	void noReportReturnsAbstain() {
+	void noReportReturnsError() {
 		CoverageMetrics baseline = new CoverageMetrics(80.0, 0, 0, 80, 100, 0, 0, 0, 0, "baseline");
 
 		Judgment judgment = judge.judge(contextWithBaseline(baseline));
 
-		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).contains("No JaCoCo report");
 	}
 
 	/**
-	 * A missing report and a measured regression are different facts. Abstention carries no
-	 * score because no measurement was made, whereas a measured regression is a completed
-	 * negative finding that scores zero improvement.
+	 * A missing required report means the evaluation could not complete and carries no
+	 * score; a measured regression is a completed negative finding scored at zero.
 	 */
 	@Test
-	void missingReportAbstainsWithoutScoreWhereMeasuredRegressionFailsAtZero() throws IOException {
+	void missingReportErrorsWithoutScoreWhereMeasuredRegressionFailsAtZero() throws IOException {
 		CoverageMetrics baseline = new CoverageMetrics(60.0, 0, 0, 60, 100, 0, 0, 0, 0, "baseline");
 
 		Judgment withoutReport = judge.judge(contextWithBaseline(baseline));
@@ -120,7 +119,7 @@ class CoverageImprovementJudgeTest {
 		writeJacocoReport(50, 50); // 50% — below baseline, actually measured
 		Judgment withMeasuredRegression = judge.judge(contextWithBaseline(baseline));
 
-		assertThat(withoutReport.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(withoutReport.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(withoutReport.score()).isNull();
 		assertThat(withMeasuredRegression.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(withMeasuredRegression.score()).isEqualTo(0.0);

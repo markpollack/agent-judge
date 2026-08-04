@@ -75,6 +75,8 @@ class LabelJudgmentClassifierTests {
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.label()).isEqualTo("good");
 		assertThat(judgment.score()).isEqualTo(0.6);
+		assertThat(classifier.scoreFor("good")).hasValue(0.6);
+		assertThat(classifier.scoreFor("unknown")).isEmpty();
 	}
 
 	@Test
@@ -106,6 +108,24 @@ class LabelJudgmentClassifierTests {
 	void builderRequiresAtLeastOneMapping() {
 		assertThatThrownBy(() -> LabelJudgmentClassifier.builder().build())
 			.isInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
+	void builderRejectsBlankLabels() {
+		assertThatThrownBy(() -> LabelJudgmentClassifier.builder().pass("  "))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("non-blank");
+		assertThatThrownBy(() -> LabelJudgmentClassifier.passFail("  ", "no"))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("non-blank");
+	}
+
+	@Test
+	void laterUnscoredMappingClearsEarlierDeclaredScore() {
+		var classifier = LabelJudgmentClassifier.builder().pass("review", 0.8).abstain("review").build();
+
+		assertThat(classifier.classify(response("review")).status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(classifier.scoreFor("review")).isEmpty();
 	}
 
 	@Test

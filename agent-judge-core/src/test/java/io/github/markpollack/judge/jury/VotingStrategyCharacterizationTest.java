@@ -52,19 +52,34 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class VotingStrategyCharacterizationTest {
 
 	private static Judgment numeric(double normalized, JudgmentStatus status) {
-		return Judgment.scored(normalized).withStatus(status).because("numeric " + normalized).build();
+		Judgment.FindingBuilder builder = switch (status) {
+			case PASS -> Judgment.builder().pass();
+			case FAIL -> Judgment.builder().fail();
+			case ABSTAIN, ERROR -> throw new IllegalArgumentException("A numeric judgment requires PASS or FAIL");
+		};
+		return builder.score(normalized).reasoning("numeric " + normalized).build();
 	}
 
 	private static Judgment booleanJudgment(boolean pass) {
-		return Judgment.verdict(pass).because("boolean " + pass).build();
+		return (pass ? Judgment.builder().pass() : Judgment.builder().fail()).reasoning("boolean " + pass).build();
 	}
 
 	private static Judgment labelled(String label, JudgmentStatus status) {
-		return Judgment.classified(label).as(status).because("classified " + label).build();
+		return switch (status) {
+			case PASS -> Judgment.builder().pass().label(label).reasoning("classified " + label).build();
+			case FAIL -> Judgment.builder().fail().label(label).reasoning("classified " + label).build();
+			case ABSTAIN -> Judgment.builder().abstain().reasoning("classified " + label).label(label).build();
+			case ERROR -> throw new IllegalArgumentException("ERROR cannot carry a classification label");
+		};
 	}
 
 	private static Judgment statusOnly(JudgmentStatus status) {
-		return Judgment.withStatus(status).because("status only " + status).build();
+		return switch (status) {
+			case PASS -> Judgment.builder().pass().reasoning("status only " + status).build();
+			case FAIL -> Judgment.builder().fail().reasoning("status only " + status).build();
+			case ABSTAIN -> Judgment.builder().abstain().reasoning("status only " + status).build();
+			case ERROR -> Judgment.builder().error().reasoning("status only " + status).build();
+		};
 	}
 
 	private static Offset<Double> within() {
@@ -307,7 +322,7 @@ class VotingStrategyCharacterizationTest {
 		}
 
 		@Test
-		@DisplayName("CHANGED: empty weights compute in-strategy (was delegating to AverageVotingStrategy)")
+		@DisplayName("PRESERVED: empty weights still mean equal weighting; evidence now preserves attribution")
 		void emptyWeightsComputeInStrategy() {
 			Judgment result = strategy.aggregate(
 					List.of(numeric(1.0, JudgmentStatus.PASS), numeric(0.0, JudgmentStatus.FAIL)), Map.of());
@@ -396,15 +411,17 @@ class VotingStrategyCharacterizationTest {
 		}
 
 		@Test
-		@DisplayName("CHANGED: unanimous fail and no consensus are now distinguishable")
-		void unanimousFailDistinctFromNoConsensus() {
+		@DisplayName("PRESERVED: unanimous failure and disagreement both fail, with distinct reasoning")
+		void unanimousFailureAndDisagreementHaveDistinctReasoning() {
 			Judgment consensusOnFail = strategy.aggregate(List.of(booleanJudgment(false), booleanJudgment(false)),
 					Map.of());
 			Judgment noConsensus = strategy.aggregate(List.of(booleanJudgment(true), booleanJudgment(false)), Map.of());
 
-			// Both were FAIL, collapsing the one fact a consensus strategy exists to report.
+			// Both fail the consensus requirement, but the reason and counts remain distinct.
 			assertThat(consensusOnFail.status()).isEqualTo(JudgmentStatus.FAIL);
-			assertThat(noConsensus.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+			assertThat(noConsensus.status()).isEqualTo(JudgmentStatus.FAIL);
+			assertThat(consensusOnFail.reasoning()).contains("Unanimous consensus");
+			assertThat(noConsensus.reasoning()).contains("No consensus");
 		}
 
 		@Test
@@ -517,6 +534,15 @@ class VotingStrategyCharacterizationTest {
 				.aggregate(List.of(booleanJudgment(true), Judgment.error("boom")), Map.of());
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
+		}
+
+		@Test
+		@DisplayName("PRESERVED: Majority reads status and ignores numeric score magnitude")
+		void numericScoresDoNotOverrideStatus() {
+			Judgment result = strategy.aggregate(
+					List.of(numeric(0.9, JudgmentStatus.FAIL), numeric(0.95, JudgmentStatus.FAIL)), Map.of());
+
+			assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		}
 
 		@Test
