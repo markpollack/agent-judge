@@ -43,16 +43,25 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * <tr><td>all FAIL</td><td>FAIL</td></tr>
  * <tr><td>PASS + ABSTAIN</td><td>PASS</td></tr>
  * <tr><td>FAIL + ABSTAIN</td><td>FAIL</td></tr>
- * <tr><td>PASS + FAIL</td><td>FAIL — unanimity was not reached</td></tr>
+ * <tr><td>PASS + FAIL</td><td>ABSTAIN — the applicable judges disagree</td></tr>
  * <tr><td>all ABSTAIN</td><td>ABSTAIN</td></tr>
  * <tr><td>any ERROR</td><td>per {@link ErrorPolicy}, default PROPAGATE</td></tr>
  * </table>
  *
  * <p>
- * Disagreement yields {@code FAIL}: every applicable judge completed, but the unanimity
- * requirement was not met. The reasoning and pass/fail evidence distinguish disagreement
- * from unanimous failure. {@code ABSTAIN} remains reserved for a population with no
- * applicable finding.
+ * Disagreement yields {@code ABSTAIN}: every applicable judge completed, but they reached
+ * no collective finding, so consensus has nothing to report. This is an aggregation
+ * conclusion, not a gate decision — whether a split panel is rejected or escalated belongs
+ * to an explicit {@link TierPolicy} or downstream gate, which reads individual judgments.
+ * A consumer that must fail closed on disagreement checks for {@code ABSTAIN} explicitly.
+ * </p>
+ *
+ * <p>
+ * Disagreement and unanimous failure therefore differ in status; disagreement and a
+ * no-applicable-judge abstention share {@code ABSTAIN} and are told apart by the
+ * reasoning and the {@link AggregationEvidence#PASS_COUNT}/{@link
+ * AggregationEvidence#FAIL_COUNT} vote evidence, which a no-result aggregate does not
+ * emit.
  * </p>
  *
  * <p>
@@ -117,7 +126,9 @@ public class ConsensusStrategy implements VotingStrategy {
 			reasoning = String.format("Unanimous consensus: all %d applicable judge(s) failed", eligibleCount);
 		}
 		else {
-			status = JudgmentStatus.FAIL;
+			// The applicable judges disagree, so there is no collective finding to report.
+			// Rejecting or escalating that split is a gate decision, not this one.
+			status = JudgmentStatus.ABSTAIN;
 			reasoning = String.format("No consensus: %d passed, %d failed among %d applicable judge(s)", passCount,
 					failCount, eligibleCount);
 		}
@@ -125,7 +136,8 @@ public class ConsensusStrategy implements VotingStrategy {
 		Judgment aggregate = switch (status) {
 			case PASS -> Judgment.builder().pass().reasoning(reasoning).build();
 			case FAIL -> Judgment.builder().fail().reasoning(reasoning).build();
-			case ABSTAIN, ERROR -> throw new IllegalStateException("Consensus produced an unexpected status: " + status);
+			case ABSTAIN -> Judgment.builder().abstain().reasoning(reasoning).build();
+			case ERROR -> throw new IllegalStateException("Consensus produced an unexpected status: " + status);
 		};
 		return AggregationEvidence.attach(aggregate, population.evidence(getName())
 				.put(AggregationEvidence.PASS_COUNT, passCount)

@@ -411,15 +411,24 @@ class VotingStrategyCharacterizationTest {
 		}
 
 		@Test
-		@DisplayName("PRESERVED: unanimous failure and disagreement both fail, with distinct reasoning")
-		void unanimousFailureAndDisagreementHaveDistinctReasoning() {
+		@DisplayName("PRESERVED: unanimous failure yields FAIL")
+		void unanimousFailure() {
+			Judgment result = strategy.aggregate(List.of(booleanJudgment(false), booleanJudgment(false)), Map.of());
+
+			assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
+			assertThat(result.reasoning()).contains("Unanimous consensus");
+		}
+
+		@Test
+		@DisplayName("CHANGED: disagreement abstains (was FAIL, indistinguishable from unanimous failure)")
+		void disagreementAbstains() {
 			Judgment consensusOnFail = strategy.aggregate(List.of(booleanJudgment(false), booleanJudgment(false)),
 					Map.of());
 			Judgment noConsensus = strategy.aggregate(List.of(booleanJudgment(true), booleanJudgment(false)), Map.of());
 
-			// Both fail the consensus requirement, but the reason and counts remain distinct.
+			// Was FAIL for both, leaving the difference only in the reasoning string.
 			assertThat(consensusOnFail.status()).isEqualTo(JudgmentStatus.FAIL);
-			assertThat(noConsensus.status()).isEqualTo(JudgmentStatus.FAIL);
+			assertThat(noConsensus.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 			assertThat(consensusOnFail.reasoning()).contains("Unanimous consensus");
 			assertThat(noConsensus.reasoning()).contains("No consensus");
 		}

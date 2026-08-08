@@ -57,15 +57,15 @@ class CascadedJuryTest {
 
 		Verdict verdict = jury.vote(context);
 
-		// The cascade decision is unchanged: REJECT_ON_ANY_FAIL inspects the tier's
+		// The cascade decision is unchanged by M5: REJECT_ON_ANY_FAIL inspects the tier's
 		// INDIVIDUAL judgments, sees Migration's FAIL, and stops without escalating.
 		assertThat(verdict.subVerdicts()).hasSize(1); // only tier1 executed
 		assertThat(verdict.individual()).anyMatch(j -> j.status() == JudgmentStatus.FAIL);
 
-		// The copied aggregate agrees with the rejecting cascade outcome. Its reasoning
-		// and vote counts still disclose that the tier disagreed rather than unanimously
-		// failed.
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
+		// The copied aggregate reports the split panel as ABSTAIN. The gate rejected on
+		// the individual FAIL regardless, which is the separation M5 exists to keep: the
+		// aggregate states the collective fact, the tier policy decides acceptance.
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(verdict.aggregated().reasoning()).contains("No consensus");
 	}
 
@@ -146,6 +146,79 @@ class CascadedJuryTest {
 																					// tier
 																					// passes
 		assertThat(verdict.subVerdicts()).hasSize(2); // escalated to final tier
+
+		// The escalated tier's own aggregate abstained because its judges disagreed.
+		// ACCEPT_ON_ALL_PASS did not read it, so the split panel could not be accepted.
+		assertThat(verdict.subVerdicts().get(0).aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
+	}
+
+	// ==================== M5 gate boundary ====================
+
+	/**
+	 * M5 makes a split panel's aggregate ABSTAIN. That must not weaken an all-pass gate:
+	 * ACCEPT_ON_ALL_PASS reads the tier's individual judgments, so a disagreeing tier is
+	 * escalated rather than accepted, exactly as when the aggregate still said FAIL.
+	 */
+	@Test
+	void abstainingConsensusAggregateDoesNotWeakenAcceptOnAllPass() {
+		Jury splitTier = SimpleJury.builder()
+			.judge(alwaysPass("Import"))
+			.judge(alwaysFail("Annotation"))
+			.votingStrategy(new ConsensusStrategy())
+			.parallel(false)
+			.build();
+
+		Jury finalTier = SimpleJury.builder()
+			.judge(alwaysFail("Semantic"))
+			.votingStrategy(new MajorityVotingStrategy())
+			.build();
+
+		CascadedJury jury = CascadedJury.builder()
+			.tier("structural", splitTier, TierPolicy.ACCEPT_ON_ALL_PASS)
+			.tier("final", finalTier, TierPolicy.FINAL_TIER)
+			.build();
+
+		Verdict verdict = jury.vote(context);
+
+		// The split tier abstained as an aggregate...
+		assertThat(verdict.subVerdicts()).hasSize(2);
+		assertThat(verdict.subVerdicts().get(0).aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
+
+		// ...and the gate still refused to accept it, ending on the final tier's FAIL.
+		// If ACCEPT_ON_ALL_PASS had read the aggregate, a non-PASS could never accept
+		// either; the guard is that an ABSTAIN aggregate does not turn a disagreeing
+		// tier into an accepted one.
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
+	}
+
+	/**
+	 * The same separation on the rejecting side: a disagreeing tier still stops the
+	 * cascade on its individual FAIL, even though the aggregate now abstains.
+	 */
+	@Test
+	void abstainingConsensusAggregateStillRejectsOnAnyIndividualFail() {
+		Jury splitTier = SimpleJury.builder()
+			.judge(alwaysPass("Build"))
+			.judge(alwaysFail("Migration"))
+			.votingStrategy(new ConsensusStrategy())
+			.parallel(false)
+			.build();
+
+		Jury finalTier = SimpleJury.builder()
+			.judge(alwaysPass("Semantic"))
+			.votingStrategy(new MajorityVotingStrategy())
+			.build();
+
+		CascadedJury jury = CascadedJury.builder()
+			.tier("deterministic", splitTier, TierPolicy.REJECT_ON_ANY_FAIL)
+			.tier("final", finalTier, TierPolicy.FINAL_TIER)
+			.build();
+
+		Verdict verdict = jury.vote(context);
+
+		assertThat(verdict.subVerdicts()).hasSize(1); // stopped, never escalated
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(verdict.individual()).anyMatch(j -> j.status() == JudgmentStatus.FAIL);
 	}
 
 	// ==================== FINAL_TIER policy ====================

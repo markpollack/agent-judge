@@ -162,7 +162,7 @@ class MetaJuryTest {
 	}
 
 	@Test
-	void shouldFailConsensusWithSingleFailure() {
+	void shouldAbstainWhenSubJuriesDisagree() {
 		Jury jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"), alwaysPass("J2"));
 
 		Jury jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"), alwaysFail("J4"));
@@ -172,14 +172,15 @@ class MetaJuryTest {
 		JudgmentContext context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
-		// One sub-jury passing and one failing does not meet the unanimity contract.
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
+		// One sub-jury passing and one failing is disagreement, not a collective failure.
+		// A caller that must reject a split panel decides that for itself.
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(verdict.aggregated().reasoning()).contains("No consensus");
 	}
 
 	/**
-	 * When every sub-jury agrees on failure the status is also FAIL, while reasoning and
-	 * vote evidence distinguish it from disagreement.
+	 * When every sub-jury agrees on failure the status is FAIL, which is what keeps a
+	 * collective failure distinguishable from the disagreement case above.
 	 */
 	@Test
 	void shouldFailConsensusWhenAllSubJuriesFail() {

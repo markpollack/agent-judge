@@ -49,9 +49,16 @@ class AggregationErrorPolicyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 		Map<String, Object> evidence = evidence(result);
 
+		// Under TREAT_AS_FAIL the surviving population is one PASS and one converted FAIL.
+		// Majority breaks that tie with TiePolicy.FAIL; consensus reports the split as
+		// ABSTAIN; the numeric strategies average 1.0 and 0.0 to a passing 0.5.
 		JudgmentStatus expectedStatus = switch (policy) {
 			case PROPAGATE -> JudgmentStatus.ERROR;
-			case TREAT_AS_FAIL -> isStatusCounting(strategyName) ? JudgmentStatus.FAIL : JudgmentStatus.PASS;
+			case TREAT_AS_FAIL -> switch (strategyName) {
+				case "majority" -> JudgmentStatus.FAIL;
+				case "consensus" -> JudgmentStatus.ABSTAIN;
+				default -> JudgmentStatus.PASS;
+			};
 			case TREAT_AS_ABSTAIN, IGNORE -> JudgmentStatus.PASS;
 		};
 		int expectedEligible = switch (policy) {
@@ -136,10 +143,6 @@ class AggregationErrorPolicyTest {
 			case "weightedAverage" -> new WeightedAverageStrategy(policy);
 			default -> throw new IllegalArgumentException("Unknown strategy: " + name);
 		};
-	}
-
-	private static boolean isStatusCounting(String strategyName) {
-		return strategyName.equals("majority") || strategyName.equals("consensus");
 	}
 
 	@SuppressWarnings("unchecked")
