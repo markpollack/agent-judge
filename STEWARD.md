@@ -19,3 +19,9 @@ Root VISION/DESIGN files and ignored `plans/` pointer files in this repository a
 planning authorities. Historical handoffs and reviews are evidence until adjudicated; they cannot
 override the active trio.
 
+## Applicable Engineering Standard
+
+Java development follows
+`/home/mark/projects/agento-forge/guides/java-library-quality.md`. JSpecify annotations are declarations
+rather than enforcement: any `@NullMarked` adoption must be enforced by a build-breaking nullness
+checker and proved with a watched-failure case.

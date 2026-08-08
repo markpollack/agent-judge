@@ -5,9 +5,13 @@ See LICENSE.txt in the repository root for license terms.
 
 # Design proposal — normalized `Judgment` API
 
-> **Status**: **implemented and verified against a clean full reactor; consumer handoff updated**
-> **Date**: 2026-08-03
-> **Revision**: r10. r3 incorporated the design review's six contract-hardening points (constructor
+> **Status**: **structural migration implemented with a green baseline; M2, M3, and M5 closure active**
+> **Date**: 2026-08-08
+> **Revision**: r12. r12 fixes the package-scoped JSpecify/NullAway contract and the portable
+> `elapsedMillis` convention while preserving the `elapsed()` Java view. r11 records schema-visible
+> optionality, construction-time portable metadata,
+> and restoration of the existing mixed-consensus `ABSTAIN` rule as required 0.14 closure work. r10
+> recorded the post-implementation API refinement. r3 incorporated the design review's six contract-hardening points (constructor
 > invariants, stable evidence keys, corrected removal count, cascade reconciliation, qualified
 > metadata guarantee, pinned property order) plus two consequences it opened (`label` permitted on
 > `ABSTAIN` but not `ERROR`; evidence split universal versus strategy-specific). r4 moved the evidence
@@ -32,9 +36,11 @@ See LICENSE.txt in the repository root for license terms.
 
 ---
 
-## Implementation status — verified 2026-08-03
+## Implementation status — baseline verified, contract closure active
 
-The design is implemented and verified against a clean full Maven reactor.
+The structural migration is implemented and the current code passes a clean full Maven reactor. That
+baseline does not close three consumer-facing gaps: M2 schema-visible optionality, M3 recursively
+portable metadata, and M5's implementation regression from mixed consensus `ABSTAIN` to `FAIL`.
 
 - **49a6c73** committed this design and the DDD review.
 - **a5b15f8** preserved the pre-change characterization baseline, including the previously uncovered
@@ -46,9 +52,9 @@ The design is implemented and verified against a clean full Maven reactor.
 - **014a779** closed two contract-coverage gaps and retired stale aggregation test prose.
 - **c7d445c** removed `ReactiveJudge` and the Reactor dependency from core.
 
-**Latest verified result — 2026-08-04** — `./mvnw clean verify`, BUILD SUCCESS across all eleven
-reactor modules: **487 tests, 0 failures, 0 errors, 0 skipped**. `agent-judge-core` covers
-**95.29% of lines** (729/765; gate 80%) and **93.67% of branches** (296/316; gate 75%).
+**Latest verified baseline — 2026-08-06** — `./mvnw clean verify`, BUILD SUCCESS across all ten child
+modules (eleven reactor projects including the parent): **487 tests, 0 failures, 0 errors, 0 skipped**. `agent-judge-core` covers
+**95.30% of lines** (730/766; gate 80%) and **93.67% of branches** (296/316; gate 75%).
 
 > **Correction to the dc6ca2d checkpoint claim.** That checkpoint stated that all modules reached
 > main *and test* compilation. They did not. `agent-judge-ai-core` and `agent-judge-llm` test
@@ -74,14 +80,19 @@ The consumer migration handoff is written and reviewed:
 [consumer-handoff-normalized-judgment.md](consumer-handoff-normalized-judgment.md). Its Java
 examples were compiled against the built classes rather than reviewed by eye.
 
-Still pending, outside this design's scope:
+Still pending under the active closure roadmap:
 
-1. Migrating `agent-workflow` and `agentworks-pr-review`, which were reviewed read-only and remain
-   unchanged. That work requires its own authorization.
-2. Public documentation reconciliation for 0.14.
+1. Marking `score` and `label` optional in Agent Judge's public declaration/reflection contract and
+   enforcing the adopted package with NullAway (M2). Agent Workflow owns downstream schema
+   interpretation.
+2. Enforcing the portable metadata value profile recursively at Judgment construction (M3).
+3. Restoring mixed applicable `PASS + FAIL` consensus to `ABSTAIN` (M5).
+4. Installing the exact repaired snapshot locally and staging the separate Agent Workflow migration.
+5. Public documentation reconciliation for 0.14.
 
-The active execution plan is [roadmap.md](roadmap.md). The Phase 0 section below is retained as the
-historical verification protocol that produced a5b15f8; it is complete and must not be repeated.
+The active execution plan is maintained in the private Agent Judge steward; see
+[STEWARD.md](STEWARD.md). The Phase 0 section below is retained as the historical verification
+protocol that produced a5b15f8; it is complete and must not be repeated.
 
 ---
 
@@ -137,6 +148,19 @@ These are settled; listed so the delta section is unambiguous.
 ---
 
 ## 2. Target value
+
+### Nullness contract and enforcement
+
+Agent Judge uses `org.jspecify:jspecify:1.0.0` at normal compile scope because the type-use
+annotations below are part of its public API. Initial `@NullMarked` adoption is limited to
+`io.github.markpollack.judge.result`; this closure does not authorize a whole-core nullness migration.
+Within that package, `score` and `label` are explicitly `@Nullable` and required reference types such
+as `status` are non-null by default.
+
+JSpecify supplies vocabulary, not enforcement. Main sources in the adopted package are checked by
+NullAway at `ERROR` with JSpecify mode and `OnlyNullMarked=true`, following
+`/home/mark/projects/agento-forge/guides/java-library-quality.md` §4.7. The gate is trusted only after
+a deliberate violation is observed failing compilation and the legal optional paths compile cleanly.
 
 ```java
 @JsonInclude(JsonInclude.Include.NON_NULL)                       // [DELTA-7]
@@ -611,20 +635,18 @@ public boolean hasError() {
 Where `ex.getMessage()` could leak sensitive detail, judges pass a sanitized message instead.
 Machine-readable error *classification* is deferred until a concrete consumer requires it.
 
-#### Scope of the portability guarantee — stated precisely
+#### Scope of the portability guarantee — revised for 0.14 closure
 
-Removing the `Throwable` makes the **declared fields** of `Judgment` wire-safe. It does **not** make
-every `Judgment` portable, and this document must not claim otherwise: `metadata` remains
-`Map<String, Object>` and can still hold a `Duration`, an arbitrary Java object, or indeed another
-`Throwable` put there by a caller.
+Removing the `Throwable` made the declared fields wire-safe but left `metadata` conditionally
+portable. The Agent Workflow integration decision closes that gap: every constructed Judgment must be
+portable even though the Java API retains `Map<String, Object>` as its source-level shape.
 
-The guarantee is therefore:
+The 0.14 target guarantee is therefore:
 
-> `status`, `score`, `label`, `reasoning`, and `checks` are unconditionally serializable. A
-> **serializable `Judgment`** additionally requires every `metadata` value to belong to the project's
-> JSON-compatible value algebra: a **string**, a **finite number**, a **boolean**, a **list**, or a
-> **string-keyed map**, recursively composed of those. Judges that place richer objects in `metadata`
-> produce judgments that are valid in-process but not portable.
+> Every `Judgment` is portable. Metadata accepts strings, booleans, interoperable integers, finite
+> numbers, arrays/lists, and string-keyed maps recursively. Construction rejects null values or
+> elements, non-finite numbers, out-of-domain integers, malformed Unicode, non-string keys, live
+> exceptions, durations, SDK response objects, and arbitrary Java objects.
 
 **`null` is excluded from the algebra**, and deliberately so. An earlier revision listed it, which was
 self-contradictory: `Map.copyOf` rejects null keys and values outright, so a metadata map containing
@@ -636,17 +658,15 @@ excluded from `score`: `NaN` and `±∞` have no valid JSON representation.
 All aggregation-evidence values defined in §4 are integers, finite doubles, or strings, and satisfy
 this constraint.
 
-> **Immutability is shallow for caller-supplied values.** `Map.copyOf(metadata)` copies the map, not
-> the objects inside it, so a mutable object a judge places in `metadata` remains mutable through
-> `judgment.metadata().get(key)`. This is pre-existing and is not fixed here — deep-copying arbitrary
-> values is neither cheap nor well-defined. What *is* guaranteed is that the reserved `aggregation`
-> block this design introduces is itself deeply immutable, and that is tested.
+Accepted maps, lists, and arrays are defensively normalized and recursively frozen at construction;
+later mutation of caller-owned containers cannot alter a Judgment. The current implementation only
+uses `Map.copyOf` and therefore does not meet this rule yet. That is the M3 implementation gap.
 
-> **Known follow-up, deliberately not in scope.** `Judgment.elapsed()` has the same shape of problem
-> — it blind-casts a `metadata` entry to `Duration`, and a raw `Duration` does not serialize cleanly
-> under plain `jackson-databind`. The handoff's non-goals fence off redesigning `metadata`, so
-> `elapsed()` is left as-is and recorded in the consumer handoff as a named follow-up, along with the
-> question of whether `metadata` should be narrowed to the value algebra above in a later act.
+Result timing uses the optional metadata key `elapsedMillis`, whose value is a non-negative
+interoperable integer. `Judgment.elapsed()` remains as a Java convenience and derives its `Duration`
+with `Duration.ofMillis(...)`; it returns null when the key is absent. No constructed Judgment retains
+a live `Duration`. Live timing objects remain valid in `JudgmentContext` or another non-result input
+surface.
 
 ### [DELTA-8] Keep conventional builder vocabulary
 
@@ -881,8 +901,8 @@ Per handoff §7, plus what the DDD review added:
   absent optionals omitted; no type metadata; round-trip deserialization; lower-case wire names
   serialized and parsed exactly, with upper case and unknown values both rejected; a test asserting
   an `ERROR` judgment carries no exception object anywhere in its projection; and a test documenting
-  that a judgment whose `metadata` holds a non-JSON-safe value is **not** portable, so the boundary
-  of the guarantee is executable rather than prose.
+  accepted nested portable values round-trip; rejected metadata fails at construction with a stable
+  value path; and caller mutation cannot change accepted nested metadata after construction.
 - **Characterization migration** — `VotingStrategyCharacterizationTest` is rewritten against the new
   API. It holds **35 characterization cases (test methods): 16 `INTENDED`, 19 `DEFECT`.** (An earlier revision of this document
   said 14 and 13, which was wrong and did not even sum to 35.) All 19 `DEFECT` cases flip by

@@ -5,8 +5,8 @@ See LICENSE.txt in the repository root for license terms.
 
 # Consumer migration handoff — normalized `Judgment` (0.13.0 → 0.14.0)
 
-> **Status**: written against the verified 0.14.0-SNAPSHOT implementation
-> **Date**: 2026-08-03
+> **Status**: migration contract updated; M2, M3, and M5 implementation closure remains active
+> **Date**: 2026-08-08
 > **Applies to**: any consumer of `io.github.markpollack:agent-judge-*`
 > **Normative contract**: [design-normalized-judgment.md](design-normalized-judgment.md)
 > **This document does not authorize edits to any consumer repository.**
@@ -161,6 +161,19 @@ is a statement about the outcome, not about quality being perfect.
 | `Scores.toNormalized(Score, Map)` | `Judgment.effectiveScore()` |
 | `NumericalScore.value()` / `.normalized()` | one number: `Judgment.score()`, already normalized |
 | `ReactiveJudge` | wrap `Judge` yourself (§4.4) |
+
+#### Changed timing convention
+
+`Judgment.elapsed()` remains source-compatible as a Java convenience, but its result-metadata
+representation changes:
+
+| 0.13 convention | 0.14 convention |
+|---|---|
+| metadata key `elapsed` containing a Java `Duration` | optional metadata key `elapsedMillis` containing a non-negative integer |
+| `elapsed()` casts the metadata object to `Duration` | `elapsed()` derives `Duration.ofMillis(...)` from the portable integer |
+
+Consumers that read metadata directly must migrate to `elapsedMillis`. Absence remains omission of the
+key, and `elapsed()` continues to return null when timing is absent.
 
 ### 4.3 Construction, before and after
 
@@ -428,14 +441,17 @@ negative vote now surfaces as an aggregate `ERROR`.
 
 Field order is pinned for deterministic examples but is **presentational**. Parse by field name.
 
-**The metadata guarantee is conditional.** `status`, `score`, `label`, `reasoning`, and `checks` are
-unconditionally serializable. A *serializable* `Judgment` additionally requires every `metadata`
-value to be a string, a finite number, a boolean, a list, or a string-keyed map, recursively. A judge
-that puts a `Duration` or an arbitrary object in metadata produces a judgment that is valid
-in-process but not portable.
+**Every 0.14 Judgment result is portable.** Metadata accepts strings, booleans, interoperable
+integers, finite numbers, arrays/lists, and string-keyed maps recursively. Construction rejects null
+values or elements, malformed Unicode, non-finite numbers, out-of-domain integers, non-string keys,
+live exceptions, durations, SDK response objects, and arbitrary Java objects. Accepted containers are
+defensively copied and recursively frozen.
 
-`Judgment.elapsed()` is a known instance of this: it blind-casts a metadata entry to `Duration`,
-which does not serialize cleanly. It is unchanged in 0.14 and recorded here as a follow-up.
+Timing in result metadata uses the optional non-negative integer `elapsedMillis`; a live `Duration`
+belongs in `JudgmentContext` or another non-result attachment surface. `Judgment.elapsed()` derives a
+Java `Duration` from the portable integer. The current snapshot has not implemented this M3 rule yet;
+do not adopt it until the private steward ROADMAP Step 1.2 and subsequent install-verification steps
+are complete.
 
 ---
 
@@ -457,7 +473,10 @@ which does not serialize cleanly. It is unchanged in 0.14 and recorded here as a
 7. If you gate on coverage, add an explicit report-existence judge (§6.1).
 8. If you parse `Judgment` JSON, confirm you accept lower-case status names and tolerate omitted
    `score`/`label` keys (§7).
-9. Re-run your own suites. A jury-heavy suite is the place these changes surface.
+9. Audit custom Judgment metadata producers and project live objects into the portable value profile.
+10. Replace direct reads/writes of metadata key `elapsed` containing `Duration` with the integer
+    `elapsedMillis` convention; the `elapsed()` convenience remains available.
+11. Re-run your own suites. A jury-heavy suite is the place these changes surface.
 
 ---
 
@@ -475,8 +494,10 @@ Recorded from a read-only inventory. **No consumer repository was modified.**
   judge uses a non-unit range. §8 step 4 applies.
 - `GateTest` wires `ConsensusStrategy` behind a score gate, which is exactly the §1.1 trap.
 - `GateTest` constructs judgments through the removed builder and calls `reasoning(String)`.
-- No impact: `getName()`, `ErrorPolicy` configuration, `Judgment.elapsed()`, `Judgment.error()`
-  accessor, coverage judges.
+- No impact: `getName()`, `ErrorPolicy` configuration, `Judgment.error()` accessor, coverage judges.
+- M3 impact: replace direct result-metadata `elapsed`/`Duration` usage with `elapsedMillis`;
+  `Judgment.elapsed()` remains as a derived convenience and `JudgmentContext` timing remains available
+  in process.
 - Its own `workflow-spec/.../v3/envelope/Judgment.java` DTO is unaffected.
 
 ### agentworks-pr-review (branch `v3-serving`, pins 0.11.0-SNAPSHOT)
@@ -488,16 +509,17 @@ Recorded from a read-only inventory. **No consumer repository was modified.**
   score that only ever duplicated the status.
 - `CascadedJury`, `TierConfig`, and `TierPolicy` usage is structurally unaffected — tier policies
   read individual judgments.
-- No impact: `getName()`, `ErrorPolicy` configuration, `elapsed()`, coverage judges.
+- No impact: `getName()`, `ErrorPolicy` configuration, coverage judges.
+- M3 impact if used: replace direct result-metadata `elapsed`/`Duration` usage with the integer
+  `elapsedMillis` convention.
 
 ---
 
-## 10. Follow-ups not addressed in 0.14
+## 10. Remaining closure and later follow-ups
 
-- `Judgment.elapsed()` blind-casts a metadata entry to `Duration` and does not serialize cleanly
-  (§7). Redesigning `metadata` was out of scope.
-- Whether `metadata` should be narrowed to the JSON-safe value algebra rather than documented as a
-  conditional guarantee.
+- Before consumer adoption, finish M2 schema-visible optionality, M3 construction-time portable
+  metadata, and M5 consensus repair, then verify and install the exact 0.14 snapshot named by
+  the private Agent Judge steward roadmap referenced by `STEWARD.md`.
 - Machine-readable error classification. `ERROR` carries only `reasoning` today; an explicit
   `errorCode` would be added if a concrete consumer needs one. `label` must not be overloaded for it.
 - Public documentation at `docs/agent-judge/` still describes the Score hierarchy and
