@@ -18,6 +18,13 @@ steward state in this file.
 - `./mvnw clean test` - Run unit tests
 - `./mvnw clean verify` - Run full build including tests
 - `./mvnw clean install` - Install artifacts to local repository
+- `./mvnw -o javadoc:aggregate` - Check current-source Javadoc coherence across all modules
+- `./mvnw -o -Prelease -Dgpg.skip=true clean package` - Rehearse release packaging with signing
+  disabled and attach every module's sources and Javadoc JAR
+
+The release profile sets Javadoc `failOnError=true`. Do not set it back to `false` to quiet a noisy
+build: a suppressed Javadoc error can ship an incomplete Javadoc JAR, and one malformed upstream tag
+can cascade into misleading downstream diagnostics.
 
 ### Git Commit Guidelines
 - **NEVER add Claude Code attribution** in commit messages
@@ -126,7 +133,6 @@ Normalized-Judgment work (0.14 contract closure active; consumer migration not y
 
 Diataxis-based documentation at `~/projects/docs/docs/agent-judge/`.
 Diataxis taxonomy reference: `~/projects/agento-forge/concepts/documentation-taxonomy.md`.
-Diataxis research brief: `plans/inbox/diataxis-documentation-research-brief.md`.
 
 Files:
 - `getting-started.mdx` - Quick start guide
