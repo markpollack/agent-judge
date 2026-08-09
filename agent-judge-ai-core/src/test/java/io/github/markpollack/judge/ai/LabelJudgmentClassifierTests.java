@@ -6,7 +6,6 @@ import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -85,27 +84,49 @@ class LabelJudgmentClassifierTests {
 	@Test
 	void usageMetadataPreserved() {
 		var classifier = LabelJudgmentClassifier.passFail("yes", "no");
-		Usage usage = new Usage(10, 5, 15, null);
+		Usage usage = Usage.builder().inputTokens(10).outputTokens(5).reportedTotalTokens(15).build();
 		var resp = new JudgeModelResponse("yes", "gpt-4o", usage, null);
 
 		Judgment judgment = classifier.classify(resp);
 
 		assertThat(judgment.metadata()).containsEntry("model", "gpt-4o");
 		// The Usage record is a Java identity; the result carries its portable projection.
-		// An absent component is omitted rather than carried as a null.
+		// An unreported category is omitted rather than carried as a null.
 		assertThat(judgment.metadata()).containsEntry("usage",
-				Map.of("inputTokens", 10, "outputTokens", 5, "totalTokens", 15));
+				Map.of("inputTokens", 10L, "outputTokens", 5L, "reportedTotalTokens", 15L));
 	}
 
+	/**
+	 * Every category the model reported reaches the result. The classifier does not decide
+	 * which quantities are interesting, so a source that reports reasoning and cache
+	 * activity is not flattened back down to a prompt/completion pair.
+	 */
 	@Test
-	void usageProjectionCarriesEstimatedCostAsAnOrdinaryNumber() {
+	void usageProjectionCarriesEveryReportedCategory() {
 		var classifier = LabelJudgmentClassifier.passFail("yes", "no");
-		var resp = new JudgeModelResponse("yes", "gpt-4o", new Usage(10, 5, 15, new BigDecimal("0.0025")), null);
+		Usage usage = Usage.builder()
+			.inputTokens(10)
+			.outputTokens(5)
+			.reasoningTokens(4)
+			.cacheCreationTokens(3)
+			.cacheReadTokens(2)
+			.build();
+		var resp = new JudgeModelResponse("yes", "gpt-4o", usage, null);
 
 		Judgment judgment = classifier.classify(resp);
 
-		assertThat(judgment.metadata().get("usage")).isEqualTo(
-				Map.of("inputTokens", 10, "outputTokens", 5, "totalTokens", 15, "estimatedCost", 0.0025d));
+		assertThat(judgment.metadata().get("usage")).isEqualTo(Map.of("inputTokens", 10L, "outputTokens", 5L,
+				"reasoningTokens", 4L, "cacheCreationTokens", 3L, "cacheReadTokens", 2L));
+	}
+
+	@Test
+	void usageThatReportedNothingAddsNoKey() {
+		var classifier = LabelJudgmentClassifier.passFail("yes", "no");
+		var resp = new JudgeModelResponse("yes", "gpt-4o", Usage.builder().build(), null);
+
+		Judgment judgment = classifier.classify(resp);
+
+		assertThat(judgment.metadata()).doesNotContainKey("usage");
 	}
 
 	@Test

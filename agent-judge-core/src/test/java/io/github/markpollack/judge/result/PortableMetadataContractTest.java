@@ -480,14 +480,14 @@ class PortableMetadataContractTest {
 			Map<String, Object> projected = new LinkedHashMap<>();
 			projected.put("elapsedMillis", Duration.ofSeconds(2).toMillis());
 			projected.put("expectedDir", Path.of("/tmp/expected").toString());
-			projected.put("usage", Map.of("inputTokens", 10, "outputTokens", 20, "totalTokens", 30));
+			projected.put("usage", Map.of("inputTokens", 10L, "outputTokens", 20L, "reasoningTokens", 5L));
 
 			Judgment judgment = withMetadata(projected);
 
 			assertThat(judgment.elapsed()).isEqualTo(Duration.ofSeconds(2));
 			assertThat(judgment.metadata().get("expectedDir")).isEqualTo("/tmp/expected");
-			assertThat(judgment.metadata().get("usage")).isEqualTo(Map.of("inputTokens", 10, "outputTokens", 20,
-					"totalTokens", 30));
+			assertThat(judgment.metadata().get("usage")).isEqualTo(Map.of("inputTokens", 10L, "outputTokens", 20L,
+					"reasoningTokens", 5L));
 		}
 
 		@Test

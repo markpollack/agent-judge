@@ -45,9 +45,41 @@ class SpringAiJudgeModelTests {
 		assertThat(response.text()).isEqualTo("relevant");
 		assertThat(response.model()).isEqualTo("gpt-4o");
 		assertThat(response.usage()).isNotNull();
-		assertThat(response.usage().inputTokens()).isEqualTo(100);
-		assertThat(response.usage().outputTokens()).isEqualTo(50);
+		assertThat(response.usage().inputTokens()).isEqualTo(100L);
+		assertThat(response.usage().outputTokens()).isEqualTo(50L);
+		// Spring AI derives a total when the provider supplied none, so no total is
+		// recorded: reportedTotalTokens holds only a total the source itself reported.
+		assertThat(response.usage().reportedTotalTokens()).isNull();
 		assertThat(response.metadata()).containsEntry("responseId", "resp-123");
+	}
+
+	@Test
+	void generateMapsPromptCacheActivityWhenTheProviderReportsIt() {
+		ChatClient chatClient = mock(ChatClient.class);
+		ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
+		ChatClient.CallResponseSpec callSpec = mock(ChatClient.CallResponseSpec.class);
+
+		given(chatClient.prompt()).willReturn(requestSpec);
+		given(requestSpec.user(any(String.class))).willReturn(requestSpec);
+		given(requestSpec.call()).willReturn(callSpec);
+
+		Generation generation = new Generation(
+				new org.springframework.ai.chat.messages.AssistantMessage("relevant"));
+		ChatResponseMetadata responseMeta = ChatResponseMetadata.builder()
+			.model("claude-opus-5")
+			.usage(new DefaultUsage(100, 50, 150, null, 40L, 60L))
+			.build();
+		given(callSpec.chatResponse()).willReturn(new ChatResponse(List.of(generation), responseMeta));
+
+		JudgeModelResponse response = new SpringAiJudgeModel(chatClient)
+			.generate(JudgeModelRequest.user("Is this relevant?"));
+
+		assertThat(response.usage()).isNotNull();
+		assertThat(response.usage().cacheReadTokens()).isEqualTo(40L);
+		assertThat(response.usage().cacheCreationTokens()).isEqualTo(60L);
+		// Spring AI has no reasoning category; a provider that reports one puts it in its
+		// native usage object, which this adapter does not read.
+		assertThat(response.usage().reasoningTokens()).isNull();
 	}
 
 	@Test

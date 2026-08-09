@@ -5,7 +5,8 @@ See LICENSE.txt in the repository root for license terms.
 
 # Consumer migration handoff — normalized `Judgment` (0.13.0 → 0.14.0)
 
-> **Status**: migration contract updated; M2/M5 and the M3 value algebra implemented; bounded usage correction pending
+> **Status**: migration contract updated; M2/M5, the M3 value algebra, and the portable model-usage
+> correction implemented
 > **Date**: 2026-08-08
 > **Applies to**: any consumer of `io.github.markpollack:agent-judge-*`
 > **Public contract surfaces**: `Judgment`/jury Javadocs and tests, plus the wire and migration
@@ -191,33 +192,53 @@ evaluation input, not a result.
 
 #### Changed model-usage convention
 
-The unreleased first Step 1.2 implementation briefly projected:
+0.13 declared:
 
-```text
-Usage(inputTokens, outputTokens, totalTokens, estimatedCost)
-metadata.usage = {inputTokens?, outputTokens?, totalTokens?, estimatedCost?}
+```java
+record Usage(Integer inputTokens, Integer outputTokens, Integer totalTokens, BigDecimal estimatedCost)
 ```
 
-That projection is not the accepted 0.14 contract. `estimatedCost` is removed: a price changes with
-model, provider, time, currency, and pricing table, while narrowing its `BigDecimal` to `double` loses
-the precision promised by the source type.
+and `LabelJudgmentClassifier` stored that record itself under `metadata.usage`, which is a live Java
+object rather than a portable value.
 
-The accepted usage object carries optional token quantities only:
+0.14 declares:
+
+```java
+record Usage(Long inputTokens, Long outputTokens, Long reasoningTokens,
+             Long cacheCreationTokens, Long cacheReadTokens, Long reportedTotalTokens)
+```
 
 ```text
-Usage(inputTokens, outputTokens, reasoningTokens,
-      cacheCreationTokens, cacheReadTokens, reportedTotalTokens)
-
 metadata.usage = {
   inputTokens?, outputTokens?, reasoningTokens?,
   cacheCreationTokens?, cacheReadTokens?, reportedTotalTokens?
 }
 ```
 
-Components are optional `Long` values and present values are non-negative interoperable integers.
-Absence omits the key. `reportedTotalTokens` is used only when the source reports a total; Agent Judge
-does not derive it. Categories may overlap—for example, a provider may include reasoning in output—so
-do not sum every field. Derive cost downstream using explicit model/time/currency/pricing provenance.
+Three things changed and each can break a consumer:
+
+- **`estimatedCost` is gone.** A price changes with model, provider, currency, time, and pricing
+  table, so it is not durable execution evidence; narrowing its `BigDecimal` for the wire would also
+  have lost the precision the source type promised. Derive cost downstream from the token vector plus
+  an explicitly versioned pricing source.
+- **`totalTokens` is now `reportedTotalTokens`, and it is only ever a total the source supplied.**
+  Agent Judge never derives one, so a source whose total is computed for it — Spring AI's
+  `Usage.getTotalTokens()` defaults to prompt + completion — contributes no total at all. Do not read
+  an absent total as zero usage.
+- **Reasoning and prompt-cache categories are now representable** and are preserved independently
+  when a source reports them.
+
+Components are optional `Long` values; a present value is non-negative and within the interoperable
+integer domain, and is refused at construction otherwise. Absence omits the key, and `metadata.usage`
+itself is absent when the backend reported nothing. `Usage` owns the key constants
+(`Usage.INPUT_TOKENS_KEY` and siblings), the validation, and the ordered projection
+(`Usage.toPortableMap()`), so a producer cannot silently drop a category. Build one with
+`Usage.builder()`, naming only the categories your source reports.
+
+The categories are observations under each provider's own accounting, not an arithmetic identity. A
+provider may count reasoning inside output or cache activity inside input, so do not sum every field
+and do not require `reportedTotalTokens` to equal a derived sum unless that provider's contract says
+it does.
 
 ### 4.3 Construction, before and after
 
@@ -531,9 +552,11 @@ confirm the artifact you resolve before depending on it.
 10. Replace direct reads/writes of metadata key `elapsed` containing `Duration` with the integer
     `elapsedMillis` convention; the `elapsed()` convenience remains available. If you read Agent
     Judge's `CommandJudge` metadata, replace the ISO-8601 `duration` key with `elapsedMillis`.
-11. Replace the unreleased four-component `Usage`/`estimatedCost` projection, if consumed, with the
-    six optional token quantities above. Treat a reported total and category overlap explicitly; do
-    not reconstruct price inside Agent Judge result metadata.
+11. Replace the 0.13 four-component `Usage`, if consumed, with the six optional token quantities
+    above: no `estimatedCost`, and `totalTokens` only as a source-reported `reportedTotalTokens`. If
+    you read `metadata.usage`, it is now a string-keyed object of integers rather than a `Usage`
+    object. Treat category overlap explicitly; do not reconstruct price inside Agent Judge result
+    metadata.
 12. Re-run your own suites. A jury-heavy suite is the place these changes surface.
 
 ---
@@ -578,10 +601,10 @@ Recorded from a read-only inventory. **No consumer repository was modified.**
 
 ## 10. Remaining closure and later follow-ups
 
-- M3 construction-time portable metadata is implemented, but the bounded usage correction above must
-  be implemented and accepted before consumer adoption. M2/M3/M5 then have to be verified together
-  and the exact 0.14 snapshot named by the private Agent Judge steward roadmap referenced by
-  `AGENTS.md` has to be installed.
+- M3 construction-time portable metadata and the portable model-usage correction above are
+  implemented. Before consumer adoption, M2/M3/M5 have to be verified together and the exact 0.14
+  snapshot named by the private Agent Judge steward roadmap referenced by `AGENTS.md` has to be
+  installed.
 - Machine-readable error classification. `ERROR` carries only `reasoning` today; an explicit
   `errorCode` would be added if a concrete consumer needs one. `label` must not be overloaded for it.
 - Public documentation at `docs/agent-judge/` still describes the Score hierarchy and
