@@ -1,0 +1,187 @@
+{
+  "aggregated": {
+    "status": "abstain",
+    "reasoning": "No consensus: 1 passed, 1 failed among 2 applicable judge(s)",
+    "checks": [],
+    "metadata": {
+      "aggregation": {
+        "strategy": "consensus",
+        "errorPolicy": "ignore",
+        "inputCount": 4,
+        "eligibleCount": 2,
+        "explicitAbstainCount": 1,
+        "errorCount": 1,
+        "ignoredErrorCount": 1,
+        "errorsTreatedAsAbstainCount": 0,
+        "errorsTreatedAsFailCount": 0,
+        "passCount": 1,
+        "failCount": 1
+      }
+    }
+  },
+  "individual": [
+    {
+      "status": "pass",
+      "score": 0.94,
+      "reasoning": "The full reactor built and both coverage gates were met",
+      "checks": [
+        {
+          "name": "compiles",
+          "passed": true,
+          "message": ""
+        },
+        {
+          "name": "coverage",
+          "passed": true,
+          "message": "line and branch gates met"
+        }
+      ],
+      "metadata": {
+        "elapsedMillis": 1325,
+        "modules": [
+          "agent-judge-core",
+          "agent-judge-ai-core"
+        ],
+        "coverage": {
+          "linePercent": 95.63,
+          "branchPercent": 92.99
+        },
+        "offline": true
+      }
+    },
+    {
+      "status": "fail",
+      "score": 0.41,
+      "label": "incorrect",
+      "reasoning": "The answer asserts a claim the retrieved context does not support",
+      "checks": [
+        {
+          "name": "answer-supported",
+          "passed": false,
+          "message": "claim 2 is unsupported by the retrieved context"
+        }
+      ],
+      "metadata": {
+        "elapsedMillis": 4210,
+        "model": "test-model",
+        "usage": {
+          "inputTokens": 1820,
+          "outputTokens": 340,
+          "reasoningTokens": 512,
+          "cacheCreationTokens": 1024,
+          "cacheReadTokens": 768,
+          "reportedTotalTokens": 4464
+        },
+        "findings": [
+          {
+            "path": "src/main/java/io/github/markpollack/judge/ai/model/Usage.java",
+            "line": 42,
+            "tags": [
+              "unsupported-claim",
+              "boundary"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "status": "abstain",
+      "label": "not_applicable",
+      "reasoning": "No dependency change in this run, so the scan does not apply",
+      "checks": [],
+      "metadata": {}
+    },
+    {
+      "status": "error",
+      "reasoning": "The licence index was unreachable, so no finding was reached",
+      "checks": [],
+      "metadata": {}
+    }
+  ],
+  "individualByName": {
+    "build-success": {
+      "status": "pass",
+      "score": 0.94,
+      "reasoning": "The full reactor built and both coverage gates were met",
+      "checks": [
+        {
+          "name": "compiles",
+          "passed": true,
+          "message": ""
+        },
+        {
+          "name": "coverage",
+          "passed": true,
+          "message": "line and branch gates met"
+        }
+      ],
+      "metadata": {
+        "elapsedMillis": 1325,
+        "modules": [
+          "agent-judge-core",
+          "agent-judge-ai-core"
+        ],
+        "coverage": {
+          "linePercent": 95.63,
+          "branchPercent": 92.99
+        },
+        "offline": true
+      }
+    },
+    "llm-correctness": {
+      "status": "fail",
+      "score": 0.41,
+      "label": "incorrect",
+      "reasoning": "The answer asserts a claim the retrieved context does not support",
+      "checks": [
+        {
+          "name": "answer-supported",
+          "passed": false,
+          "message": "claim 2 is unsupported by the retrieved context"
+        }
+      ],
+      "metadata": {
+        "elapsedMillis": 4210,
+        "model": "test-model",
+        "usage": {
+          "inputTokens": 1820,
+          "outputTokens": 340,
+          "reasoningTokens": 512,
+          "cacheCreationTokens": 1024,
+          "cacheReadTokens": 768,
+          "reportedTotalTokens": 4464
+        },
+        "findings": [
+          {
+            "path": "src/main/java/io/github/markpollack/judge/ai/model/Usage.java",
+            "line": 42,
+            "tags": [
+              "unsupported-claim",
+              "boundary"
+            ]
+          }
+        ]
+      }
+    },
+    "security-scan": {
+      "status": "abstain",
+      "label": "not_applicable",
+      "reasoning": "No dependency change in this run, so the scan does not apply",
+      "checks": [],
+      "metadata": {}
+    },
+    "licence-audit": {
+      "status": "error",
+      "reasoning": "The licence index was unreachable, so no finding was reached",
+      "checks": [],
+      "metadata": {}
+    }
+  },
+  "weights": {
+    "0": 1.0,
+    "1": 1.0,
+    "2": 1.0,
+    "3": 1.0
+  },
+  "subVerdicts": []
+}

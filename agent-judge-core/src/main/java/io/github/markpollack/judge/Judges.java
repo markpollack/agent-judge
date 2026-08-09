@@ -25,12 +25,12 @@ import io.github.markpollack.judge.result.Judgment;
  *
  * <p>
  * Provides factory methods for common judge operations:
+ * </p>
  * <ul>
  * <li>Wrapping lambda judges with metadata via {@link NamedJudge}</li>
  * <li>Creating simple pass/fail judges</li>
  * <li>Extracting metadata from judges</li>
  * </ul>
- * </p>
  *
  * <p>
  * Example usage:

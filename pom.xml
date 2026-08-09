@@ -415,13 +415,19 @@
                         </executions>
                     </plugin>
 
-                    <!-- Javadoc JAR -->
+                    <!--
+                        Javadoc JAR. failOnError must stay true: suppressing errors here
+                        publishes a Javadoc JAR that silently omits whatever failed to
+                        generate, and a malformed tag in one module cascades into
+                        unresolved-symbol errors downstream. Broken documentation is a
+                        release defect, so the release build breaks on it.
+                    -->
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
                         <version>${maven-javadoc-plugin.version}</version>
                         <configuration>
-                            <failOnError>false</failOnError>
+                            <failOnError>true</failOnError>
                             <quiet>true</quiet>
                         </configuration>
                         <executions>
