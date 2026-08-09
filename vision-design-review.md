@@ -59,7 +59,8 @@ scoreboard. Competitive research remains in plans/learnings and can be refreshed
 
 ### 5. The roadmap confused unchecked boxes with unfinished software
 
-The historical plans/ROADMAP.md shows Steps 3.6 and 3.7 as unfinished, but commits 10f115d and d5e438f
+The historical `plans/archive/ROADMAP-product-development-through-0.13.md` shows Steps 3.6 and 3.7
+as unfinished, but commits 10f115d and d5e438f
 delivered the AgentClient and Spring AI bridges. Step 3.8's principal product outputs also shipped:
 
 - README rewrite: 97896b6;
