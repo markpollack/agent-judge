@@ -5,7 +5,7 @@ See LICENSE.txt in the repository root for license terms.
 
 # Consumer migration handoff — normalized `Judgment` (0.13.0 → 0.14.0)
 
-> **Status**: migration contract updated; M2 and M5 implemented, M3 closure active
+> **Status**: migration contract updated; M2, M3, and M5 implemented
 > **Date**: 2026-08-08
 > **Applies to**: any consumer of `io.github.markpollack:agent-judge-*`
 > **Normative contract**: [design-normalized-judgment.md](design-normalized-judgment.md)
@@ -174,6 +174,19 @@ representation changes:
 
 Consumers that read metadata directly must migrate to `elapsedMillis`. Absence remains omission of the
 key, and `elapsed()` continues to return null when timing is absent.
+
+Both halves of the old convention are gone, not merely discouraged. A `Duration` in result metadata is
+**refused at construction**, and `elapsed()` reads `elapsedMillis` only — the unit-free `elapsed` key
+is not a fallback, because a bare number whose unit is unstated is exactly the ambiguity the new key
+name removes. The public constant is `Judgment.ELAPSED_MILLIS_KEY`.
+
+`CommandJudge` is the one Agent Judge producer this changes. It previously recorded a `duration` key
+holding `Duration.toString()` — an ISO-8601 rendering such as `PT0.132S` — and now records
+`elapsedMillis` holding an integer. Read `judgment.elapsed()`, or the integer key, rather than parsing
+`duration`.
+
+`JudgmentContext.executionTime` is unaffected and remains a live `Duration`: context is an in-process
+evaluation input, not a result.
 
 ### 4.3 Construction, before and after
 
@@ -447,11 +460,18 @@ values or elements, malformed Unicode, non-finite numbers, out-of-domain integer
 live exceptions, durations, SDK response objects, and arbitrary Java objects. Accepted containers are
 defensively copied and recursively frozen.
 
+A rejection names the exact path of the offending value — `metadata.response.usage[2].recordedAt`, not
+just "bad metadata" — so a producer that needs fixing is identified by its message rather than by
+bisecting a map. Encounter order is preserved rather than rehashed, so metadata reads the way it was
+written.
+
 Timing in result metadata uses the optional non-negative integer `elapsedMillis`; a live `Duration`
 belongs in `JudgmentContext` or another non-result attachment surface. `Judgment.elapsed()` derives a
-Java `Duration` from the portable integer. The current snapshot has not implemented this M3 rule yet;
-do not adopt it until the private steward ROADMAP Step 1.2 and subsequent install-verification steps
-are complete.
+Java `Duration` from the portable integer.
+
+This rule is implemented as of the 0.14 development line. Installing and verifying the exact snapshot
+that carries it remains the private steward roadmap's work, so treat the contract as settled but
+confirm the artifact you resolve before depending on it.
 
 ---
 
@@ -474,8 +494,12 @@ are complete.
 8. If you parse `Judgment` JSON, confirm you accept lower-case status names and tolerate omitted
    `score`/`label` keys (§7).
 9. Audit custom Judgment metadata producers and project live objects into the portable value profile.
+   You do not have to find them by reading: construction now throws, naming the exact value path, so
+   running your suites surfaces every one. Note that this converts a previously silent condition into
+   a failure — a producer that has been attaching a live object since 0.12 will start throwing.
 10. Replace direct reads/writes of metadata key `elapsed` containing `Duration` with the integer
-    `elapsedMillis` convention; the `elapsed()` convenience remains available.
+    `elapsedMillis` convention; the `elapsed()` convenience remains available. If you read Agent
+    Judge's `CommandJudge` metadata, replace the ISO-8601 `duration` key with `elapsedMillis`.
 11. Re-run your own suites. A jury-heavy suite is the place these changes surface.
 
 ---
@@ -517,9 +541,9 @@ Recorded from a read-only inventory. **No consumer repository was modified.**
 
 ## 10. Remaining closure and later follow-ups
 
-- Before consumer adoption, finish M3 construction-time portable metadata, verify M2/M3/M5 together,
-  and install the exact 0.14 snapshot named by the private Agent Judge steward roadmap referenced by
-  `STEWARD.md`.
+- M3 construction-time portable metadata is implemented. Before consumer adoption, M2/M3/M5 still
+  have to be verified together and the exact 0.14 snapshot named by the private Agent Judge steward
+  roadmap referenced by `STEWARD.md` has to be installed.
 - Machine-readable error classification. `ERROR` carries only `reasoning` today; an explicit
   `errorCode` would be added if a concrete consumer needs one. `label` must not be overloaded for it.
 - Public documentation at `docs/agent-judge/` still describes the Score hierarchy and

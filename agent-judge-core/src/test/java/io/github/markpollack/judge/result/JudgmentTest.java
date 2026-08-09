@@ -295,15 +295,16 @@ class JudgmentTest {
 		}
 
 		@Test
-		@DisplayName("elapsed() reads the metadata convention")
+		@DisplayName("elapsed() derives a Duration from the portable elapsedMillis key")
 		void elapsed() {
 			assertThat(Judgment.pass("x").elapsed()).isNull();
 
 			Judgment timed = Judgment.builder().pass()
 				.reasoning("x")
-				.metadata("elapsed", Duration.ofMillis(100))
+				.metadata(Judgment.ELAPSED_MILLIS_KEY, 100)
 				.build();
 			assertThat(timed.elapsed()).isEqualTo(Duration.ofMillis(100));
+			assertThat(timed.metadata()).containsEntry("elapsedMillis", 100);
 		}
 
 	}
@@ -425,18 +426,20 @@ class JudgmentTest {
 		}
 
 		@Test
-		@DisplayName("a judgment whose metadata holds a non-JSON-safe value is not portable")
+		@DisplayName("a non-JSON-safe metadata value never reaches serialization")
 		void nonPortableMetadata() {
-			// The declared fields are unconditionally serializable; the whole judgment is
-			// portable only when every metadata value belongs to the JSON value algebra.
-			Judgment judgment = Judgment.builder().pass()
+			// Portability is a property of the constructed value, not of what a caller
+			// happens to attach. A Duration cannot round-trip under a plain ObjectMapper,
+			// so it is refused where it is supplied rather than where it is written; no
+			// judgment holding one exists to serialize. Vectors live in
+			// PortableMetadataContractTest.
+			assertThatThrownBy(() -> Judgment.builder().pass()
 				.reasoning("x")
 				.metadata("elapsed", Duration.ofMillis(100))
-				.build();
-
-			assertThatThrownBy(() -> MAPPER.readValue(MAPPER.writeValueAsString(judgment), Judgment.class))
-				.as("a Duration does not round-trip under a plain ObjectMapper")
-				.isInstanceOf(Exception.class);
+				.build())
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("metadata.elapsed")
+				.hasMessageContaining("java.time.Duration");
 		}
 
 	}

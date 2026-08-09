@@ -16,6 +16,7 @@
 
 package io.github.markpollack.judge.jury;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -39,9 +40,10 @@ import io.github.markpollack.judge.result.Judgment;
  *
  * <p>
  * This is a factory, not a value type: it produces an immutable, JSON-compatible
- * {@code Map<String, Object>}. An {@code AggregationEvidence} object is never placed into
- * {@code metadata}, which would violate the metadata value algebra documented on
- * {@link Judgment}. Every value produced here is an integer, a finite double, or a string.
+ * {@code Map<String, Object>} in declared key order. An {@code AggregationEvidence} object
+ * is never placed into {@code metadata}; the portable value algebra {@link Judgment}
+ * enforces at construction would refuse it. Every value produced here is an integer, a
+ * finite double, or a string, and {@code Judgment} freezes the block again on the way in.
  * </p>
  *
  * @author Mark Pollack
@@ -104,7 +106,7 @@ public final class AggregationEvidence {
 
 	static Judgment attach(Judgment judgment, Map<String, Object> evidence) {
 		Map<String, Object> metadata = new LinkedHashMap<>(judgment.metadata());
-		metadata.put(Judgment.AGGREGATION_KEY, Map.copyOf(evidence));
+		metadata.put(Judgment.AGGREGATION_KEY, evidence);
 		return new Judgment(judgment.status(), judgment.score(), judgment.label(), judgment.reasoning(), judgment.checks(),
 				metadata);
 	}
@@ -135,7 +137,9 @@ public final class AggregationEvidence {
 		}
 
 		Map<String, Object> build() {
-			return Map.copyOf(this.entries);
+			// Declared order, not hash order: the block is read by humans as often as by
+			// machines, and Judgment construction freezes it either way.
+			return Collections.unmodifiableMap(new LinkedHashMap<>(this.entries));
 		}
 
 	}

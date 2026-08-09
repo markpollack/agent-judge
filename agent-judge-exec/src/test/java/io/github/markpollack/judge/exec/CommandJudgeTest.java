@@ -115,7 +115,11 @@ class CommandJudgeTest {
 			.containsEntry("expectedExitCode", 0)
 			.containsKey("exitCode")
 			.containsKey("output")
-			.containsKey("duration");
+			.containsKey("elapsedMillis");
+		assertThat(judgment.metadata().get("elapsedMillis"))
+			.as("timing is a portable integer, not an ISO-8601 rendering of a Duration")
+			.isInstanceOf(Long.class);
+		assertThat(judgment.elapsed()).isNotNull().isGreaterThanOrEqualTo(Duration.ZERO);
 	}
 
 	private JudgmentContext createContext() {

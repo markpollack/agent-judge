@@ -47,7 +47,9 @@ import java.util.Optional;
  * @param agentOutput the agent's output (if successful)
  * @param status the agent's execution status
  * @param error any exception that occurred during execution
- * @param metadata additional context information (extensibility)
+ * @param metadata additional context information (extensibility); an in-process evaluation
+ * input, so unlike {@link io.github.markpollack.judge.result.Judgment} metadata it may carry
+ * framework-native objects a judge needs to inspect
  * @author Mark Pollack
  * @since 0.1.0
  */

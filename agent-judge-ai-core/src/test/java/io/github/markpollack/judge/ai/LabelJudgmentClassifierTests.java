@@ -6,6 +6,9 @@ import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -88,7 +91,30 @@ class LabelJudgmentClassifierTests {
 		Judgment judgment = classifier.classify(resp);
 
 		assertThat(judgment.metadata()).containsEntry("model", "gpt-4o");
-		assertThat(judgment.metadata()).containsEntry("usage", usage);
+		// The Usage record is a Java identity; the result carries its portable projection.
+		// An absent component is omitted rather than carried as a null.
+		assertThat(judgment.metadata()).containsEntry("usage",
+				Map.of("inputTokens", 10, "outputTokens", 5, "totalTokens", 15));
+	}
+
+	@Test
+	void usageProjectionCarriesEstimatedCostAsAnOrdinaryNumber() {
+		var classifier = LabelJudgmentClassifier.passFail("yes", "no");
+		var resp = new JudgeModelResponse("yes", "gpt-4o", new Usage(10, 5, 15, new BigDecimal("0.0025")), null);
+
+		Judgment judgment = classifier.classify(resp);
+
+		assertThat(judgment.metadata().get("usage")).isEqualTo(
+				Map.of("inputTokens", 10, "outputTokens", 5, "totalTokens", 15, "estimatedCost", 0.0025d));
+	}
+
+	@Test
+	void absentUsageAddsNoKey() {
+		var classifier = LabelJudgmentClassifier.passFail("yes", "no");
+
+		Judgment judgment = classifier.classify(new JudgeModelResponse("yes", "gpt-4o", null, null));
+
+		assertThat(judgment.metadata()).doesNotContainKey("usage");
 	}
 
 	@Test

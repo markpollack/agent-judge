@@ -14,6 +14,13 @@
  * {@code Judgment.score} and {@code Judgment.label} visible to readers, reflection, and
  * schema derivers rather than only to prose.
  *
+ * <p>Values here are results, so they are portable: {@code Judgment} metadata accepts only
+ * strings, booleans, interoperable integers, finite numbers, arrays, and string-keyed
+ * objects, recursively, and construction refuses anything else. That is a property of the
+ * constructed value rather than of caller restraint. Evaluation <em>inputs</em> carry no
+ * such guarantee — {@code JudgmentContext} is in-process and may hold framework-native
+ * objects a judge needs to inspect.
+ *
  * <p>JSpecify supplies vocabulary, not enforcement. Main sources in this package are checked
  * by NullAway at {@code ERROR} during {@code default-compile}, in JSpecify mode with
  * {@code OnlyNullMarked=true}; see {@code agent-judge-core/pom.xml}. Adoption is deliberately

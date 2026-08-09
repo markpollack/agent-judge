@@ -8,7 +8,7 @@ package io.github.markpollack.judge.result;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -73,14 +73,23 @@ import org.jspecify.annotations.Nullable;
  * non-blank for {@code ERROR} and {@code ABSTAIN}.
  * </p>
  *
- * <h2>Serialization</h2>
+ * <h2>Serialization and portability</h2>
  * <p>
- * {@code status}, {@code score}, {@code label}, {@code reasoning}, and {@code checks} are
- * unconditionally serializable; absent optionals are omitted rather than emitted as
- * {@code null}. A <em>serializable</em> {@code Judgment} additionally requires every
- * {@code metadata} value to be a string, a finite number, a boolean, a list, or a
- * string-keyed map, recursively. Judges that place richer objects in {@code metadata}
- * produce judgments that are valid in-process but not portable.
+ * Every {@code Judgment} is portable. Absent optionals are omitted rather than emitted as
+ * {@code null}, and {@code metadata} accepts only strings, booleans, interoperable
+ * integers, finite numbers, arrays, and string-keyed objects, recursively. Anything else —
+ * a live exception, a {@link Duration}, an SDK response, an enum constant, an
+ * arbitrary-precision number — is refused by the constructor, naming the exact path of the
+ * offending value. Accepted containers are copied and recursively frozen, so a caller that
+ * keeps mutating its own map, list, or array cannot alter a judgment that was already
+ * built.
+ * </p>
+ * <p>
+ * This is a property of the value, not of caller restraint: a consumer never discovers at
+ * serialization time that an in-process judgment held a Java object. Diagnostics that
+ * genuinely need live objects belong in {@code JudgmentContext} or another non-result
+ * surface. Result timing is the worked example — {@value #ELAPSED_MILLIS_KEY} carries an
+ * integer and {@link #elapsed()} derives the {@code Duration} view.
  * </p>
  *
  * <p>
@@ -106,7 +115,8 @@ import org.jspecify.annotations.Nullable;
  * @param label the classification assigned, or null when nothing was classified
  * @param reasoning human-readable explanation of the judgment; never null
  * @param checks individual check results
- * @param metadata additional judgment information (extensibility, timing, evidence)
+ * @param metadata additional judgment information (extensibility, timing, evidence);
+ * recursively portable and recursively immutable, in encounter order
  * @author Mark Pollack
  * @since 0.1.0
  */
@@ -126,6 +136,19 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	 */
 	public static final String AGGREGATION_KEY = "aggregation";
 
+	/**
+	 * Metadata key carrying elapsed result timing, as a non-negative interoperable integer
+	 * count of milliseconds.
+	 * <p>
+	 * The unit is part of the key so the number is never ambiguous, and absence is the
+	 * omission of the key rather than a sentinel. {@link #elapsed()} derives a Java
+	 * {@link Duration} from it. A live {@code Duration} belongs in
+	 * {@code JudgmentContext} or another non-result surface; it is not a portable result
+	 * value and is refused here.
+	 * </p>
+	 */
+	public static final String ELAPSED_MILLIS_KEY = "elapsedMillis";
+
 	public Judgment {
 		Objects.requireNonNull(status, "status must not be null");
 		Objects.requireNonNull(reasoning, "reasoning must not be null");
@@ -133,7 +156,7 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		Objects.requireNonNull(metadata, "metadata must not be null");
 
 		checks = List.copyOf(checks);
-		metadata = Map.copyOf(metadata);
+		metadata = PortableValues.normalizeMetadata(metadata);
 
 		if (score != null) {
 			if (!Double.isFinite(score)) {
@@ -211,11 +234,17 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	}
 
 	/**
-	 * Get elapsed time from metadata.
-	 * @return elapsed duration, or null if not present
+	 * The elapsed evaluation time recorded on this judgment, as a Java {@link Duration}.
+	 * <p>
+	 * This is a derived view over the portable {@value #ELAPSED_MILLIS_KEY} metadata key,
+	 * never stored state. The stored value is an integer count of milliseconds so the
+	 * judgment stays portable; this accessor is the Java convenience over it.
+	 * </p>
+	 * @return the elapsed duration, or null when the judgment records no timing
 	 */
 	public @Nullable Duration elapsed() {
-		return (Duration) metadata.get("elapsed");
+		Object millis = metadata.get(ELAPSED_MILLIS_KEY);
+		return millis == null ? null : Duration.ofMillis(((Number) millis).longValue());
 	}
 
 	// ==================== Direct conveniences ====================
@@ -360,7 +389,7 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		builder.label = this.label;
 		builder.reasoning = this.reasoning;
 		builder.checks = new ArrayList<>(this.checks);
-		builder.metadata = new HashMap<>(this.metadata);
+		builder.metadata = new LinkedHashMap<>(this.metadata);
 		return builder;
 	}
 
@@ -508,7 +537,7 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 
 		private List<Check> checks = new ArrayList<>();
 
-		private Map<String, Object> metadata = new HashMap<>();
+		private Map<String, Object> metadata = new LinkedHashMap<>();
 
 		@Override
 		public Builder pass() {
@@ -602,7 +631,8 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		 * Add a metadata entry.
 		 * @param key the key; must not be the reserved {@value Judgment#AGGREGATION_KEY}
 		 * key
-		 * @param value the value
+		 * @param value the value; must belong to the portable value algebra, which the
+		 * constructor enforces
 		 * @return this builder
 		 */
 		public Builder metadata(String key, Object value) {
@@ -624,7 +654,9 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		public Builder metadata(Map<String, Object> metadata) {
 			Objects.requireNonNull(metadata, "metadata must not be null");
 			metadata.keySet().forEach(Builder::requireNotReserved);
-			this.metadata.putAll(Map.copyOf(metadata));
+			// Copied in encounter order rather than through Map.copyOf, which rehashes.
+			// Portability of the values themselves is settled once, at construction.
+			this.metadata.putAll(metadata);
 			return this;
 		}
 

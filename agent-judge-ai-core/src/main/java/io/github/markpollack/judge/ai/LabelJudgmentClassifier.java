@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.OptionalDouble;
 
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.Usage;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
 
@@ -105,9 +106,46 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 		if (response.model() != null) {
 			builder.metadata("model", response.model());
 		}
-		if (response.usage() != null) {
-			builder.metadata("usage", response.usage());
+		Map<String, Object> usage = portableUsage(response.usage());
+		if (!usage.isEmpty()) {
+			builder.metadata("usage", usage);
 		}
+	}
+
+	/**
+	 * Project token usage into the portable value profile a {@code Judgment} result
+	 * accepts.
+	 * <p>
+	 * A {@link Usage} record is a Java identity, not a portable value, so it is flattened
+	 * into a string-keyed object of numbers. Absent components are omitted rather than
+	 * carried as nulls. {@code estimatedCost} becomes an ordinary finite number, which is
+	 * how a JSON consumer would read it in any case; the exact {@code BigDecimal} stays
+	 * available on the response itself for callers that need it.
+	 * </p>
+	 * @param usage the model-reported usage, or null when the backend reported none
+	 * @return the portable projection, empty when there is nothing to record
+	 */
+	private static Map<String, Object> portableUsage(Usage usage) {
+		if (usage == null) {
+			return Map.of();
+		}
+		Map<String, Object> portable = new LinkedHashMap<>();
+		if (usage.inputTokens() != null) {
+			portable.put("inputTokens", usage.inputTokens());
+		}
+		if (usage.outputTokens() != null) {
+			portable.put("outputTokens", usage.outputTokens());
+		}
+		if (usage.totalTokens() != null) {
+			portable.put("totalTokens", usage.totalTokens());
+		}
+		if (usage.estimatedCost() != null) {
+			double cost = usage.estimatedCost().doubleValue();
+			if (Double.isFinite(cost)) {
+				portable.put("estimatedCost", cost);
+			}
+		}
+		return portable;
 	}
 
 	/**

@@ -30,7 +30,7 @@ import io.github.markpollack.sandbox.Sandbox;
 
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -68,7 +68,10 @@ import java.util.function.Function;
  * }</pre>
  *
  * <p>
- * The judgment includes stdout, stderr, and exit code in metadata for detailed analysis.
+ * The judgment records the command, merged stdout/stderr, expected and actual exit codes,
+ * and elapsed time under {@link Judgment#ELAPSED_MILLIS_KEY} in result metadata. Every one
+ * of those is a portable value; {@link Judgment#elapsed()} gives the Java view of the
+ * timing.
  * </p>
  *
  * @author Mark Pollack
@@ -141,12 +144,15 @@ public class CommandJudge extends DeterministicJudge {
 
 			boolean pass = result.exitCode() == expectedExitCode;
 
-			Map<String, Object> metadata = new HashMap<>();
+			Map<String, Object> metadata = new LinkedHashMap<>();
 			metadata.put("command", command);
 			metadata.put("exitCode", result.exitCode());
 			metadata.put("expectedExitCode", expectedExitCode);
 			metadata.put("output", result.mergedLog());
-			metadata.put("duration", result.duration().toString());
+			// Result timing is a portable millisecond count under the conventional key,
+			// not an ISO-8601 rendering of a Java Duration. Clamped because a clock
+			// artifact should not turn a command that ran into a construction failure.
+			metadata.put(Judgment.ELAPSED_MILLIS_KEY, Math.max(0L, result.duration().toMillis()));
 
 			String reasoning = pass ? String.format("Command succeeded with exit code %d", result.exitCode()) : String
 				.format("Command failed. Expected exit code %d but got %d", expectedExitCode, result.exitCode());
