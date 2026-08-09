@@ -5,7 +5,7 @@ See LICENSE.txt in the repository root for license terms.
 
 # Consumer migration handoff — normalized `Judgment` (0.13.0 → 0.14.0)
 
-> **Status**: migration contract updated; M2, M3, and M5 implementation closure remains active
+> **Status**: migration contract updated; M2 and M5 implemented, M3 closure active
 > **Date**: 2026-08-08
 > **Applies to**: any consumer of `io.github.markpollack:agent-judge-*`
 > **Normative contract**: [design-normalized-judgment.md](design-normalized-judgment.md)
@@ -517,9 +517,9 @@ Recorded from a read-only inventory. **No consumer repository was modified.**
 
 ## 10. Remaining closure and later follow-ups
 
-- Before consumer adoption, finish M2 schema-visible optionality, M3 construction-time portable
-  metadata, and M5 consensus repair, then verify and install the exact 0.14 snapshot named by
-  the private Agent Judge steward roadmap referenced by `STEWARD.md`.
+- Before consumer adoption, finish M3 construction-time portable metadata, verify M2/M3/M5 together,
+  and install the exact 0.14 snapshot named by the private Agent Judge steward roadmap referenced by
+  `STEWARD.md`.
 - Machine-readable error classification. `ERROR` carries only `reasoning` today; an explicit
   `errorCode` would be added if a concrete consumer needs one. `label` must not be overloaded for it.
 - Public documentation at `docs/agent-judge/` still describes the Score hierarchy and

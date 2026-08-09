@@ -5,7 +5,7 @@ See LICENSE.txt in the repository root for license terms.
 
 # Design proposal — normalized `Judgment` API
 
-> **Status**: **structural migration implemented with a green baseline; M2, M3, and M5 closure active**
+> **Status**: **structural migration, M2, and M5 implemented; M3 closure active**
 > **Date**: 2026-08-08
 > **Revision**: r12. r12 fixes the package-scoped JSpecify/NullAway contract and the portable
 > `elapsedMillis` convention while preserving the `elapsed()` Java view. r11 records schema-visible
@@ -36,11 +36,11 @@ See LICENSE.txt in the repository root for license terms.
 
 ---
 
-## Implementation status — baseline verified, contract closure active
+## Implementation status — M2 and M5 closed; M3 active
 
-The structural migration is implemented and the current code passes a clean full Maven reactor. That
-baseline does not close three consumer-facing gaps: M2 schema-visible optionality, M3 recursively
-portable metadata, and M5's implementation regression from mixed consensus `ABSTAIN` to `FAIL`.
+The structural migration is implemented. M5 mixed-consensus semantics are restored and M2
+schema-visible optionality is declared and enforced. M3 recursively portable metadata remains the
+open consumer-facing contract gap.
 
 - **49a6c73** committed this design and the DDD review.
 - **a5b15f8** preserved the pre-change characterization baseline, including the previously uncovered
@@ -51,10 +51,16 @@ portable metadata, and M5's implementation regression from mixed consensus `ABST
   behavior.
 - **014a779** closed two contract-coverage gaps and retired stale aggregation test prose.
 - **c7d445c** removed `ReactiveJudge` and the Reactor dependency from core.
+- **84ca549** restored mixed applicable consensus disagreement to `ABSTAIN` with truth-table and
+  cascade-boundary guards (M5).
+- **7eef4d1** made `score` and `label` declaration-visible optionals and enforced the adopted result
+  package with NullAway (M2).
 
-**Latest verified baseline — 2026-08-06** — `./mvnw clean verify`, BUILD SUCCESS across all ten child
-modules (eleven reactor projects including the parent): **487 tests, 0 failures, 0 errors, 0 skipped**. `agent-judge-core` covers
-**95.30% of lines** (730/766; gate 80%) and **93.67% of branches** (296/316; gate 75%).
+**Latest step evidence — 2026-08-08** — at `7eef4d1`, `./mvnw clean test` passed **528 tests**
+across all ten child modules with no failures, errors, or skips. `./mvnw -pl agent-judge-core verify`
+covered **95.31% of lines** (731/767; gate 80%) and **93.69% of branches** (297/317; gate 75%). The
+combined full-reactor `clean verify` remains the steward roadmap's Step 1.3 gate and is not claimed
+here.
 
 > **Correction to the dc6ca2d checkpoint claim.** That checkpoint stated that all modules reached
 > main *and test* compilation. They did not. `agent-judge-ai-core` and `agent-judge-llm` test
@@ -82,13 +88,10 @@ examples were compiled against the built classes rather than reviewed by eye.
 
 Still pending under the active closure roadmap:
 
-1. Marking `score` and `label` optional in Agent Judge's public declaration/reflection contract and
-   enforcing the adopted package with NullAway (M2). Agent Workflow owns downstream schema
-   interpretation.
-2. Enforcing the portable metadata value profile recursively at Judgment construction (M3).
-3. Restoring mixed applicable `PASS + FAIL` consensus to `ABSTAIN` (M5).
-4. Installing the exact repaired snapshot locally and staging the separate Agent Workflow migration.
-5. Public documentation reconciliation for 0.14.
+1. Enforcing the portable metadata value profile recursively at Judgment construction (M3).
+2. Proving M2/M3/M5 together through combined full-reactor and artifact conformance.
+3. Installing the exact repaired snapshot locally and staging the separate Agent Workflow migration.
+4. Public documentation reconciliation for 0.14.
 
 The active execution plan is maintained in the private Agent Judge steward; see
 [STEWARD.md](STEWARD.md). The Phase 0 section below is retained as the historical verification
@@ -298,10 +301,11 @@ plus its unused `THRESHOLD` constant and unused `NumericalScore` import — the 
 
 *Source: `ddd-review.md` Warning 3 and `plans/inbox/abstain-aware-consensus.md`; resolved by the maintainer.*
 
-The handoff does not mention this. Today both "unanimously failed" and "could not agree" return
-`FAIL`; the distinction survives only in the reasoning string, and it is the one fact a consensus
-strategy exists to report. Worse, the `score`-reading fall-through lets an `ABSTAIN` count as a fail
-vote and *manufacture* unanimity — `Consensus(fail, abstain)` currently reports "Unanimous consensus".
+The handoff did not originally mention this. Before the M5 repair, both "unanimously failed" and
+"could not agree" returned `FAIL`; the distinction survived only in the reasoning string, and it is
+the one fact a consensus strategy exists to report. Worse, the old `score`-reading fall-through let
+an `ABSTAIN` count as a fail vote and *manufacture* unanimity — `Consensus(fail, abstain)` reported
+"Unanimous consensus".
 
 **`ABSTAIN` means "not applicable to this run" — it is not a vote at all**, so it is excluded from
 the consensus population rather than blocking unanimity. Consensus is then computed over the
@@ -786,7 +790,7 @@ Three consequences worth stating plainly:
    **explicit stable token fields**; the tokens are never derived mechanically from enum constant
    names, so renaming a constant cannot silently alter the published contract.
 
-   **This normalises `VotingStrategy.getName()`**, which currently returns the inconsistent set
+   **This normalises `VotingStrategy.getName()`**, which previously returned the inconsistent set
    `"majority"`, `"Consensus"`, `"AverageVoting"`, `"WeightedAverage"`, `"MedianVoting"`. Usage was
    checked across `agent-judge`, `agent-workflow`, and `agentworks-pr-review`: the existing values are
    pinned only by `agent-judge`'s own tests, with no known production consumer. Its Javadoc is
