@@ -38,8 +38,7 @@ logs/
 # Flattened POMs
 .flattened-pom.xml
 
-# Claude Code / local project docs
-CLAUDE.md
+# Transitional local project docs
 plans/
 
 # Generated project-status cache (GitHub-derived; no authored content)

@@ -581,7 +581,7 @@ Recorded from a read-only inventory. **No consumer repository was modified.**
 - M3 construction-time portable metadata is implemented, but the bounded usage correction above must
   be implemented and accepted before consumer adoption. M2/M3/M5 then have to be verified together
   and the exact 0.14 snapshot named by the private Agent Judge steward roadmap referenced by
-  `STEWARD.md` has to be installed.
+  `AGENTS.md` has to be installed.
 - Machine-readable error classification. `ERROR` carries only `reasoning` today; an explicit
   `errorCode` would be added if a concrete consumer needs one. `label` must not be overloaded for it.
 - Public documentation at `docs/agent-judge/` still describes the Score hierarchy and
