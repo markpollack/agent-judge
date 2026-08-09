@@ -75,6 +75,11 @@
         <!-- JSON processing -->
         <jackson.version>2.21.2</jackson.version>
 
+        <!-- Nullness contract (declarations) and its enforcing checker -->
+        <jspecify.version>1.0.0</jspecify.version>
+        <errorprone.version>2.50.0</errorprone.version>
+        <nullaway.version>0.13.8</nullaway.version>
+
         <!-- Test dependency versions -->
         <junit-jupiter.version>5.10.1</junit-jupiter.version>
         <mockito.version>5.7.0</mockito.version>
@@ -165,6 +170,13 @@
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
                 <version>${slf4j.version}</version>
+            </dependency>
+
+            <!-- JSpecify nullness annotations; compile scope because they are part of the public API -->
+            <dependency>
+                <groupId>org.jspecify</groupId>
+                <artifactId>jspecify</artifactId>
+                <version>${jspecify.version}</version>
             </dependency>
 
             <!-- Project modules -->

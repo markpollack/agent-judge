@@ -16,6 +16,7 @@ import java.util.OptionalDouble;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Result of a judgment: an outcome, optionally a normalized quantitative assessment, and
@@ -90,6 +91,16 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  * pattern), providing transparency into evaluation logic.
  * </p>
  *
+ * <h2>Declared optionality</h2>
+ * <p>
+ * This package is {@code @NullMarked}, so every component below is non-null unless it is
+ * declared {@link Nullable}. {@code score} and {@code label} are the only two optional
+ * members, and they are optional in the Java declaration exactly as they are on the wire: a
+ * consumer reading the record by eye, by reflection, or through a schema deriver sees the
+ * same contract that {@link JsonInclude} produces. The build enforces these declarations with
+ * NullAway rather than leaving them as prose.
+ * </p>
+ *
  * @param status the judgment status (PASS, FAIL, ABSTAIN, ERROR); never null
  * @param score normalized assessment in [0.0, 1.0], or null when no measurement was made
  * @param label the classification assigned, or null when nothing was classified
@@ -101,8 +112,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({ "status", "score", "label", "reasoning", "checks", "metadata" })
-public record Judgment(JudgmentStatus status, Double score, String label, String reasoning, List<Check> checks,
-		Map<String, Object> metadata) {
+public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable String label, String reasoning,
+		List<Check> checks, Map<String, Object> metadata) {
 
 	/**
 	 * Metadata key reserved for aggregation evidence written by voting strategies.
@@ -203,7 +214,7 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 	 * Get elapsed time from metadata.
 	 * @return elapsed duration, or null if not present
 	 */
-	public Duration elapsed() {
+	public @Nullable Duration elapsed() {
 		return (Duration) metadata.get("elapsed");
 	}
 
@@ -486,11 +497,12 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 	private static final class Builder implements OutcomeStage, FindingBuilder, RequiredAbstainReason, AbstainBuilder,
 			RequiredErrorReason, ErrorBuilder {
 
-		private JudgmentStatus status;
+		/** Null until an outcome stage is selected; {@link #build()} requires it. */
+		private @Nullable JudgmentStatus status;
 
-		private Double score;
+		private @Nullable Double score;
 
-		private String label;
+		private @Nullable String label;
 
 		private String reasoning = "";
 
@@ -623,7 +635,12 @@ public record Judgment(JudgmentStatus status, Double score, String label, String
 		}
 
 		public Judgment build() {
-			return new Judgment(status, score, label, reasoning, checks, metadata);
+			// The staged interfaces make build() unreachable before an outcome is selected,
+			// but that invariant is invisible to a nullness checker reading this class. State
+			// it where the value is used rather than trusting the stage types; the message
+			// matches the one the compact constructor would otherwise raise.
+			return new Judgment(Objects.requireNonNull(status, "status must not be null"), score, label, reasoning,
+					checks, metadata);
 		}
 
 	}
