@@ -5,10 +5,11 @@ See LICENSE.txt in the repository root for license terms.
 
 # Consumer migration handoff — normalized `Judgment` (0.13.0 → 0.14.0)
 
-> **Status**: migration contract updated; M2, M3, and M5 implemented
+> **Status**: migration contract updated; M2/M5 and the M3 value algebra implemented; bounded usage correction pending
 > **Date**: 2026-08-08
 > **Applies to**: any consumer of `io.github.markpollack:agent-judge-*`
-> **Normative contract**: [design-normalized-judgment.md](design-normalized-judgment.md)
+> **Public contract surfaces**: `Judgment`/jury Javadocs and tests, plus the wire and migration
+> contract in this guide. Private planning authority lives in the paired steward repository.
 > **This document does not authorize edits to any consumer repository.**
 
 0.14 replaces the sealed `Score` hierarchy with three independent facts on `Judgment`. You can
@@ -187,6 +188,36 @@ holding `Duration.toString()` — an ISO-8601 rendering such as `PT0.132S` — a
 
 `JudgmentContext.executionTime` is unaffected and remains a live `Duration`: context is an in-process
 evaluation input, not a result.
+
+#### Changed model-usage convention
+
+The unreleased first Step 1.2 implementation briefly projected:
+
+```text
+Usage(inputTokens, outputTokens, totalTokens, estimatedCost)
+metadata.usage = {inputTokens?, outputTokens?, totalTokens?, estimatedCost?}
+```
+
+That projection is not the accepted 0.14 contract. `estimatedCost` is removed: a price changes with
+model, provider, time, currency, and pricing table, while narrowing its `BigDecimal` to `double` loses
+the precision promised by the source type.
+
+The accepted usage object carries optional token quantities only:
+
+```text
+Usage(inputTokens, outputTokens, reasoningTokens,
+      cacheCreationTokens, cacheReadTokens, reportedTotalTokens)
+
+metadata.usage = {
+  inputTokens?, outputTokens?, reasoningTokens?,
+  cacheCreationTokens?, cacheReadTokens?, reportedTotalTokens?
+}
+```
+
+Components are optional `Long` values and present values are non-negative interoperable integers.
+Absence omits the key. `reportedTotalTokens` is used only when the source reports a total; Agent Judge
+does not derive it. Categories may overlap—for example, a provider may include reasoning in output—so
+do not sum every field. Derive cost downstream using explicit model/time/currency/pricing provenance.
 
 ### 4.3 Construction, before and after
 
@@ -500,7 +531,10 @@ confirm the artifact you resolve before depending on it.
 10. Replace direct reads/writes of metadata key `elapsed` containing `Duration` with the integer
     `elapsedMillis` convention; the `elapsed()` convenience remains available. If you read Agent
     Judge's `CommandJudge` metadata, replace the ISO-8601 `duration` key with `elapsedMillis`.
-11. Re-run your own suites. A jury-heavy suite is the place these changes surface.
+11. Replace the unreleased four-component `Usage`/`estimatedCost` projection, if consumed, with the
+    six optional token quantities above. Treat a reported total and category overlap explicitly; do
+    not reconstruct price inside Agent Judge result metadata.
+12. Re-run your own suites. A jury-heavy suite is the place these changes surface.
 
 ---
 
@@ -523,6 +557,9 @@ Recorded from a read-only inventory. **No consumer repository was modified.**
   `Judgment.elapsed()` remains as a derived convenience and `JudgmentContext` timing remains available
   in process.
 - Its own `workflow-spec/.../v3/envelope/Judgment.java` DTO is unaffected.
+- Its current `OperationUsage(tokens, costUsd)` and neutral `cost{tokens,costUsd,...}` shapes are a
+  separately owned Workflow follow-up: preserve category-level token evidence and keep volatile
+  pricing distinct. Agent Judge does not authorize that consumer change.
 
 ### agentworks-pr-review (branch `v3-serving`, pins 0.11.0-SNAPSHOT)
 
@@ -541,9 +578,10 @@ Recorded from a read-only inventory. **No consumer repository was modified.**
 
 ## 10. Remaining closure and later follow-ups
 
-- M3 construction-time portable metadata is implemented. Before consumer adoption, M2/M3/M5 still
-  have to be verified together and the exact 0.14 snapshot named by the private Agent Judge steward
-  roadmap referenced by `STEWARD.md` has to be installed.
+- M3 construction-time portable metadata is implemented, but the bounded usage correction above must
+  be implemented and accepted before consumer adoption. M2/M3/M5 then have to be verified together
+  and the exact 0.14 snapshot named by the private Agent Judge steward roadmap referenced by
+  `STEWARD.md` has to be installed.
 - Machine-readable error classification. `ERROR` carries only `reasoning` today; an explicit
   `errorCode` would be added if a concrete consumer needs one. `label` must not be overloaded for it.
 - Public documentation at `docs/agent-judge/` still describes the Score hierarchy and

@@ -15,9 +15,10 @@ The authoritative active planning trio is:
 - `/home/mark/projects/agent-judge-steward/plans/DESIGN.md`
 - `/home/mark/projects/agent-judge-steward/plans/ROADMAP.md`
 
-Root VISION/DESIGN files and ignored `plans/` pointer files in this repository are discovery aids, not
-planning authorities. Historical handoffs and reviews are evidence until adjudicated; they cannot
-override the active trio.
+`STEWARD.md` is the sole tracked planning bridge in this public repository. The ignored `plans/` tree
+is retained temporarily through the current closure round and is not authority; it will be migrated
+and removed at the recorded stage-close cleanup. Historical handoffs and reviews are evidence until
+adjudicated; they cannot override the active trio.
 
 ## Applicable Engineering Standard
 
