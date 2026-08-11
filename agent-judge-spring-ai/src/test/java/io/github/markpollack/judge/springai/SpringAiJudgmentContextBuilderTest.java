@@ -14,6 +14,7 @@ import org.springframework.ai.chat.model.Generation;
 
 import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.conformance.JudgmentContextConformance;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,7 +49,29 @@ class SpringAiJudgmentContextBuilderTest {
 		assertThat(context.metadata()).containsEntry(SpringAiMetadataKeys.FINISH_REASON, "stop");
 		assertThat(context.metadata()).containsEntry(SpringAiMetadataKeys.USAGE_PROMPT_TOKENS, 100);
 		assertThat(context.metadata()).containsEntry(SpringAiMetadataKeys.USAGE_COMPLETION_TOKENS, 50);
-		assertThat(context.metadata()).containsEntry(SpringAiMetadataKeys.USAGE_TOTAL_TOKENS, 150);
+		assertThat(context.metadata()).doesNotContainKey("springai.usage.totalTokens");
+		JudgmentContextConformance.assertSuccessful(context, "Explain Spring Boot",
+				"Spring Boot simplifies application development.");
+	}
+
+	@Test
+	void shouldExposeIndependentCacheQuantitiesWithoutDerivedTotal() {
+		AssistantMessage message = new AssistantMessage("Cached response");
+		Generation generation = new Generation(message,
+				ChatGenerationMetadata.builder().finishReason("stop").build());
+		ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+			.id("resp-cache")
+			.model("gpt-cache")
+			.usage(new DefaultUsage(100, 50, null, null, 25L, 10L))
+			.build();
+
+		JudgmentContext context = SpringAiJudgmentContextBuilder.from(
+				new ChatResponse(List.of(generation), metadata), "Use cache", Instant.now(), Duration.ofMillis(5));
+
+		assertThat(context.metadata())
+			.containsEntry("springai.usage.cacheCreationTokens", 10L)
+			.containsEntry("springai.usage.cacheReadTokens", 25L)
+			.doesNotContainKey("springai.usage.totalTokens");
 	}
 
 	@Test
@@ -92,13 +115,15 @@ class SpringAiJudgmentContextBuilderTest {
 
 	@Test
 	void shouldCaptureExceptionFromSupplier() {
+		RuntimeException failure = new RuntimeException("Connection refused");
 		JudgmentContext context = SpringAiJudgmentContextBuilder.execute("Fail please", () -> {
-			throw new RuntimeException("Connection refused");
+			throw failure;
 		});
 
 		assertThat(context.status()).isEqualTo(ExecutionStatus.FAILED);
 		assertThat(context.error()).isPresent()
 			.hasValueSatisfying(e -> assertThat(e.getMessage()).isEqualTo("Connection refused"));
+		JudgmentContextConformance.assertFailed(context, "Fail please", failure);
 	}
 
 	@Test

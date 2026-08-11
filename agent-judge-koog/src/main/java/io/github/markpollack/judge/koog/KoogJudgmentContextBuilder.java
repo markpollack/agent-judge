@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import ai.koog.agents.core.agent.AIAgent;
+import ai.koog.agents.core.agent.config.AIAgentConfig;
+import ai.koog.prompt.llm.LLModel;
 import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
 
@@ -46,11 +48,12 @@ public final class KoogJudgmentContextBuilder {
 			Map<String, Object> extraMetadata) {
 		Instant startedAt = Instant.now();
 		String agentId = safeGetId(agent);
+		Map<String, Object> metadata = new HashMap<>(extraMetadata);
+		metadata.put(KoogMetadataKeys.AGENT_ID, agentId);
+		extractModelIdentity(agent, metadata);
 		try {
 			String output = agent.run(input);
 			Duration elapsed = Duration.between(startedAt, Instant.now());
-			Map<String, Object> metadata = new HashMap<>(extraMetadata);
-			metadata.put("koog.agentId", agentId);
 			return JudgmentContext.builder()
 				.goal(input)
 				.status(ExecutionStatus.SUCCESS)
@@ -65,8 +68,6 @@ public final class KoogJudgmentContextBuilder {
 				Thread.currentThread().interrupt();
 			}
 			Duration elapsed = Duration.between(startedAt, Instant.now());
-			Map<String, Object> metadata = new HashMap<>(extraMetadata);
-			metadata.put("koog.agentId", agentId);
 			return JudgmentContext.builder()
 				.goal(input)
 				.status(ExecutionStatus.FAILED)
@@ -80,10 +81,31 @@ public final class KoogJudgmentContextBuilder {
 
 	private static String safeGetId(AIAgent<String, String> agent) {
 		try {
-			return agent.getId();
+			String id = agent.getId();
+			return id != null && !id.isEmpty() ? id : "unknown";
 		}
 		catch (Exception ex) {
 			return "unknown";
+		}
+	}
+
+	private static void extractModelIdentity(AIAgent<String, String> agent, Map<String, Object> metadata) {
+		try {
+			AIAgentConfig config = agent.getAgentConfig();
+			LLModel model = config != null ? config.getModel() : null;
+			if (model == null) {
+				return;
+			}
+			if (model.getProvider() != null && model.getProvider().getId() != null
+					&& !model.getProvider().getId().isEmpty()) {
+				metadata.put(KoogMetadataKeys.PROVIDER, model.getProvider().getId());
+			}
+			if (model.getId() != null && !model.getId().isEmpty()) {
+				metadata.put(KoogMetadataKeys.MODEL, model.getId());
+			}
+		}
+		catch (Exception ex) {
+			// Model identity is optional and must not turn an otherwise valid execution into a failure.
 		}
 	}
 

@@ -59,13 +59,13 @@
         <agent-judge.version>${project.version}</agent-judge.version>
 
         <!-- AgentClient version -->
-        <agent-client.version>0.20.0</agent-client.version>
+        <agent-client.version>0.25.0</agent-client.version>
 
         <!-- Core dependency versions - aligned with Spring AI 2.0 -->
         <agent-sandbox-core.version>0.9.3</agent-sandbox-core.version>
-        <spring-framework.version>7.0.2</spring-framework.version>
+        <spring-framework.version>7.0.8</spring-framework.version>
         <spring-ai.version>2.0.0</spring-ai.version>
-        <spring-boot.version>4.0.7</spring-boot.version>
+        <spring-boot.version>4.1.0</spring-boot.version>
         <slf4j.version>2.0.9</slf4j.version>
 
         <!-- File comparison -->

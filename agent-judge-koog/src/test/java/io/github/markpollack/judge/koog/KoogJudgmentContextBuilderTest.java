@@ -3,8 +3,12 @@ package io.github.markpollack.judge.koog;
 import java.time.Duration;
 
 import ai.koog.agents.core.agent.AIAgent;
+import ai.koog.agents.core.agent.config.AIAgentConfig;
+import ai.koog.prompt.llm.LLModel;
+import ai.koog.prompt.llm.LLMProvider;
 import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.conformance.JudgmentContextConformance;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +40,23 @@ class KoogJudgmentContextBuilderTest {
 		assertThat(context.executionTime()).isGreaterThanOrEqualTo(Duration.ZERO);
 		assertThat(context.metadata()).containsEntry("koog.agentId", "test-agent-1");
 		assertThat(context.error()).isEmpty();
+		JudgmentContextConformance.assertSuccessful(context, "Write a hello world program", "Created HelloWorld.java");
+	}
+
+	@Test
+	void shouldExposeConfiguredProviderAndModelIdentity() {
+		AIAgent<String, String> agent = mockAgent();
+		AIAgentConfig config = mock(AIAgentConfig.class);
+		when(agent.run("Identify model")).thenReturn("done");
+		when(agent.getId()).thenReturn("model-agent");
+		when(agent.getAgentConfig()).thenReturn(config);
+		when(config.getModel()).thenReturn(new LLModel(LLMProvider.OpenAI, "gpt-5"));
+
+		JudgmentContext context = KoogJudgmentContextBuilder.from(agent, "Identify model");
+
+		assertThat(context.metadata())
+			.containsEntry("koog.provider", "openai")
+			.containsEntry("koog.model", "gpt-5");
 	}
 
 	@Test
@@ -52,6 +73,7 @@ class KoogJudgmentContextBuilderTest {
 		assertThat(context.agentOutput()).isEmpty();
 		assertThat(context.error()).isPresent().hasValueSatisfying(e -> assertThat(e.getMessage()).isEqualTo("Agent timed out"));
 		assertThat(context.metadata()).containsEntry("koog.agentId", "test-agent-2");
+		JudgmentContextConformance.assertFailed(context, "Impossible task", failure);
 	}
 
 }

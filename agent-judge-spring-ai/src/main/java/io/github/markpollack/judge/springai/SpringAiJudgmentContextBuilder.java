@@ -22,9 +22,11 @@ import io.github.markpollack.judge.context.JudgmentContext;
  * judging-side LLM dependency (that is {@code agent-judge-llm} which uses
  * {@code spring-ai-client-chat}).
  * <p>
- * Extracts output text, finish reason, token usage, model name, response ID, and
- * tool-call indicators into metadata. Tool call details are best-effort — detailed
- * tool execution traces belong to agent-journal / advisor instrumentation.
+ * Extracts output text, finish reason, independently available token quantities,
+ * model name, response ID, and tool-call indicators into metadata. Tool call details
+ * are best-effort — detailed tool execution traces belong to agent-journal / advisor
+ * instrumentation. A total token count is not emitted because Spring AI may derive it
+ * from prompt and completion counts rather than preserve provider-reporting provenance.
  *
  * @author Mark Pollack
  * @since 0.10.0
@@ -169,8 +171,11 @@ public final class SpringAiJudgmentContextBuilder {
 				if (usage.getCompletionTokens() != null) {
 					metadata.put(SpringAiMetadataKeys.USAGE_COMPLETION_TOKENS, usage.getCompletionTokens());
 				}
-				if (usage.getTotalTokens() != null) {
-					metadata.put(SpringAiMetadataKeys.USAGE_TOTAL_TOKENS, usage.getTotalTokens());
+				if (usage.getCacheWriteInputTokens() != null) {
+					metadata.put(SpringAiMetadataKeys.USAGE_CACHE_CREATION_TOKENS, usage.getCacheWriteInputTokens());
+				}
+				if (usage.getCacheReadInputTokens() != null) {
+					metadata.put(SpringAiMetadataKeys.USAGE_CACHE_READ_TOKENS, usage.getCacheReadInputTokens());
 				}
 			}
 		}

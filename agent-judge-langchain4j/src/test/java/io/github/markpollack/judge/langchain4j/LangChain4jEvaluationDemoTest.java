@@ -4,8 +4,10 @@ import java.util.List;
 
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
+import dev.langchain4j.invocation.InvocationContext;
 import dev.langchain4j.service.Result;
 import dev.langchain4j.service.tool.ToolExecution;
+import dev.langchain4j.service.tool.ToolExecutionResult;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
@@ -60,7 +62,8 @@ class LangChain4jEvaluationDemoTest {
 				.name("searchDocs")
 				.arguments("{\"query\": \"Spring Boot\"}")
 				.build())
-			.result("Found 3 relevant docs")
+			.result(ToolExecutionResult.builder().resultText("Found 3 relevant docs").build())
+			.invocationContext(InvocationContext.builder().build())
 			.build();
 
 		Judgment judgment = LangChain4jEvaluator.evaluate("Search for Spring Boot docs",

@@ -24,8 +24,11 @@ public final class SpringAiMetadataKeys {
 	/** Number of tokens in the AI response. */
 	public static final String USAGE_COMPLETION_TOKENS = "springai.usage.completionTokens";
 
-	/** Total tokens (prompt + completion). */
-	public static final String USAGE_TOTAL_TOKENS = "springai.usage.totalTokens";
+	/** Number of input tokens written to the provider prompt cache. */
+	public static final String USAGE_CACHE_CREATION_TOKENS = "springai.usage.cacheCreationTokens";
+
+	/** Number of input tokens read from the provider prompt cache. */
+	public static final String USAGE_CACHE_READ_TOKENS = "springai.usage.cacheReadTokens";
 
 	/** Whether the response contains tool call requests. */
 	public static final String HAS_TOOL_CALLS = "springai.hasToolCalls";

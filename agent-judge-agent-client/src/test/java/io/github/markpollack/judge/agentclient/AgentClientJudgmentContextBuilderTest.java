@@ -10,6 +10,7 @@ import io.github.markpollack.agents.model.AgentResponse;
 import io.github.markpollack.agents.model.AgentResponseMetadata;
 import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.conformance.JudgmentContextConformance;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -57,6 +58,18 @@ class AgentClientJudgmentContextBuilderTest {
 		assertThat(context.metadata()).containsEntry(AgentClientMetadataKeys.MODEL, "claude-code");
 		assertThat(context.metadata()).containsEntry(AgentClientMetadataKeys.SESSION_ID, "sess-abc-123");
 		assertThat(context.metadata()).containsEntry(AgentClientMetadataKeys.FINISH_REASON, "SUCCESS");
+		JudgmentContextConformance.assertSuccessful(context, "Fix the build", "Fixed the build error in Main.java");
+	}
+
+	@Test
+	void shouldPreserveTimeoutAndCancellationStatus() {
+		JudgmentContext timeout = AgentClientJudgmentContextBuilder.from(responseWithFinishReason("TIMEOUT"),
+				"Wait", Path.of("/tmp/project"));
+		JudgmentContext cancelled = AgentClientJudgmentContextBuilder.from(responseWithFinishReason("CANCELLED"),
+				"Stop", Path.of("/tmp/project"));
+
+		assertThat(timeout.status()).isEqualTo(ExecutionStatus.TIMEOUT);
+		assertThat(cancelled.status()).isEqualTo(ExecutionStatus.CANCELLED);
 	}
 
 	@Test
@@ -73,14 +86,21 @@ class AgentClientJudgmentContextBuilderTest {
 
 	@Test
 	void shouldCaptureExceptionFromSupplier() {
+		RuntimeException failure = new RuntimeException("CLI process failed");
 		JudgmentContext context = AgentClientJudgmentContextBuilder.execute("Crash", Path.of("/tmp"), () -> {
-			throw new RuntimeException("CLI process failed");
+			throw failure;
 		});
 
 		assertThat(context.status()).isEqualTo(ExecutionStatus.FAILED);
 		assertThat(context.error()).isPresent()
 			.hasValueSatisfying(e -> assertThat(e.getMessage()).isEqualTo("CLI process failed"));
 		assertThat(context.executionTime()).isGreaterThanOrEqualTo(Duration.ZERO);
+		JudgmentContextConformance.assertFailed(context, "Crash", failure);
+	}
+
+	private AgentClientResponse responseWithFinishReason(String finishReason) {
+		AgentGeneration generation = new AgentGeneration("", new AgentGenerationMetadata(finishReason, null));
+		return new AgentClientResponse(new AgentResponse(List.of(generation), AgentResponseMetadata.builder().build()));
 	}
 
 	@Test

@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -57,7 +58,8 @@ public final class AgentClientJudgmentContextBuilder {
 
 		if (response != null) {
 			output = response.getResult();
-			status = response.isSuccessful() ? ExecutionStatus.SUCCESS : ExecutionStatus.FAILED;
+			String finishReason = safeGetFinishReason(response);
+			status = mapFinishReason(finishReason, response.isSuccessful());
 
 			AgentResponseMetadata meta = safeGetMetadata(response);
 			if (meta != null) {
@@ -70,7 +72,6 @@ public final class AgentClientJudgmentContextBuilder {
 				}
 			}
 
-			String finishReason = safeGetFinishReason(response);
 			if (finishReason != null) {
 				metadata.put(AgentClientMetadataKeys.FINISH_REASON, finishReason);
 			}
@@ -161,6 +162,20 @@ public final class AgentClientJudgmentContextBuilder {
 		catch (Exception ex) {
 			return null;
 		}
+	}
+
+	private static ExecutionStatus mapFinishReason(String finishReason, boolean successful) {
+		if (finishReason == null || finishReason.isBlank()) {
+			return successful ? ExecutionStatus.SUCCESS : ExecutionStatus.UNKNOWN;
+		}
+		return switch (finishReason.toUpperCase(Locale.ROOT)) {
+			case "SUCCESS", "COMPLETE" -> ExecutionStatus.SUCCESS;
+			case "ERROR", "FAILED" -> ExecutionStatus.FAILED;
+			case "TIMEOUT" -> ExecutionStatus.TIMEOUT;
+			case "CANCELLED", "CANCELED" -> ExecutionStatus.CANCELLED;
+			case "REFUSED", "CONTENT_FILTER" -> ExecutionStatus.REFUSED;
+			default -> successful ? ExecutionStatus.SUCCESS : ExecutionStatus.UNKNOWN;
+		};
 	}
 
 }

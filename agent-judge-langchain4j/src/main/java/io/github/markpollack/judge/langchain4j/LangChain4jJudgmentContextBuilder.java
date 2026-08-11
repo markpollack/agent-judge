@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import dev.langchain4j.model.output.FinishReason;
+import dev.langchain4j.model.output.TokenUsage;
 import dev.langchain4j.service.Result;
 import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
@@ -38,18 +39,49 @@ public final class LangChain4jJudgmentContextBuilder {
 	 */
 	public static <T> JudgmentContext from(Result<T> result, String goal, Instant startedAt,
 			Duration executionTime) {
-		Map<String, Object> metadata = new HashMap<>();
-		if (result.tokenUsage() != null) {
-			metadata.put("langchain4j.tokenUsage", result.tokenUsage());
+		return from(result, goal, startedAt, executionTime, Map.of());
+	}
+
+	/**
+	 * Build a context with caller metadata. Native response facts remain authoritative if
+	 * a caller supplies a colliding key.
+	 * @param <T> result content type
+	 * @param result the LangChain4j result to wrap
+	 * @param goal the task description that produced this result
+	 * @param startedAt when execution began
+	 * @param executionTime how long execution took
+	 * @param extraMetadata additional caller-owned context metadata
+	 * @return a fully populated JudgmentContext
+	 */
+	public static <T> JudgmentContext from(Result<T> result, String goal, Instant startedAt, Duration executionTime,
+			Map<String, Object> extraMetadata) {
+		Map<String, Object> metadata = new HashMap<>(extraMetadata);
+		TokenUsage usage = result.tokenUsage();
+		if (usage != null) {
+			metadata.put(LangChain4jMetadataKeys.TOKEN_USAGE, usage);
+			if (usage.inputTokenCount() != null) {
+				metadata.put(LangChain4jMetadataKeys.USAGE_INPUT_TOKENS, usage.inputTokenCount());
+			}
+			if (usage.outputTokenCount() != null) {
+				metadata.put(LangChain4jMetadataKeys.USAGE_OUTPUT_TOKENS, usage.outputTokenCount());
+			}
 		}
 		if (result.toolExecutions() != null && !result.toolExecutions().isEmpty()) {
-			metadata.put("langchain4j.toolExecutions", result.toolExecutions());
+			metadata.put(LangChain4jMetadataKeys.TOOL_EXECUTIONS, result.toolExecutions());
 		}
 		if (result.sources() != null && !result.sources().isEmpty()) {
-			metadata.put("langchain4j.sources", result.sources());
+			metadata.put(LangChain4jMetadataKeys.SOURCES, result.sources());
 		}
 		if (result.finishReason() != null) {
-			metadata.put("langchain4j.finishReason", result.finishReason().name());
+			metadata.put(LangChain4jMetadataKeys.FINISH_REASON, result.finishReason().name());
+		}
+		if (result.finalResponse() != null) {
+			if (result.finalResponse().id() != null && !result.finalResponse().id().isEmpty()) {
+				metadata.put(LangChain4jMetadataKeys.RESPONSE_ID, result.finalResponse().id());
+			}
+			if (result.finalResponse().modelName() != null && !result.finalResponse().modelName().isEmpty()) {
+				metadata.put(LangChain4jMetadataKeys.MODEL, result.finalResponse().modelName());
+			}
 		}
 
 		String output = result.content() != null ? result.content().toString() : null;
@@ -106,21 +138,7 @@ public final class LangChain4jJudgmentContextBuilder {
 					.build();
 			}
 			Duration elapsed = Duration.between(startedAt, Instant.now());
-			JudgmentContext context = from(result, goal, startedAt, elapsed);
-			if (!extraMetadata.isEmpty()) {
-				Map<String, Object> merged = new HashMap<>(context.metadata());
-				merged.putAll(extraMetadata);
-				context = JudgmentContext.builder()
-					.goal(context.goal())
-					.workspace(context.workspace())
-					.status(context.status())
-					.startedAt(context.startedAt())
-					.executionTime(context.executionTime())
-					.agentOutput(context.agentOutput().orElse(null))
-					.metadata(merged)
-					.build();
-			}
-			return context;
+			return from(result, goal, startedAt, elapsed, extraMetadata);
 		}
 		catch (Exception ex) {
 			Duration elapsed = Duration.between(startedAt, Instant.now());
