@@ -5,11 +5,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.invocation.InvocationContext;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.model.chat.response.ChatResponse;
-import dev.langchain4j.invocation.InvocationContext;
+import dev.langchain4j.rag.content.Content;
 import dev.langchain4j.service.Result;
 import dev.langchain4j.service.tool.ToolExecution;
 import dev.langchain4j.service.tool.ToolExecutionResult;
@@ -120,6 +121,21 @@ class LangChain4jJudgmentContextBuilderTest {
 		@SuppressWarnings("unchecked")
 		List<ToolExecution> tools = (List<ToolExecution>) context.metadata().get("langchain4j.toolExecutions");
 		assertThat(tools).hasSize(1);
+	}
+
+	@Test
+	void shouldExposeRetrievalSources() {
+		Content source = Content.from("Reference passage about evaluation evidence");
+		Result<String> result = Result.<String>builder()
+			.content("Answer grounded in the reference")
+			.sources(List.of(source))
+			.build();
+
+		JudgmentContext context = LangChain4jJudgmentContextBuilder.from(result, "Answer from references",
+				Instant.now(), Duration.ofMillis(5));
+
+		assertThat(context.metadata())
+			.containsExactlyEntriesOf(Map.of(LangChain4jMetadataKeys.SOURCES, List.of(source)));
 	}
 
 	@Test

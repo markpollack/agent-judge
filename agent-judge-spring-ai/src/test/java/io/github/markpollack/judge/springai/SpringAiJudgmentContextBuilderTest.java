@@ -75,6 +75,24 @@ class SpringAiJudgmentContextBuilderTest {
 	}
 
 	@Test
+	void shouldExposeNativeAssistantToolCalls() {
+		AssistantMessage.ToolCall toolCall = new AssistantMessage.ToolCall("call-1", "function", "lookupWeather",
+				"{\"city\":\"Boston\"}");
+		AssistantMessage message = AssistantMessage.builder()
+			.content("")
+			.toolCalls(List.of(toolCall))
+			.build();
+		ChatResponse response = new ChatResponse(List.of(new Generation(message)));
+
+		JudgmentContext context = SpringAiJudgmentContextBuilder.from(response, "Check the weather", Instant.now(),
+				Duration.ofMillis(5));
+
+		assertThat(context.metadata())
+			.containsEntry(SpringAiMetadataKeys.HAS_TOOL_CALLS, true)
+			.containsEntry(SpringAiMetadataKeys.TOOL_CALLS, List.of(toolCall));
+	}
+
+	@Test
 	void shouldMapContentFilterToRefused() {
 		AssistantMessage message = new AssistantMessage("");
 		ChatGenerationMetadata genMeta = ChatGenerationMetadata.builder().finishReason("content_filter").build();
