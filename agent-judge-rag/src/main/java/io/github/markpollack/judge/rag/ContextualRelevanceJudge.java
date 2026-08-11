@@ -28,6 +28,10 @@ public class ContextualRelevanceJudge extends LLMJudge {
 	private static final java.util.regex.Pattern ANSWER_PATTERN = java.util.regex.Pattern
 		.compile("(?mi)^\\s*Answer:\\s*(YES|NO)");
 
+	/**
+	 * Create a contextual-relevance judge.
+	 * @param chatClientBuilder Spring AI client used for judging
+	 */
 	public ContextualRelevanceJudge(ChatClient.Builder chatClientBuilder) {
 		super("ContextualRelevance", "Evaluates whether retrieved context is relevant to the question",
 				chatClientBuilder);

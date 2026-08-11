@@ -42,6 +42,10 @@ import java.util.List;
  */
 public class MavenBuildRunner {
 
+	/** Create a Maven build runner. */
+	public MavenBuildRunner() {
+	}
+
 	private static final Logger logger = LoggerFactory.getLogger(MavenBuildRunner.class);
 
 	private static final long DEFAULT_TIMEOUT_MINUTES = 10;

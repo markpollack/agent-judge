@@ -35,18 +35,7 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * // Wrap lambda with metadata
- * Judge fileCheck = ctx -> Judgment.pass("File exists");
- * NamedJudge named = Judges.named(fileCheck, "FileCheck", "Checks if file exists");
- *
- * // Simple judges
- * Judge alwaysPass = Judges.alwaysPass("Default success");
- * Judge alwaysFail = Judges.alwaysFail("Not implemented");
- *
- * // Extract metadata
- * Optional<JudgeMetadata> meta = Judges.tryMetadata(judge);
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0
@@ -138,10 +127,7 @@ public final class Judges {
 	 * <p>
 	 * Example usage:
 	 * </p>
-	 * <pre>{@code
-	 * Judge validation = Judges.and(fileExists, contentMatches);
-	 * Judge chained = Judges.and(fileExists, Judges.and(contentMatches, buildSucceeds));
-	 * }</pre>
+	 * See the Agent Judge Tutorial for compiled composition examples.
 	 * @param first the first judge to execute
 	 * @param second the second judge to execute (only if first passes)
 	 * @return composed judge with AND logic
@@ -163,9 +149,7 @@ public final class Judges {
 	 * <p>
 	 * Example usage:
 	 * </p>
-	 * <pre>{@code
-	 * Judge fallback = Judges.or(primaryCheck, secondaryCheck);
-	 * }</pre>
+	 * See the Agent Judge Tutorial for compiled composition examples.
 	 * @param first the first judge to execute
 	 * @param second the second judge to execute (only if first fails)
 	 * @return composed judge with OR logic
@@ -187,9 +171,7 @@ public final class Judges {
 	 * <p>
 	 * Example usage:
 	 * </p>
-	 * <pre>{@code
-	 * Judge validation = Judges.allOf(fileExists, contentMatches, buildSucceeds, testsPass);
-	 * }</pre>
+	 * See the Agent Judge Tutorial for compiled composition examples.
 	 * @param judges the judges to compose (varargs)
 	 * @return composed judge with AND logic
 	 */
@@ -215,9 +197,7 @@ public final class Judges {
 	 * <p>
 	 * Example usage:
 	 * </p>
-	 * <pre>{@code
-	 * Judge fallback = Judges.anyOf(checkA, checkB, checkC);
-	 * }</pre>
+	 * See the Agent Judge Tutorial for compiled composition examples.
 	 * @param judges the judges to compose (varargs)
 	 * @return composed judge with OR logic
 	 */

@@ -30,6 +30,7 @@ public class JavaSemanticJudge extends DeterministicJudge {
 
 	private final JavaSemanticComparator comparator = new JavaSemanticComparator();
 
+	/** Create a Java source semantic-comparison judge. */
 	public JavaSemanticJudge() {
 		super("JavaSemanticJudge", "Compares Java files using AST-based semantic comparison");
 	}

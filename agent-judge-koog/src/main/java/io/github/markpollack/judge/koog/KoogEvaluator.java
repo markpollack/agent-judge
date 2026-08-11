@@ -17,14 +17,7 @@ import io.github.markpollack.judge.result.Judgment;
  * because {@link AIAgent} is a concrete type with a synchronous {@code run()} method.
  * <p>
  * Usage:
- * <pre>{@code
- * Judgment result = KoogEvaluator.evaluate(agent, "build a REST API", myJudge);
- * Verdict verdict = KoogEvaluator.evaluate(agent, "build a REST API", myJury);
- *
- * // With extra metadata for run tagging
- * Judgment tagged = KoogEvaluator.evaluate(agent, "build a REST API", myJudge,
- *     Map.of("run.id", "exp-42", "dataset.row", 7));
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.10.0

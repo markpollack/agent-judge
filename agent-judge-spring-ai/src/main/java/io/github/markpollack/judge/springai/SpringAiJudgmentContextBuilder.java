@@ -36,6 +36,11 @@ public final class SpringAiJudgmentContextBuilder {
 
 	/**
 	 * Build a {@link JudgmentContext} from a pre-computed {@link ChatResponse}.
+	 * @param response Spring AI response
+	 * @param goal task description
+	 * @param startedAt execution start time
+	 * @param executionTime elapsed execution time
+	 * @return populated judgment context
 	 */
 	public static JudgmentContext from(ChatResponse response, String goal, Instant startedAt,
 			Duration executionTime) {
@@ -45,6 +50,12 @@ public final class SpringAiJudgmentContextBuilder {
 	/**
 	 * Build a {@link JudgmentContext} from a pre-computed {@link ChatResponse} with extra
 	 * metadata.
+	 * @param response Spring AI response
+	 * @param goal task description
+	 * @param startedAt execution start time
+	 * @param executionTime elapsed execution time
+	 * @param extraMetadata additional context metadata
+	 * @return populated judgment context
 	 */
 	public static JudgmentContext from(ChatResponse response, String goal, Instant startedAt, Duration executionTime,
 			Map<String, Object> extraMetadata) {
@@ -92,6 +103,9 @@ public final class SpringAiJudgmentContextBuilder {
 	/**
 	 * Execute a Spring AI call via a Supplier, capture the result, and build a
 	 * {@link JudgmentContext}.
+	 * @param goal task description
+	 * @param call Spring AI invocation
+	 * @return populated judgment context
 	 */
 	public static JudgmentContext execute(String goal, Supplier<ChatResponse> call) {
 		return execute(goal, call, Map.of());
@@ -99,6 +113,10 @@ public final class SpringAiJudgmentContextBuilder {
 
 	/**
 	 * Execute a Spring AI call via a Supplier with extra metadata.
+	 * @param goal task description
+	 * @param call Spring AI invocation
+	 * @param extraMetadata additional context metadata
+	 * @return populated judgment context
 	 */
 	public static JudgmentContext execute(String goal, Supplier<ChatResponse> call,
 			Map<String, Object> extraMetadata) {

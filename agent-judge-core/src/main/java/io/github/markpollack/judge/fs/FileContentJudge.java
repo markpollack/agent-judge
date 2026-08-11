@@ -44,25 +44,7 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * // Exact match
- * &#64;Bean
- * public FileContentJudge exactMatch() {
- *     return new FileContentJudge("output.txt", "Hello World", MatchMode.EXACT);
- * }
- *
- * // Contains check
- * &#64;Bean
- * public FileContentJudge containsCheck() {
- *     return new FileContentJudge("log.txt", "SUCCESS", MatchMode.CONTAINS);
- * }
- *
- * // Regex pattern
- * &#64;Bean
- * public FileContentJudge regexCheck() {
- *     return new FileContentJudge("data.json", "\\{.*\"status\".*\\}", MatchMode.REGEX);
- * }
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0
@@ -77,6 +59,12 @@ public class FileContentJudge extends DeterministicJudge {
 
 	private final MatchMode matchMode;
 
+	/**
+	 * Create a content judge with an explicit match mode.
+	 * @param filePath path relative to the judgment workspace
+	 * @param expectedContent expected text or regular expression
+	 * @param matchMode comparison mode
+	 */
 	public FileContentJudge(String filePath, String expectedContent, MatchMode matchMode) {
 		super("FileContentJudge",
 				String.format("Verifies file content at %s (%s match)", filePath, matchMode.name().toLowerCase()));
@@ -85,6 +73,11 @@ public class FileContentJudge extends DeterministicJudge {
 		this.matchMode = matchMode;
 	}
 
+	/**
+	 * Create an exact-content judge.
+	 * @param filePath path relative to the judgment workspace
+	 * @param expectedContent expected file content
+	 */
 	public FileContentJudge(String filePath, String expectedContent) {
 		this(filePath, expectedContent, MatchMode.EXACT);
 	}

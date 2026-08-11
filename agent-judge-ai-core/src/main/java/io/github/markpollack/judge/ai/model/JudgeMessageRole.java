@@ -8,10 +8,13 @@ package io.github.markpollack.judge.ai.model;
  */
 public enum JudgeMessageRole {
 
+	/** System instruction. */
 	SYSTEM,
 
+	/** User request. */
 	USER,
 
+	/** Assistant response. */
 	ASSISTANT
 
 }

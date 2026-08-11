@@ -45,26 +45,7 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * &#64;Component
- * public class SimpleAsyncJudgeAdapter implements AsyncJudge {
- *     private final Judge delegate;
- *     private final Executor executor;
- *
- *     public SimpleAsyncJudgeAdapter(Judge delegate,
- *                                     &#64;Qualifier("judgeExecutor") Executor executor) {
- *         this.delegate = delegate;
- *         this.executor = executor;
- *     }
- *
- *     public CompletableFuture<Judgment> judgeAsync(JudgmentContext context) {
- *         return CompletableFuture.supplyAsync(
- *             () -> delegate.judge(context),
- *             executor
- *         );
- *     }
- * }
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0

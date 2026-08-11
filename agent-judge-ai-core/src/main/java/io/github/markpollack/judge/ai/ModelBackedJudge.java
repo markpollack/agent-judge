@@ -21,14 +21,7 @@ import io.github.markpollack.judge.result.Judgment;
  * </ol>
  *
  * <p>Example:
- * <pre>{@code
- * Judge judge = ModelBackedJudge.builder()
- *     .name("relevance")
- *     .promptTemplate(JudgePromptTemplate.fromClasspath("judges/relevance.md"))
- *     .judgmentClassifier(JudgmentClassifiers.passFail("relevant", "irrelevant"))
- *     .model(springAiJudgeModel)
- *     .build();
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.10.0
@@ -63,11 +56,20 @@ public final class ModelBackedJudge implements JudgeWithMetadata {
 		return metadata;
 	}
 
+	/**
+	 * Start a model-backed judge builder.
+	 * @return a new builder
+	 */
 	public static Builder builder() {
 		return new Builder();
 	}
 
+	/** Builds a model-backed judge from its four required collaborators. */
 	public static class Builder {
+
+		/** Create an empty builder. */
+		public Builder() {
+		}
 
 		private String name;
 
@@ -79,31 +81,60 @@ public final class ModelBackedJudge implements JudgeWithMetadata {
 
 		private JudgeModel model;
 
+		/**
+		 * Set the judge name.
+		 * @param name judge name
+		 * @return this builder
+		 */
 		public Builder name(String name) {
 			this.name = name;
 			return this;
 		}
 
+		/**
+		 * Set the judge description.
+		 * @param description judge description
+		 * @return this builder
+		 */
 		public Builder description(String description) {
 			this.description = description;
 			return this;
 		}
 
+		/**
+		 * Set the prompt template.
+		 * @param promptTemplate prompt template
+		 * @return this builder
+		 */
 		public Builder promptTemplate(JudgePromptTemplate promptTemplate) {
 			this.promptTemplate = promptTemplate;
 			return this;
 		}
 
+		/**
+		 * Set the response classifier.
+		 * @param classifier response classifier
+		 * @return this builder
+		 */
 		public Builder judgmentClassifier(JudgmentClassifier classifier) {
 			this.classifier = classifier;
 			return this;
 		}
 
+		/**
+		 * Set the model adapter.
+		 * @param model model adapter
+		 * @return this builder
+		 */
 		public Builder model(JudgeModel model) {
 			this.model = model;
 			return this;
 		}
 
+		/**
+		 * Build the configured judge.
+		 * @return a model-backed judge
+		 */
 		public ModelBackedJudge build() {
 			if (name == null) {
 				throw new IllegalStateException("Judge name is required");

@@ -36,14 +36,7 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * &#64;Component
- * public class MyFileExistsJudge extends FileExistsJudge {
- *     public MyFileExistsJudge() {
- *         super("output.txt");
- *     }
- * }
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0
@@ -52,6 +45,10 @@ public class FileExistsJudge extends DeterministicJudge {
 
 	private final String filePath;
 
+	/**
+	 * Create a file-existence judge.
+	 * @param filePath path relative to the judgment workspace
+	 */
 	public FileExistsJudge(String filePath) {
 		super("FileExistsJudge", "Verifies that file exists at path: " + filePath);
 		this.filePath = filePath;

@@ -31,6 +31,10 @@ public final class AgentClientJudgeModel implements JudgeModel {
 
 	private final AgentClient agentClient;
 
+	/**
+	 * Create a judging backend for the supplied AgentClient.
+	 * @param agentClient client that executes the judging agent
+	 */
 	public AgentClientJudgeModel(AgentClient agentClient) {
 		this.agentClient = agentClient;
 	}

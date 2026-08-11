@@ -19,22 +19,51 @@ import java.util.*;
  */
 public class MavenSemanticComparator {
 
+	/** Create a Maven semantic comparator. */
+	public MavenSemanticComparator() {
+	}
+
 	private static final String DEFAULT_PLUGIN_GROUP_ID = "org.apache.maven.plugins";
 
+	/**
+	 * Result of comparing two Maven models.
+	 * @param equivalent whether the models are semantically equivalent
+	 * @param differences descriptions of semantic differences
+	 */
 	public record ComparisonResult(boolean equivalent, List<String> differences) {
+		/**
+		 * Create an equivalent result.
+		 * @return an equivalent result
+		 */
 		public static ComparisonResult match() {
 			return new ComparisonResult(true, List.of());
 		}
 
+		/**
+		 * Create a mismatch from difference descriptions.
+		 * @param diffs difference descriptions
+		 * @return a mismatch result
+		 */
 		public static ComparisonResult mismatch(String... diffs) {
 			return new ComparisonResult(false, Arrays.asList(diffs));
 		}
 
+		/**
+		 * Create a mismatch from a difference list.
+		 * @param diffs difference descriptions
+		 * @return a mismatch result
+		 */
 		public static ComparisonResult mismatch(List<String> diffs) {
 			return new ComparisonResult(false, diffs);
 		}
 	}
 
+	/**
+	 * Compare two POM documents semantically.
+	 * @param expected expected POM text
+	 * @param actual actual POM text
+	 * @return comparison result
+	 */
 	public ComparisonResult compare(String expected, String actual) {
 		try {
 			MavenXpp3Reader reader = new MavenXpp3Reader();

@@ -23,6 +23,7 @@ public class MavenSemanticJudge extends DeterministicJudge {
 
 	private final MavenSemanticComparator comparator = new MavenSemanticComparator();
 
+	/** Create a Maven semantic judge. */
 	public MavenSemanticJudge() {
 		super("MavenSemanticJudge", "Compares pom.xml files using Maven model-based semantic comparison");
 	}

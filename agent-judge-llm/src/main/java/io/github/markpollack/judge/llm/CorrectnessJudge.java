@@ -60,24 +60,7 @@ import org.springframework.ai.chat.client.ChatClient;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * // Standalone evaluation
- * Judge judge = new CorrectnessJudge(chatClientBuilder);
- * Judgment judgment = judge.judge(context);
- * System.out.println(judgment.reasoning());
- *
- * // Combined with AgentClient via JudgeAdvisor
- * AgentClientResponse response = agentClient
- *     .goal("Write a README with installation instructions")
- *     .advisors(JudgeAdvisor.builder()
- *         .judge(new CorrectnessJudge(chatClientBuilder))
- *         .build())
- *     .run();
- *
- * if (response.isJudgmentPassed()) {
- *     System.out.println("Task succeeded!");
- * }
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0

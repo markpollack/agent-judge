@@ -28,10 +28,18 @@ public final class SpringAiJudgeModel implements JudgeModel {
 
 	private final ChatClient chatClient;
 
+	/**
+	 * Create an adapter from an existing chat client.
+	 * @param chatClient chat client
+	 */
 	public SpringAiJudgeModel(ChatClient chatClient) {
 		this.chatClient = chatClient;
 	}
 
+	/**
+	 * Create an adapter from a chat client builder.
+	 * @param chatClientBuilder chat client builder
+	 */
 	public SpringAiJudgeModel(ChatClient.Builder chatClientBuilder) {
 		this.chatClient = chatClientBuilder.build();
 	}

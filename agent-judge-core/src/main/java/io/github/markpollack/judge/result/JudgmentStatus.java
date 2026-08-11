@@ -32,11 +32,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * <p>
  * The central distinction this enum draws:
  * </p>
- * <pre>{@code
- * FAIL    = the judge completed and rejected the subject
- * ERROR   = the judge could not complete the evaluation
- * ABSTAIN = the judge does not apply to this subject, so it casts no vote
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * <h2>Wire representation</h2>
  * <p>

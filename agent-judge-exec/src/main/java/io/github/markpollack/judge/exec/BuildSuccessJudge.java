@@ -35,16 +35,7 @@ import java.time.Duration;
  * Example usage:
  * </p>
  *
- * <pre>{@code
- * // Auto-detect Maven wrapper or fallback to mvn
- * Judge judge = BuildSuccessJudge.maven("clean", "compile");
- *
- * // Auto-detect Gradle wrapper or fallback to gradle
- * Judge judge = BuildSuccessJudge.gradle("build");
- *
- * // Custom build command
- * Judge judge = new BuildSuccessJudge("npm run build");
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * <p>
  * The judge uses a 10-minute default timeout (longer than CommandJudge's 2 minutes) since

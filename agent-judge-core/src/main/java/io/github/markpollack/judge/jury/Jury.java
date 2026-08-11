@@ -39,16 +39,7 @@ import java.util.List;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * Jury jury = SimpleJury.builder()
- *     .judge(fileExistsJudge, 0.3)
- *     .judge(correctnessJudge, 0.7)
- *     .votingStrategy(new WeightedAverageStrategy())
- *     .build();
- *
- * Verdict verdict = jury.vote(context);
- * Judgment aggregated = verdict.aggregated();
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0

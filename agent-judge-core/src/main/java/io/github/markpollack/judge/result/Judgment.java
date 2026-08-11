@@ -149,6 +149,7 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	 */
 	public static final String ELAPSED_MILLIS_KEY = "elapsedMillis";
 
+	/** Validate, copy, and recursively freeze every judgment component. */
 	public Judgment {
 		Objects.requireNonNull(status, "status must not be null");
 		Objects.requireNonNull(reasoning, "reasoning must not be null");
@@ -398,12 +399,28 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	 */
 	public interface OutcomeStage {
 
+		/**
+		 * Select a passing outcome.
+		 * @return a builder with PASS selected
+		 */
 		FindingBuilder pass();
 
+		/**
+		 * Select a failing outcome.
+		 * @return a builder with FAIL selected
+		 */
 		FindingBuilder fail();
 
+		/**
+		 * Select an abstaining outcome.
+		 * @return a stage requiring ABSTAIN reasoning
+		 */
 		RequiredAbstainReason abstain();
 
+		/**
+		 * Select an error outcome.
+		 * @return a stage requiring ERROR reasoning
+		 */
 		RequiredErrorReason error();
 
 	}
@@ -434,14 +451,39 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	/** Common enrichment operations that are legal for every outcome. */
 	public interface EnrichmentBuilder {
 
+		/**
+		 * Add a check.
+		 * @param check check to add
+		 * @return this builder
+		 */
 		EnrichmentBuilder check(Check check);
 
+		/**
+		 * Add checks.
+		 * @param checks checks to add
+		 * @return this builder
+		 */
 		EnrichmentBuilder checks(Collection<Check> checks);
 
+		/**
+		 * Add a portable metadata entry.
+		 * @param key metadata key
+		 * @param value portable value
+		 * @return this builder
+		 */
 		EnrichmentBuilder metadata(String key, Object value);
 
+		/**
+		 * Add metadata entries.
+		 * @param metadata metadata entries
+		 * @return this builder
+		 */
 		EnrichmentBuilder metadata(Map<String, Object> metadata);
 
+		/**
+		 * Build the immutable judgment.
+		 * @return the immutable judgment
+		 */
 		Judgment build();
 
 	}
@@ -449,21 +491,40 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	/** Builder for completed PASS and FAIL findings. */
 	public interface FindingBuilder extends EnrichmentBuilder {
 
+		/**
+		 * Set the explanation.
+		 * @param reasoning explanation
+		 * @return this builder
+		 */
 		FindingBuilder reasoning(String reasoning);
 
+		/**
+		 * Set the normalized score.
+		 * @param score normalized score
+		 * @return this builder
+		 */
 		FindingBuilder score(double score);
 
+		/**
+		 * Set the classification label.
+		 * @param label classification label
+		 * @return this builder
+		 */
 		FindingBuilder label(String label);
 
+		/** {@inheritDoc} */
 		@Override
 		FindingBuilder check(Check check);
 
+		/** {@inheritDoc} */
 		@Override
 		FindingBuilder checks(Collection<Check> checks);
 
+		/** {@inheritDoc} */
 		@Override
 		FindingBuilder metadata(String key, Object value);
 
+		/** {@inheritDoc} */
 		@Override
 		FindingBuilder metadata(Map<String, Object> metadata);
 
@@ -472,6 +533,11 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	/** Required reasoning step for an ABSTAIN outcome. */
 	public interface RequiredAbstainReason {
 
+		/**
+		 * Set the required abstention explanation.
+		 * @param reasoning explanation
+		 * @return an abstention builder
+		 */
 		AbstainBuilder reasoning(String reasoning);
 
 	}
@@ -479,19 +545,33 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	/** Builder for a reasoned ABSTAIN outcome. */
 	public interface AbstainBuilder extends EnrichmentBuilder {
 
+		/**
+		 * Replace the abstention explanation.
+		 * @param reasoning explanation
+		 * @return this builder
+		 */
 		AbstainBuilder reasoning(String reasoning);
 
+		/**
+		 * Set a completed classification.
+		 * @param label completed classification
+		 * @return this builder
+		 */
 		AbstainBuilder label(String label);
 
+		/** {@inheritDoc} */
 		@Override
 		AbstainBuilder check(Check check);
 
+		/** {@inheritDoc} */
 		@Override
 		AbstainBuilder checks(Collection<Check> checks);
 
+		/** {@inheritDoc} */
 		@Override
 		AbstainBuilder metadata(String key, Object value);
 
+		/** {@inheritDoc} */
 		@Override
 		AbstainBuilder metadata(Map<String, Object> metadata);
 
@@ -500,6 +580,11 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	/** Required reasoning step for an ERROR outcome. */
 	public interface RequiredErrorReason {
 
+		/**
+		 * Set the required error explanation.
+		 * @param reasoning explanation
+		 * @return an error builder
+		 */
 		ErrorBuilder reasoning(String reasoning);
 
 	}
@@ -507,17 +592,26 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	/** Builder for a reasoned ERROR outcome. */
 	public interface ErrorBuilder extends EnrichmentBuilder {
 
+		/**
+		 * Replace the error explanation.
+		 * @param reasoning explanation
+		 * @return this builder
+		 */
 		ErrorBuilder reasoning(String reasoning);
 
+		/** {@inheritDoc} */
 		@Override
 		ErrorBuilder check(Check check);
 
+		/** {@inheritDoc} */
 		@Override
 		ErrorBuilder checks(Collection<Check> checks);
 
+		/** {@inheritDoc} */
 		@Override
 		ErrorBuilder metadata(String key, Object value);
 
+		/** {@inheritDoc} */
 		@Override
 		ErrorBuilder metadata(Map<String, Object> metadata);
 

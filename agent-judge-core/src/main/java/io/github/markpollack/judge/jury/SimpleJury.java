@@ -43,16 +43,7 @@ import java.util.stream.Collectors;
  * <p>
  * Example usage with builder:
  * </p>
- * <pre>{@code
- * Jury jury = SimpleJury.builder()
- *     .judge(fileExistsJudge, 0.3)
- *     .judge(correctnessJudge, 0.7)
- *     .votingStrategy(new WeightedAverageStrategy())
- *     .parallel(true)
- *     .build();
- *
- * Judgment result = jury.judge(context);
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0
@@ -155,6 +146,10 @@ public class SimpleJury implements Jury {
 	 * Builder for SimpleJury.
 	 */
 	public static class Builder {
+
+		/** Create an empty jury builder. */
+		public Builder() {
+		}
 
 		private final List<Judge> judges = new ArrayList<>();
 

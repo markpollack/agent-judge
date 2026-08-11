@@ -24,12 +24,7 @@ import io.github.markpollack.judge.result.Judgment;
  * chain before invocation.
  * <p>
  * Usage:
- * <pre>{@code
- * Judgment result = SpringAiEvaluator.evaluate(
- *     "Summarize the document",
- *     () -> chatClient.prompt().user(prompt).call().chatResponse(),
- *     myJudge);
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.10.0
@@ -41,6 +36,10 @@ public final class SpringAiEvaluator {
 
 	/**
 	 * Execute a Spring AI call and evaluate the result with a judge.
+	 * @param goal task description
+	 * @param call Spring AI invocation
+	 * @param judge judge to apply
+	 * @return the judgment
 	 */
 	public static Judgment evaluate(String goal, Supplier<ChatResponse> call, Judge judge) {
 		return evaluate(goal, call, judge, Map.of());
@@ -49,6 +48,11 @@ public final class SpringAiEvaluator {
 	/**
 	 * Execute a Spring AI call and evaluate the result with a judge, attaching extra
 	 * metadata.
+	 * @param goal task description
+	 * @param call Spring AI invocation
+	 * @param judge judge to apply
+	 * @param extraMetadata additional context metadata
+	 * @return the judgment
 	 */
 	public static Judgment evaluate(String goal, Supplier<ChatResponse> call, Judge judge,
 			Map<String, Object> extraMetadata) {
@@ -58,6 +62,10 @@ public final class SpringAiEvaluator {
 
 	/**
 	 * Execute a Spring AI call and evaluate the result with a jury.
+	 * @param goal task description
+	 * @param call Spring AI invocation
+	 * @param jury jury to apply
+	 * @return the verdict
 	 */
 	public static Verdict evaluate(String goal, Supplier<ChatResponse> call, Jury jury) {
 		return evaluate(goal, call, jury, Map.of());
@@ -66,6 +74,11 @@ public final class SpringAiEvaluator {
 	/**
 	 * Execute a Spring AI call and evaluate the result with a jury, attaching extra
 	 * metadata.
+	 * @param goal task description
+	 * @param call Spring AI invocation
+	 * @param jury jury to apply
+	 * @param extraMetadata additional context metadata
+	 * @return the verdict
 	 */
 	public static Verdict evaluate(String goal, Supplier<ChatResponse> call, Jury jury,
 			Map<String, Object> extraMetadata) {

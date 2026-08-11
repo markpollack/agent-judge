@@ -23,6 +23,7 @@ public class XmlSemanticJudge extends DeterministicJudge {
 
 	private final XmlSemanticComparator comparator = new XmlSemanticComparator();
 
+	/** Create an XML semantic judge. */
 	public XmlSemanticJudge() {
 		super("XmlSemanticJudge", "Compares XML files using DOM-based semantic comparison");
 	}

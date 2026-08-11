@@ -19,6 +19,10 @@ import java.time.Duration;
 public record JudgeModelOptions(String model, Double temperature, Integer maxTokens, Duration timeout,
 		String responseFormat) {
 
+	/**
+	 * Create options that defer every setting to the backend.
+	 * @return empty/default options
+	 */
 	public static JudgeModelOptions defaults() {
 		return new JudgeModelOptions(null, null, null, null, null);
 	}

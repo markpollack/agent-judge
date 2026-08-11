@@ -10,7 +10,7 @@ import io.github.markpollack.judge.result.Judgment;
  * <ul>
  *   <li><em>agent output</em> — the output being evaluated</li>
  *   <li><em>judge output</em> — response from the AI judge backend</li>
- *   <li><em>judgment</em> — normalized domain object (Score + Status + reasoning)</li>
+ *   <li><em>judgment</em> — required status plus optional normalized score/label and evidence</li>
  * </ul>
  *
  * <p>Simple classifiers inspect only {@code response.text()}; richer classifiers

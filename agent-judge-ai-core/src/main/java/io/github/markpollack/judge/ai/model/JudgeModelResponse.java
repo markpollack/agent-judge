@@ -14,6 +14,7 @@ import java.util.Map;
  */
 public record JudgeModelResponse(String text, String model, Usage usage, Map<String, Object> metadata) {
 
+	/** Normalize absent metadata to an empty immutable map. */
 	public JudgeModelResponse {
 		metadata = metadata != null ? Map.copyOf(metadata) : Map.of();
 	}

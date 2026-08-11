@@ -44,10 +44,7 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * VotingStrategy strategy = new AverageVotingStrategy();
- * Judgment result = strategy.aggregate(judgments, Map.of());
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0

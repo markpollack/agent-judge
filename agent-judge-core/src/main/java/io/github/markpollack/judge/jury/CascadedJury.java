@@ -39,14 +39,7 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * <p>
  * Example:
  * </p>
- * <pre>{@code
- * CascadedJury jury = CascadedJury.builder()
- *     .tier("deterministic", tier1Jury, TierPolicy.REJECT_ON_ANY_FAIL)
- *     .tier("structural", tier2Jury, TierPolicy.ACCEPT_ON_ALL_PASS)
- *     .tier("semantic", tier3Jury, TierPolicy.FINAL_TIER)
- *     .build();
- * Verdict verdict = jury.vote(context);
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.9.0
@@ -159,6 +152,10 @@ public class CascadedJury implements Jury {
 	 * Builder for CascadedJury.
 	 */
 	public static class Builder {
+
+		/** Create an empty cascade builder. */
+		public Builder() {
+		}
 
 		private final List<TierConfig> tiers = new ArrayList<>();
 

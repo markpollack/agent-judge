@@ -1,42 +1,35 @@
 # Agent Judge
 
-Framework-neutral evaluation layer for AI agent output across Spring AI, LangChain4j, Koog, and CLI agents.
+Agent Judge is the portable verification layer for JVM agent systems.
+It evaluates agent output and workspace evidence with the same judges, juries, and policies whether the result came from Spring AI, LangChain4j, Koog, AgentClient, or a custom runtime.
 
-Judges are like unit tests for your agent: executable checks that decide whether an agent output satisfies a goal. You wouldn't ship application code without tests or assertions; agents need the same discipline.
+Judges answer one question: did this execution satisfy its goal, and what evidence supports that conclusion?
 
-```
-        Spring AI     LangChain4j     Koog     AgentClient
-            |              |           |             |
-            v              v           v             v
------------------------------------------------------------------
-                         Agent Judge
-                 horizontal evaluation layer
------------------------------------------------------------------
-   Build checks, file checks, AST comparison, coverage,
-   tool-use metadata checks, RAG faithfulness, hallucination,
-   LLM-as-judge, juries, cascaded juries
-```
+## Result model
+
+Every `Judgment` records a required outcome—`PASS`, `FAIL`, `ABSTAIN`, or `ERROR`—plus an optional normalized score and optional classification label.
+These are independent facts: an abstention is not a failing vote, an error is not a negative finding, and a status-only pass does not manufacture a stored score.
+
+Result metadata is recursively immutable and restricted to ordinary JSON-compatible values.
+Token usage preserves independently reported input, output, reasoning, cache-creation, cache-read, and total quantities; pricing is a downstream derivation.
 
 ## Modules
 
-**Judge families:**
+| Module | Responsibility |
+|---|---|
+| `agent-judge-core` | `JudgmentContext`, `Judgment`, judges, juries, verdicts, and voting strategies |
+| `agent-judge-ai-core` | Framework-neutral prompt, model, and classifier infrastructure for AI-backed judges |
+| `agent-judge-exec` | Command, build, class-version, and coverage judges |
+| `agent-judge-file` | Java, Maven, XML, and text semantic comparison |
+| `agent-judge-llm` | Spring AI-backed semantic judging |
+| `agent-judge-rag` | Faithfulness, contextual relevance, and hallucination judges |
+| `agent-judge-spring-ai` | Evaluated-side `ChatResponse` bridge |
+| `agent-judge-langchain4j` | Evaluated-side `Result<T>` bridge |
+| `agent-judge-koog` | Evaluated-side Koog `AIAgent` bridge |
+| `agent-judge-agent-client` | Evaluated-side AgentClient bridge and AgentClient judging backend |
 
-| Module | Description |
-|--------|-------------|
-| `agent-judge-core` | Core Judge API, juries, scoring (zero external deps) |
-| `agent-judge-exec` | Build, shell, and coverage judges |
-| `agent-judge-file` | AST, POM, XML, and text comparison judges |
-| `agent-judge-llm` | LLM-powered judges (Spring AI ChatClient) |
-| `agent-judge-rag` | RAG evaluation: faithfulness, hallucination, relevance |
-
-**Framework/runtime bridges:**
-
-| Module | Description |
-|--------|-------------|
-| `agent-judge-spring-ai` | Adapts `ChatResponse` output |
-| `agent-judge-langchain4j` | Adapts `Result<T>` output |
-| `agent-judge-koog` | Adapts `AIAgent` output |
-| `agent-judge-agent-client` | Adapts CLI-agent responses |
+`agent-judge-core` is framework-neutral, not dependency-free.
+It uses Jackson Databind, SLF4J API, and compile-scope JSpecify annotations; no core dependency is an agent framework, model provider, dependency-injection container, or hosted evaluation service.
 
 ## Install
 
@@ -44,53 +37,67 @@ Judges are like unit tests for your agent: executable checks that decide whether
 <dependency>
     <groupId>io.github.markpollack</groupId>
     <artifactId>agent-judge-core</artifactId>
-    <version>0.10.0</version>
+    <version>0.14.0</version>
 </dependency>
 ```
 
-Start with `agent-judge-core`, then add only the modules you need.
+Add only the judge-family and runtime-bridge modules your application needs.
+All published modules use the same version.
 
-`agent-judge-llm` uses Spring AI to call an LLM *as a judge*; `agent-judge-spring-ai` adapts Spring AI `ChatResponse` output *for evaluation*.
+## Quick start
 
-## Quick Example
-
-Abbreviated — imports omitted:
+This example is maintained as compiled source in [Tutorial module 04](https://github.com/markpollack/agent-judge-tutorial/blob/main/module-04-simple-jury/src/main/java/io/github/markpollack/judge/tutorial/module04/SimpleJuryDemo.java):
 
 ```java
+Path workspace = Path.of("test-workspace");
+String controllerPath = "src/main/java/com/example/HelloController.java";
+
 JudgmentContext context = JudgmentContext.builder()
-    .goal("Verify the project builds and includes a README")
-    .workspace(Path.of("."))
+    .goal("Add a HelloController class")
+    .workspace(workspace)
+    .status(ExecutionStatus.SUCCESS)
+    .startedAt(Instant.now())
+    .executionTime(Duration.ofSeconds(5))
     .build();
 
-Judge fileCheck = new FileExistsJudge("README.md");
-Judge buildCheck = BuildSuccessJudge.maven("compile");
+Judge fileExists = Judges.named(
+    new FileExistsJudge(controllerPath),
+    "file-exists", "Controller file created");
 
-SimpleJury jury = SimpleJury.builder()
-    .judge(fileCheck)
-    .judge(buildCheck, 2.0)
+Judge hasMethod = Judges.named(
+    new FileContentJudge(controllerPath, "hello",
+        FileContentJudge.MatchMode.CONTAINS),
+    "has-method", "Contains hello method");
+
+Judge hasPom = Judges.named(
+    new FileExistsJudge("pom.xml"),
+    "has-pom", "Maven project file exists");
+
+SimpleJury majorityJury = SimpleJury.builder()
+    .judge(fileExists, 1.0)
+    .judge(hasMethod, 1.0)
+    .judge(hasPom, 1.0)
     .votingStrategy(new MajorityVotingStrategy())
+    .parallel(true)
     .build();
 
-Verdict verdict = jury.vote(context);
+Verdict majorityVerdict = majorityJury.vote(context);
+
+System.out.println("Overall: " + majorityVerdict.aggregated().status());
 ```
 
-With a framework bridge, runtime output is adapted into the same evaluation layer:
+## Executable examples and documentation
 
-```java
-Verdict verdict = KoogEvaluator.evaluate(
-    agent, "Add a REST controller", jury);
-```
+The [Agent Judge Tutorial](https://github.com/markpollack/agent-judge-tutorial) is the canonical executable sample repository.
+Its ten credential-free Maven modules cover core judging, composition, juries, custom judges, model-backed judges, Koog, and LangChain4j.
 
-## Documentation
-
-Full docs — getting started, tutorials, built-in judges, jury system, API reference:
-
-[lab.pollack.ai/projects/agent-judge](https://lab.pollack.ai/projects/agent-judge)
+- [Getting started](https://lab.pollack.ai/docs/agent-judge/getting-started)
+- [Tutorial source](https://github.com/markpollack/agent-judge-tutorial)
+- [0.13 to 0.14 migration guide](consumer-handoff-normalized-judgment.md)
+- [0.14 release notes](RELEASE_NOTES_0.14.md)
 
 ## License
 
 This project originated from earlier Apache-licensed work in the Spring AI Community.
-
-Beginning with version 0.9.2, new development is licensed under the Business Source License 1.1 (BSL). Internal enterprise use is welcome; commercial redistribution or competing hosted/managed offerings require permission.
-
-Historical Apache-licensed portions remain available under their original terms. See [LICENSE](LICENSE) and [LICENSE-APACHE.txt](LICENSE-APACHE.txt) for details.
+Beginning with version 0.9.2, new development is licensed under the Business Source License 1.1 with the project-specific terms in [LICENSE](LICENSE).
+Historical Apache-licensed portions remain under their original terms; see [LICENSE-APACHE.txt](LICENSE-APACHE.txt).

@@ -112,14 +112,26 @@ public final class JudgePromptTemplate {
 		return applyMissingVariablePolicy(rendered);
 	}
 
+	/**
+	 * Return the template name.
+	 * @return template name
+	 */
 	public String name() {
 		return name;
 	}
 
+	/**
+	 * Return variables that must be present before rendering.
+	 * @return immutable required-variable set
+	 */
 	public Set<String> requiredVariables() {
 		return requiredVariables;
 	}
 
+	/**
+	 * Return the unresolved-placeholder policy.
+	 * @return missing-variable policy
+	 */
 	public MissingVariablePolicy missingVariablePolicy() {
 		return missingVariablePolicy;
 	}
@@ -144,11 +156,20 @@ public final class JudgePromptTemplate {
 		return lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
 	}
 
+	/**
+	 * Start building a prompt template.
+	 * @return a new builder
+	 */
 	public static Builder builder() {
 		return new Builder();
 	}
 
+	/** Builds a prompt template from a source, renderer, and variable policy. */
 	public static class Builder {
+
+		/** Create an empty prompt-template builder. */
+		public Builder() {
+		}
 
 		private String name;
 
@@ -160,21 +181,41 @@ public final class JudgePromptTemplate {
 
 		private MissingVariablePolicy missingVariablePolicy = MissingVariablePolicy.STRICT;
 
+		/**
+		 * Set the template name.
+		 * @param name template name
+		 * @return this builder
+		 */
 		public Builder name(String name) {
 			this.name = name;
 			return this;
 		}
 
+		/**
+		 * Set the source of template text.
+		 * @param source template source
+		 * @return this builder
+		 */
 		public Builder source(TextSource source) {
 			this.source = source;
 			return this;
 		}
 
+		/**
+		 * Set the renderer.
+		 * @param renderer renderer implementation
+		 * @return this builder
+		 */
 		public Builder renderer(JudgeTemplateRenderer renderer) {
 			this.renderer = renderer;
 			return this;
 		}
 
+		/**
+		 * Add required context variables.
+		 * @param variables required variable names
+		 * @return this builder
+		 */
 		public Builder requiredVariables(String... variables) {
 			for (String v : variables) {
 				this.requiredVariables.add(v);
@@ -182,11 +223,20 @@ public final class JudgePromptTemplate {
 			return this;
 		}
 
+		/**
+		 * Set the unresolved-placeholder policy.
+		 * @param policy policy to apply after rendering
+		 * @return this builder
+		 */
 		public Builder missingVariablePolicy(MissingVariablePolicy policy) {
 			this.missingVariablePolicy = policy;
 			return this;
 		}
 
+		/**
+		 * Build the prompt template.
+		 * @return configured template
+		 */
 		public JudgePromptTemplate build() {
 			if (name == null) {
 				throw new IllegalStateException("Template name is required");

@@ -38,22 +38,7 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * // Pure lambda judges
- * Judge simpleCheck = ctx -> Judgment.pass("Success");
- *
- * // Method references
- * Judge validator = this::validateOutput;
- *
- * // Composition
- * Judge combined = ctx -> {
- *     Judgment first = checkOne.judge(ctx);
- *     return first.pass() ? checkTwo.judge(ctx) : first;
- * };
- *
- * // With metadata via NamedJudge
- * NamedJudge named = Judges.named(simpleCheck, "SimpleCheck", "Basic validation", JudgeType.DETERMINISTIC);
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * <p>
  * <strong>Design Inspiration:</strong> This interface draws from the "judges" framework's
@@ -74,7 +59,7 @@ public interface Judge {
 	 * Evaluate an agent execution result.
 	 * @param context the judgment context containing all information about the agent
 	 * execution
-	 * @return the judgment with score, pass/fail, reasoning, and checks
+	 * @return the judgment with required status, optional score/label, reasoning, and checks
 	 */
 	Judgment judge(JudgmentContext context);
 

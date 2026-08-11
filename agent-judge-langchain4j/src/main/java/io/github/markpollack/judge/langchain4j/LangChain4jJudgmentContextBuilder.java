@@ -29,6 +29,7 @@ public final class LangChain4jJudgmentContextBuilder {
 
 	/**
 	 * Build a {@link JudgmentContext} from a pre-computed LangChain4j {@link Result}.
+	 * @param <T> result content type
 	 * @param result the LangChain4j result to wrap
 	 * @param goal the task description that produced this result
 	 * @param startedAt when execution began
@@ -70,6 +71,7 @@ public final class LangChain4jJudgmentContextBuilder {
 
 	/**
 	 * Execute a function, capture the result, and build a {@link JudgmentContext}.
+	 * @param <T> result content type
 	 * @param goal the task description
 	 * @param serviceCall the LangChain4j service invocation
 	 * @return a fully populated JudgmentContext
@@ -81,6 +83,7 @@ public final class LangChain4jJudgmentContextBuilder {
 	/**
 	 * Execute a function, capture the result, and build a {@link JudgmentContext} with
 	 * extra metadata.
+	 * @param <T> result content type
 	 * @param goal the task description
 	 * @param serviceCall the LangChain4j service invocation
 	 * @param extraMetadata additional metadata to attach (e.g., run ID, experiment tag)

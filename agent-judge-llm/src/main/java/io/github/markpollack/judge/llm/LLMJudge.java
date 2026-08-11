@@ -49,35 +49,7 @@ import org.springframework.ai.chat.client.ChatClient;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * public class CodeQualityJudge extends LLMJudge {
- *
- *     public CodeQualityJudge(ChatClient.Builder chatClientBuilder) {
- *         super("CodeQuality", "Evaluates code quality 0-10", chatClientBuilder);
- *     }
- *
- *     &#64;Override
- *     protected String buildPrompt(JudgmentContext context) {
- *         return String.format("""
- *             Review this code and rate quality 0-10:
- *             %s
- *             """, context.agentOutput().orElse(""));
- *     }
- *
- *
-
-&#64;Override
- *     protected Judgment parseResponse(String response, JudgmentContext context) {
- *         // Extract score and reasoning from LLM response and normalize its 0-10
- *         // scale before building the judgment.
- *         double score = extractScore(response) / 10.0;
- *         return (score >= 0.7 ? Judgment.builder().pass() : Judgment.builder().fail())
- *             .score(score)
- *             .reasoning(response)
- *             .build();
- *     }
- * }
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0
@@ -86,6 +58,7 @@ public abstract class LLMJudge implements JudgeWithMetadata {
 
 	private final JudgeMetadata metadata;
 
+	/** Chat client used by subclasses to evaluate prompts. */
 	protected final ChatClient chatClient;
 
 	/**
@@ -115,9 +88,9 @@ public abstract class LLMJudge implements JudgeWithMetadata {
 	/**
 	 * Parse the LLM response into a judgment.
 	 * <p>
-	 * Subclasses implement this to extract score, pass/fail, and reasoning from the LLM's
-	 * text response. Handle edge cases like unclear responses, missing data, or
-	 * unexpected formats.
+	 * Subclasses implement this to extract a required outcome, any independently measured
+	 * normalized score or label, and reasoning from the LLM's text response. Handle edge
+	 * cases like unclear responses, missing data, or unexpected formats.
 	 * </p>
 	 * @param response the LLM response text
 	 * @param context the original judgment context

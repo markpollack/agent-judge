@@ -37,22 +37,7 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * // Wrap a lambda judge with metadata
- * Judge simple = ctx -> Judgment.pass("Success");
- * NamedJudge named = new NamedJudge(
- *     simple,
- *     new JudgeMetadata("SimpleCheck", "Basic validation", JudgeType.DETERMINISTIC)
- * );
- *
- * // Access metadata via marker interface
- * if (judge instanceof JudgeWithMetadata jwm) {
- *     log.info("Running judge: {}", jwm.metadata().name());
- * }
- *
- * // Use as normal Judge
- * Judgment result = named.judge(context);
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0

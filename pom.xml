@@ -10,7 +10,7 @@
     <packaging>pom</packaging>
 
     <name>Agent Judge</name>
-    <description>Agent Judge - LLM Output Evaluation Framework</description>
+    <description>Framework-neutral, status-first evaluation for AI agent outcomes</description>
     <url>https://github.com/markpollack/agent-judge</url>
 
     <licenses>
@@ -428,6 +428,7 @@
                         <version>${maven-javadoc-plugin.version}</version>
                         <configuration>
                             <failOnError>true</failOnError>
+                            <failOnWarnings>true</failOnWarnings>
                             <quiet>true</quiet>
                         </configuration>
                         <executions>

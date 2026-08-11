@@ -56,6 +56,11 @@ public abstract class DeterministicJudge implements io.github.markpollack.judge.
 
 	private final JudgeMetadata metadata;
 
+	/**
+	 * Create a deterministic judge with discoverable metadata.
+	 * @param name judge name
+	 * @param description human-readable purpose
+	 */
 	protected DeterministicJudge(String name, String description) {
 		this.metadata = new JudgeMetadata(name, description, JudgeType.DETERMINISTIC);
 	}

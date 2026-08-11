@@ -19,6 +19,7 @@ public class TextFileJudge extends DeterministicJudge {
 
 	private static final Logger logger = LoggerFactory.getLogger(TextFileJudge.class);
 
+	/** Create a whitespace-normalizing text-file judge. */
 	public TextFileJudge() {
 		super("TextFileJudge", "Compares text files using whitespace-normalized string comparison");
 	}

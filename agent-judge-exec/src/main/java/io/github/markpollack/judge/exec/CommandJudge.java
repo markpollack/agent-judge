@@ -52,20 +52,7 @@ import java.util.function.Function;
  * Example usage:
  * </p>
  *
- * <pre>{@code
- * // Simple command with default timeout (2 minutes) and expected exit code (0)
- * CommandJudge mvnCompile = new CommandJudge("mvn compile");
- *
- * // Custom exit code and timeout
- * CommandJudge customCommand = new CommandJudge("my-script.sh", 0, Duration.ofMinutes(5));
- *
- * // Check for non-zero exit (command expected to fail)
- * CommandJudge shouldFail = new CommandJudge("grep 'ERROR' build.log", 1);
- *
- * // With custom Sandbox factory (for Docker execution or testing)
- * CommandJudge withDocker = new CommandJudge("mvn test", 0, Duration.ofMinutes(5),
- *     path -> DockerSandbox.builder().workDir(path).build());
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * <p>
  * The judgment records the command, merged stdout/stderr, expected and actual exit codes,

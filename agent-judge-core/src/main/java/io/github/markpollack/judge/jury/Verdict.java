@@ -32,6 +32,7 @@ import java.util.Objects;
 public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String, Judgment> individualByName,
 		Map<String, Double> weights, List<Verdict> subVerdicts) {
 
+	/** Validate and defensively copy all verdict components. */
 	public Verdict {
 		Objects.requireNonNull(aggregated, "aggregated judgment must not be null");
 		// Defensive copy for immutability
@@ -74,6 +75,10 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 	 */
 	public static class Builder {
 
+		/** Create an empty verdict builder. */
+		public Builder() {
+		}
+
 		private Judgment aggregated;
 
 		private List<Judgment> individual = new ArrayList<>();
@@ -84,31 +89,60 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 
 		private List<Verdict> subVerdicts = new ArrayList<>();
 
+		/**
+		 * Set the aggregated judgment.
+		 * @param aggregated aggregated judgment
+		 * @return this builder
+		 */
 		public Builder aggregated(Judgment aggregated) {
 			this.aggregated = Objects.requireNonNull(aggregated, "aggregated judgment must not be null");
 			return this;
 		}
 
+		/**
+		 * Set ordered individual judgments.
+		 * @param individual individual judgments
+		 * @return this builder
+		 */
 		public Builder individual(List<Judgment> individual) {
 			this.individual = new ArrayList<>(individual);
 			return this;
 		}
 
+		/**
+		 * Set named individual judgments.
+		 * @param individualByName judgments by name
+		 * @return this builder
+		 */
 		public Builder individualByName(Map<String, Judgment> individualByName) {
 			this.individualByName = new HashMap<>(individualByName);
 			return this;
 		}
 
+		/**
+		 * Set judge weights.
+		 * @param weights weights by judge identity
+		 * @return this builder
+		 */
 		public Builder weights(Map<String, Double> weights) {
 			this.weights = new HashMap<>(weights);
 			return this;
 		}
 
+		/**
+		 * Set nested verdicts.
+		 * @param subVerdicts nested verdicts
+		 * @return this builder
+		 */
 		public Builder subVerdicts(List<Verdict> subVerdicts) {
 			this.subVerdicts = new ArrayList<>(subVerdicts);
 			return this;
 		}
 
+		/**
+		 * Build the verdict.
+		 * @return immutable verdict
+		 */
 		public Verdict build() {
 			return new Verdict(aggregated, individual, individualByName, weights, subVerdicts);
 		}

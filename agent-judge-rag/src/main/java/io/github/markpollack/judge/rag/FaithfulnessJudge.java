@@ -29,6 +29,10 @@ public class FaithfulnessJudge extends LLMJudge {
 	private static final java.util.regex.Pattern ANSWER_PATTERN = java.util.regex.Pattern
 		.compile("(?mi)^\\s*Answer:\\s*(YES|NO)");
 
+	/**
+	 * Create a faithfulness judge.
+	 * @param chatClientBuilder Spring AI client used for judging
+	 */
 	public FaithfulnessJudge(ChatClient.Builder chatClientBuilder) {
 		super("Faithfulness", "Evaluates whether the answer is grounded in the provided context",
 				chatClientBuilder);

@@ -38,16 +38,16 @@ import java.nio.file.Path;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * Path reportPath = workspace.resolve("target/site/jacoco/jacoco.xml");
- * CoverageMetrics metrics = JaCoCoReportParser.parse(reportPath);
- * System.out.println("Line coverage: " + metrics.lineCoverage() + "%");
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0
  */
 public class JaCoCoReportParser {
+
+	/** Create a JaCoCo report parser. */
+	public JaCoCoReportParser() {
+	}
 
 	private static final Logger logger = LoggerFactory.getLogger(JaCoCoReportParser.class);
 

@@ -37,19 +37,7 @@ import java.util.Map;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * // Create jury from judges with auto-naming
- * Jury jury = Juries.fromJudges(
- *     new MajorityVotingStrategy(),
- *     fileJudge, buildJudge, correctnessJudge
- * );
- *
- * // Combine two juries
- * Jury combined = Juries.combine(jury1, jury2, new WeightedAverageStrategy());
- *
- * // Create meta-jury (jury of juries)
- * Jury metaJury = Juries.allOf(new ConsensusStrategy(), jury1, jury2, jury3);
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0

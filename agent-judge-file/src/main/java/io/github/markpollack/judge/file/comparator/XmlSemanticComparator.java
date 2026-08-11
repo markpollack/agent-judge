@@ -21,20 +21,49 @@ import java.util.*;
  */
 public class XmlSemanticComparator {
 
+	/** Create an XML semantic comparator. */
+	public XmlSemanticComparator() {
+	}
+
+	/**
+	 * Result of comparing two XML documents.
+	 * @param equivalent whether the documents are semantically equivalent
+	 * @param differences descriptions of semantic differences
+	 */
 	public record ComparisonResult(boolean equivalent, List<String> differences) {
+		/**
+		 * Create an equivalent result.
+		 * @return an equivalent result
+		 */
 		public static ComparisonResult match() {
 			return new ComparisonResult(true, List.of());
 		}
 
+		/**
+		 * Create a mismatch from difference descriptions.
+		 * @param diffs difference descriptions
+		 * @return a mismatch result
+		 */
 		public static ComparisonResult mismatch(String... diffs) {
 			return new ComparisonResult(false, Arrays.asList(diffs));
 		}
 
+		/**
+		 * Create a mismatch from a difference list.
+		 * @param diffs difference descriptions
+		 * @return a mismatch result
+		 */
 		public static ComparisonResult mismatch(List<String> diffs) {
 			return new ComparisonResult(false, diffs);
 		}
 	}
 
+	/**
+	 * Compare two XML documents semantically.
+	 * @param expected expected XML text
+	 * @param actual actual XML text
+	 * @return comparison result
+	 */
 	public ComparisonResult compare(String expected, String actual) {
 		try {
 			Document expectedDoc = parse(expected);

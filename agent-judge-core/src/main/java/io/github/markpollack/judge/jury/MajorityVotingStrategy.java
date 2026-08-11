@@ -51,11 +51,7 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * VotingStrategy strategy = new MajorityVotingStrategy();
- * VotingStrategy custom = new MajorityVotingStrategy(TiePolicy.PASS, ErrorPolicy.IGNORE);
- * Judgment result = strategy.aggregate(judgments, Map.of());
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0

@@ -18,6 +18,7 @@ import java.util.Map;
 public record JudgeModelRequest(List<JudgeMessage> messages, JudgeModelOptions options,
 		Map<String, Object> metadata) {
 
+	/** Copy request collections into immutable values. */
 	public JudgeModelRequest {
 		messages = List.copyOf(messages);
 		metadata = Map.copyOf(metadata);

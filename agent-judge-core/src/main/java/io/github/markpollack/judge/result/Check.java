@@ -34,6 +34,7 @@ import java.util.Objects;
  */
 public record Check(String name, boolean passed, String message) {
 
+	/** Validate a check's required name and message. */
 	public Check {
 		Objects.requireNonNull(name, "name must not be null");
 		Objects.requireNonNull(message, "message must not be null");
@@ -42,14 +43,31 @@ public record Check(String name, boolean passed, String message) {
 		}
 	}
 
+	/**
+	 * Create a passing check without an additional message.
+	 * @param name check name
+	 * @return a passing check
+	 */
 	public static Check pass(String name) {
 		return new Check(name, true, "");
 	}
 
+	/**
+	 * Create a passing check.
+	 * @param name check name
+	 * @param message supporting detail
+	 * @return a passing check
+	 */
 	public static Check pass(String name, String message) {
 		return new Check(name, true, message);
 	}
 
+	/**
+	 * Create a failing check.
+	 * @param name check name
+	 * @param message failure detail
+	 * @return a failing check
+	 */
 	public static Check fail(String name, String message) {
 		return new Check(name, false, message);
 	}

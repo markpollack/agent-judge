@@ -64,13 +64,7 @@ import io.github.markpollack.judge.result.Judgment;
  * Example usage:
  * </p>
  *
- * <pre>{@code
- * // Compare all files
- * SupersetDiffJudge judge = new SupersetDiffJudge();
- *
- * // Skip Maven wrapper files
- * SupersetDiffJudge judge = new SupersetDiffJudge(Set.of(".mvn/", "mvnw", "mvnw.cmd"));
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.9.1
@@ -83,10 +77,15 @@ public class SupersetDiffJudge extends DeterministicJudge {
 
 	private final Set<String> excludes;
 
+	/** Create a judge with no excluded paths. */
 	public SupersetDiffJudge() {
 		this(Set.of());
 	}
 
+	/**
+	 * Create a judge with excluded relative paths.
+	 * @param excludes paths excluded from comparison
+	 */
 	public SupersetDiffJudge(Set<String> excludes) {
 		super("SupersetDiffJudge", "Verifies output is a superset of the reference project");
 		this.excludes = Set.copyOf(excludes);

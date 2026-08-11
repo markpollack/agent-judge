@@ -30,6 +30,10 @@ public class HallucinationJudge extends LLMJudge {
 	private static final java.util.regex.Pattern ANSWER_PATTERN = java.util.regex.Pattern
 		.compile("(?mi)^\\s*Answer:\\s*(YES|NO)");
 
+	/**
+	 * Create a hallucination judge.
+	 * @param chatClientBuilder Spring AI client used for judging
+	 */
 	public HallucinationJudge(ChatClient.Builder chatClientBuilder) {
 		super("Hallucination", "Detects claims in the answer not supported by the context", chatClientBuilder);
 	}

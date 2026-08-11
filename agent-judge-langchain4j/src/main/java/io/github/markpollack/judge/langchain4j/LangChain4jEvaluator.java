@@ -18,14 +18,7 @@ import io.github.markpollack.judge.result.Judgment;
  * reference works.
  * <p>
  * Usage:
- * <pre>{@code
- * // With a service call (timing captured automatically)
- * Judgment result = LangChain4jEvaluator.evaluate("Summarize the document", assistant::chat, judge);
- *
- * // With extra metadata for run tagging
- * Judgment tagged = LangChain4jEvaluator.evaluate("Summarize", assistant::chat, judge,
- *     Map.of("run.id", "exp-42"));
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.10.0
@@ -37,6 +30,7 @@ public final class LangChain4jEvaluator {
 
 	/**
 	 * Execute a LangChain4j service call and evaluate with a judge.
+	 * @param <T> service result content type
 	 * @param goal the input to send to the service
 	 * @param serviceCall the LangChain4j service invocation
 	 * @param judge the judge to evaluate the result
@@ -49,6 +43,7 @@ public final class LangChain4jEvaluator {
 	/**
 	 * Execute a LangChain4j service call and evaluate with a judge, attaching extra
 	 * metadata.
+	 * @param <T> service result content type
 	 * @param goal the input to send to the service
 	 * @param serviceCall the LangChain4j service invocation
 	 * @param judge the judge to evaluate the result
@@ -62,6 +57,7 @@ public final class LangChain4jEvaluator {
 
 	/**
 	 * Execute a LangChain4j service call and evaluate with a jury.
+	 * @param <T> service result content type
 	 * @param goal the input to send to the service
 	 * @param serviceCall the LangChain4j service invocation
 	 * @param jury the jury to evaluate the result
@@ -74,6 +70,7 @@ public final class LangChain4jEvaluator {
 	/**
 	 * Execute a LangChain4j service call and evaluate with a jury, attaching extra
 	 * metadata.
+	 * @param <T> service result content type
 	 * @param goal the input to send to the service
 	 * @param serviceCall the LangChain4j service invocation
 	 * @param jury the jury to evaluate the result

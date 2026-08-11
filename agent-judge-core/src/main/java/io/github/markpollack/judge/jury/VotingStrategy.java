@@ -26,18 +26,15 @@ import java.util.Map;
  *
  * <p>
  * VotingStrategy implementations define how to combine individual judgments from multiple
- * judges into a single aggregated judgment. Different strategies support different
- * scoring types (boolean, numerical, categorical) and aggregation methods (majority,
- * average, weighted, consensus).
+ * judges into a single aggregated judgment. Status-counting strategies aggregate
+ * outcomes; numeric strategies aggregate each applicable judgment's
+ * {@link Judgment#effectiveScore()} view.
  * </p>
  *
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * VotingStrategy strategy = new MajorityVotingStrategy();
- * Judgment aggregated = strategy.aggregate(judgments, weights);
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0

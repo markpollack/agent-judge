@@ -72,6 +72,7 @@ public record Usage(Long inputTokens, Long outputTokens, Long reasoningTokens, L
 	 */
 	private static final long MAX_INTEROPERABLE_INTEGER = 9007199254740991L;
 
+	/** Validate all reported token quantities. */
 	public Usage {
 		requireQuantity(inputTokens, INPUT_TOKENS_KEY);
 		requireQuantity(outputTokens, OUTPUT_TOKENS_KEY);

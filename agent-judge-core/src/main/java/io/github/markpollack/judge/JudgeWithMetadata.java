@@ -37,23 +37,7 @@ package io.github.markpollack.judge;
  * <p>
  * Example usage:
  * </p>
- * <pre>{@code
- * // Infrastructure code can pattern match
- * if (judge instanceof JudgeWithMetadata jwm) {
- *     log.info("Running judge: {}", jwm.metadata().name());
- *     metrics.recordJudgeExecution(jwm.metadata().name());
- * }
- *
- * // NamedJudge implements this interface
- * Judge lambda = ctx -> Judgment.pass("OK");
- * JudgeWithMetadata named = Judges.named(lambda, "MyJudge");
- * String name = named.metadata().name();
- *
- * // DeterministicJudge subclasses can also implement it
- * public class FileExistsJudge extends DeterministicJudge implements JudgeWithMetadata {
- *     // Already has metadata() method from DeterministicJudge
- * }
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0

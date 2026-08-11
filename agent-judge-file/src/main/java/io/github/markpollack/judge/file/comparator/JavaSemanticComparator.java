@@ -30,26 +30,52 @@ public class JavaSemanticComparator {
 
 	private final JavaParser parser;
 
+	/** Create a comparator configured for Java 17 language syntax. */
 	public JavaSemanticComparator() {
 		ParserConfiguration config = new ParserConfiguration()
 			.setLanguageLevel(ParserConfiguration.LanguageLevel.JAVA_17);
 		this.parser = new JavaParser(config);
 	}
 
+	/**
+	 * Result of a semantic comparison.
+	 * @param equivalent whether both compilation units are semantically equivalent
+	 * @param differences human-readable differences
+	 */
 	public record ComparisonResult(boolean equivalent, List<String> differences) {
+		/**
+		 * Create an equivalent result.
+		 * @return a matching result
+		 */
 		public static ComparisonResult match() {
 			return new ComparisonResult(true, List.of());
 		}
 
+		/**
+		 * Create a non-equivalent result from difference strings.
+		 * @param diffs differences found
+		 * @return a mismatching result
+		 */
 		public static ComparisonResult mismatch(String... diffs) {
 			return new ComparisonResult(false, Arrays.asList(diffs));
 		}
 
+		/**
+		 * Create a non-equivalent result from a difference list.
+		 * @param diffs differences found
+		 * @return a mismatching result
+		 */
 		public static ComparisonResult mismatch(List<String> diffs) {
 			return new ComparisonResult(false, diffs);
 		}
 	}
 
+	/**
+	 * Compare two Java sources semantically.
+	 * @param expected expected source
+	 * @param actual actual source
+	 * @return semantic comparison result
+	 */
 	public ComparisonResult compare(String expected, String actual) {
 		try {
 			ParseResult<CompilationUnit> expectedResult = parser.parse(expected);

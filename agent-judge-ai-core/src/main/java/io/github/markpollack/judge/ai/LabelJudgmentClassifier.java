@@ -30,13 +30,7 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * recorded on the judgment; otherwise the judgment carries a label and no score, and
  * downstream aggregation needs no category mapping at all.
  *
- * <pre>{@code
- * LabelJudgmentClassifier.builder()
- *     .pass("excellent", 1.0)
- *     .pass("good", 0.6)
- *     .fail("poor", 0.0)
- *     .build();
- * }</pre>
+ * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.10.0
@@ -149,16 +143,30 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 		return normalized;
 	}
 
+	/**
+	 * Start a label-classifier builder.
+	 * @return a new builder
+	 */
 	public static Builder builder() {
 		return new Builder();
 	}
 
+	/** Builds an explicit label-to-outcome policy. */
 	public static class Builder {
+
+		/** Create an empty policy builder. */
+		public Builder() {
+		}
 
 		private final Map<String, JudgmentStatus> mapping = new LinkedHashMap<>();
 
 		private final Map<String, Double> scores = new HashMap<>();
 
+		/**
+		 * Map a label to PASS without assigning a numeric score.
+		 * @param label the label
+		 * @return this builder
+		 */
 		public Builder pass(String label) {
 			return map(label, JudgmentStatus.PASS);
 		}
@@ -173,6 +181,11 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 			return map(label, JudgmentStatus.PASS, normalizedScore);
 		}
 
+		/**
+		 * Map a label to FAIL without assigning a numeric score.
+		 * @param label the label
+		 * @return this builder
+		 */
 		public Builder fail(String label) {
 			return map(label, JudgmentStatus.FAIL);
 		}
@@ -187,6 +200,11 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 			return map(label, JudgmentStatus.FAIL, normalizedScore);
 		}
 
+		/**
+		 * Map a label to ABSTAIN without assigning a numeric score.
+		 * @param label the label
+		 * @return this builder
+		 */
 		public Builder abstain(String label) {
 			return map(label, JudgmentStatus.ABSTAIN);
 		}
@@ -209,6 +227,10 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 			return this;
 		}
 
+		/**
+		 * Build the classifier.
+		 * @return an immutable label classifier
+		 */
 		public LabelJudgmentClassifier build() {
 			if (mapping.isEmpty()) {
 				throw new IllegalStateException("At least one label mapping is required");

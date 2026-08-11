@@ -5,13 +5,8 @@ See LICENSE.txt in the repository root for license terms.
 
 # Consumer migration handoff — normalized `Judgment` (0.13.0 → 0.14.0)
 
-> **Status**: migration contract updated; M2/M5, the M3 value algebra, and the portable model-usage
-> correction implemented
-> **Date**: 2026-08-08
 > **Applies to**: any consumer of `io.github.markpollack:agent-judge-*`
-> **Public contract surfaces**: `Judgment`/jury Javadocs and tests, plus the wire and migration
-> contract in this guide. Private planning authority lives in the paired steward repository.
-> **This document does not authorize edits to any consumer repository.**
+> **Release notes**: [Agent Judge 0.14.0](RELEASE_NOTES_0.14.md)
 
 0.14 replaces the sealed `Score` hierarchy with three independent facts on `Judgment`. You can
 migrate from this document alone; you should not need to read the implementation diff.
@@ -521,9 +516,7 @@ Timing in result metadata uses the optional non-negative integer `elapsedMillis`
 belongs in `JudgmentContext` or another non-result attachment surface. `Judgment.elapsed()` derives a
 Java `Duration` from the portable integer.
 
-This rule is implemented as of the 0.14 development line. Installing and verifying the exact snapshot
-that carries it remains the private steward roadmap's work, so treat the contract as settled but
-confirm the artifact you resolve before depending on it.
+This contract applies to the 0.14.0 artifacts.
 
 ---
 
@@ -561,51 +554,11 @@ confirm the artifact you resolve before depending on it.
 
 ---
 
-## 9. Known consumer findings
+## 9. Compatibility notes
 
-Recorded from a read-only inventory. **No consumer repository was modified.**
-
-### agent-workflow (branch `v3`, pins 0.12.0)
-
-- 10 `Scores.toNormalized` call sites across 8 files: `SpringAiJuryAdapter` (2),
-  `JuryPassedException` (2), `TerminationStrategy`, `TurnLimitedResult`, `JuryTerminationStrategy`,
-  `StateMachineLoop`, `EvaluatorOptimizerLoop`, `TurnLimitedLoop`. This is the largest single item.
-- `JudgeGate.extractScore` and `TieredGate.extractScore` both read `NumericalScore.value()` — the
-  **raw** value — and compare it against a normalized gate threshold. Latent only because no current
-  judge uses a non-unit range. §8 step 4 applies.
-- `GateTest` wires `ConsensusStrategy` behind a score gate, which is exactly the §1.1 trap.
-- `GateTest` constructs judgments through the removed builder and calls `reasoning(String)`.
-- No impact: `getName()`, `ErrorPolicy` configuration, `Judgment.error()` accessor, coverage judges.
-- M3 impact: replace direct result-metadata `elapsed`/`Duration` usage with `elapsedMillis`;
-  `Judgment.elapsed()` remains as a derived convenience and `JudgmentContext` timing remains available
-  in process.
-- Its own `workflow-spec/.../v3/envelope/Judgment.java` DTO is unaffected.
-- Its current `OperationUsage(tokens, costUsd)` and neutral `cost{tokens,costUsd,...}` shapes are a
-  separately owned Workflow follow-up: preserve category-level token evidence and keep volatile
-  pricing distinct. Agent Judge does not authorize that consumer change.
-
-### agentworks-pr-review (branch `v3-serving`, pins 0.11.0-SNAPSHOT)
-
-- `VersionPatternJudge` (2 sites), `BuildJudge`, and `QualityJudge` construct judgments through the
-  removed builder with `BooleanScore`/`NumericalScore`. `TestAssessments` does the same in 4 test
-  fixtures.
-- The Boolean-score sites are the clean case: `Judgment.verdict(passed).reasoning(...)` replaces a
-  score that only ever duplicated the status.
-- `CascadedJury`, `TierConfig`, and `TierPolicy` usage is structurally unaffected — tier policies
-  read individual judgments.
-- No impact: `getName()`, `ErrorPolicy` configuration, coverage judges.
-- M3 impact if used: replace direct result-metadata `elapsed`/`Duration` usage with the integer
-  `elapsedMillis` convention.
-
----
-
-## 10. Remaining closure and later follow-ups
-
-- M3 construction-time portable metadata and the portable model-usage correction above are
-  implemented. Before consumer adoption, M2/M3/M5 have to be verified together and the exact 0.14
-  snapshot named by the private Agent Judge steward roadmap referenced by `AGENTS.md` has to be
-  installed.
-- Machine-readable error classification. `ERROR` carries only `reasoning` today; an explicit
-  `errorCode` would be added if a concrete consumer needs one. `label` must not be overloaded for it.
-- Public documentation at `docs/agent-judge/` still describes the Score hierarchy and
-  `ReactiveJudge`, and is reconciled separately from this handoff.
+- Machine-readable error classification is not part of 0.14. `ERROR` carries `reasoning`; do not
+  overload `label` as an error-code channel.
+- Framework bridge modules use provided-scope runtime dependencies where practical. Declare the
+  framework version your application uses and run its adapter tests when upgrading that runtime.
+- The canonical credential-free examples are maintained in the
+  [Agent Judge Tutorial](https://github.com/markpollack/agent-judge-tutorial).

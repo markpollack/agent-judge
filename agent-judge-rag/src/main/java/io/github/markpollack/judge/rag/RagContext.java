@@ -28,12 +28,16 @@ import io.github.markpollack.judge.context.JudgmentContext;
  */
 public final class RagContext {
 
+	/** Metadata key for the user's question. */
 	public static final String QUESTION_KEY = "rag.question";
 
+	/** Metadata key for retrieved context. */
 	public static final String CONTEXT_KEY = "rag.context";
 
+	/** Metadata key for the generated answer. */
 	public static final String ANSWER_KEY = "rag.answer";
 
+	/** Metadata key used as a LangChain4j source fallback. */
 	public static final String LANGCHAIN4J_SOURCES_KEY = "langchain4j.sources";
 
 	private RagContext() {
@@ -42,6 +46,8 @@ public final class RagContext {
 	/**
 	 * Extract the question from context metadata, falling back to
 	 * {@link JudgmentContext#goal()}.
+	 * @param context judgment context
+	 * @return the question
 	 */
 	public static String question(JudgmentContext context) {
 		Object q = context.metadata().get(QUESTION_KEY);
@@ -58,6 +64,8 @@ public final class RagContext {
 	 * Handles both String and List values (list elements are joined with newlines).
 	 * Returns {@link Optional#empty()} when no context is available — judges should
 	 * ABSTAIN rather than evaluate against empty context.
+	 * @param context judgment context
+	 * @return retrieved context, or empty when unavailable
 	 */
 	public static Optional<String> context(JudgmentContext context) {
 		// Try rag.context first
@@ -75,6 +83,8 @@ public final class RagContext {
 	/**
 	 * Extract the answer from metadata or {@link JudgmentContext#agentOutput()}.
 	 * Returns {@link Optional#empty()} when no answer is available.
+	 * @param context judgment context
+	 * @return generated answer, or empty when unavailable
 	 */
 	public static Optional<String> answer(JudgmentContext context) {
 		Object a = context.metadata().get(ANSWER_KEY);

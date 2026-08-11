@@ -55,6 +55,7 @@ public class ClassVersionJudge extends DeterministicJudge {
 
 	private static final int CLASS_MAGIC = 0xCAFEBABE;
 
+	/** Create a class-file version judge. */
 	public ClassVersionJudge() {
 		super("ClassVersionJudge", "Verifies .class file major versions match target Java version");
 	}

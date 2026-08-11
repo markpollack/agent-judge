@@ -15,7 +15,12 @@ import java.util.Map;
  */
 public final class SimpleJudgeTemplateRenderer implements JudgeTemplateRenderer {
 
+	/** Shared stateless renderer instance. */
 	public static final SimpleJudgeTemplateRenderer INSTANCE = new SimpleJudgeTemplateRenderer();
+
+	/** Create a template renderer. */
+	public SimpleJudgeTemplateRenderer() {
+	}
 
 	@Override
 	public String render(String template, Map<String, Object> variables) {

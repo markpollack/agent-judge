@@ -32,6 +32,7 @@ public class FileComparisonJudge extends DeterministicJudge {
 
 	private final TextFileJudge textJudge = new TextFileJudge();
 
+	/** Create a composite semantic file-comparison judge. */
 	public FileComparisonJudge() {
 		super("FileComparisonJudge", "Compares all files in expected directory against actual directory");
 	}
