@@ -5,6 +5,12 @@ It evaluates agent output and workspace evidence with the same judges, juries, a
 
 Judges answer one question: did this execution satisfy its goal, and what evidence supports that conclusion?
 
+## Research foundations
+
+Agent Judge evaluates whether work satisfies an explicit definition of done, using executable evidence and independent checks—not whether it resembles one reference answer.
+
+[Read the research foundations](https://lab.pollack.ai/docs/agent-judge/research-foundations) for the motivating migration experiment, five design principles, their current implementation in Agent Judge, and the complete source map.
+
 ## Result model
 
 Every `Judgment` records a required outcome—`PASS`, `FAIL`, `ABSTAIN`, or `ERROR`—plus an optional normalized score and optional classification label.
