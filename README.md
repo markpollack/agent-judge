@@ -98,6 +98,5 @@ Its ten credential-free Maven modules cover core judging, composition, juries, c
 
 ## License
 
-This project originated from earlier Apache-licensed work in the Spring AI Community.
-Beginning with version 0.9.2, new development is licensed under the Business Source License 1.1 with the project-specific terms in [LICENSE](LICENSE).
-Historical Apache-licensed portions remain under their original terms; see [LICENSE-APACHE.txt](LICENSE-APACHE.txt).
+The current source tree is licensed under the Business Source License 1.1 with the project-specific terms in [LICENSE](LICENSE).
+Previously published Apache-licensed releases retain their original terms; [LICENSE-APACHE.txt](LICENSE-APACHE.txt) is preserved only as that release-history record and is not a second license for the current source tree.

@@ -15,7 +15,7 @@
 
     <licenses>
         <license>
-            <name>Business Source License 1.1</name>
+            <name>Business Source License 1.1 (project-specific terms)</name>
             <url>https://github.com/markpollack/agent-judge/blob/main/LICENSE</url>
             <distribution>repo</distribution>
         </license>
@@ -90,6 +90,8 @@
         <maven-javadoc-plugin.version>3.6.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
+        <cyclonedx-maven-plugin.version>2.9.2</cyclonedx-maven-plugin.version>
+        <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -430,6 +432,9 @@
                             <failOnError>true</failOnError>
                             <failOnWarnings>true</failOnWarnings>
                             <quiet>true</quiet>
+                            <javadocDirectory>${project.build.directory}/javadoc-resources</javadocDirectory>
+                            <docfilessubdirs>true</docfilessubdirs>
+                            <bottom><![CDATA[Agent Judge is licensed under the project-specific Business Source License terms in the repository root LICENSE file.]]></bottom>
                         </configuration>
                         <executions>
                             <execution>
@@ -446,6 +451,19 @@
     </profiles>
 
     <build>
+        <resources>
+            <resource>
+                <directory>${maven.multiModuleProjectDirectory}</directory>
+                <includes>
+                    <include>LICENSE</include>
+                </includes>
+                <targetPath>META-INF</targetPath>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/src/main/resources</directory>
+            </resource>
+        </resources>
+
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -474,6 +492,73 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+
+            <!--
+                One schema-1.6 JSON aggregate for the complete reactor. The execution is
+                root-only so child modules neither generate nor attach module BOMs. It runs
+                at verify because the upstream aggregate goal requires online mode; release
+                packaging remains reproducible offline, while the online release deploy
+                lifecycle regenerates and attaches this parent artifact before publication.
+            -->
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>${cyclonedx-maven-plugin.version}</version>
+                <inherited>false</inherited>
+                <configuration>
+                    <projectType>library</projectType>
+                    <schemaVersion>1.6</schemaVersion>
+                    <includeBomSerialNumber>true</includeBomSerialNumber>
+                    <includeCompileScope>true</includeCompileScope>
+                    <includeProvidedScope>true</includeProvidedScope>
+                    <includeRuntimeScope>true</includeRuntimeScope>
+                    <includeSystemScope>true</includeSystemScope>
+                    <includeTestScope>false</includeTestScope>
+                    <includeLicenseText>false</includeLicenseText>
+                    <outputReactorProjects>false</outputReactorProjects>
+                    <!-- Central Publishing replaces Maven's standard deploy path. -->
+                    <skipNotDeployed>false</skipNotDeployed>
+                    <outputFormat>json</outputFormat>
+                    <outputName>agent-judge-bom</outputName>
+                    <classifier>cyclonedx</classifier>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>aggregate-cyclonedx-sbom</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>makeAggregateBom</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Keep root LICENSE authoritative while including it in binary/source artifacts. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>${maven-resources-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>stage-javadoc-license</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/javadoc-resources/resources</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${maven.multiModuleProjectDirectory}</directory>
+                                    <includes>
+                                        <include>LICENSE</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -28,3 +28,7 @@ Ten credential-free Maven modules cover the normalized API, jury behavior, model
 
 Use `io.github.markpollack:agent-judge-*:0.14.0` for every Agent Judge module.
 Runtime bridge dependencies remain provided where practical, so applications choose their framework runtime versions.
+
+## License
+
+Agent Judge 0.14.0 is licensed under the project-specific Business Source License terms in the repository root `LICENSE` file.

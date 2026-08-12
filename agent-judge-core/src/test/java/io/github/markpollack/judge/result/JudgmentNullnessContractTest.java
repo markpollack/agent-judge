@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2026 Mark Pollack
- * See LICENSE.txt in the repository root for license terms.
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 
 package io.github.markpollack.judge.result;

@@ -7,6 +7,8 @@ documentation. Private planning and control state are authoritative in
 Use `./mvnw`, never `mvn`. The normal gate is `./mvnw clean verify`. Release-health checks are
 `./mvnw -o javadoc:aggregate` and
 `./mvnw -o -Prelease -Dgpg.skip=true clean package`; Javadoc errors remain build-breaking.
+The aggregate CycloneDX goal requires online mode and runs at `verify`; the offline release package
+checks the source/Javadoc artifacts but intentionally does not regenerate the SBOM.
 
 Follow `/home/mark/projects/agento-forge/guides/java-library-quality.md`. The project uses a
 customized source license; see `LICENSE`. Commit messages contain no AI attribution.
