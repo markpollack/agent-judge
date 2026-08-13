@@ -6,29 +6,22 @@
 package io.github.markpollack.judge.jury;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
 
 /**
- * A Jury that evaluates through cascading tiers with fail-fast and escalation semantics.
- * Each tier is itself a Jury (typically SimpleJury).
- *
- * <p>
- * Tier execution proceeds sequentially. Each tier's {@link TierPolicy} determines whether
- * to stop (reject/accept) or escalate to the next tier. The final tier always produces a
- * verdict.
- * </p>
- *
- * <p>
- * Example:
- * </p>
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * A jury that evaluates named tiers sequentially with explicit stop and escalation
+ * semantics. Every entered tier in a returned result is represented by one complete
+ * {@link CompositeAttempt}.
  *
  * @author Mark Pollack
  * @since 0.9.0
@@ -39,9 +32,18 @@ public class CascadedJury implements Jury {
 
 	private static final Logger logger = LoggerFactory.getLogger(CascadedJury.class);
 
+	private static final CompositeFailure EXECUTION_FAILURE =
+			new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED);
+
 	private final List<TierConfig> tiers;
 
 	private CascadedJury(List<TierConfig> tiers) {
+		Set<String> names = new HashSet<>();
+		for (TierConfig tier : tiers) {
+			if (!names.add(tier.name())) {
+				throw new IllegalArgumentException("Duplicate cascade tier name: " + tier.name());
+			}
+		}
 		this.tiers = List.copyOf(tiers);
 	}
 
@@ -57,76 +59,73 @@ public class CascadedJury implements Jury {
 
 	@Override
 	public Verdict vote(JudgmentContext context) {
-		List<Verdict> executedTierVerdicts = new ArrayList<>();
-		List<String> tiersExecuted = new ArrayList<>();
+		return CompositeExecutionScope.withinCompositeVote(() -> execute(context));
+	}
 
-		for (int i = 0; i < tiers.size(); i++) {
-			TierConfig tier = tiers.get(i);
-			tiersExecuted.add(tier.name());
-
+	private Verdict execute(JudgmentContext context) {
+		List<CompositeAttempt> attempts = new ArrayList<>();
+		Verdict lastSuccessful = null;
+		for (TierConfig tier : tiers) {
 			Verdict tierVerdict;
 			try {
-				tierVerdict = tier.jury().vote(context);
+				tierVerdict = CompositeExecutionScope.invokeChild(() -> tier.jury().vote(context));
+			}
+			catch (CompositeLimitExceededException ex) {
+				throw ex;
 			}
 			catch (Exception ex) {
-				logger.warn("Tier '{}' threw exception, escalating to next tier", tier.name(), ex);
-				if (i == tiers.size() - 1) {
-					// Final tier exception → ERROR verdict
-					return buildErrorVerdict(tier.name(), ex, executedTierVerdicts, tiersExecuted);
+				logger.warn("Tier '{}' failed to execute; continuing according to cascade policy", tier.name());
+				attempts.add(new CompositeAttempt(tier.name(), CompositeRelation.CASCADE_TIER, tier.policy(), null,
+						EXECUTION_FAILURE));
+				if (tier.policy() == TierPolicy.FINAL_TIER) {
+					return errorVerdict("The final cascade tier failed to execute.", attempts);
 				}
 				continue;
 			}
 
-			executedTierVerdicts.add(tierVerdict);
-
-			switch (tier.policy()) {
-				case REJECT_ON_ANY_FAIL -> {
-					if (hasAnyFail(tierVerdict)) {
-						return buildCascadeVerdict(tierVerdict, executedTierVerdicts, tier.name(), tiersExecuted);
-					}
-					// No failures → escalate
-				}
-				case ACCEPT_ON_ALL_PASS -> {
-					if (allPassed(tierVerdict)) {
-						return buildCascadeVerdict(tierVerdict, executedTierVerdicts, tier.name(), tiersExecuted);
-					}
-					// Not all passed → escalate
-				}
-				case FINAL_TIER -> {
-					return buildCascadeVerdict(tierVerdict, executedTierVerdicts, tier.name(), tiersExecuted);
-				}
+			attempts.add(new CompositeAttempt(tier.name(), CompositeRelation.CASCADE_TIER, tier.policy(), tierVerdict,
+					null));
+			lastSuccessful = tierVerdict;
+			if (shouldStop(tier, tierVerdict)) {
+				return successfulVerdict(tierVerdict, attempts);
 			}
 		}
 
-		// Should not reach here if last tier is FINAL_TIER, but defensive fallback
-		Verdict lastVerdict = executedTierVerdicts.get(executedTierVerdicts.size() - 1);
-		return buildCascadeVerdict(lastVerdict, executedTierVerdicts, tiers.get(tiers.size() - 1).name(),
-				tiersExecuted);
+		if (lastSuccessful == null) {
+			return errorVerdict("No cascade tier returned a verdict.", attempts);
+		}
+		return successfulVerdict(lastSuccessful, attempts);
 	}
 
-	private boolean hasAnyFail(Verdict tierVerdict) {
-		return tierVerdict.individual().stream().anyMatch(j -> j.status() == JudgmentStatus.FAIL);
+	private boolean shouldStop(TierConfig tier, Verdict verdict) {
+		return switch (tier.policy()) {
+			case REJECT_ON_ANY_FAIL -> hasAnyFail(verdict);
+			case ACCEPT_ON_ALL_PASS -> allPassed(verdict);
+			case FINAL_TIER -> true;
+		};
 	}
 
-	private boolean allPassed(Verdict tierVerdict) {
-		return tierVerdict.individual().stream().allMatch(j -> j.status() == JudgmentStatus.PASS);
+	private boolean hasAnyFail(Verdict verdict) {
+		return verdict.individual().stream().anyMatch(judgment -> judgment.status() == JudgmentStatus.FAIL);
 	}
 
-	private Verdict buildCascadeVerdict(Verdict stoppingTierVerdict, List<Verdict> allTierVerdicts, String stoppedAt,
-			List<String> tiersExecuted) {
+	private boolean allPassed(Verdict verdict) {
+		return verdict.individual().stream().allMatch(judgment -> judgment.status() == JudgmentStatus.PASS);
+	}
+
+	private Verdict successfulVerdict(Verdict stoppingVerdict, List<CompositeAttempt> attempts) {
 		return Verdict.builder()
-			.aggregated(stoppingTierVerdict.aggregated())
-			.individual(stoppingTierVerdict.individual())
-			.individualByName(stoppingTierVerdict.individualByName())
-			.subVerdicts(allTierVerdicts)
+			.aggregated(stoppingVerdict.aggregated())
+			.individual(stoppingVerdict.individual())
+			.individualByName(stoppingVerdict.individualByName())
+			.weights(stoppingVerdict.weights())
+			.compositeAttempts(attempts)
 			.build();
 	}
 
-	private Verdict buildErrorVerdict(String tierName, Exception ex, List<Verdict> allTierVerdicts,
-			List<String> tiersExecuted) {
-		logger.error("Final tier '{}' threw exception", tierName, ex);
-		Judgment errorJudgment = Judgment.error("Final tier '" + tierName + "' threw exception: " + ex.getMessage());
-		return Verdict.builder().aggregated(errorJudgment).subVerdicts(allTierVerdicts).build();
+	private Verdict errorVerdict(String reasoning, List<CompositeAttempt> attempts) {
+		Judgment error = Judgment.error(reasoning);
+		return Verdict.builder().aggregated(error).compositeAttempts(attempts).build();
 	}
 
 	/**
@@ -137,22 +136,20 @@ public class CascadedJury implements Jury {
 		return new Builder();
 	}
 
-	/**
-	 * Builder for CascadedJury.
-	 */
+	/** Builder for {@link CascadedJury}. */
 	public static class Builder {
+
+		private final List<TierConfig> tiers = new ArrayList<>();
 
 		/** Create an empty cascade builder. */
 		public Builder() {
 		}
 
-		private final List<TierConfig> tiers = new ArrayList<>();
-
 		/**
-		 * Add a tier to the cascade.
-		 * @param name human-readable tier name (e.g., "deterministic")
-		 * @param jury the jury for this tier
-		 * @param policy how this tier's result maps to stop/escalate
+		 * Add a named tier to the cascade.
+		 * @param name stable unique sibling identity
+		 * @param jury jury for this tier
+		 * @param policy how this tier maps to stop or escalation
 		 * @return this builder
 		 */
 		public Builder tier(String name, Jury jury, TierPolicy policy) {

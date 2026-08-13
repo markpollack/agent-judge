@@ -13,11 +13,22 @@ This is a breaking pre-1.0 release; consumers must recompile and follow the [0.1
 - Model usage records optional provider-reported input, output, reasoning, cache-creation, cache-read, and total token quantities. It stores no volatile price estimate.
 - `agent-judge-core` no longer depends on Reactor. It remains framework-neutral while declaring its actual Jackson Databind, SLF4J API, and JSpecify dependencies.
 - JSpecify makes `score` and `label` visibly nullable in the public result API, with NullAway enforcing the adopted package during compilation.
+- Composite results now expose complete ordered named attempts through `Verdict.compositeAttempts()`.
+  Each attempt contains either its returned child `Verdict` or the code-only failure
+  `jury_execution_failed`; `CompositePaths.flatten(...)` derives stable RFC 6901 paths for nested
+  results.
+- `MetaJury` records and continues after member execution exceptions. If any member fails, its
+  strategy is not invoked and the root is `ERROR`, while successful evidence and every ordered
+  success/failure attempt remain available.
 
 ## Removed API
 
 The complete `io.github.markpollack.judge.score` package and `ReactiveJudge` are removed.
 Use outcome-specific `Judgment` factories/builders, `effectiveScore()` where a numeric PASS/FAIL view is intentional, and a runtime-specific async wrapper when needed.
+
+The unreleased composite projection `subVerdicts` is deleted rather than deprecated. Composite
+consumers must move directly to `compositeAttempts()` or `CompositePaths.flatten(...)` and handle
+the verdict-or-failure outcome explicitly. See [MIGRATION_0.14.md](MIGRATION_0.14.md).
 
 ## Samples
 

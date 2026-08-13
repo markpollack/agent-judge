@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.result.Judgment;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,11 +43,11 @@ class VerdictTest {
 		assertThat(verdict.individual()).hasSize(3);
 		assertThat(verdict.individualByName()).hasSize(3);
 		assertThat(verdict.weights()).hasSize(3);
-		assertThat(verdict.subVerdicts()).isEmpty();
+		assertThat(verdict.compositeAttempts()).isEmpty();
 	}
 
 	@Test
-	void shouldSupportSubVerdictsForMetaJury() {
+	void shouldSupportCompleteAttemptsForMetaJury() {
 		Verdict subVerdict1 = unanimousPass(2);
 		Verdict subVerdict2 = split(1, 1);
 
@@ -55,13 +56,15 @@ class VerdictTest {
 		Verdict metaVerdict = Verdict.builder()
 			.aggregated(metaAggregated)
 			.individual(List.of(subVerdict1.aggregated(), subVerdict2.aggregated()))
-			.subVerdicts(List.of(subVerdict1, subVerdict2))
+			.compositeAttempts(List.of(
+					new CompositeAttempt("first", CompositeRelation.META_MEMBER, null, subVerdict1, null),
+					new CompositeAttempt("second", CompositeRelation.META_MEMBER, null, subVerdict2, null)))
 			.build();
 
 		assertThat(metaVerdict.aggregated()).isEqualTo(metaAggregated);
-		assertThat(metaVerdict.subVerdicts()).hasSize(2);
-		assertThat(metaVerdict.subVerdicts().get(0)).isEqualTo(subVerdict1);
-		assertThat(metaVerdict.subVerdicts().get(1)).isEqualTo(subVerdict2);
+		assertThat(metaVerdict.compositeAttempts()).hasSize(2);
+		assertThat(metaVerdict.compositeAttempts().get(0).verdict()).isEqualTo(subVerdict1);
+		assertThat(metaVerdict.compositeAttempts().get(1).verdict()).isEqualTo(subVerdict2);
 	}
 
 	@Test
@@ -73,18 +76,50 @@ class VerdictTest {
 		Map<String, Judgment> originalByName = new java.util.HashMap<>();
 		originalByName.put("Judge1", booleanPass("Judge 1"));
 
+		List<CompositeAttempt> originalAttempts = new java.util.ArrayList<>();
+		originalAttempts.add(new CompositeAttempt("member", CompositeRelation.META_MEMBER, null,
+				Verdict.single("leaf", booleanPass("Leaf")), null));
+
 		Verdict verdict = Verdict.builder()
 			.aggregated(booleanPass("Aggregated"))
 			.individual(originalIndividual)
 			.individualByName(originalByName)
+			.compositeAttempts(originalAttempts)
 			.build();
 
 		// Modify originals - should not affect verdict
 		originalIndividual.add(booleanPass("Judge 3"));
 		originalByName.put("Judge2", booleanFail("Judge 2"));
+		originalAttempts.clear();
 
 		assertThat(verdict.individual()).hasSize(2);
 		assertThat(verdict.individualByName()).hasSize(1);
+		assertThat(verdict.compositeAttempts()).hasSize(1).isUnmodifiable();
+	}
+
+	@Test
+	void shouldPreserveMapInsertionOrderAndContainedIdentity() {
+		Judgment first = booleanPass("First");
+		Judgment second = booleanFail("Second");
+		Map<String, Judgment> byName = new LinkedHashMap<>();
+		byName.put("first", first);
+		byName.put("second", second);
+		Map<String, Double> weights = new LinkedHashMap<>();
+		weights.put("first", 0.25);
+		weights.put("second", 0.75);
+
+		Verdict verdict = Verdict.builder()
+			.aggregated(first)
+			.individual(List.of(first, second))
+			.individualByName(byName)
+			.weights(weights)
+			.build();
+
+		assertThat(verdict.individual()).containsExactly(first, second);
+		assertThat(verdict.individual().get(0)).isSameAs(first);
+		assertThat(verdict.individualByName()).containsExactly(Map.entry("first", first), Map.entry("second", second));
+		assertThat(verdict.individualByName().get("first")).isSameAs(first);
+		assertThat(verdict.weights()).containsExactly(Map.entry("first", 0.25), Map.entry("second", 0.75));
 	}
 
 	@Test
@@ -112,7 +147,7 @@ class VerdictTest {
 		assertThat(verdict.individual()).isEmpty();
 		assertThat(verdict.individualByName()).isEmpty();
 		assertThat(verdict.weights()).isEmpty();
-		assertThat(verdict.subVerdicts()).isEmpty();
+		assertThat(verdict.compositeAttempts()).isEmpty();
 	}
 
 	@Test
@@ -122,13 +157,13 @@ class VerdictTest {
 			.individual(List.of())
 			.individualByName(Map.of())
 			.weights(Map.of())
-			.subVerdicts(List.of())
+			.compositeAttempts(List.of())
 			.build();
 
 		assertThat(verdict.individual()).isEmpty();
 		assertThat(verdict.individualByName()).isEmpty();
 		assertThat(verdict.weights()).isEmpty();
-		assertThat(verdict.subVerdicts()).isEmpty();
+		assertThat(verdict.compositeAttempts()).isEmpty();
 	}
 
 	@Test
@@ -177,6 +212,13 @@ class VerdictTest {
 	}
 
 	@Test
+	void shouldRequireNonNullCompositeAttemptsOnTheCanonicalConstructor() {
+		assertThatThrownBy(() -> new Verdict(booleanPass("Aggregated"), List.of(), Map.of(), Map.of(), null))
+			.isInstanceOf(NullPointerException.class)
+			.hasMessageContaining("compositeAttempts");
+	}
+
+	@Test
 	void shouldCreateCompleteSingleJudgeVerdictWithoutRepetition() {
 		Judgment judgment = booleanPass("File exists");
 
@@ -186,7 +228,7 @@ class VerdictTest {
 		assertThat(verdict.individual()).containsExactly(judgment);
 		assertThat(verdict.individualByName()).containsExactlyEntriesOf(Map.of("file-exists", judgment));
 		assertThat(verdict.weights()).isEmpty();
-		assertThat(verdict.subVerdicts()).isEmpty();
+		assertThat(verdict.compositeAttempts()).isEmpty();
 	}
 
 	@Test

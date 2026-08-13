@@ -9,8 +9,6 @@ import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.Judges;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,12 +91,14 @@ public final class Juries {
 	 * @param second the second jury
 	 * @param metaStrategy the voting strategy for aggregating jury verdicts
 	 * @return a meta-jury combining both juries
+	 * @deprecated use {@link #meta(VotingStrategy, NamedJury...)} with explicit names
 	 */
+	@Deprecated(since = "0.14.0")
 	public static Jury combine(Jury first, Jury second, VotingStrategy metaStrategy) {
 		if (first == null || second == null) {
 			throw new IllegalArgumentException("Both juries must be non-null");
 		}
-		return new MetaJury(Arrays.asList(first, second), metaStrategy);
+		return meta(metaStrategy, new NamedJury("member-1", first), new NamedJury("member-2", second));
 	}
 
 	/**
@@ -106,12 +106,31 @@ public final class Juries {
 	 * @param strategy the voting strategy for aggregating jury verdicts
 	 * @param juries the juries to combine
 	 * @return a meta-jury combining all juries
+	 * @deprecated use {@link #meta(VotingStrategy, NamedJury...)} with explicit names
 	 */
+	@Deprecated(since = "0.14.0")
 	public static Jury allOf(VotingStrategy strategy, Jury... juries) {
 		if (juries == null || juries.length == 0) {
 			throw new IllegalArgumentException("At least one jury is required");
 		}
-		return new MetaJury(Arrays.asList(juries), strategy);
+		NamedJury[] members = new NamedJury[juries.length];
+		for (int index = 0; index < juries.length; index++) {
+			members[index] = new NamedJury("member-" + (index + 1), juries[index]);
+		}
+		return meta(strategy, members);
+	}
+
+	/**
+	 * Create a meta-jury from explicitly named members.
+	 * @param strategy strategy that aggregates successful member aggregates
+	 * @param members named members in execution order
+	 * @return configured named meta-jury
+	 */
+	public static Jury meta(VotingStrategy strategy, NamedJury... members) {
+		if (members == null || members.length == 0) {
+			throw new IllegalArgumentException("At least one named jury is required");
+		}
+		return new MetaJury(List.of(members), strategy);
 	}
 
 }

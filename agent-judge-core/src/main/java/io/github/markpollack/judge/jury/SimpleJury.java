@@ -11,7 +11,7 @@ import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,7 +59,7 @@ public class SimpleJury implements Jury {
 		}
 		this.judges = List.copyOf(judges);
 		this.votingStrategy = votingStrategy;
-		this.weights = Map.copyOf(weights);
+		this.weights = Collections.unmodifiableMap(new LinkedHashMap<>(weights));
 		this.parallel = parallel;
 		this.executor = executor != null ? executor : ForkJoinPool.commonPool();
 	}
@@ -110,6 +110,7 @@ public class SimpleJury implements Jury {
 			.individual(individualJudgments)
 			.individualByName(judgmentByName)
 			.weights(weights)
+			.compositeAttempts(List.of())
 			.build();
 	}
 
@@ -142,7 +143,7 @@ public class SimpleJury implements Jury {
 
 		private final List<Judge> judges = new ArrayList<>();
 
-		private final Map<String, Double> weights = new HashMap<>();
+		private final Map<String, Double> weights = new LinkedHashMap<>();
 
 		private VotingStrategy votingStrategy;
 

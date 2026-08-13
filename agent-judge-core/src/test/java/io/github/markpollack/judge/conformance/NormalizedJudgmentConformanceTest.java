@@ -10,6 +10,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -30,11 +31,19 @@ import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jury.AggregationEvidence;
+import io.github.markpollack.judge.jury.CascadedJury;
+import io.github.markpollack.judge.jury.CompositeAttempt;
+import io.github.markpollack.judge.jury.CompositeFailure;
+import io.github.markpollack.judge.jury.CompositeRelation;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
 import io.github.markpollack.judge.jury.ErrorPolicy;
+import io.github.markpollack.judge.jury.Juries;
 import io.github.markpollack.judge.jury.Jury;
+import io.github.markpollack.judge.jury.NamedJury;
 import io.github.markpollack.judge.jury.SimpleJury;
+import io.github.markpollack.judge.jury.TierPolicy;
 import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.jury.VotingStrategy;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
@@ -74,6 +83,8 @@ class NormalizedJudgmentConformanceTest {
 
 	private static final String GOLDEN_RESOURCE = "/conformance/normalized-judgment-0.14.json";
 
+	private static final String COMPOSITE_GOLDEN_RESOURCE = "/conformance/composite-verdict-0.14.json";
+
 	/** The judge whose result carries the richest portable metadata in the fixture. */
 	private static final String MODEL_BACKED_JUDGE = "llm-correctness";
 
@@ -82,11 +93,21 @@ class NormalizedJudgmentConformanceTest {
 	class Golden {
 
 		@Test
-		@DisplayName("the fixture serializes to the pinned golden document")
-		void matchesTheGoldenDocument() {
-			assertThat(fixtureTree())
-				.as("the 0.14 wire projection changed; review the diff before repinning %s", GOLDEN_RESOURCE)
-				.isEqualTo(goldenTree());
+		@DisplayName("the immutable historical fixture is byte-pinned and accounted for by a private shape")
+		void historicalFixtureIsPinnedAndAccountedFor() throws Exception {
+			byte[] bytes = historicalBytes();
+			assertThat(bytes).hasSize(4696);
+			assertThat(hex(MessageDigest.getInstance("SHA-256").digest(bytes)))
+				.isEqualTo("715749d0ca4ddf2be2e64e1c3adce4bcbcc6c7c94acb21a821026ff9a3010600");
+
+			HistoricalVerdictFixture historical = MAPPER.readValue(bytes, HistoricalVerdictFixture.class);
+			assertThat(fieldNames(goldenTree())).containsExactlyElementsOf(componentNames(HistoricalVerdictFixture.class));
+			assertThat(historical.aggregated()).isNotNull();
+			assertThat(historical.individual()).hasSize(4);
+			assertThat(historical.individualByName()).hasSize(4);
+			assertThat(historical.weights()).hasSize(4);
+			assertThat(historical.subVerdicts()).isEmpty();
+			assertThatThrownBy(() -> MAPPER.readValue(bytes, Verdict.class)).isInstanceOf(Exception.class);
 		}
 
 		@Test
@@ -95,8 +116,8 @@ class NormalizedJudgmentConformanceTest {
 			Verdict parsed = MAPPER.readValue(writeFixture(), Verdict.class);
 
 			assertThat(MAPPER.readTree(MAPPER.writeValueAsString(parsed)))
-				.as("re-serializing a parsed verdict must reproduce the same document")
-				.isEqualTo(goldenTree());
+				.as("re-serializing a parsed verdict must reproduce the same corrected document")
+				.isEqualTo(fixtureTree());
 
 			assertThat(parsed.aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 			assertThat(parsed.individual()).extracting(Judgment::status)
@@ -145,6 +166,78 @@ class NormalizedJudgmentConformanceTest {
 						AggregationEvidence.FAIL_COUNT);
 		}
 
+	}
+
+	@Nested
+	@DisplayName("Corrected composite golden document")
+	class CompositeGolden {
+
+		@Test
+		void realCompositeExecutionMatchesTheGoldenDocument() {
+			assertThat(compositeFixtureTree())
+				.as("the corrected composite wire projection changed; review before repinning %s",
+						COMPOSITE_GOLDEN_RESOURCE)
+				.isEqualTo(compositeGoldenTree());
+		}
+
+		@Test
+		void correctedCompositeDocumentRoundTripsThroughTheOrdinaryMapper() throws Exception {
+			Verdict parsed = MAPPER.readValue(writeCompositeFixture(), Verdict.class);
+			assertThat(MAPPER.readTree(MAPPER.writeValueAsString(parsed))).isEqualTo(compositeGoldenTree());
+			assertThat(parsed.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(parsed.compositeAttempts()).extracting(CompositeAttempt::name)
+				.containsExactly("pipeline", "audit");
+			assertThat(parsed.compositeAttempts().get(0).verdict().compositeAttempts())
+				.extracting(CompositeAttempt::name)
+				.containsExactly("broken-check", "semantic-check");
+		}
+
+		@Test
+		void declarationsDeriveTheCompleteCompositePropertySet() {
+			for (JsonNode verdictNode : allVerdictNodes(compositeFixtureTree())) {
+				assertThat(fieldNames(verdictNode)).containsExactlyElementsOf(componentNames(Verdict.class));
+			}
+
+			Set<String> attemptProperties = new LinkedHashSet<>();
+			for (JsonNode attempt : allAttemptNodes(compositeFixtureTree())) {
+				attemptProperties.addAll(fieldNames(attempt));
+				List<String> declared = componentNames(CompositeAttempt.class);
+				assertThat(fieldNames(attempt))
+					.containsExactlyElementsOf(declared.stream().filter(attempt::has).toList());
+			}
+			assertThat(attemptProperties).containsExactlyInAnyOrderElementsOf(componentNames(CompositeAttempt.class));
+			assertThat(componentNames(CompositeFailure.class)).containsExactly("code");
+			assertThat(Arrays.stream(CompositeRelation.values()).map(CompositeRelation::wireName))
+				.containsExactlyInAnyOrder("cascade_tier", "meta_member");
+		}
+
+		@Test
+		void compositeDocumentHasNoNullLegacyTypeFailureDetailOrLiveObjectSurface() {
+			String json = writeCompositeFixture();
+			assertThat(nullPaths(compositeFixtureTree(), "")).isEmpty();
+			assertThat(json).doesNotContain("sub" + "Verdicts")
+				.doesNotContain("\"message\"")
+				.doesNotContain("\"path\"")
+				.doesNotContain("@class")
+				.doesNotContain("@type")
+				.doesNotContain("Throwable")
+				.doesNotContain("Exception")
+				.doesNotContain("/home/alice/.ssh/id_ed25519");
+		}
+
+		@Test
+		void compositeMapsKeepConfiguredInsertionOrder() {
+			assertThat(fieldNames(compositeFixtureTree().get("individualByName"))).containsExactly("pipeline");
+			JsonNode stopping = compositeFixtureTree().at("/compositeAttempts/0/verdict/compositeAttempts/1/verdict");
+			assertThat(fieldNames(stopping.get("individualByName"))).containsExactly("semantic-check");
+			assertThat(fieldNames(stopping.get("weights"))).containsExactly("0");
+		}
+
+	}
+
+	private record HistoricalVerdictFixture(Judgment aggregated, List<Judgment> individual,
+			Map<String, Judgment> individualByName, Map<String, Double> weights,
+			List<HistoricalVerdictFixture> subVerdicts) {
 	}
 
 	@Nested
@@ -352,6 +445,41 @@ class NormalizedJudgmentConformanceTest {
 			.build());
 	}
 
+	private static Verdict compositeVerdict() {
+		Jury successful = SimpleJury.builder()
+			.votingStrategy(new ConsensusStrategy())
+			.parallel(false)
+			.judge(Judges.named(context -> Judgment.pass("Semantic fallback accepted"), "semantic-check"))
+			.build();
+		Jury cascade = CascadedJury.builder()
+			.tier("broken-check", throwingJury(new IllegalStateException("/home/alice/.ssh/id_ed25519")),
+					TierPolicy.REJECT_ON_ANY_FAIL)
+			.tier("semantic-check", successful, TierPolicy.FINAL_TIER)
+			.build();
+		Jury meta = Juries.meta(new ConsensusStrategy(), new NamedJury("pipeline", cascade),
+				new NamedJury("audit", throwingJury(new IllegalArgumentException("token=opaque-secret"))));
+		return meta.vote(JudgmentContext.builder().goal("Verify the corrected composite result").build());
+	}
+
+	private static Jury throwingJury(RuntimeException failure) {
+		return new Jury() {
+			@Override
+			public List<Judge> getJudges() {
+				return List.of();
+			}
+
+			@Override
+			public VotingStrategy getVotingStrategy() {
+				return new ConsensusStrategy();
+			}
+
+			@Override
+			public Verdict vote(JudgmentContext context) {
+				throw failure;
+			}
+		};
+	}
+
 	/** PASS carrying a score, no label, checks, and nested portable metadata. */
 	private static Judgment buildSuccess() {
 		Map<String, Object> coverage = new LinkedHashMap<>();
@@ -439,6 +567,35 @@ class NormalizedJudgmentConformanceTest {
 		}
 	}
 
+	private static String writeCompositeFixture() {
+		try {
+			return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(compositeVerdict());
+		}
+		catch (Exception ex) {
+			throw new AssertionError("could not serialize the composite conformance fixture", ex);
+		}
+	}
+
+	private static JsonNode compositeFixtureTree() {
+		try {
+			return MAPPER.readTree(writeCompositeFixture());
+		}
+		catch (Exception ex) {
+			throw new AssertionError("could not parse the composite conformance fixture", ex);
+		}
+	}
+
+	private static JsonNode compositeGoldenTree() {
+		try (InputStream golden = NormalizedJudgmentConformanceTest.class
+			.getResourceAsStream(COMPOSITE_GOLDEN_RESOURCE)) {
+			assertThat(golden).as("missing golden resource %s", COMPOSITE_GOLDEN_RESOURCE).isNotNull();
+			return MAPPER.readTree(new String(golden.readAllBytes(), StandardCharsets.UTF_8));
+		}
+		catch (Exception ex) {
+			throw new AssertionError("could not read " + COMPOSITE_GOLDEN_RESOURCE, ex);
+		}
+	}
+
 	private static JsonNode goldenTree() {
 		try (InputStream golden = NormalizedJudgmentConformanceTest.class.getResourceAsStream(GOLDEN_RESOURCE)) {
 			assertThat(golden).as("missing golden resource %s", GOLDEN_RESOURCE).isNotNull();
@@ -447,6 +604,24 @@ class NormalizedJudgmentConformanceTest {
 		catch (Exception ex) {
 			throw new AssertionError("could not read " + GOLDEN_RESOURCE, ex);
 		}
+	}
+
+	private static byte[] historicalBytes() {
+		try (InputStream golden = NormalizedJudgmentConformanceTest.class.getResourceAsStream(GOLDEN_RESOURCE)) {
+			assertThat(golden).as("missing golden resource %s", GOLDEN_RESOURCE).isNotNull();
+			return golden.readAllBytes();
+		}
+		catch (Exception ex) {
+			throw new AssertionError("could not read " + GOLDEN_RESOURCE, ex);
+		}
+	}
+
+	private static String hex(byte[] bytes) {
+		StringBuilder result = new StringBuilder(bytes.length * 2);
+		for (byte value : bytes) {
+			result.append(String.format("%02x", value & 0xff));
+		}
+		return result.toString();
 	}
 
 	private static List<Judgment> allJudgments() {
@@ -460,6 +635,30 @@ class NormalizedJudgmentConformanceTest {
 		nodes.add(document.get("aggregated"));
 		document.get("individual").forEach(nodes::add);
 		return nodes;
+	}
+
+	private static List<JsonNode> allVerdictNodes(JsonNode root) {
+		List<JsonNode> verdicts = new ArrayList<>();
+		List<JsonNode> pending = new ArrayList<>();
+		pending.add(root);
+		while (!pending.isEmpty()) {
+			JsonNode verdict = pending.remove(pending.size() - 1);
+			verdicts.add(verdict);
+			for (JsonNode attempt : verdict.get("compositeAttempts")) {
+				if (attempt.has("verdict")) {
+					pending.add(attempt.get("verdict"));
+				}
+			}
+		}
+		return verdicts;
+	}
+
+	private static List<JsonNode> allAttemptNodes(JsonNode root) {
+		List<JsonNode> attempts = new ArrayList<>();
+		for (JsonNode verdict : allVerdictNodes(root)) {
+			verdict.get("compositeAttempts").forEach(attempts::add);
+		}
+		return attempts;
 	}
 
 	private static JsonNode judgmentNode(String judgeName) {

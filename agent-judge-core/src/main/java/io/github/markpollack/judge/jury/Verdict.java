@@ -5,41 +5,52 @@
 
 package io.github.markpollack.judge.jury;
 
-import io.github.markpollack.judge.result.Judgment;
-
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+
+import io.github.markpollack.judge.result.Judgment;
+
 /**
- * Verdict from a jury of judges.
+ * Immutable result from a jury of judges.
  *
- * <p>
- * Contains the aggregated judgment from voting strategy plus all individual judgments
- * with identity preservation and optional sub-verdicts for meta-jury composition.
- * </p>
+ * <p>The first four components describe the root result. {@code compositeAttempts}
+ * contains the complete ordered evidence for each direct stage entered by a composite
+ * jury. A leaf verdict has an empty attempt list.</p>
  *
- * @param aggregated the final aggregated judgment from voting strategy
- * @param individual all individual judgments from each judge (ordered)
- * @param individualByName judgments indexed by judge name for identity preservation
- * @param weights the weights assigned to each judge (by judge name or index)
- * @param subVerdicts nested verdicts from sub-juries (for MetaJury composition)
+ * @param aggregated the final aggregated judgment
+ * @param individual the ordered judgments aggregated at this root
+ * @param individualByName those judgments keyed by configured identity in insertion order
+ * @param weights the configured weights in insertion order
+ * @param compositeAttempts complete ordered direct composite attempts
  * @author Mark Pollack
  * @since 0.1.0
  */
+@JsonPropertyOrder({ "aggregated", "individual", "individualByName", "weights", "compositeAttempts" })
 public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String, Judgment> individualByName,
-		Map<String, Double> weights, List<Verdict> subVerdicts) {
+		Map<String, Double> weights, List<CompositeAttempt> compositeAttempts) {
 
-	/** Validate and defensively copy all verdict components. */
+	/** Validate, bound, and defensively copy all verdict components. */
 	public Verdict {
 		Objects.requireNonNull(aggregated, "aggregated judgment must not be null");
-		// Defensive copy for immutability
 		individual = individual != null ? List.copyOf(individual) : List.of();
-		individualByName = individualByName != null ? Map.copyOf(individualByName) : Map.of();
-		weights = weights != null ? Map.copyOf(weights) : Map.of();
-		subVerdicts = subVerdicts != null ? List.copyOf(subVerdicts) : List.of();
+		individualByName = immutableLinkedMap(individualByName);
+		weights = immutableLinkedMap(weights);
+		Objects.requireNonNull(compositeAttempts, "compositeAttempts must not be null");
+		compositeAttempts = List.copyOf(compositeAttempts);
+		CompositeExecutionScope.validateTree(compositeAttempts);
+	}
+
+	private static <K, V> Map<K, V> immutableLinkedMap(Map<K, V> source) {
+		if (source == null || source.isEmpty()) {
+			return Map.of();
+		}
+		return Collections.unmodifiableMap(new LinkedHashMap<>(source));
 	}
 
 	/**
@@ -51,8 +62,7 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 	}
 
 	/**
-	 * Create the complete verdict of a one-member jury without making the caller repeat the
-	 * same immutable judgment in its aggregate and evidence roles.
+	 * Create the complete verdict of a one-member jury.
 	 * @param name non-blank identity of the sole judge
 	 * @param judgment the judge's result and therefore the jury's aggregate
 	 * @return a complete one-member verdict
@@ -70,24 +80,22 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 			.build();
 	}
 
-	/**
-	 * Builder for Verdict.
-	 */
+	/** Builder for {@link Verdict}. */
 	public static class Builder {
-
-		/** Create an empty verdict builder. */
-		public Builder() {
-		}
 
 		private Judgment aggregated;
 
 		private List<Judgment> individual = new ArrayList<>();
 
-		private Map<String, Judgment> individualByName = new HashMap<>();
+		private Map<String, Judgment> individualByName = new LinkedHashMap<>();
 
-		private Map<String, Double> weights = new HashMap<>();
+		private Map<String, Double> weights = new LinkedHashMap<>();
 
-		private List<Verdict> subVerdicts = new ArrayList<>();
+		private List<CompositeAttempt> compositeAttempts = new ArrayList<>();
+
+		/** Create an empty verdict builder. */
+		public Builder() {
+		}
 
 		/**
 		 * Set the aggregated judgment.
@@ -115,7 +123,7 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 		 * @return this builder
 		 */
 		public Builder individualByName(Map<String, Judgment> individualByName) {
-			this.individualByName = new HashMap<>(individualByName);
+			this.individualByName = new LinkedHashMap<>(individualByName);
 			return this;
 		}
 
@@ -125,17 +133,17 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 		 * @return this builder
 		 */
 		public Builder weights(Map<String, Double> weights) {
-			this.weights = new HashMap<>(weights);
+			this.weights = new LinkedHashMap<>(weights);
 			return this;
 		}
 
 		/**
-		 * Set nested verdicts.
-		 * @param subVerdicts nested verdicts
+		 * Set complete ordered direct composite attempts.
+		 * @param compositeAttempts composite attempts
 		 * @return this builder
 		 */
-		public Builder subVerdicts(List<Verdict> subVerdicts) {
-			this.subVerdicts = new ArrayList<>(subVerdicts);
+		public Builder compositeAttempts(List<CompositeAttempt> compositeAttempts) {
+			this.compositeAttempts = new ArrayList<>(compositeAttempts);
 			return this;
 		}
 
@@ -144,7 +152,7 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 		 * @return immutable verdict
 		 */
 		public Verdict build() {
-			return new Verdict(aggregated, individual, individualByName, weights, subVerdicts);
+			return new Verdict(aggregated, individual, individualByName, weights, compositeAttempts);
 		}
 
 	}

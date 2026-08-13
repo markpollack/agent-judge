@@ -22,7 +22,8 @@ import java.util.List;
  * <p>
  * The jury executes all its constituent judges (potentially in parallel) and aggregates
  * their judgments using a {@link VotingStrategy}. The final verdict includes identity
- * preservation via judge names and supports composition via sub-verdicts.
+	 * preservation via judge names and complete named {@link CompositeAttempt} evidence for
+	 * composite implementations.
  * </p>
  *
  * <p>

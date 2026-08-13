@@ -19,6 +19,12 @@ These are independent facts: an abstention is not a failing vote, an error is no
 Result metadata is recursively immutable and restricted to ordinary JSON-compatible values.
 Token usage preserves independently reported input, output, reasoning, cache-creation, cache-read, and total quantities; pricing is a downstream derivation.
 
+Composite juries return complete ordered execution evidence in `Verdict.compositeAttempts()`.
+Each named attempt contains exactly one returned child verdict or one stable code-only failure, so
+callers can distinguish a negative finding from a stage that did not execute successfully.
+`CompositePaths.flatten(verdict)` derives deterministic RFC 6901 paths across nested meta-juries and
+cascades without placing paths or runtime exceptions in the wire result.
+
 ## Modules
 
 | Module | Responsibility |
@@ -99,7 +105,8 @@ Its ten credential-free Maven modules cover core judging, composition, juries, c
 
 - [Getting started](https://lab.pollack.ai/docs/agent-judge/getting-started)
 - [Tutorial source](https://github.com/markpollack/agent-judge-tutorial)
-- [0.13 to 0.14 migration guide](consumer-handoff-normalized-judgment.md)
+- [0.13 to 0.14 migration guide](MIGRATION_0.14.md)
+- [Detailed normalized-Judgment handoff](consumer-handoff-normalized-judgment.md)
 - [0.14 release notes](RELEASE_NOTES_0.14.md)
 
 ## License

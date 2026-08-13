@@ -42,6 +42,8 @@ class SimpleJuryTest {
 
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individual()).hasSize(3);
+		assertThat(verdict.compositeAttempts()).isEmpty();
+		assertThat(verdict.compositeAttempts()).isUnmodifiable();
 	}
 
 	@Test

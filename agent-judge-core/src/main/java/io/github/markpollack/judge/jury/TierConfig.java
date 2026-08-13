@@ -20,7 +20,7 @@ public record TierConfig(String name, Jury jury, TierPolicy policy) {
 
 	/** Validate all tier components. */
 	public TierConfig {
-		Objects.requireNonNull(name, "name must not be null");
+		name = NamedJury.requireValidName(name);
 		Objects.requireNonNull(jury, "jury must not be null");
 		Objects.requireNonNull(policy, "policy must not be null");
 	}

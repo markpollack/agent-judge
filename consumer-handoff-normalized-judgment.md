@@ -316,6 +316,52 @@ Verdict verdict = Verdict.single("file-exists", individual);
 This is equivalent to setting `aggregated`, `individual`, and `individualByName` explicitly. A
 `Verdict` without `aggregated` is rejected because it has evidence but no jury conclusion.
 
+### 4.4 Composite verdicts are complete named attempt trees
+
+Composite consumers must replace the removed `subVerdicts()` projection with either direct ordered
+attempt access or canonical flattening:
+
+```java
+for (CompositeAttempt attempt : verdict.compositeAttempts()) {
+    if (attempt.verdict() != null) {
+        consume(attempt.name(), attempt.relation(), attempt.policy(), attempt.verdict());
+    }
+    else {
+        handleFailure(attempt.name(), attempt.failure().code());
+    }
+}
+
+for (CompositePathEntry entry : CompositePaths.flatten(verdict)) {
+    System.out.println(entry.path() + " -> " + entry.attempt().name());
+}
+```
+
+The direct list contains the complete attempts entered at that root in configuration order. A
+successful attempt contains the exact child `Verdict`; a failed attempt contains only
+`JURY_EXECUTION_FAILED`, serialized as `jury_execution_failed`. Exactly one outcome is present.
+Cascade attempts have relation `cascade_tier` and require their `TierPolicy`; meta-member attempts
+have relation `meta_member` and omit policy.
+
+Configure meta-juries with stable names:
+
+```java
+Jury jury = Juries.meta(new ConsensusStrategy(),
+        new NamedJury("build", buildJury),
+        new NamedJury("quality", qualityJury));
+```
+
+Names are unique among siblings, NFC-normalized, 1–64 Unicode scalar values, and exclude controls,
+format characters, line/paragraph separators, and leading or trailing Unicode whitespace. `/` and
+`~` are legal and are escaped in flattened paths using RFC 6901. Flattening is immutable preorder
+depth-first traversal, omits the root, and emits paths such as `/outer/a~1b/c~0d`.
+
+Nested composite results accept depth 8 and at most 32 total attempts; depth 9 and attempt 33 are
+refused before invoking the rejected stage. A throwing cascade tier is recorded and a non-final tier
+continues. A throwing final tier returns an `ERROR` root. A throwing meta member is recorded and
+remaining members still execute; if any member fails, the strategy is not called and the root is
+`ERROR`. Failure evidence contains no exception message, class, stack, path, credential, or live
+object.
+
 **Abstention and error.** Neither carries a manufactured score any more.
 
 ```java
@@ -329,7 +375,7 @@ logger.error("Judge invocation failed", exception);        // log it where you c
 return Judgment.error("Judge invocation timed out");       // no score, no label, no Throwable
 ```
 
-### 4.4 `ReactiveJudge` is removed
+### 4.5 `ReactiveJudge` is removed
 
 It had no implementation, test, caller, or sample in the producing repository. If you need it, wrap
 `Judge` directly:
@@ -550,7 +596,10 @@ This contract applies to the 0.14.0 artifacts.
     you read `metadata.usage`, it is now a string-keyed object of integers rather than a `Usage`
     object. Treat category overlap explicitly; do not reconstruct price inside Agent Judge result
     metadata.
-12. Re-run your own suites. A jury-heavy suite is the place these changes surface.
+12. Replace the removed historical `subVerdicts()` projection with `compositeAttempts()` or
+    `CompositePaths.flatten(...)`, and branch explicitly between returned verdict and code-only
+    failure.
+13. Re-run your own suites. A jury-heavy suite is the place these changes surface.
 
 ---
 
@@ -562,3 +611,7 @@ This contract applies to the 0.14.0 artifacts.
   framework version your application uses and run its adapter tests when upgrading that runtime.
 - The canonical credential-free examples are maintained in the
   [Agent Judge Tutorial](https://github.com/markpollack/agent-judge-tutorial).
+- The fixed `conformance/normalized-judgment-0.14.json` file remains historical field-accounting
+  evidence and is intentionally not accepted as the corrected `Verdict` wire shape. The corrected
+  composite example is `conformance/composite-verdict-0.14.json`, generated from real nested
+  `MetaJury`/`CascadedJury` execution.

@@ -104,7 +104,8 @@ class JuriesTest {
 		Verdict verdict = metaJury.vote(context);
 
 		// jury1 → PASS, jury2 → FAIL, majority → FAIL (tie resolved by TiePolicy)
-		assertThat(verdict.subVerdicts()).hasSize(2);
+		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name)
+			.containsExactly("member-1", "member-2");
 	}
 
 	@Test
@@ -134,7 +135,8 @@ class JuriesTest {
 		Verdict verdict = metaJury.vote(context);
 
 		// All juries pass → consensus pass
-		assertThat(verdict.subVerdicts()).hasSize(3);
+		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name)
+			.containsExactly("member-1", "member-2", "member-3");
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
@@ -171,7 +173,7 @@ class JuriesTest {
 		Verdict verdict = metaJury.vote(context);
 
 		// All sub-juries pass → majority passes
-		assertThat(verdict.subVerdicts()).hasSize(3);
+		assertThat(verdict.compositeAttempts()).hasSize(3);
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
 	}
 

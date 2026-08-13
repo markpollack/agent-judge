@@ -48,7 +48,7 @@ class CascadedJuryTest {
 
 		// The cascade decision is unchanged by M5: REJECT_ON_ANY_FAIL inspects the tier's
 		// INDIVIDUAL judgments, sees Migration's FAIL, and stops without escalating.
-		assertThat(verdict.subVerdicts()).hasSize(1); // only tier1 executed
+		assertThat(verdict.compositeAttempts()).hasSize(1); // only tier1 executed
 		assertThat(verdict.individual()).anyMatch(j -> j.status() == JudgmentStatus.FAIL);
 
 		// The copied aggregate reports the split panel as ABSTAIN. The gate rejected on
@@ -80,7 +80,7 @@ class CascadedJuryTest {
 		Verdict verdict = jury.vote(context);
 
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(verdict.subVerdicts()).hasSize(2); // both tiers executed
+		assertThat(verdict.compositeAttempts()).hasSize(2); // both tiers executed
 	}
 
 	// ==================== ACCEPT_ON_ALL_PASS policy ====================
@@ -107,7 +107,7 @@ class CascadedJuryTest {
 		Verdict verdict = jury.vote(context);
 
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(verdict.subVerdicts()).hasSize(1); // accepted at tier2
+		assertThat(verdict.compositeAttempts()).hasSize(1); // accepted at tier2
 	}
 
 	@Test
@@ -134,11 +134,12 @@ class CascadedJuryTest {
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS); // final
 																					// tier
 																					// passes
-		assertThat(verdict.subVerdicts()).hasSize(2); // escalated to final tier
+		assertThat(verdict.compositeAttempts()).hasSize(2); // escalated to final tier
 
 		// The escalated tier's own aggregate abstained because its judges disagreed.
 		// ACCEPT_ON_ALL_PASS did not read it, so the split panel could not be accepted.
-		assertThat(verdict.subVerdicts().get(0).aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(verdict.compositeAttempts().get(0).verdict().aggregated().status())
+			.isEqualTo(JudgmentStatus.ABSTAIN);
 	}
 
 	// ==================== M5 gate boundary ====================
@@ -170,8 +171,9 @@ class CascadedJuryTest {
 		Verdict verdict = jury.vote(context);
 
 		// The split tier abstained as an aggregate...
-		assertThat(verdict.subVerdicts()).hasSize(2);
-		assertThat(verdict.subVerdicts().get(0).aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(verdict.compositeAttempts()).hasSize(2);
+		assertThat(verdict.compositeAttempts().get(0).verdict().aggregated().status())
+			.isEqualTo(JudgmentStatus.ABSTAIN);
 
 		// ...and the gate still refused to accept it, ending on the final tier's FAIL.
 		// If ACCEPT_ON_ALL_PASS had read the aggregate, a non-PASS could never accept
@@ -205,7 +207,7 @@ class CascadedJuryTest {
 
 		Verdict verdict = jury.vote(context);
 
-		assertThat(verdict.subVerdicts()).hasSize(1); // stopped, never escalated
+		assertThat(verdict.compositeAttempts()).hasSize(1); // stopped, never escalated
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(verdict.individual()).anyMatch(j -> j.status() == JudgmentStatus.FAIL);
 	}
@@ -224,13 +226,13 @@ class CascadedJuryTest {
 		Verdict verdict = jury.vote(context);
 
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(verdict.subVerdicts()).hasSize(1);
+		assertThat(verdict.compositeAttempts()).hasSize(1);
 	}
 
 	// ==================== Tier tracing ====================
 
 	@Test
-	void subVerdictsContainsCorrectPerTierVerdicts() {
+	void compositeAttemptsContainCorrectPerTierVerdicts() {
 		Jury tier1 = SimpleJury.builder()
 			.judge(alwaysPass("Build"))
 			.votingStrategy(new MajorityVotingStrategy())
@@ -257,13 +259,15 @@ class CascadedJuryTest {
 		Verdict verdict = jury.vote(context);
 
 		// Tier 1 passes (no fail) → escalate; Tier 2 all pass → accept
-		assertThat(verdict.subVerdicts()).hasSize(2);
-		assertThat(verdict.subVerdicts().get(0).aggregated().status()).isEqualTo(JudgmentStatus.PASS); // tier1
-		assertThat(verdict.subVerdicts().get(1).aggregated().status()).isEqualTo(JudgmentStatus.PASS); // tier2
+		assertThat(verdict.compositeAttempts()).hasSize(2);
+		assertThat(verdict.compositeAttempts().get(0).verdict().aggregated().status())
+			.isEqualTo(JudgmentStatus.PASS); // tier1
+		assertThat(verdict.compositeAttempts().get(1).verdict().aggregated().status())
+			.isEqualTo(JudgmentStatus.PASS); // tier2
 	}
 
 	@Test
-	void onlyExecutedTiersAppearInSubVerdicts() {
+	void onlyExecutedTiersAppearInCompositeAttempts() {
 		Jury tier1 = SimpleJury.builder()
 			.judge(alwaysFail("Build"))
 			.votingStrategy(new MajorityVotingStrategy())
@@ -290,7 +294,7 @@ class CascadedJuryTest {
 
 		// Tier 1 has a FAIL → rejected at tier 1
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(verdict.subVerdicts()).hasSize(1); // only tier1 ran
+		assertThat(verdict.compositeAttempts()).hasSize(1); // only tier1 ran
 	}
 
 	// ==================== Error handling ====================
@@ -312,8 +316,10 @@ class CascadedJuryTest {
 		Verdict verdict = jury.vote(context);
 
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
-		// The throwing tier's verdict is not in subVerdicts (it never produced one)
-		assertThat(verdict.subVerdicts()).hasSize(1);
+		assertThat(verdict.compositeAttempts()).hasSize(2);
+		assertThat(verdict.compositeAttempts().get(0).failure().code())
+			.isEqualTo(CompositeFailureCode.JURY_EXECUTION_FAILED);
+		assertThat(verdict.compositeAttempts().get(1).verdict()).isNotNull();
 	}
 
 	@Test
@@ -325,7 +331,11 @@ class CascadedJuryTest {
 		Verdict verdict = jury.vote(context);
 
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(verdict.aggregated().reasoning()).contains("threw exception");
+		assertThat(verdict.aggregated().reasoning()).isEqualTo("The final cascade tier failed to execute.");
+		assertThat(verdict.compositeAttempts()).singleElement().satisfies(attempt -> {
+			assertThat(attempt.verdict()).isNull();
+			assertThat(attempt.failure().code()).isEqualTo(CompositeFailureCode.JURY_EXECUTION_FAILED);
+		});
 	}
 
 	// ==================== Edge cases ====================
@@ -344,7 +354,7 @@ class CascadedJuryTest {
 		Verdict verdict = jury.vote(context);
 
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(verdict.subVerdicts()).hasSize(1);
+		assertThat(verdict.compositeAttempts()).hasSize(1);
 		assertThat(verdict.individual()).hasSize(2);
 	}
 
@@ -370,7 +380,7 @@ class CascadedJuryTest {
 		Verdict verdict = jury.vote(context);
 
 		// ABSTAIN is not FAIL, so REJECT_ON_ANY_FAIL escalates
-		assertThat(verdict.subVerdicts()).hasSize(2);
+		assertThat(verdict.compositeAttempts()).hasSize(2);
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
@@ -396,7 +406,7 @@ class CascadedJuryTest {
 		Verdict verdict = jury.vote(context);
 
 		// ABSTAIN is not FAIL → no rejection → escalate to final
-		assertThat(verdict.subVerdicts()).hasSize(2);
+		assertThat(verdict.compositeAttempts()).hasSize(2);
 	}
 
 	@Test
@@ -421,7 +431,7 @@ class CascadedJuryTest {
 		Verdict verdict = jury.vote(context);
 
 		// ABSTAIN is not PASS → ACCEPT_ON_ALL_PASS escalates
-		assertThat(verdict.subVerdicts()).hasSize(2);
+		assertThat(verdict.compositeAttempts()).hasSize(2);
 	}
 
 	// ==================== Builder validation ====================
@@ -478,7 +488,7 @@ class CascadedJuryTest {
 
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
 		// Tier 1: no fails → escalate; Tier 2: all pass → accept
-		assertThat(verdict.subVerdicts()).hasSize(2);
+		assertThat(verdict.compositeAttempts()).hasSize(2);
 	}
 
 	@Test
@@ -511,7 +521,7 @@ class CascadedJuryTest {
 
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
 		// Tier 1: no fail → escalate; Tier 2: AST failed → escalate; Tier 3: pass
-		assertThat(verdict.subVerdicts()).hasSize(3);
+		assertThat(verdict.compositeAttempts()).hasSize(3);
 	}
 
 	// ==================== getJudges / getVotingStrategy ====================

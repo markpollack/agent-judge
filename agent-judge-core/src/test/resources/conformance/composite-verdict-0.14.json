@@ -1,0 +1,152 @@
+{
+  "aggregated" : {
+    "status" : "error",
+    "reasoning" : "One or more jury members failed to execute.",
+    "checks" : [ ],
+    "metadata" : { }
+  },
+  "individual" : [ {
+    "status" : "pass",
+    "reasoning" : "Unanimous consensus: all 1 applicable judge(s) passed",
+    "checks" : [ ],
+    "metadata" : {
+      "aggregation" : {
+        "strategy" : "consensus",
+        "errorPolicy" : "propagate",
+        "inputCount" : 1,
+        "eligibleCount" : 1,
+        "explicitAbstainCount" : 0,
+        "errorCount" : 0,
+        "ignoredErrorCount" : 0,
+        "errorsTreatedAsAbstainCount" : 0,
+        "errorsTreatedAsFailCount" : 0,
+        "passCount" : 1,
+        "failCount" : 0
+      }
+    }
+  } ],
+  "individualByName" : {
+    "pipeline" : {
+      "status" : "pass",
+      "reasoning" : "Unanimous consensus: all 1 applicable judge(s) passed",
+      "checks" : [ ],
+      "metadata" : {
+        "aggregation" : {
+          "strategy" : "consensus",
+          "errorPolicy" : "propagate",
+          "inputCount" : 1,
+          "eligibleCount" : 1,
+          "explicitAbstainCount" : 0,
+          "errorCount" : 0,
+          "ignoredErrorCount" : 0,
+          "errorsTreatedAsAbstainCount" : 0,
+          "errorsTreatedAsFailCount" : 0,
+          "passCount" : 1,
+          "failCount" : 0
+        }
+      }
+    }
+  },
+  "weights" : { },
+  "compositeAttempts" : [ {
+    "name" : "pipeline",
+    "relation" : "meta_member",
+    "verdict" : {
+      "aggregated" : {
+        "status" : "pass",
+        "reasoning" : "Unanimous consensus: all 1 applicable judge(s) passed",
+        "checks" : [ ],
+        "metadata" : {
+          "aggregation" : {
+            "strategy" : "consensus",
+            "errorPolicy" : "propagate",
+            "inputCount" : 1,
+            "eligibleCount" : 1,
+            "explicitAbstainCount" : 0,
+            "errorCount" : 0,
+            "ignoredErrorCount" : 0,
+            "errorsTreatedAsAbstainCount" : 0,
+            "errorsTreatedAsFailCount" : 0,
+            "passCount" : 1,
+            "failCount" : 0
+          }
+        }
+      },
+      "individual" : [ {
+        "status" : "pass",
+        "reasoning" : "Semantic fallback accepted",
+        "checks" : [ ],
+        "metadata" : { }
+      } ],
+      "individualByName" : {
+        "semantic-check" : {
+          "status" : "pass",
+          "reasoning" : "Semantic fallback accepted",
+          "checks" : [ ],
+          "metadata" : { }
+        }
+      },
+      "weights" : {
+        "0" : 1.0
+      },
+      "compositeAttempts" : [ {
+        "name" : "broken-check",
+        "relation" : "cascade_tier",
+        "policy" : "REJECT_ON_ANY_FAIL",
+        "failure" : {
+          "code" : "jury_execution_failed"
+        }
+      }, {
+        "name" : "semantic-check",
+        "relation" : "cascade_tier",
+        "policy" : "FINAL_TIER",
+        "verdict" : {
+          "aggregated" : {
+            "status" : "pass",
+            "reasoning" : "Unanimous consensus: all 1 applicable judge(s) passed",
+            "checks" : [ ],
+            "metadata" : {
+              "aggregation" : {
+                "strategy" : "consensus",
+                "errorPolicy" : "propagate",
+                "inputCount" : 1,
+                "eligibleCount" : 1,
+                "explicitAbstainCount" : 0,
+                "errorCount" : 0,
+                "ignoredErrorCount" : 0,
+                "errorsTreatedAsAbstainCount" : 0,
+                "errorsTreatedAsFailCount" : 0,
+                "passCount" : 1,
+                "failCount" : 0
+              }
+            }
+          },
+          "individual" : [ {
+            "status" : "pass",
+            "reasoning" : "Semantic fallback accepted",
+            "checks" : [ ],
+            "metadata" : { }
+          } ],
+          "individualByName" : {
+            "semantic-check" : {
+              "status" : "pass",
+              "reasoning" : "Semantic fallback accepted",
+              "checks" : [ ],
+              "metadata" : { }
+            }
+          },
+          "weights" : {
+            "0" : 1.0
+          },
+          "compositeAttempts" : [ ]
+        }
+      } ]
+    }
+  }, {
+    "name" : "audit",
+    "relation" : "meta_member",
+    "failure" : {
+      "code" : "jury_execution_failed"
+    }
+  } ]
+}
