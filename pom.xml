@@ -70,7 +70,7 @@
 
         <!-- File comparison -->
         <javaparser.version>3.26.3</javaparser.version>
-        <maven-model.version>3.9.6</maven-model.version>
+        <maven-model.version>3.9.16</maven-model.version>
 
         <!-- JSON processing -->
         <jackson.version>2.21.6</jackson.version>
