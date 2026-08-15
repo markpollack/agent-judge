@@ -73,7 +73,7 @@
         <maven-model.version>3.9.6</maven-model.version>
 
         <!-- JSON processing -->
-        <jackson.version>2.21.2</jackson.version>
+        <jackson.version>2.21.6</jackson.version>
 
         <!-- Nullness contract (declarations) and its enforcing checker -->
         <jspecify.version>1.0.0</jspecify.version>
