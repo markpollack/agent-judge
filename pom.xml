@@ -59,7 +59,7 @@
         <agent-judge.version>${project.version}</agent-judge.version>
 
         <!-- AgentClient version -->
-        <agent-client.version>0.25.0</agent-client.version>
+        <agent-client.version>0.26.0</agent-client.version>
 
         <!-- Core dependency versions - aligned with Spring AI 2.0 -->
         <agent-sandbox-core.version>0.9.3</agent-sandbox-core.version>
@@ -74,6 +74,7 @@
 
         <!-- JSON processing -->
         <jackson.version>2.21.6</jackson.version>
+        <jackson3.version>3.1.6</jackson3.version>
 
         <!-- Nullness contract (declarations) and its enforcing checker -->
         <jspecify.version>1.0.0</jspecify.version>
@@ -105,11 +106,18 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- Jackson 3 BOM (tools.jackson) to converge transitive jackson-core 3.0.3 -> 3.1.4 (CVE-2026-29062) -->
+            <!--
+                Jackson 3 BOM (tools.jackson). Spring AI 2.0.0 drags in jackson-core 3.0.3
+                (CVE-2026-29062) and jackson-databind 3.1.4; this import converges the reactor on
+                the accepted 3.1.6 floor. Dependency management alone does not reach standalone
+                consumers, because the released flattened child POMs carry no dependencyManagement:
+                agent-judge-llm and agent-judge-rag additionally declare tools.jackson.core:jackson-databind
+                directly so the floor is exported.
+            -->
             <dependency>
                 <groupId>tools.jackson</groupId>
                 <artifactId>jackson-bom</artifactId>
-                <version>3.1.4</version>
+                <version>${jackson3.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -257,39 +265,6 @@
             <url>https://central.sonatype.com/repository/maven-snapshots/</url>
         </snapshotRepository>
     </distributionManagement>
-
-    <repositories>
-        <repository>
-            <id>central-snapshots</id>
-            <name>Maven Central Snapshots</name>
-            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-        </repository>
-        <repository>
-            <id>spring-snapshots</id>
-            <name>Spring Snapshots</name>
-            <url>https://repo.spring.io/snapshot</url>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-        </repository>
-        <repository>
-            <id>spring-milestones</id>
-            <name>Spring Milestones</name>
-            <url>https://repo.spring.io/milestone</url>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </repository>
-    </repositories>
 
     <profiles>
         <!-- OWASP dependency-check: build-time CVE gate (fails on HIGH+). Run: ./mvnw -Powasp verify -->

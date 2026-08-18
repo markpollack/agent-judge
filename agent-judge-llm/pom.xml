@@ -36,6 +36,16 @@
             <artifactId>spring-ai-client-chat</artifactId>
         </dependency>
 
+        <!--
+            Export the accepted Jackson 3 floor. The released flattened POM carries no
+            dependencyManagement, so a standalone consumer would otherwise resolve the
+            jackson-core 3.0.3 / jackson-databind 3.1.4 versions that Spring AI 2.0.0 selects.
+        -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
         <!-- Test dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

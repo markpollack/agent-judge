@@ -112,4 +112,5 @@ Its ten credential-free Maven modules cover core judging, composition, juries, c
 ## License
 
 The current source tree is licensed under the Business Source License 1.1 with the project-specific terms in [LICENSE](LICENSE).
-Previously published Apache-licensed releases retain their original terms; [LICENSE-APACHE.txt](LICENSE-APACHE.txt) is preserved only as that release-history record and is not a second license for the current source tree.
+Releases through 0.9.1, published under the former `org.springaicommunity` coordinates, were licensed under [Apache License 2.0](LICENSE-APACHE.txt); 0.9.2 is the first release under the Business Source License.
+Previously published Apache-licensed releases retain their original terms; `LICENSE-APACHE.txt` is preserved only as that release-history record and is not a second license for the current source tree.
