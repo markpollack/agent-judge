@@ -62,7 +62,7 @@
         <agent-client.version>0.26.0</agent-client.version>
 
         <!-- Core dependency versions - aligned with Spring AI 2.0 -->
-        <agent-sandbox-core.version>0.9.3</agent-sandbox-core.version>
+        <agent-sandbox-core.version>0.10.0</agent-sandbox-core.version>
         <spring-framework.version>7.0.8</spring-framework.version>
         <spring-ai.version>2.0.0</spring-ai.version>
         <spring-boot.version>4.1.0</spring-boot.version>
