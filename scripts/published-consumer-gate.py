@@ -9,6 +9,7 @@ module. It always writes the complete matrix before returning dependency-policy 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -142,7 +143,16 @@ def derive_version(wrapper: Path, repository: Path, local_repo: Path, settings: 
     return candidates[0]
 
 
-def consumer_pom(artifact_id: str, version: str) -> str:
+def consumer_pom(artifact_id: str, version: str, staged_repository: Path | None = None) -> str:
+    repositories = ""
+    if staged_repository is not None:
+        repositories = f"""  <repositories>
+    <repository>
+      <id>staged-release</id>
+      <url>{staged_repository.as_uri()}</url>
+    </repository>
+  </repositories>
+"""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -151,7 +161,7 @@ def consumer_pom(artifact_id: str, version: str) -> str:
   <groupId>io.github.markpollack.diligence.consumer</groupId>
   <artifactId>{artifact_id}-consumer</artifactId>
   <version>1.0.0</version>
-  <dependencies>
+{repositories}  <dependencies>
     <dependency>
       <groupId>{GROUP_ID}</groupId>
       <artifactId>{artifact_id}</artifactId>
@@ -193,21 +203,91 @@ def class_majors(jar: Path) -> list[int]:
 
 
 def selected_dependencies(tree: dict) -> list[dict]:
-    selected: dict[tuple[str, str], dict] = {}
+    selected: dict[tuple[str, str, str, str], dict] = {}
     for node in walk_tree(tree):
         group = node.get("groupId")
         artifact = node.get("artifactId")
         version = node.get("version")
         if not group or not artifact or not version or group == "io.github.markpollack.diligence.consumer":
             continue
-        selected[(group, artifact)] = {
+        dependency_type = node.get("type") or "jar"
+        classifier = node.get("classifier") or ""
+        selected[(group, artifact, dependency_type, classifier)] = {
             "groupId": group,
             "artifactId": artifact,
+            "type": dependency_type,
+            "classifier": classifier,
             "version": version,
             "scope": node.get("scope") or "compile",
-            "optional": node.get("optional") == "true",
+            "optional": node.get("optional") in (True, "true"),
         }
-    return sorted(selected.values(), key=lambda item: (item["groupId"], item["artifactId"]))
+    return sorted(
+        selected.values(),
+        key=lambda item: (item["groupId"], item["artifactId"], item["type"], item["classifier"]),
+    )
+
+
+def coordinate(dependency: dict) -> str:
+    return ":".join(
+        (
+            dependency["groupId"],
+            dependency["artifactId"],
+            dependency.get("type") or "jar",
+            dependency.get("classifier") or "",
+            dependency["version"],
+        )
+    )
+
+
+def purl_coordinate(purl: str) -> str:
+    match = re.fullmatch(r"pkg:maven/([^/]+)/([^@]+)@([^?]+)(?:\?(.*))?", purl)
+    if not match:
+        raise GateError(f"unsupported Maven purl: {purl}")
+    from urllib.parse import parse_qs, unquote
+
+    qualifiers = parse_qs(match.group(4) or "")
+    return ":".join(
+        (
+            unquote(match.group(1)),
+            unquote(match.group(2)),
+            qualifiers.get("type", ["jar"])[0],
+            qualifiers.get("classifier", [""])[0],
+            unquote(match.group(3)),
+        )
+    )
+
+
+def required_sbom_coordinates(sbom_path: Path) -> list[str]:
+    sbom = json.loads(sbom_path.read_text(encoding="utf-8"))
+    components = [sbom["metadata"]["component"]]
+    components.extend(
+        component for component in sbom.get("components", []) if component.get("scope", "required") == "required"
+    )
+    coordinates = []
+    for component in components:
+        purl = component.get("purl")
+        if not purl:
+            raise GateError(f"component has no purl in {sbom_path}: {component.get('bom-ref', component)}")
+        coordinates.append(purl_coordinate(purl))
+    return sorted(set(coordinates))
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def extract_bundle(bundle: Path, destination: Path) -> None:
+    with zipfile.ZipFile(bundle) as archive:
+        root = destination.resolve()
+        for member in archive.infolist():
+            target = (destination / member.filename).resolve()
+            if target != root and root not in target.parents:
+                raise GateError(f"staged bundle has an unsafe path: {member.filename}")
+        archive.extractall(destination)
 
 
 def family(dependencies: list[dict], predicate) -> list[dict]:
@@ -269,11 +349,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, help="Matrix/closure directory (default: target/published-consumer-gate)")
     parser.add_argument("--skip-install", action="store_true", help="Use already installed release-profile artifacts")
+    parser.add_argument("--staged-bundle", type=Path, help="Resolve and compare artifacts from this Central bundle")
+    parser.add_argument("--project-version", help="Exact staged version (required with --staged-bundle)")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if bool(args.staged_bundle) != bool(args.project_version):
+        raise GateError("--staged-bundle and --project-version must be supplied together")
+    if args.staged_bundle and args.skip_install:
+        raise GateError("--skip-install cannot be combined with --staged-bundle")
     repository = Path(__file__).resolve().parent.parent
     wrapper = repository / "mvnw"
     output = (args.output_dir or repository / "target" / "published-consumer-gate").resolve()
@@ -286,21 +372,37 @@ def main() -> int:
         matrix_output.unlink()
     with tempfile.TemporaryDirectory(prefix="agent-judge-consumer-gate-") as scratch_text:
         scratch = Path(scratch_text)
-        local_repo = Path(os.environ.get("MAVEN_REPO_LOCAL", scratch / "m2")).resolve()
+        local_repo = (
+            scratch / "consumer-m2"
+            if args.staged_bundle
+            else Path(os.environ.get("MAVEN_REPO_LOCAL", scratch / "m2"))
+        ).resolve()
         local_repo.mkdir(parents=True, exist_ok=True)
+        staged_repository = None
+        bundle_sha256 = None
+        if args.staged_bundle:
+            bundle = args.staged_bundle.resolve()
+            if not bundle.is_file():
+                raise GateError(f"staged bundle is missing: {bundle}")
+            staged_repository = scratch / "staged-repository"
+            staged_repository.mkdir()
+            extract_bundle(bundle, staged_repository)
+            bundle_sha256 = sha256(bundle)
         settings = scratch / "settings.xml"
         settings.write_text(
             """<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0">
-  <mirrors><mirror><id>central-only</id><url>https://repo.maven.apache.org/maven2</url><mirrorOf>*</mirrorOf></mirror></mirrors>
+  <mirrors><mirror><id>central-only</id><url>https://repo.maven.apache.org/maven2</url><mirrorOf>central</mirrorOf></mirror></mirrors>
 </settings>
 """,
             encoding="utf-8",
         )
-        version = derive_version(wrapper, repository, local_repo, settings, scratch / "derive-version.log")
+        version = args.project_version or derive_version(
+            wrapper, repository, local_repo, settings, scratch / "derive-version.log"
+        )
         all_modules, modules = discover_reactor(repository / "pom.xml")
         internal_artifacts = {module.artifact_id for module in modules}
 
-        if not args.skip_install:
+        if not args.skip_install and not args.staged_bundle:
             install_log = scratch / "release-profile-install.log"
             try:
                 run(
@@ -321,7 +423,7 @@ def main() -> int:
             closure = consumer / "closure"
             closure.mkdir(parents=True)
             pom = consumer / "pom.xml"
-            pom.write_text(consumer_pom(module.artifact_id, version), encoding="utf-8")
+            pom.write_text(consumer_pom(module.artifact_id, version, staged_repository), encoding="utf-8")
             tree_path = consumer / "runtime-tree.json"
             failures: list[str] = []
             try:
@@ -358,11 +460,35 @@ def main() -> int:
                 )
                 tree = json.loads(tree_path.read_text(encoding="utf-8"))
                 dependencies = selected_dependencies(tree)
-                flattened = local_repo / group_path / module.artifact_id / version / f"{module.artifact_id}-{version}.pom"
+                artifact_repository = staged_repository or local_repo
+                artifact_directory = artifact_repository / group_path / module.artifact_id / version
+                flattened = artifact_directory / f"{module.artifact_id}-{version}.pom"
                 if not flattened.is_file():
                     failures.append(f"installed flattened POM missing: {flattened}")
                 else:
                     failures.extend(assess(module.artifact_id, version, flattened, dependencies, internal_artifacts))
+                consumer_coordinates = sorted(coordinate(dependency) for dependency in dependencies)
+                sbom_path = artifact_directory / f"{module.artifact_id}-{version}-cyclonedx.json"
+                if not sbom_path.is_file():
+                    sbom_coordinates = []
+                    sbom_only = []
+                    consumer_only = consumer_coordinates
+                    failures.append(f"staged CycloneDX artifact missing: {sbom_path}")
+                else:
+                    sbom_coordinates = required_sbom_coordinates(sbom_path)
+                    sbom_only = sorted(set(sbom_coordinates) - set(consumer_coordinates))
+                    consumer_only = sorted(set(consumer_coordinates) - set(sbom_coordinates))
+                    if sbom_only or consumer_only:
+                        failures.append(
+                            f"SBOM/consumer coordinate mismatch: {len(sbom_only)} SBOM-only, "
+                            f"{len(consumer_only)} consumer-only"
+                        )
+                if staged_repository is not None:
+                    resolved_pom = local_repo / group_path / module.artifact_id / version / flattened.name
+                    if not resolved_pom.is_file():
+                        failures.append(f"consumer did not cache the staged POM: {resolved_pom}")
+                    elif sha256(resolved_pom) != sha256(flattened):
+                        failures.append("consumer POM differs byte-for-byte from the staged POM")
                 jars = sorted(path.name for path in closure.glob("*.jar"))
                 primary = closure / f"{module.artifact_id}-{version}.jar"
                 majors = class_majors(primary) if primary.is_file() else []
@@ -370,6 +496,7 @@ def main() -> int:
                     failures.append(f"published classes have majors {majors}; expected [{EXPECTED_CLASS_MAJOR}] (Java 21)")
             except (subprocess.CalledProcessError, json.JSONDecodeError, zipfile.BadZipFile) as error:
                 dependencies, jars, majors = [], [], []
+                consumer_coordinates, sbom_coordinates, sbom_only, consumer_only = [], [], [], []
                 failures.append(f"consumer resolution/inspection failed: {error}")
 
             row = {
@@ -379,6 +506,11 @@ def main() -> int:
                 "runtimeJarCount": len(jars),
                 "runtimeJarFiles": jars,
                 "runtimeArtifacts": dependencies,
+                "consumerCoordinates": consumer_coordinates,
+                "sbomRequiredCoordinates": sbom_coordinates,
+                "sbomOnly": sbom_only,
+                "consumerOnly": consumer_only,
+                "coordinateEquality": not sbom_only and not consumer_only,
                 "jackson2": family(dependencies, lambda item: item["groupId"].startswith("com.fasterxml.jackson")),
                 "jackson3": family(dependencies, lambda item: item["groupId"].startswith("tools.jackson")),
                 "networknt": family(
@@ -404,6 +536,9 @@ def main() -> int:
             "projectVersion": version,
             "repository": str(repository),
             "mavenRepository": str(local_repo),
+            "settingsSha256": sha256(settings),
+            "stagedBundle": str(args.staged_bundle.resolve()) if args.staged_bundle else None,
+            "stagedBundleSha256": bundle_sha256,
             "discovery": {
                 "reactorProjectCount": len(all_modules),
                 "publishedRuntimeModuleCount": len(modules),
