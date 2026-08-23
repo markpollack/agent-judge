@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "consumer-rooted-sbom-reroot-falsification-test",
+  "executionHead": "38814a4ccfccc64507e7530be33fd39aaf8a7c15",
+  "stagedSourceCommit": "1ed053aa8612680f292ec6501a2d193aad4338da",
+  "stagedCoordinate": "io.github.markpollack:agent-judge-langchain4j:0.16.0-phase0",
+  "precondition": {
+    "result": "pass",
+    "dependencyCount": 1,
+    "soleDependency": "io.github.markpollack:agent-judge-langchain4j:0.16.0-phase0",
+    "parent": false,
+    "dependencyManagement": false,
+    "importedBom": false,
+    "consumerLocalOverrides": false
+  },
+  "cleanRoom": {
+    "maven": "Apache Maven 3.8.6 (84538c9988a25aec085021c365c560670ad80f63)",
+    "mavenWrapperSha256": "5e53a64422a43077b28e7545942c20de550d6d885ed017a910d5f837a4041700",
+    "jdk": "GraalVM Community OpenJDK 21.0.2",
+    "cycloneDxMavenPlugin": "2.9.3",
+    "dependencyPlugin": "3.8.1",
+    "helpPlugin": "3.5.1",
+    "settingsSha256": "5f4578e9fa3cf36868725a61cd02d99cda128cdf77ca59bae3ad9f75ec10a3a1",
+    "profile": "published-consumer-gate",
+    "freshLocalRepository": "/home/mark/worktrees/agent-judge-release-truth/target/plan-b1/consumer-m2",
+    "scopeFlags": [
+      "-Dscope=runtime",
+      "-DincludeCompileScope=true",
+      "-DincludeRuntimeScope=true",
+      "-DincludeTestScope=false",
+      "-DincludeProvidedScope=false",
+      "-DincludeSystemScope=false"
+    ],
+    "sharedCommandPrefix": "JAVA_HOME=/home/mark/.sdkman/candidates/java/current /home/mark/worktrees/agent-judge-release-truth/mvnw -B -ntp -s /home/mark/worktrees/agent-judge-release-truth/target/plan-b1/settings.xml -Dmaven.repo.local=/home/mark/worktrees/agent-judge-release-truth/target/plan-b1/consumer-m2 -Ppublished-consumer-gate -Dscope=runtime -DincludeCompileScope=true -DincludeRuntimeScope=true -DincludeTestScope=false -DincludeProvidedScope=false -DincludeSystemScope=false",
+    "invocations": [
+      "--version",
+      "-f /home/mark/worktrees/agent-judge-release-truth/target/plan-b1/consumer/pom.xml org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree -DoutputType=json -DoutputFile=/home/mark/worktrees/agent-judge-release-truth/target/plan-b1/evidence/consumer-runtime-tree.json",
+      "-f /home/mark/worktrees/agent-judge-release-truth/target/plan-b1/consumer/pom.xml org.apache.maven.plugins:maven-help-plugin:3.5.1:effective-pom -Doutput=/home/mark/worktrees/agent-judge-release-truth/target/plan-b1/evidence/effective-consumer-pom.xml",
+      "-f /home/mark/worktrees/agent-judge-release-truth/target/plan-b1/consumer/pom.xml org.cyclonedx:cyclonedx-maven-plugin:2.9.3:makeBom -DoutputFormat=json -DoutputName=consumer-rooted-original -DoutputDirectory=/home/mark/worktrees/agent-judge-release-truth/target/plan-b1/evidence"
+    ]
+  },
+  "inventory": {
+    "consumerCoordinateCount": 7,
+    "rerootedSbomRequiredCoordinateCount": 7,
+    "consumerOnly": [],
+    "sbomOnly": [],
+    "jackson": [
+      "com.fasterxml.jackson.core:jackson-annotations:jar::2.21",
+      "com.fasterxml.jackson.core:jackson-core:jar::2.21.6",
+      "com.fasterxml.jackson.core:jackson-databind:jar::2.21.6"
+    ],
+    "providedLangchainComponentPresent": false,
+    "providedLangchainDependencyNodePresent": false,
+    "providedOnlyResiduePresent": false
+  },
+  "rerootAssertions": {
+    "identity": "pass",
+    "graph": "pass",
+    "requiredReachable": true,
+    "expectedDirectCoordinates": [
+      "io.github.markpollack:agent-judge-core:jar::0.16.0-phase0"
+    ],
+    "actualDirectCoordinates": [
+      "io.github.markpollack:agent-judge-core:jar::0.16.0-phase0"
+    ],
+    "syntheticConsumerAbsent": true,
+    "targetIdentityCount": 1,
+    "targetDependencyNodeUnchanged": true,
+    "selfEdgeCount": 0,
+    "unresolvedReferenceCount": 0
+  },
+  "schemaValidation": {
+    "original": "pass",
+    "rerooted": "pass",
+    "schema": "CycloneDX 1.6",
+    "schemaSha256": "3e92dddbc30cf7f6a02b80f0942b1a4cfd4fb1c26f1dfc4310afa9d613cafb93"
+  },
+  "cycloneDxWarnings": [
+    "Unable to create Maven project for io.github.markpollack:agent-judge-langchain4j:jar:0.16.0-phase0 from repository.",
+    "Unable to create Maven project for io.github.markpollack:agent-judge-core:jar:0.16.0-phase0 from repository."
+  ],
+  "hashes": {
+    "stagedBundleSha256": "9c4f30fc562ca012235452ec290a728b836e2844fd2e900aa67a546145d1ea0f",
+    "consumerPomSha256": "da646584c7d3d25290cfbba6ba141b0d00dd0869251f2245be32f77b309a1956",
+    "consumerTreeSha256": "4e9fad195160560cba914a0b6f30e15d4c402a7297c15a1cbb9aaac77f623ca5",
+    "effectiveConsumerPomSha256": "361b009abae610147bcd8e948737dc1127c0d22d62aac931d21d840f01ab65db",
+    "consumerRootedOriginalSha256": "ce020ba12224ddc25e10060e3304d6b1ac4e16360ef4b3a80fce6c8a785120c7",
+    "moduleRerootedSha256": "fc8aab6e712028cda4eb7c66ed6fafdd33aadaf11084cb5659587068fbccb5b2",
+    "transformationRecordSha256": "416530bfc1d3cd4189ff7761934502603dd33f0b358939cd4b34a37b0b3178a8",
+    "rerootScriptSha256": "52012e5cf6ddd954fbf6129f829a7b5b01e17a85c19cef79c797f90178ee5a5c"
+  },
+  "productDependencyChanges": 0,
+  "scaRun": false,
+  "result": "pass"
+}

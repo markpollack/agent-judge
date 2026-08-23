@@ -1,0 +1,11 @@
+{
+  "schema": "CycloneDX 1.6",
+  "schemaSource": "org.cyclonedx:cyclonedx-core-java:9.0.5!/bom-1.6.schema.json",
+  "schemaSha256": "3e92dddbc30cf7f6a02b80f0942b1a4cfd4fb1c26f1dfc4310afa9d613cafb93",
+  "validator": "python-jsonschema 4.10.3 Draft7Validator",
+  "documents": {
+    "consumer-rooted-original.json": [],
+    "module-rerooted.json": []
+  },
+  "result": "pass"
+}

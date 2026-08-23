@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "input": "/home/mark/worktrees/agent-judge-release-truth/target/plan-b1/evidence/consumer-rooted-original.json",
+  "inputSha256": "ce020ba12224ddc25e10060e3304d6b1ac4e16360ef4b3a80fce6c8a785120c7",
+  "output": "/home/mark/worktrees/agent-judge-release-truth/target/plan-b1/evidence/module-rerooted.json",
+  "syntheticConsumer": {
+    "purl": "pkg:maven/io.github.markpollack.diligence.consumer/agent-judge-langchain4j-consumer@1.0.0?type=jar",
+    "bomRef": "pkg:maven/io.github.markpollack.diligence.consumer/agent-judge-langchain4j-consumer@1.0.0?type=jar"
+  },
+  "target": {
+    "purl": "pkg:maven/io.github.markpollack/agent-judge-langchain4j@0.16.0-phase0?type=jar",
+    "bomRef": "pkg:maven/io.github.markpollack/agent-judge-langchain4j@0.16.0-phase0?type=jar"
+  },
+  "operations": [
+    "promoted the existing target component to metadata.component",
+    "removed the target component duplicate from components",
+    "removed the synthetic consumer root and dependency node",
+    "preserved the target dependency node and dependsOn edges byte-for-byte canonically"
+  ],
+  "targetDependencyNodeBeforeSha256": "13165d7f04f606ad84cb2b1a3de229d00761324735321c8336393d7d732a4996",
+  "targetDependencyNodeAfterSha256": "13165d7f04f606ad84cb2b1a3de229d00761324735321c8336393d7d732a4996",
+  "assertions": {
+    "syntheticConsumerAbsent": true,
+    "targetIdentityCount": 1,
+    "targetDependencyNodeUnchanged": true,
+    "selfEdgeCount": 0,
+    "unresolvedReferenceCount": 0
+  },
+  "outputSha256": "fc8aab6e712028cda4eb7c66ed6fafdd33aadaf11084cb5659587068fbccb5b2"
+}

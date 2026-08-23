@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-08-23",
+  "consumerPom": "/home/mark/worktrees/agent-judge-release-truth/target/plan-b1/consumer/pom.xml",
+  "consumerPomSha256": "da646584c7d3d25290cfbba6ba141b0d00dd0869251f2245be32f77b309a1956",
+  "dependencyCount": 1,
+  "expectedDependency": "io.github.markpollack:agent-judge-langchain4j:0.16.0-phase0",
+  "actualDependency": "io.github.markpollack:agent-judge-langchain4j:0.16.0-phase0",
+  "extraDependencyFields": [],
+  "hasParent": false,
+  "hasDependencyManagement": false,
+  "hasImportedBom": false,
+  "hasProperties": false,
+  "hasRepositories": false,
+  "hasProfiles": false,
+  "freshLocalRepository": "/home/mark/worktrees/agent-judge-release-truth/target/plan-b1/consumer-m2",
+  "freshLocalRepositoryWasEmpty": true,
+  "settingsSha256": "5f4578e9fa3cf36868725a61cd02d99cda128cdf77ca59bae3ad9f75ec10a3a1",
+  "stagedBundleSha256": "9c4f30fc562ca012235452ec290a728b836e2844fd2e900aa67a546145d1ea0f",
+  "stagedPomSha256": "2194f4b08861c0189a7b4b71fe5ad07e9bb1d3057219807d8be0f2b347601ed0",
+  "stagedJarSha256": "1068415cc0773c6b7925d23ea79266216874438c810baab079ccaa9c8a213ed1",
+  "result": "pass"
+}
