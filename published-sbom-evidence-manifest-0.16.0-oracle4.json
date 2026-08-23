@@ -1,0 +1,483 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "synthetic-staged-release-oracle",
+  "createdAt": "2026-08-23T15:35:23Z",
+  "release": {
+    "groupId": "io.github.markpollack",
+    "version": "0.16.0-oracle4",
+    "sourceCommit": "9f05ff945c4a26a27b29232f683c45d0336b4b58",
+    "stagedBundleSha256": "3c01026200e3b7775ec114dc41d7be46f27554ac7178769298af0cf6f0f777c0"
+  },
+  "build": {
+    "mavenWrapper": "Apache Maven 3.8.6",
+    "mavenWrapperScriptSha256": "5e53a64422a43077b28e7545942c20de550d6d885ed017a910d5f837a4041700",
+    "jdk": "GraalVM Community OpenJDK 21.0.2+13.1, JVMCI 23.1-b30",
+    "profile": "release",
+    "properties": [
+      "gpg.skip=true",
+      "skipTests=true"
+    ],
+    "settingsSha256": "195bc35a545fd4677fb75e3b0699fe434f4036115755d1ac91971b06e7e375a8",
+    "repository": "fresh worktree-local Maven repository; Maven Central only"
+  },
+  "consumerOracle": {
+    "matrixSha256": "3f6a35df75b3c5d63ad60eec0bc041d39719f1ceb63c62435729facd6c30f0c7",
+    "settingsSha256": "f32888fa36ec31a8dee33dfc35d8a9243d5a090b4bf271fddab2b71932ee848f",
+    "parent": false,
+    "bom": false,
+    "profiles": [],
+    "repository": "fresh temporary Maven repository; staged exact Agent Judge POM plus Maven Central"
+  },
+  "sbom": {
+    "generator": "org.cyclonedx:cyclonedx-maven-plugin:2.9.3",
+    "schema": "CycloneDX 1.6"
+  },
+  "scanner": {
+    "name": "Trivy",
+    "version": "0.70.0",
+    "severities": [
+      "UNKNOWN",
+      "LOW",
+      "MEDIUM",
+      "HIGH",
+      "CRITICAL"
+    ],
+    "frozenDatabase": {
+      "vulnerabilityDbSha256": "2755fd01b5ea63660d993ceb6af50f7045c75cc5d78bb4401599931c3bffc1f3",
+      "vulnerabilityDbUpdatedAt": "2026-08-21T13:05:54.74660547Z",
+      "javaDbSha256": "f499c3d5fcae196a61828c723167f5df45a553600d7dd5357970aa0418bdc43c",
+      "javaDbUpdatedAt": "2026-08-17T01:05:44.801663581Z"
+    },
+    "currentDatabase": {
+      "vulnerabilityDbSha256": "4a4a799e564839e1bff7baebba1cdad79aee5d7e6fb00d95c2200676ccf6d3c8",
+      "vulnerabilityDbUpdatedAt": "2026-08-23T12:55:49.676159552Z"
+    }
+  },
+  "signature": {
+    "status": "UNSIGNED",
+    "normalMechanism": "CI/repository provenance",
+    "reason": "Synthetic local oracle coordinate; release, publication, and CI provenance signing were prohibited"
+  },
+  "modules": [
+    {
+      "artifactId": "agent-judge-agent-client",
+      "gav": "io.github.markpollack:agent-judge-agent-client:0.16.0-oracle4",
+      "purl": "pkg:maven/io.github.markpollack/agent-judge-agent-client@0.16.0-oracle4?type=jar",
+      "sbomSerialNumber": "urn:uuid:a7237f54-6af4-38e7-a47e-7582afd20594",
+      "hashes": {
+        "jarSha256": "559ef6798f85474f65ec64fd4186bd78fdb28b6075ce2fdc1a5aaf1f41a00574",
+        "pomSha256": "ca43b9eb7b374ec7514e6a23c5d0c7862bbac965976a06f38b6a6c04ebb90c22",
+        "sbomSha256": "2247079516604e2a2a8cbffd0cf8efd5ffe4bbd7798e85faee4f6ccf414ebcce",
+        "consumerClosureSha256": "54edba94ecc4354b14dc6bab67c7ea99b77e1eaf344e44c37355e4c364d3adfa",
+        "frozenScanSha256": "4943f0c1750edaec9b59f11025ab56288c299c66d804b45c4dee0e4f474d6016",
+        "currentScanSha256": "ab43427909b0ecb0272977b29745bdb64932547695bc2e2f93b8b07d358fe0a9"
+      },
+      "consumerClosure": {
+        "coordinateCount": 8,
+        "canonicalization": "sorted compact JSON coordinate array plus LF"
+      },
+      "scans": {
+        "frozen": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "current": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "deltaFindingCount": 0
+      },
+      "assertions": {
+        "coordinateEquality": "PASS",
+        "thinJar": "PASS",
+        "sbomQuality": "PASS"
+      }
+    },
+    {
+      "artifactId": "agent-judge-ai-core",
+      "gav": "io.github.markpollack:agent-judge-ai-core:0.16.0-oracle4",
+      "purl": "pkg:maven/io.github.markpollack/agent-judge-ai-core@0.16.0-oracle4?type=jar",
+      "sbomSerialNumber": "urn:uuid:56c3cf92-4a7f-3a8e-a1f8-d5637c56ecff",
+      "hashes": {
+        "jarSha256": "eeb6f290483ee04ff0cf5eda5eb84eea06e54b25f4c0cb834d56ea82e9b30b4d",
+        "pomSha256": "2ecdf8abb4bdb7f8e08bd29156a3b31bce3a5a26ef9191bbb39982c0c7e94a53",
+        "sbomSha256": "e0e1e214ad94f557db470236777f6ffa0a10d6d01947ee81c26989c0e8b3a704",
+        "consumerClosureSha256": "0d682b772259374148b69bbc7617114701bd946d3656c337277a48ccc511cc8f",
+        "frozenScanSha256": "b032d7fc72cae35ad17402ba280cb016714d7f2f00965b918a4c452255337c28",
+        "currentScanSha256": "41f91bdcf6996f5645e0ef645926155304ba34976edba45ad07bb7e7f5c72829"
+      },
+      "consumerClosure": {
+        "coordinateCount": 7,
+        "canonicalization": "sorted compact JSON coordinate array plus LF"
+      },
+      "scans": {
+        "frozen": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "current": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "deltaFindingCount": 0
+      },
+      "assertions": {
+        "coordinateEquality": "PASS",
+        "thinJar": "PASS",
+        "sbomQuality": "PASS"
+      }
+    },
+    {
+      "artifactId": "agent-judge-core",
+      "gav": "io.github.markpollack:agent-judge-core:0.16.0-oracle4",
+      "purl": "pkg:maven/io.github.markpollack/agent-judge-core@0.16.0-oracle4?type=jar",
+      "sbomSerialNumber": "urn:uuid:9cf4e0ad-b2c7-3dd1-aebf-d17338daab92",
+      "hashes": {
+        "jarSha256": "52719cdf696f3da48025d35a4a1b4f90e2435345e89662b806715dd56b4dbb89",
+        "pomSha256": "f0934acd4ef504be69ee25f1259c5209c055f8c632554853307dc9ed55f4a77b",
+        "sbomSha256": "9a133cf72a91355868bcf78a403203da58ec1df5295b14275fdbbde3e80c50c7",
+        "consumerClosureSha256": "82e283e642d2ff54618d7f310f62ad34ce8a4a4cda9d0f0aef3115170fa7ffdd",
+        "frozenScanSha256": "f5c5225b765d5429f8ef5656437cfd79064d5d43dde5915792820642b03b72de",
+        "currentScanSha256": "0d9938eff80c13b2f094312480c1dd831d6f2403bdc99d9011b27d1ed5474aa2"
+      },
+      "consumerClosure": {
+        "coordinateCount": 6,
+        "canonicalization": "sorted compact JSON coordinate array plus LF"
+      },
+      "scans": {
+        "frozen": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "current": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "deltaFindingCount": 0
+      },
+      "assertions": {
+        "coordinateEquality": "PASS",
+        "thinJar": "PASS",
+        "sbomQuality": "PASS"
+      }
+    },
+    {
+      "artifactId": "agent-judge-exec",
+      "gav": "io.github.markpollack:agent-judge-exec:0.16.0-oracle4",
+      "purl": "pkg:maven/io.github.markpollack/agent-judge-exec@0.16.0-oracle4?type=jar",
+      "sbomSerialNumber": "urn:uuid:81ba6474-87e3-3c3a-96bd-30554d89d7c6",
+      "hashes": {
+        "jarSha256": "98b9092eb3cc3537cabade814f5acf6289511934bca315180e0ae9992abcefb7",
+        "pomSha256": "6f36b5487ce54f6378783ede69ded1ead6cb0c9ddc19386e0137dba23ab8e569",
+        "sbomSha256": "3e3b04d487c9e299e96639289139dcfd1e2b08b62675ed9b7053550238b5e7bb",
+        "consumerClosureSha256": "786b011ed8e316f3f15e730201e08bc93bfcc5b05d6d7d86d339b879f2db2fe9",
+        "frozenScanSha256": "8480328457366d3b26c7b024e66874c450d6d99cc1c563922f3eb2bc255e49da",
+        "currentScanSha256": "a94d3ba280c8c33d9ad57ad98305a257b56780818ad05ad8e9640fdfd7dcbc4a"
+      },
+      "consumerClosure": {
+        "coordinateCount": 9,
+        "canonicalization": "sorted compact JSON coordinate array plus LF"
+      },
+      "scans": {
+        "frozen": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "current": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "deltaFindingCount": 0
+      },
+      "assertions": {
+        "coordinateEquality": "PASS",
+        "thinJar": "PASS",
+        "sbomQuality": "PASS"
+      }
+    },
+    {
+      "artifactId": "agent-judge-file",
+      "gav": "io.github.markpollack:agent-judge-file:0.16.0-oracle4",
+      "purl": "pkg:maven/io.github.markpollack/agent-judge-file@0.16.0-oracle4?type=jar",
+      "sbomSerialNumber": "urn:uuid:9ee6d781-e611-3b5b-be6f-99e633eda50f",
+      "hashes": {
+        "jarSha256": "fb0b3a4aa2946e889190535f01253cebf48c521ffd8abedb85b2db036d974dce",
+        "pomSha256": "18f68305b1a5abb115c02f369dbf9ae50348cde857b36a0ccff2670c81111b58",
+        "sbomSha256": "30ff8a224888e9f3a566fafef78a480e765ceaf65d8c5f17f008bbdfee0f1c53",
+        "consumerClosureSha256": "537c03e3bf8bb851e5fc6e40cdac85bc28ccc86f0e13d068c942ee999f652256",
+        "frozenScanSha256": "2aedc973dcc5f3f7d508f67c44ff6f36e5b4424140ffb6dfd430c6f17542ceaf",
+        "currentScanSha256": "1d4c5d4de25608ec81f2c81d34e77d7eede22a8b1ae246ca2faea66a4b8d2499"
+      },
+      "consumerClosure": {
+        "coordinateCount": 10,
+        "canonicalization": "sorted compact JSON coordinate array plus LF"
+      },
+      "scans": {
+        "frozen": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "current": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "deltaFindingCount": 0
+      },
+      "assertions": {
+        "coordinateEquality": "PASS",
+        "thinJar": "PASS",
+        "sbomQuality": "PASS"
+      }
+    },
+    {
+      "artifactId": "agent-judge-koog",
+      "gav": "io.github.markpollack:agent-judge-koog:0.16.0-oracle4",
+      "purl": "pkg:maven/io.github.markpollack/agent-judge-koog@0.16.0-oracle4?type=jar",
+      "sbomSerialNumber": "urn:uuid:4da2f43c-9967-3196-8db8-44d9de6d6858",
+      "hashes": {
+        "jarSha256": "989b556d757fa4d4f3790787ab96686ada806d42b0c6dfc5345e0b6890ed3192",
+        "pomSha256": "8b7423a4af0b771e9beae8b2b73b71e31e103a210cbaca144d286bbfe9611203",
+        "sbomSha256": "462aa2964ab0e0e5f880bba3515daa1c99266a2ee8d615769c107428061c540f",
+        "consumerClosureSha256": "044a97c7bff48edd4efd2fc01373be1f0234d1c4536ecd8590e1b978d7523c56",
+        "frozenScanSha256": "d6633bf5aaf95391baacc31a397dfd6d0f5f13985e23a0a2a80653b84ed87d2d",
+        "currentScanSha256": "78a62191582ded2feba4e4bced6c8eee529187715a7ad41330c56eef762a0e5f"
+      },
+      "consumerClosure": {
+        "coordinateCount": 7,
+        "canonicalization": "sorted compact JSON coordinate array plus LF"
+      },
+      "scans": {
+        "frozen": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "current": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "deltaFindingCount": 0
+      },
+      "assertions": {
+        "coordinateEquality": "PASS",
+        "thinJar": "PASS",
+        "sbomQuality": "PASS"
+      }
+    },
+    {
+      "artifactId": "agent-judge-langchain4j",
+      "gav": "io.github.markpollack:agent-judge-langchain4j:0.16.0-oracle4",
+      "purl": "pkg:maven/io.github.markpollack/agent-judge-langchain4j@0.16.0-oracle4?type=jar",
+      "sbomSerialNumber": "urn:uuid:35a6ac18-0e06-3968-9142-fa2292bbd4c6",
+      "hashes": {
+        "jarSha256": "14a1ad134ffdef49bf6508986539adeada8fecadc3ec65908c3df86bb65b61b1",
+        "pomSha256": "7f7fd22b4828593f3e442fc1a439f8e9f9115aab740188c56f41c45da1bbda61",
+        "sbomSha256": "dc03263728c958cdb1b77cd7835d4dfd51105377155fc2a70f3380d399c849fb",
+        "consumerClosureSha256": "46e396ac144e0e22c1de4dd46819c8d16f878b476e2ec4dd6861c9d6760ff35c",
+        "frozenScanSha256": "d8d4031c39f259f0375d49d21ef2180a33f748dc3cb3a93b3dfb4442bd75a834",
+        "currentScanSha256": "eeaff4bd6e82763777b02fbbd757e9b4f2c66b0a8f8d524032e602287c876b4b"
+      },
+      "consumerClosure": {
+        "coordinateCount": 7,
+        "canonicalization": "sorted compact JSON coordinate array plus LF"
+      },
+      "scans": {
+        "frozen": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "current": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "deltaFindingCount": 0
+      },
+      "assertions": {
+        "coordinateEquality": "PASS",
+        "thinJar": "PASS",
+        "sbomQuality": "PASS"
+      }
+    },
+    {
+      "artifactId": "agent-judge-llm",
+      "gav": "io.github.markpollack:agent-judge-llm:0.16.0-oracle4",
+      "purl": "pkg:maven/io.github.markpollack/agent-judge-llm@0.16.0-oracle4?type=jar",
+      "sbomSerialNumber": "urn:uuid:e2ca3058-b50e-3c38-9653-cb21785d4d4e",
+      "hashes": {
+        "jarSha256": "cb13ad2c6c31102116f00fb90cbaf89aae1f636249fdf7081e215546aa4890c8",
+        "pomSha256": "80076d8042def56ab5ef1054f585c51dfb2ad039b99d6d3a2c973a2da3b96985",
+        "sbomSha256": "ffe035056e7947f0b4720c3bf52d528ca9d037e279e87603b9a85f70d31c3d2c",
+        "consumerClosureSha256": "5cee9b0eace8f4886f1e29b70382165a5b1113083b19a1f51f7f18dfd1d3c95f",
+        "frozenScanSha256": "e8f475de448df53e641d3bca0a56c090d6958c16b7dbf5947121fb6205775e61",
+        "currentScanSha256": "3dd3ce2229ab1fc2f8c520bdac195263395dae0241c9bab6c4cc2dc6ae633245"
+      },
+      "consumerClosure": {
+        "coordinateCount": 41,
+        "canonicalization": "sorted compact JSON coordinate array plus LF"
+      },
+      "scans": {
+        "frozen": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "current": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "deltaFindingCount": 0
+      },
+      "assertions": {
+        "coordinateEquality": "PASS",
+        "thinJar": "PASS",
+        "sbomQuality": "PASS"
+      }
+    },
+    {
+      "artifactId": "agent-judge-rag",
+      "gav": "io.github.markpollack:agent-judge-rag:0.16.0-oracle4",
+      "purl": "pkg:maven/io.github.markpollack/agent-judge-rag@0.16.0-oracle4?type=jar",
+      "sbomSerialNumber": "urn:uuid:7c7e17ca-0c1c-358c-8474-25fc36cda8c2",
+      "hashes": {
+        "jarSha256": "8d9c0c901f16f03b559e9d0529a8830fd7d875f1d487199cc1425aa4ecff96f4",
+        "pomSha256": "c91cecc8370efab1af697d14490a37c40905c8d82d52186bd8e4f3f92a3a4b1f",
+        "sbomSha256": "a7990c4c7a675f2a990b0bdae7982c068e55e59edaa8b90cbb65d0b0fece68a0",
+        "consumerClosureSha256": "63cd775d19536f5eaf7536d354bba734a5e701baae9c6e7f1ecfaf09d264177a",
+        "frozenScanSha256": "3c2e0b778d4f2614e05f65516aac9f40115449452899c15281508ff0644b7092",
+        "currentScanSha256": "6333ed833315aeb375a82b566acba5fe361293e331911f5a509b3fbeab7c7538"
+      },
+      "consumerClosure": {
+        "coordinateCount": 42,
+        "canonicalization": "sorted compact JSON coordinate array plus LF"
+      },
+      "scans": {
+        "frozen": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "current": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "deltaFindingCount": 0
+      },
+      "assertions": {
+        "coordinateEquality": "PASS",
+        "thinJar": "PASS",
+        "sbomQuality": "PASS"
+      }
+    },
+    {
+      "artifactId": "agent-judge-spring-ai",
+      "gav": "io.github.markpollack:agent-judge-spring-ai:0.16.0-oracle4",
+      "purl": "pkg:maven/io.github.markpollack/agent-judge-spring-ai@0.16.0-oracle4?type=jar",
+      "sbomSerialNumber": "urn:uuid:ec6705c0-896c-3788-9b54-ab063edcbe88",
+      "hashes": {
+        "jarSha256": "d50530f08d546ef104d7ef1f6b032fa4bcd7bbe6f82e35452af4199bafa9b4c1",
+        "pomSha256": "8764a2008ce553f04164a98aef07456e9b82d7f7be7b9d21eeebcb0f63b6769d",
+        "sbomSha256": "526bcfb084aca0da2483a002d88becc8f4da296c351846930a4fb62f4a995339",
+        "consumerClosureSha256": "37600f6628183ef425461fc5605482ece4862e5572a69d4402ea6a444b8f46f0",
+        "frozenScanSha256": "bc834bc0dc807e4426bce4664aa8132cc39e29e27c5b821928f012721fcedd00",
+        "currentScanSha256": "b84e3bc01511a0f52cae5aba52e6da73dbf5b9a82ed3f7497623fe3a20441308"
+      },
+      "consumerClosure": {
+        "coordinateCount": 7,
+        "canonicalization": "sorted compact JSON coordinate array plus LF"
+      },
+      "scans": {
+        "frozen": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "current": {
+          "total": 0,
+          "unknown": 0,
+          "low": 0,
+          "medium": 0,
+          "high": 0,
+          "critical": 0
+        },
+        "deltaFindingCount": 0
+      },
+      "assertions": {
+        "coordinateEquality": "PASS",
+        "thinJar": "PASS",
+        "sbomQuality": "PASS"
+      }
+    }
+  ]
+}
