@@ -74,7 +74,7 @@
 
         <!-- JSON processing -->
         <jackson.version>2.21.6</jackson.version>
-        <jackson3.version>3.2.1</jackson3.version>
+        <jackson3.version>3.1.6</jackson3.version>
 
         <!-- Consumer-visible transitive floors exported by the Spring AI-backed modules -->
         <networknt-json-schema-validator.version>3.0.7</networknt-json-schema-validator.version>
@@ -114,11 +114,11 @@
             <!--
                 Jackson 3 BOM (tools.jackson). Spring AI 2.0.0 drags in jackson-core 3.0.3
                 (CVE-2026-29062) and jackson-databind 3.1.4; this import converges the reactor on
-                the accepted 3.2.1 floor required by NetworkNT 3.0.7. Dependency management alone
+                the accepted 3.1.6 floor. Dependency management alone
                 does not reach standalone consumers, because the released flattened child POMs carry
                 no dependencyManagement:
-                agent-judge-llm and agent-judge-rag additionally declare tools.jackson.core:jackson-databind
-                directly so the floor is exported.
+                agent-judge-llm and agent-judge-rag additionally declare Jackson 3 databind and YAML
+                directly so the aligned versions are exported.
             -->
             <dependency>
                 <groupId>tools.jackson</groupId>
