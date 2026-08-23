@@ -75,6 +75,27 @@ public final class JudgeTestFixtures {
 	}
 
 	/**
+	 * Create a judge that throws instead of returning a judgment.
+	 * @param name judge name
+	 * @param failure the exception the judge throws
+	 * @return always-throwing judge
+	 */
+	public static Judge alwaysThrows(String name, RuntimeException failure) {
+		return Judges.named(ctx -> {
+			throw failure;
+		}, name, null, JudgeType.DETERMINISTIC);
+	}
+
+	/**
+	 * Create a judge that violates the contract by returning no judgment at all.
+	 * @param name judge name
+	 * @return judge returning null
+	 */
+	public static Judge returnsNothing(String name) {
+		return Judges.named(ctx -> null, name, null, JudgeType.DETERMINISTIC);
+	}
+
+	/**
 	 * Create a judge that returns a specific score.
 	 * @param name judge name
 	 * @param score numerical score value

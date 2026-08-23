@@ -18,7 +18,10 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
-import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Simple jury implementation with parallel judge execution.
@@ -30,6 +33,19 @@ import java.util.stream.Collectors;
  * </p>
  *
  * <p>
+ * <strong>A judge that fails still votes.</strong> If a judge throws, or returns no
+ * judgment at all, the jury records an {@link io.github.markpollack.judge.result.JudgmentStatus#ERROR}
+ * judgment naming the judge and the cause, and continues. Every configured judge is
+ * therefore represented in the returned {@link Verdict}, and the strategy's
+ * {@link ErrorPolicy} decides what an error means — which is the whole point of having
+ * one. Letting the exception escape instead would discard every other judge's result in
+ * the same jury and, inside a {@link CascadedJury}, collapse the entire tier: a jury would
+ * silently score with fewer judges than it lists, or report nothing where most judges
+ * succeeded. The count that actually voted is recoverable from the
+ * {@link AggregationEvidence} block on the aggregate.
+ * </p>
+ *
+ * <p>
  * Example usage with builder:
  * </p>
  * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
@@ -38,6 +54,8 @@ import java.util.stream.Collectors;
  * @since 0.1.0
  */
 public class SimpleJury implements Jury {
+
+	private static final Logger logger = LoggerFactory.getLogger(SimpleJury.class);
 
 	private final List<Judge> judges;
 
@@ -80,8 +98,8 @@ public class SimpleJury implements Jury {
 
 		if (parallel) {
 			// Parallel execution using CompletableFuture
-			List<CompletableFuture<Judgment>> futures = judges.stream()
-				.map(judge -> CompletableFuture.supplyAsync(() -> judge.judge(context), executor))
+			List<CompletableFuture<Judgment>> futures = IntStream.range(0, judges.size())
+				.mapToObj(index -> CompletableFuture.supplyAsync(() -> invokeJudge(index, context), executor))
 				.toList();
 
 			// Wait for all to complete
@@ -92,7 +110,8 @@ public class SimpleJury implements Jury {
 		}
 		else {
 			// Sequential execution
-			individualJudgments = judges.stream().map(judge -> judge.judge(context)).toList();
+			individualJudgments = IntStream.range(0, judges.size()).mapToObj(index -> invokeJudge(index, context))
+				.toList();
 		}
 
 		// Build identity map (preserves order via LinkedHashMap)
@@ -112,6 +131,43 @@ public class SimpleJury implements Jury {
 			.weights(weights)
 			.compositeAttempts(List.of())
 			.build();
+	}
+
+	/**
+	 * Invoke one judge, converting any failure into an ERROR judgment.
+	 * <p>
+	 * The conversion happens here, inside the task, so the parallel and sequential paths
+	 * share one definition of failure and no {@code CompletionException} unwrapping is
+	 * needed at the join. {@link Error} is deliberately not caught: a
+	 * {@code StackOverflowError} or {@code OutOfMemoryError} is not a judgment this jury
+	 * can report on.
+	 * </p>
+	 * @param index the judge's position in the configured list
+	 * @param context the judgment context
+	 * @return the judge's judgment, or an ERROR judgment naming the judge and the cause
+	 */
+	private Judgment invokeJudge(int index, JudgmentContext context) {
+		Judge judge = judges.get(index);
+		String name = getJudgeName(judge, index);
+		try {
+			Judgment judgment = judge.judge(context);
+			if (judgment == null) {
+				logger.warn("Judge '{}' returned no judgment; recording an ERROR for the error policy to resolve",
+						name);
+				return Judgment.error("Judge '" + name + "' returned no judgment");
+			}
+			return judgment;
+		}
+		catch (Exception ex) {
+			logger.warn("Judge '{}' threw {}; recording an ERROR for the error policy to resolve", name,
+					ex.getClass().getName(), ex);
+			return Judgment.error("Judge '" + name + "' threw " + ex.getClass().getName() + describeCause(ex));
+		}
+	}
+
+	private static String describeCause(Exception ex) {
+		String message = ex.getMessage();
+		return (message == null || message.isBlank()) ? "" : ": " + message;
 	}
 
 	/**

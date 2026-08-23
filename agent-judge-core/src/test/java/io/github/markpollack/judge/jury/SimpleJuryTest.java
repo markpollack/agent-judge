@@ -283,4 +283,112 @@ class SimpleJuryTest {
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
+	// ==================== A failing judge still votes ====================
+	//
+	// Regression guards for the defect where a throwing judge escaped SimpleJury
+	// entirely, bypassing ErrorPolicy and discarding every other judge's result in the
+	// same jury. Before the fix each of these tests failed by propagating the judge's
+	// exception out of vote().
+
+	@Test
+	void throwingJudgeBecomesAnErrorJudgmentTheErrorPolicyResolves() {
+		SimpleJury jury = SimpleJury.builder()
+			.judge(withScore("Scorer", 0.9))
+			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
+			.judge(alwaysPass("Checker"))
+			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.parallel(true)
+			.build();
+
+		Verdict verdict = jury.vote(simpleContext("Test goal"));
+
+		// TREAT_AS_ABSTAIN makes the failed judge a non-vote; the two that worked decide.
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+
+		// Every configured judge is still represented, and the working judges keep their
+		// scores rather than being discarded along with the failure.
+		assertThat(verdict.individual()).hasSize(3);
+		assertThat(verdict.individual().get(0).status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.individual().get(0).score()).isEqualTo(0.9);
+		assertThat(verdict.individual().get(2).status()).isEqualTo(JudgmentStatus.PASS);
+
+		Judgment failed = verdict.individual().get(1);
+		assertThat(failed.status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(failed.reasoning()).contains("Exploder")
+			.contains(IllegalStateException.class.getName())
+			.contains("model timed out");
+		assertThat(verdict.individualByName()).containsKeys("Scorer", "Exploder", "Checker");
+	}
+
+	@Test
+	void throwingJudgeIsContainedInSequentialModeToo() {
+		SimpleJury jury = SimpleJury.builder()
+			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
+			.judge(alwaysPass("Checker"))
+			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.parallel(false)
+			.build();
+
+		Verdict verdict = jury.vote(simpleContext("Test goal"));
+
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.individual()).hasSize(2);
+		assertThat(verdict.individual().get(0).status()).isEqualTo(JudgmentStatus.ERROR);
+	}
+
+	@Test
+	void throwingJudgeUnderPropagateErrorsRatherThanEscaping() {
+		SimpleJury jury = SimpleJury.builder()
+			.judge(alwaysPass("Checker"))
+			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
+			.votingStrategy(new MajorityVotingStrategy())
+			.build();
+
+		Verdict verdict = jury.vote(simpleContext("Test goal"));
+
+		// PROPAGATE is the default, so the aggregate is an ERROR — but it is a verdict
+		// the caller can read, with the working judge's result still attached, not an
+		// exception that destroys the whole jury's output.
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(verdict.individual()).hasSize(2);
+		assertThat(verdict.individual().get(0).status()).isEqualTo(JudgmentStatus.PASS);
+	}
+
+	@Test
+	void judgeReturningNoJudgmentBecomesAnErrorJudgment() {
+		SimpleJury jury = SimpleJury.builder()
+			.judge(returnsNothing("Silent"))
+			.judge(alwaysPass("Checker"))
+			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.build();
+
+		Verdict verdict = jury.vote(simpleContext("Test goal"));
+
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.individual().get(0).status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(verdict.individual().get(0).reasoning()).contains("Silent").contains("returned no judgment");
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	void aggregationEvidenceReportsTheCountThatActuallyVoted() {
+		SimpleJury jury = SimpleJury.builder()
+			.judge(alwaysPass("Checker"))
+			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
+			.judge(alwaysPass("Reviewer"))
+			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.build();
+
+		Verdict verdict = jury.vote(simpleContext("Test goal"));
+
+		// This is what makes silent under-counting impossible to miss: the aggregate
+		// states that three judges were submitted and only two reduced.
+		Object block = verdict.aggregated().metadata().get(Judgment.AGGREGATION_KEY);
+		assertThat(block).isInstanceOf(Map.class);
+		assertThat((Map<String, Object>) block).containsEntry(AggregationEvidence.INPUT_COUNT, 3)
+			.containsEntry(AggregationEvidence.ELIGIBLE_COUNT, 2)
+			.containsEntry(AggregationEvidence.ERROR_COUNT, 1)
+			.containsEntry(AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT, 1);
+	}
+
 }
