@@ -61,8 +61,13 @@ public final class JudgePromptTemplate {
 
 	/**
 	 * Create a template from a classpath resource with default settings.
+	 * <p>
+	 * The resource is read here, on the calling thread, not on the thread that later
+	 * renders the template. See {@link TextSources#classpath(String)} for why.
+	 * </p>
 	 * @param path classpath resource path
 	 * @return a new template
+	 * @throws IllegalArgumentException if the resource cannot be found
 	 */
 	public static JudgePromptTemplate fromClasspath(String path) {
 		return new JudgePromptTemplate(pathToName(path), TextSources.classpath(path),
@@ -71,8 +76,13 @@ public final class JudgePromptTemplate {
 
 	/**
 	 * Create a template from a file with default settings.
+	 * <p>
+	 * The file is read here, freezing the template text at construction. See
+	 * {@link TextSources#file(Path)}.
+	 * </p>
 	 * @param path the file path
 	 * @return a new template
+	 * @throws java.io.UncheckedIOException if the file cannot be read
 	 */
 	public static JudgePromptTemplate fromFile(Path path) {
 		return new JudgePromptTemplate(path.getFileName().toString(), TextSources.file(path),
