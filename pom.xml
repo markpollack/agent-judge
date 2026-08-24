@@ -59,7 +59,7 @@
         <agent-judge.version>${project.version}</agent-judge.version>
 
         <!-- AgentClient version -->
-        <agent-client.version>0.26.0</agent-client.version>
+        <agent-client.version>0.29.0</agent-client.version>
 
         <!-- Core dependency versions - aligned with Spring AI 2.0 -->
         <agent-sandbox-core.version>0.10.0</agent-sandbox-core.version>
