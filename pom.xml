@@ -63,35 +63,35 @@
 
         <!-- Core dependency versions - aligned with Spring AI 2.0 -->
         <agent-sandbox-core.version>0.10.0</agent-sandbox-core.version>
-        <spring-framework.version>7.0.8</spring-framework.version>
-        <spring-ai.version>2.0.0</spring-ai.version>
-        <spring-boot.version>4.1.0</spring-boot.version>
-        <slf4j.version>2.0.9</slf4j.version>
+        <spring-framework.version>7.0.9</spring-framework.version>
+        <spring-ai.version>2.0.1</spring-ai.version>
+        <spring-boot.version>4.1.1</spring-boot.version>
+        <slf4j.version>2.0.18</slf4j.version>
 
         <!-- File comparison -->
-        <javaparser.version>3.26.3</javaparser.version>
+        <javaparser.version>3.28.2</javaparser.version>
         <maven-model.version>3.9.16</maven-model.version>
 
         <!-- JSON processing -->
-        <jackson.version>2.21.6</jackson.version>
-        <jackson3.version>3.1.6</jackson3.version>
+        <jackson.version>2.22.2</jackson.version>
+        <jackson3.version>3.2.2</jackson3.version>
 
         <!-- Nullness contract (declarations) and its enforcing checker -->
-        <jspecify.version>1.0.0</jspecify.version>
+        <jspecify.version>1.0.1</jspecify.version>
         <errorprone.version>2.50.0</errorprone.version>
         <nullaway.version>0.13.8</nullaway.version>
 
         <!-- Test dependency versions -->
-        <junit-jupiter.version>5.10.1</junit-jupiter.version>
-        <mockito.version>5.7.0</mockito.version>
-        <assertj.version>3.24.2</assertj.version>
+        <junit-jupiter.version>5.14.4</junit-jupiter.version>
+        <mockito.version>5.23.0</mockito.version>
+        <assertj.version>3.27.7</assertj.version>
 
         <!-- Plugin versions -->
         <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.6.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
-        <cyclonedx-maven-plugin.version>2.9.2</cyclonedx-maven-plugin.version>
+        <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
         <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
     </properties>
 
