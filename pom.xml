@@ -59,10 +59,10 @@
         <agent-judge.version>${project.version}</agent-judge.version>
 
         <!-- AgentClient version -->
-        <agent-client.version>0.29.0</agent-client.version>
+        <agent-client.version>0.29.3</agent-client.version>
 
         <!-- Core dependency versions - aligned with Spring AI 2.0 -->
-        <agent-sandbox-core.version>0.10.0</agent-sandbox-core.version>
+        <agent-sandbox-core.version>0.10.2</agent-sandbox-core.version>
         <spring-framework.version>7.0.9</spring-framework.version>
         <spring-ai.version>2.0.1</spring-ai.version>
         <spring-boot.version>4.1.1</spring-boot.version>
@@ -91,7 +91,6 @@
         <maven-javadoc-plugin.version>3.6.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
-        <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
         <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
     </properties>
 
@@ -467,39 +466,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-            </plugin>
-
-            <!-- One consumer-scoped CycloneDX 1.6 JSON attachment per artifact. -->
-            <plugin>
-                <groupId>org.cyclonedx</groupId>
-                <artifactId>cyclonedx-maven-plugin</artifactId>
-                <version>${cyclonedx-maven-plugin.version}</version>
-                <configuration>
-                    <projectType>library</projectType>
-                    <schemaVersion>1.6</schemaVersion>
-                    <includeBomSerialNumber>true</includeBomSerialNumber>
-                    <includeCompileScope>true</includeCompileScope>
-                    <includeProvidedScope>false</includeProvidedScope>
-                    <includeRuntimeScope>true</includeRuntimeScope>
-                    <includeSystemScope>false</includeSystemScope>
-                    <includeTestScope>false</includeTestScope>
-                    <includeLicenseText>false</includeLicenseText>
-                    <outputReactorProjects>false</outputReactorProjects>
-                    <!-- Central Publishing replaces Maven's standard deploy path. -->
-                    <skipNotDeployed>false</skipNotDeployed>
-                    <outputFormat>json</outputFormat>
-                    <outputName>${project.artifactId}-${project.version}-cyclonedx</outputName>
-                    <classifier>cyclonedx</classifier>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>consumer-cyclonedx-sbom</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>makeBom</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
 
             <!-- Keep root LICENSE authoritative while including it in binary/source artifacts. -->
