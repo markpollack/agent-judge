@@ -577,4 +577,30 @@ class CascadedJuryTest {
 
 	}
 
+	// ==================== A failing judge does not collapse its tier ====================
+
+	@Test
+	void throwingJudgeDoesNotCollapseItsCascadeTier() {
+		// Before the fix, the judge's exception escaped SimpleJury and CascadedJury
+		// recorded the whole tier as JURY_EXECUTION_FAILED — every other judge in the
+		// tier lost, and the item scored as though the subject had produced nothing.
+		Jury scoring = SimpleJury.builder()
+			.judge(alwaysPass("Build"))
+			.judge(alwaysThrows("Coverage", new IllegalStateException("rate limited")))
+			.judge(alwaysPass("Style"))
+			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.build();
+
+		CascadedJury jury = CascadedJury.builder().tier("scoring", scoring, TierPolicy.FINAL_TIER).build();
+
+		Verdict verdict = jury.vote(context);
+
+		assertThat(verdict.compositeAttempts()).hasSize(1);
+		CompositeAttempt attempt = verdict.compositeAttempts().get(0);
+		assertThat(attempt.failure()).isNull();
+		assertThat(attempt.verdict()).isNotNull();
+		assertThat(verdict.individual()).hasSize(3);
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+	}
+
 }
