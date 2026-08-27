@@ -1,13 +1,36 @@
 # Agent Judge 0.15.2
 
-Correctness release. **If you have collected scores with 0.15.0 or 0.15.1, read this.**
+> ## ⚠️ Correction, 2026-08-27 — the affected range is wider than this note originally said
+>
+> This note originally scoped the defect to **0.15.0 and 0.15.1**. That was wrong. The affected code
+> is **byte-identical in every release from 0.11.0 through 0.15.1** — verified by blob hash on
+> `TextSources.java`:
+>
+> ```
+> v0.11.0  0f7e3b4c38c4      v0.14.0  0f7e3b4c38c4
+> v0.12.0  0f7e3b4c38c4      v0.15.0  0f7e3b4c38c4
+> v0.13.0  0f7e3b4c38c4      v0.15.1  0f7e3b4c38c4
+>                            v0.15.2  7f1e4329e259   <- the fix
+> ```
+>
+> All six affected versions are published on Maven Central. The uncontained-throw path in
+> `SimpleJury` is older still, present from **0.9.2**.
+>
+> **If you followed the original guidance you re-checked two releases and left four in place.**
+> If you have collected scores with a parallel jury on **any release from 0.11.0 through 0.15.1**,
+> treat them as suspect. Upgrade to **0.15.2 or later**.
+>
+> The description of the defect below is accurate; only the version range was understated.
+
+Correctness release. **If you have collected scores with any release from 0.11.0 through 0.15.1,
+read this.**
 
 ## A jury could silently score with fewer judges than it listed
 
-In 0.15.0 and 0.15.1 a jury could drop a judge from the vote and still return a verdict. The
+In every release from 0.11.0 through 0.15.1 a jury could drop a judge from the vote and still return a verdict. The
 verdict did not fail, did not warn, and still named every configured judge — but the aggregate was
-computed from the judges that survived. **Any score produced by a parallel jury on 0.15.0 or 0.15.1
-may have been computed from fewer judges than it reports.** Treat those scores as suspect and
+computed from the judges that survived. **Any score produced by a parallel jury on any release from
+0.11.0 through 0.15.1 may have been computed from fewer judges than it reports.** Treat those scores as suspect and
 re-run anything you are relying on.
 
 Two independent defects combined to produce it.
