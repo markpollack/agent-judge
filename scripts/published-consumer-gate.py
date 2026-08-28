@@ -3,7 +3,8 @@
 
 The gate installs release-profile artifacts into an isolated Maven repository, discovers
 publishable JAR modules from the reactor, and resolves one fresh no-parent/no-BOM consumer per
-module. It always writes the complete matrix before returning dependency-policy failures.
+module. It generates each SBOM from the exact staged POM in that same clean room and validates
+the generated inventory and graph against the independent consumer resolution.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import struct
 import subprocess
@@ -27,10 +29,20 @@ from typing import Iterable
 
 GROUP_ID = "io.github.markpollack"
 DEPENDENCY_PLUGIN = "3.8.1"
+HELP_PLUGIN = "3.5.1"
+CYCLONEDX_PLUGIN = "2.9.3"
+CLEAN_ROOM_PROFILE = "published-consumer-gate"
+CLEAN_ROOM_SCOPE_FLAGS = (
+    "-Dscope=runtime",
+    "-DincludeCompileScope=true",
+    "-DincludeRuntimeScope=true",
+    "-DincludeTestScope=false",
+    "-DincludeProvidedScope=false",
+    "-DincludeSystemScope=false",
+)
 JACKSON2_FLOOR = "2.21.6"
 JACKSON2_ANNOTATIONS_LINE = "2.21"
 JACKSON3_FLOOR = "3.1.6"
-NETWORKNT_FLOOR = "3.0.7"
 EXPECTED_CLASS_MAJOR = 65
 
 
@@ -124,6 +136,61 @@ def maven(wrapper: Path, local_repo: Path, settings: Path, *arguments: str) -> l
         f"-Dmaven.repo.local={local_repo}",
         *arguments,
     ]
+
+
+def clean_room_maven(wrapper: Path, local_repo: Path, settings: Path, *arguments: str) -> list[str]:
+    return maven(
+        wrapper,
+        local_repo,
+        settings,
+        "-ntp",
+        f"-P{CLEAN_ROOM_PROFILE}",
+        *CLEAN_ROOM_SCOPE_FLAGS,
+        *arguments,
+    )
+
+
+def settings_xml(staged_repository: Path | None) -> str:
+    staged = ""
+    if staged_repository is not None:
+        staged = f"""        <repository>
+          <id>staged-release</id>
+          <url>{staged_repository.resolve().as_uri()}</url>
+          <releases><enabled>true</enabled></releases>
+          <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+"""
+    return f"""<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0">
+  <mirrors>
+    <mirror>
+      <id>central-only</id>
+      <url>https://repo.maven.apache.org/maven2</url>
+      <mirrorOf>central</mirrorOf>
+    </mirror>
+  </mirrors>
+  <profiles>
+    <profile>
+      <id>{CLEAN_ROOM_PROFILE}</id>
+      <repositories>
+{staged}        <repository>
+          <id>central</id>
+          <url>https://repo.maven.apache.org/maven2</url>
+          <releases><enabled>true</enabled></releases>
+          <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>central</id>
+          <url>https://repo.maven.apache.org/maven2</url>
+          <releases><enabled>true</enabled></releases>
+          <snapshots><enabled>false</enabled></snapshots>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+</settings>
+"""
 
 
 def derive_version(wrapper: Path, repository: Path, local_repo: Path, settings: Path, log: Path) -> str:
@@ -272,6 +339,208 @@ def required_sbom_coordinates(sbom_path: Path) -> list[str]:
     return sorted(set(coordinates))
 
 
+def published_direct_coordinates(pom: Path) -> list[str]:
+    model = ET.parse(pom).getroot()
+    coordinates: list[str] = []
+    for dependencies in direct_children(model, "dependencies"):
+        for dependency in dependencies:
+            if local_name(dependency.tag) != "dependency":
+                continue
+            scope = child_text(dependency, "scope") or "compile"
+            optional = (child_text(dependency, "optional") or "false").lower() == "true"
+            if scope not in {"compile", "runtime"} or optional:
+                continue
+            group = child_text(dependency, "groupId")
+            artifact = child_text(dependency, "artifactId")
+            version = child_text(dependency, "version")
+            if not group or not artifact or not version:
+                raise GateError(f"consumer-facing dependency has incomplete coordinates in {pom}")
+            coordinates.append(
+                ":".join(
+                    (
+                        group,
+                        artifact,
+                        child_text(dependency, "type") or "jar",
+                        child_text(dependency, "classifier") or "",
+                        version,
+                    )
+                )
+            )
+    return sorted(set(coordinates))
+
+
+def validate_generated_sbom(
+    sbom_path: Path,
+    artifact_id: str,
+    version: str,
+    staged_pom: Path,
+) -> tuple[list[str], dict, dict, list[str]]:
+    sbom = json.loads(sbom_path.read_text(encoding="utf-8"))
+    if not isinstance(sbom, dict):
+        raise GateError(f"generated CycloneDX document is not an object: {sbom_path}")
+    metadata = sbom.get("metadata")
+    if not isinstance(metadata, dict) or not isinstance(metadata.get("component"), dict):
+        raise GateError("generated CycloneDX document has no metadata.component object")
+    root = metadata["component"]
+    components = sbom.get("components", [])
+    dependencies = sbom.get("dependencies")
+    if not isinstance(components, list) or not all(isinstance(component, dict) for component in components):
+        raise GateError("generated CycloneDX components is not an array of objects")
+    if not isinstance(dependencies, list) or not all(isinstance(entry, dict) for entry in dependencies):
+        raise GateError("generated CycloneDX dependencies is not an array of objects")
+
+    failures: list[str] = []
+    expected_coordinate = f"{GROUP_ID}:{artifact_id}:jar::{version}"
+    root_purl = root.get("purl")
+    root_ref = root.get("bom-ref")
+    try:
+        root_coordinate = purl_coordinate(root_purl) if isinstance(root_purl, str) else None
+    except GateError as error:
+        root_coordinate = None
+        failures.append(f"SBOM root has malformed purl: {error}")
+    identity = {
+        "expectedCoordinate": expected_coordinate,
+        "actualCoordinate": root_coordinate,
+        "group": root.get("group"),
+        "name": root.get("name"),
+        "version": root.get("version"),
+        "purl": root_purl,
+        "bomRef": root_ref,
+    }
+    if root.get("group") != GROUP_ID or root.get("name") != artifact_id or root.get("version") != version:
+        failures.append(
+            "SBOM metadata.component identity mismatch: "
+            f"expected {GROUP_ID}:{artifact_id}:{version}, "
+            f"got {root.get('group')}:{root.get('name')}:{root.get('version')}"
+        )
+    if root_coordinate != expected_coordinate:
+        failures.append(f"SBOM metadata.component purl mismatch: expected {expected_coordinate}, got {root_coordinate}")
+    if not isinstance(root_ref, str) or not root_ref:
+        failures.append("SBOM metadata.component has no bom-ref")
+
+    component_by_ref: dict[str, dict] = {}
+    required_refs: set[str] = set()
+    required_coordinates: list[str] = []
+    malformed_graph = False
+    for index, component in enumerate([root, *components]):
+        label = "metadata.component" if index == 0 else f"components[{index - 1}]"
+        component_ref = component.get("bom-ref")
+        if not isinstance(component_ref, str) or not component_ref:
+            failures.append(f"{label} has no bom-ref")
+            malformed_graph = True
+            continue
+        if component_ref in component_by_ref:
+            failures.append(f"duplicate CycloneDX component bom-ref: {component_ref}")
+            malformed_graph = True
+            continue
+        component_by_ref[component_ref] = component
+        purl = component.get("purl")
+        if not isinstance(purl, str) or not purl:
+            failures.append(f"{label} has no purl: {component_ref}")
+            malformed_graph = True
+            continue
+        try:
+            component_coordinate = purl_coordinate(purl)
+        except GateError as error:
+            failures.append(f"{label} has malformed purl: {error}")
+            malformed_graph = True
+            continue
+        if index == 0 or component.get("scope", "required") == "required":
+            required_refs.add(component_ref)
+            required_coordinates.append(component_coordinate)
+    duplicate_coordinates = sorted(
+        coordinate_value
+        for coordinate_value in set(required_coordinates)
+        if required_coordinates.count(coordinate_value) > 1
+    )
+    if duplicate_coordinates:
+        failures.append(f"duplicate required CycloneDX coordinates: {duplicate_coordinates}")
+        malformed_graph = True
+
+    graph_by_ref: dict[str, list[str]] = {}
+    for index, entry in enumerate(dependencies):
+        entry_ref = entry.get("ref")
+        depends_on = entry.get("dependsOn")
+        if not isinstance(entry_ref, str) or not entry_ref:
+            failures.append(f"dependencies[{index}] has no ref")
+            malformed_graph = True
+            continue
+        if entry_ref in graph_by_ref:
+            failures.append(f"duplicate CycloneDX dependency ref: {entry_ref}")
+            malformed_graph = True
+            continue
+        if not isinstance(depends_on, list) or not all(isinstance(target, str) for target in depends_on):
+            failures.append(f"dependency entry {entry_ref} has malformed dependsOn")
+            malformed_graph = True
+            continue
+        if len(depends_on) != len(set(depends_on)):
+            failures.append(f"dependency entry {entry_ref} has duplicate dependsOn refs")
+            malformed_graph = True
+        graph_by_ref[entry_ref] = depends_on
+        if entry_ref not in component_by_ref:
+            failures.append(f"dependency graph ref has no component: {entry_ref}")
+            malformed_graph = True
+        for target in depends_on:
+            if target not in component_by_ref:
+                failures.append(f"dependency graph target has no component: {target}")
+                malformed_graph = True
+    missing_graph_entries = sorted(set(component_by_ref) - set(graph_by_ref))
+    if missing_graph_entries:
+        failures.append(f"CycloneDX components have no dependency graph entry: {missing_graph_entries}")
+        malformed_graph = True
+
+    root_targets = graph_by_ref.get(root_ref, []) if isinstance(root_ref, str) else []
+    actual_direct_coordinates: list[str] = []
+    for target in root_targets:
+        component = component_by_ref.get(target)
+        if component and isinstance(component.get("purl"), str):
+            try:
+                actual_direct_coordinates.append(purl_coordinate(component["purl"]))
+            except GateError:
+                pass
+    actual_direct_coordinates = sorted(set(actual_direct_coordinates))
+    expected_direct_coordinates = published_direct_coordinates(staged_pom)
+    if actual_direct_coordinates != expected_direct_coordinates:
+        failures.append(
+            "SBOM root dependency mismatch: "
+            f"expected {expected_direct_coordinates}, got {actual_direct_coordinates}"
+        )
+        malformed_graph = True
+
+    reachable: set[str] = set()
+    pending = [root_ref] if isinstance(root_ref, str) and root_ref else []
+    while pending:
+        current = pending.pop()
+        if current in reachable:
+            continue
+        reachable.add(current)
+        pending.extend(graph_by_ref.get(current, []))
+    unreachable_required = sorted(required_refs - reachable)
+    if unreachable_required:
+        failures.append(f"required CycloneDX components are not reachable from the root: {unreachable_required}")
+        malformed_graph = True
+
+    identity["result"] = (
+        "pass"
+        if root.get("group") == GROUP_ID
+        and root.get("name") == artifact_id
+        and root.get("version") == version
+        and root_coordinate == expected_coordinate
+        and isinstance(root_ref, str)
+        and bool(root_ref)
+        else "fail"
+    )
+    graph = {
+        "result": "fail" if malformed_graph else "pass",
+        "componentRefCount": len(component_by_ref),
+        "dependencyEntryCount": len(graph_by_ref),
+        "requiredReachable": not unreachable_required,
+        "expectedDirectCoordinates": expected_direct_coordinates,
+        "actualDirectCoordinates": actual_direct_coordinates,
+    }
+    return sorted(set(required_coordinates)), identity, graph, failures
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -332,12 +601,6 @@ def assess(
                     failures.append(f"Jackson 2 floor violation: {coordinate} < {JACKSON2_FLOOR}")
             elif group.startswith("tools.jackson") and not version_at_least(actual, JACKSON3_FLOOR):
                 failures.append(f"Jackson 3 floor violation: {coordinate} < {JACKSON3_FLOOR}")
-            elif (
-                group == "com.networknt"
-                and name == "json-schema-validator"
-                and not version_at_least(actual, NETWORKNT_FLOOR)
-            ):
-                failures.append(f"NetworkNT floor violation: {coordinate} < {NETWORKNT_FLOOR}")
         except ValueError:
             failures.append(f"cannot compare required dependency version: {coordinate}")
     if not any(item["groupId"] == GROUP_ID and item["artifactId"] == artifact_id for item in dependencies):
@@ -389,13 +652,7 @@ def main() -> int:
             extract_bundle(bundle, staged_repository)
             bundle_sha256 = sha256(bundle)
         settings = scratch / "settings.xml"
-        settings.write_text(
-            """<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0">
-  <mirrors><mirror><id>central-only</id><url>https://repo.maven.apache.org/maven2</url><mirrorOf>central</mirrorOf></mirror></mirrors>
-</settings>
-""",
-            encoding="utf-8",
-        )
+        settings.write_text(settings_xml(staged_repository), encoding="utf-8")
         version = args.project_version or derive_version(
             wrapper, repository, local_repo, settings, scratch / "derive-version.log"
         )
@@ -417,6 +674,10 @@ def main() -> int:
         rows: list[dict] = []
         all_failures: list[str] = []
         group_path = GROUP_ID.replace(".", "/")
+        stopped_early = False
+        stop_module = None
+        toolchain_command = clean_room_maven(wrapper, local_repo, settings, "--version")
+        toolchain_output = run(toolchain_command, output, output / "toolchain.log", capture=True)
 
         for module in modules:
             consumer = output / "consumers" / module.artifact_id
@@ -426,78 +687,160 @@ def main() -> int:
             pom.write_text(consumer_pom(module.artifact_id, version, staged_repository), encoding="utf-8")
             tree_path = consumer / "runtime-tree.json"
             failures: list[str] = []
+            dependencies: list[dict] = []
+            jars: list[str] = []
+            majors: list[int] = []
+            consumer_coordinates: list[str] = []
+            sbom_coordinates: list[str] = []
+            sbom_only: list[str] = []
+            consumer_only: list[str] = []
+            sbom_identity: dict = {}
+            sbom_graph: dict = {}
+            cyclonedx_warnings: list[str] = []
+            generated_sbom_sha256 = None
+            effective_pom_path = None
+            certification_failure = False
+            commands: dict[str, str] = {}
+            artifact_repository = staged_repository or local_repo
+            artifact_directory = artifact_repository / group_path / module.artifact_id / version
+            flattened = artifact_directory / f"{module.artifact_id}-{version}.pom"
+
+            tree_command = clean_room_maven(
+                wrapper,
+                local_repo,
+                settings,
+                "-q",
+                "-f",
+                str(pom),
+                f"org.apache.maven.plugins:maven-dependency-plugin:{DEPENDENCY_PLUGIN}:tree",
+                "-DoutputType=json",
+                f"-DoutputFile={tree_path}",
+            )
+            copy_command = clean_room_maven(
+                wrapper,
+                local_repo,
+                settings,
+                "-q",
+                "-f",
+                str(pom),
+                f"org.apache.maven.plugins:maven-dependency-plugin:{DEPENDENCY_PLUGIN}:copy-dependencies",
+                "-DincludeScope=runtime",
+                f"-DoutputDirectory={closure}",
+            )
+            commands["consumerTree"] = shlex.join(tree_command)
+            commands["consumerCopy"] = shlex.join(copy_command)
             try:
-                run(
-                    maven(
-                        wrapper,
-                        local_repo,
-                        settings,
-                        "-q",
-                        "-f",
-                        str(pom),
-                        f"org.apache.maven.plugins:maven-dependency-plugin:{DEPENDENCY_PLUGIN}:tree",
-                        "-Dscope=runtime",
-                        "-DoutputType=json",
-                        f"-DoutputFile={tree_path}",
-                    ),
-                    repository,
-                    consumer / "tree.log",
-                )
-                run(
-                    maven(
-                        wrapper,
-                        local_repo,
-                        settings,
-                        "-q",
-                        "-f",
-                        str(pom),
-                        f"org.apache.maven.plugins:maven-dependency-plugin:{DEPENDENCY_PLUGIN}:copy-dependencies",
-                        "-DincludeScope=runtime",
-                        f"-DoutputDirectory={closure}",
-                    ),
-                    repository,
-                    consumer / "copy.log",
-                )
+                run(tree_command, consumer, consumer / "tree.log")
+                run(copy_command, consumer, consumer / "copy.log")
                 tree = json.loads(tree_path.read_text(encoding="utf-8"))
                 dependencies = selected_dependencies(tree)
-                artifact_repository = staged_repository or local_repo
-                artifact_directory = artifact_repository / group_path / module.artifact_id / version
-                flattened = artifact_directory / f"{module.artifact_id}-{version}.pom"
-                if not flattened.is_file():
-                    failures.append(f"installed flattened POM missing: {flattened}")
-                else:
-                    failures.extend(assess(module.artifact_id, version, flattened, dependencies, internal_artifacts))
                 consumer_coordinates = sorted(coordinate(dependency) for dependency in dependencies)
-                sbom_path = artifact_directory / f"{module.artifact_id}-{version}-cyclonedx.json"
-                if not sbom_path.is_file():
-                    sbom_coordinates = []
-                    sbom_only = []
-                    consumer_only = consumer_coordinates
-                    failures.append(f"staged CycloneDX artifact missing: {sbom_path}")
-                else:
-                    sbom_coordinates = required_sbom_coordinates(sbom_path)
-                    sbom_only = sorted(set(sbom_coordinates) - set(consumer_coordinates))
-                    consumer_only = sorted(set(consumer_coordinates) - set(sbom_coordinates))
-                    if sbom_only or consumer_only:
-                        failures.append(
-                            f"SBOM/consumer coordinate mismatch: {len(sbom_only)} SBOM-only, "
-                            f"{len(consumer_only)} consumer-only"
-                        )
+            except (subprocess.CalledProcessError, json.JSONDecodeError, OSError) as error:
+                failures.append(f"clean-room consumer resolution failed: {error}")
+                certification_failure = True
+
+            if not flattened.is_file():
+                failures.append(f"installed flattened POM missing: {flattened}")
+                certification_failure = True
+            elif not certification_failure:
+                failures.extend(assess(module.artifact_id, version, flattened, dependencies, internal_artifacts))
                 if staged_repository is not None:
                     resolved_pom = local_repo / group_path / module.artifact_id / version / flattened.name
                     if not resolved_pom.is_file():
                         failures.append(f"consumer did not cache the staged POM: {resolved_pom}")
+                        certification_failure = True
                     elif sha256(resolved_pom) != sha256(flattened):
                         failures.append("consumer POM differs byte-for-byte from the staged POM")
+                        certification_failure = True
+
+            if not certification_failure:
                 jars = sorted(path.name for path in closure.glob("*.jar"))
                 primary = closure / f"{module.artifact_id}-{version}.jar"
-                majors = class_majors(primary) if primary.is_file() else []
+                try:
+                    majors = class_majors(primary) if primary.is_file() else []
+                except zipfile.BadZipFile as error:
+                    failures.append(f"published JAR inspection failed: {error}")
                 if majors and majors != [EXPECTED_CLASS_MAJOR]:
-                    failures.append(f"published classes have majors {majors}; expected [{EXPECTED_CLASS_MAJOR}] (Java 21)")
-            except (subprocess.CalledProcessError, json.JSONDecodeError, zipfile.BadZipFile) as error:
-                dependencies, jars, majors = [], [], []
-                consumer_coordinates, sbom_coordinates, sbom_only, consumer_only = [], [], [], []
-                failures.append(f"consumer resolution/inspection failed: {error}")
+                    failures.append(
+                        f"published classes have majors {majors}; expected [{EXPECTED_CLASS_MAJOR}] (Java 21)"
+                    )
+
+            sbom_path = consumer / "generated-sbom" / f"{module.artifact_id}-{version}-clean-room.json"
+            if not certification_failure:
+                sbom_path.parent.mkdir()
+                make_bom_command = clean_room_maven(
+                    wrapper,
+                    local_repo,
+                    settings,
+                    "-q",
+                    "-f",
+                    str(flattened),
+                    f"org.cyclonedx:cyclonedx-maven-plugin:{CYCLONEDX_PLUGIN}:makeBom",
+                    "-DoutputFormat=json",
+                    f"-DoutputName={sbom_path.stem}",
+                    f"-DoutputDirectory={sbom_path.parent}",
+                )
+                commands["makeBom"] = shlex.join(make_bom_command)
+                try:
+                    make_bom_output = run(
+                        make_bom_command,
+                        consumer,
+                        consumer / "make-bom.log",
+                        capture=True,
+                    )
+                    cyclonedx_warnings = [
+                        line.strip()
+                        for line in make_bom_output.splitlines()
+                        if "Unable to create Maven project for" in line
+                    ]
+                except subprocess.CalledProcessError as error:
+                    failures.append(f"clean-room CycloneDX generation failed: {error}")
+                    certification_failure = True
+                if not certification_failure and not sbom_path.is_file():
+                    failures.append(f"clean-room CycloneDX generation produced no SBOM: {sbom_path}")
+                    certification_failure = True
+                if not certification_failure:
+                    try:
+                        sbom_coordinates, sbom_identity, sbom_graph, validation_failures = validate_generated_sbom(
+                            sbom_path,
+                            module.artifact_id,
+                            version,
+                            flattened,
+                        )
+                    except (GateError, json.JSONDecodeError, OSError, ET.ParseError) as error:
+                        failures.append(f"clean-room CycloneDX validation failed: {error}")
+                        certification_failure = True
+                    else:
+                        generated_sbom_sha256 = sha256(sbom_path)
+                        failures.extend(validation_failures)
+                        if validation_failures:
+                            certification_failure = True
+                        sbom_only = sorted(set(sbom_coordinates) - set(consumer_coordinates))
+                        consumer_only = sorted(set(consumer_coordinates) - set(sbom_coordinates))
+                        if sbom_only or consumer_only:
+                            failures.append(
+                                f"SBOM/consumer coordinate mismatch: {len(sbom_only)} SBOM-only, "
+                                f"{len(consumer_only)} consumer-only"
+                            )
+                            certification_failure = True
+
+            if certification_failure and flattened.is_file():
+                effective_pom_path = consumer / "effective-staged-pom.xml"
+                effective_pom_command = clean_room_maven(
+                    wrapper,
+                    local_repo,
+                    settings,
+                    "-q",
+                    "-f",
+                    str(flattened),
+                    f"org.apache.maven.plugins:maven-help-plugin:{HELP_PLUGIN}:effective-pom",
+                    f"-Doutput={effective_pom_path}",
+                )
+                commands["effectivePomOnFailure"] = shlex.join(effective_pom_command)
+                try:
+                    run(effective_pom_command, consumer, consumer / "effective-pom.log")
+                except subprocess.CalledProcessError as error:
+                    failures.append(f"effective staged POM capture failed: {error}")
 
             row = {
                 "module": module.artifact_id,
@@ -507,10 +850,17 @@ def main() -> int:
                 "runtimeJarFiles": jars,
                 "runtimeArtifacts": dependencies,
                 "consumerCoordinates": consumer_coordinates,
+                "generatedSbom": str(sbom_path),
+                "generatedSbomSha256": generated_sbom_sha256,
                 "sbomRequiredCoordinates": sbom_coordinates,
                 "sbomOnly": sbom_only,
                 "consumerOnly": consumer_only,
-                "coordinateEquality": not sbom_only and not consumer_only,
+                "coordinateEquality": generated_sbom_sha256 is not None and not sbom_only and not consumer_only,
+                "sbomIdentity": sbom_identity,
+                "sbomGraph": sbom_graph,
+                "cycloneDxWarnings": cyclonedx_warnings,
+                "effectivePomOnFailure": str(effective_pom_path) if effective_pom_path else None,
+                "cleanRoomCommands": commands,
                 "jackson2": family(dependencies, lambda item: item["groupId"].startswith("com.fasterxml.jackson")),
                 "jackson3": family(dependencies, lambda item: item["groupId"].startswith("tools.jackson")),
                 "networknt": family(
@@ -530,15 +880,31 @@ def main() -> int:
             rows.append(row)
             all_failures.extend(f"{module.artifact_id}: {failure}" for failure in failures)
             print(f"{row['result'].upper():4} {module.artifact_id}: {len(jars)} runtime JARs", flush=True)
+            if certification_failure:
+                stopped_early = True
+                stop_module = module.artifact_id
+                print(f"STOP {module.artifact_id}: SBOM certification prerequisite failed", file=sys.stderr)
+                break
 
         matrix = {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "projectVersion": version,
             "repository": str(repository),
             "mavenRepository": str(local_repo),
             "settingsSha256": sha256(settings),
             "stagedBundle": str(args.staged_bundle.resolve()) if args.staged_bundle else None,
             "stagedBundleSha256": bundle_sha256,
+            "cleanRoom": {
+                "profile": CLEAN_ROOM_PROFILE,
+                "scopeFlags": list(CLEAN_ROOM_SCOPE_FLAGS),
+                "dependencyPlugin": DEPENDENCY_PLUGIN,
+                "helpPlugin": HELP_PLUGIN,
+                "cycloneDxPlugin": CYCLONEDX_PLUGIN,
+                "mavenWrapperSha256": sha256(wrapper),
+                "toolchainCommand": shlex.join(toolchain_command),
+                "toolchainOutput": toolchain_output.strip(),
+                "consumerAndSbomShareSettingsRepositoryProfileAndScopes": True,
+            },
             "discovery": {
                 "reactorProjectCount": len(all_modules),
                 "publishedRuntimeModuleCount": len(modules),
@@ -549,8 +915,9 @@ def main() -> int:
                 "jackson2": JACKSON2_FLOOR,
                 "jackson2AnnotationsLine": JACKSON2_ANNOTATIONS_LINE,
                 "jackson3": JACKSON3_FLOOR,
-                "networkntJsonSchemaValidator": NETWORKNT_FLOOR,
             },
+            "stoppedEarly": stopped_early,
+            "stopModule": stop_module,
             "consumers": rows,
             "failureCount": len(all_failures),
             "failures": all_failures,
