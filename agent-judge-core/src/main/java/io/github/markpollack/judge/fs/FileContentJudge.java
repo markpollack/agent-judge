@@ -73,7 +73,19 @@ public class FileContentJudge extends DeterministicJudge {
 
 	@Override
 	public Judgment judge(JudgmentContext context) {
-		Path targetFile = context.workspace().resolve(filePath);
+		Path workspace = context.workspace().toAbsolutePath().normalize();
+		Path targetFile = workspace.resolve(filePath).toAbsolutePath().normalize();
+
+		// Same containment rule as FileExistsJudge, and the same reason. Path.resolve
+		// returns its argument unchanged when that argument is absolute, so an absolute or
+		// traversing filePath silently leaves the workspace and this judge would then
+		// compare content the subject never produced. A path that escapes is a
+		// misconfigured judge, not a failing subject, so it is ERROR rather than FAIL.
+		if (!targetFile.startsWith(workspace)) {
+			return Judgment.error(String.format(
+					"Path escapes the workspace and cannot be judged against it: %s resolves outside %s", filePath,
+					workspace));
+		}
 
 		// A missing file is a completed evaluation with a negative result: FAIL.
 		if (!Files.exists(targetFile)) {

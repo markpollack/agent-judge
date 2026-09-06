@@ -45,14 +45,43 @@ public class FileExistsJudge extends DeterministicJudge {
 
 	@Override
 	public Judgment judge(JudgmentContext context) {
-		Path targetFile = context.workspace().resolve(filePath);
-		boolean exists = Files.exists(targetFile);
+		Path workspace = context.workspace().toAbsolutePath().normalize();
+		Path targetFile = workspace.resolve(filePath).toAbsolutePath().normalize();
 
-		return (exists ? Judgment.builder().pass() : Judgment.builder().fail())
-			.reasoning(exists ? String.format("File exists at %s", filePath)
-					: String.format("File not found at %s", filePath))
-			.check(exists ? Check.pass("file_exists", "File found at " + filePath)
-					: Check.fail("file_exists", "File not found at " + filePath))
+		// A path that leaves the workspace is a misconfigured judge, not a failing
+		// subject. ERROR rather than FAIL, because FAIL would blame the subject for the
+		// author's mistake, and at a reject-on-any-fail tier that rejects the run.
+		// resolve() returns its argument unchanged when that argument is absolute, so an
+		// absolute filePath silently escapes and the judge can pass on a file the subject
+		// never created.
+		if (!targetFile.startsWith(workspace)) {
+			return Judgment.error(String.format(
+					"Path escapes the workspace and cannot be judged against it: %s resolves outside %s", filePath,
+					workspace));
+		}
+
+		// isRegularFile, not exists: a directory is not a file, and the difference is not
+		// pedantic here. An expected-path entry of "src/main/java" names a directory Maven
+		// creates in every scaffold, so exists() made that check pass before the subject
+		// did anything. A judge that cannot fail is not a judge.
+		boolean isFile = Files.isRegularFile(targetFile);
+		boolean isDirectory = Files.isDirectory(targetFile);
+
+		String reason;
+		if (isFile) {
+			reason = String.format("File exists at %s", filePath);
+		}
+		else if (isDirectory) {
+			reason = String.format("Expected a file at %s, found a directory", filePath);
+		}
+		else {
+			reason = String.format("File not found at %s", filePath);
+		}
+
+		return (isFile ? Judgment.builder().pass() : Judgment.builder().fail())
+			.reasoning(reason)
+			.check(isFile ? Check.pass("file_exists", "File found at " + filePath)
+					: Check.fail("file_exists", reason))
 			.build();
 	}
 
