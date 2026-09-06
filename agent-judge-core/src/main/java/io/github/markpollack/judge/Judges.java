@@ -21,6 +21,37 @@ import io.github.markpollack.judge.result.Judgment;
  * <li>Extracting metadata from judges</li>
  * </ul>
  *
+ * <h2>The combinators are Boolean, and that is deliberate</h2>
+ * <p>
+ * {@link #and}, {@link #or}, {@link #allOf} and {@link #anyOf} branch on
+ * {@link Judgment#pass()}, so they reason about two outcomes: passed, and did not pass.
+ * They are short-circuit Boolean composition and nothing more.
+ * </p>
+ * <p>
+ * A judgment carries four statuses, and these combinators do not distinguish the other
+ * two. {@code ABSTAIN} and {@code ERROR} are "not passed" here, which has two consequences
+ * worth knowing before you use them:
+ * </p>
+ * <ul>
+ * <li>{@code allOf} and {@code and} short-circuit on an abstaining or errored judge and
+ * return that judgment, so later judges do not run;</li>
+ * <li>{@code anyOf} and {@code or} return a {@code FAIL} when no judge passed, including
+ * when every judge <em>abstained</em>.</li>
+ * </ul>
+ * <p>
+ * ⚠️ If any of your judges can abstain or error, <b>do not compose them here.</b> Use a
+ * {@link io.github.markpollack.judge.jury.Jury} with an explicit
+ * {@link io.github.markpollack.judge.jury.ErrorPolicy}: a jury resolves the population by
+ * status, publishes what it actually reduced over in its aggregation evidence, and
+ * {@link io.github.markpollack.judge.jury.AllMustPassStrategy} expresses "every applicable
+ * judge must pass" without collapsing an abstention into a negative finding.
+ * </p>
+ * <p>
+ * This behaviour is pinned by tests rather than changed. Widening the combinators to be
+ * status-aware would alter the outcome of every existing composition, and the jury API
+ * already covers the case properly.
+ * </p>
+ *
  * <p>
  * Example usage:
  * </p>
