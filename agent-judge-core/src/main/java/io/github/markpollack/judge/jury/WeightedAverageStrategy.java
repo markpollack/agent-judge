@@ -61,7 +61,20 @@ import io.github.markpollack.judge.result.Judgment;
  */
 public class WeightedAverageStrategy implements VotingStrategy {
 
-	private static final double THRESHOLD = 0.5;
+	/**
+	 * The acceptance bar applied when the caller does not state one.
+	 * <p>
+	 * 0.5 is the convention across the evaluation ecosystem and is retained as the
+	 * default so existing behaviour is unchanged. It is a convention, not a derivation: it
+	 * knows nothing about the scale your judges score on. Prefer a threshold derived from
+	 * the rubric that produced the scores, supplied through the threshold constructor.
+	 * </p>
+	 *
+	 * @since 0.16.0
+	 */
+	public static final double DEFAULT_THRESHOLD = 0.5;
+
+	private final double threshold;
 
 	private final ErrorPolicy errorPolicy;
 
@@ -69,7 +82,7 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	 * Create a weighted average strategy with the default error policy.
 	 */
 	public WeightedAverageStrategy() {
-		this(ErrorPolicy.PROPAGATE);
+		this(DEFAULT_THRESHOLD, ErrorPolicy.PROPAGATE);
 	}
 
 	/**
@@ -77,7 +90,46 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	 * @param errorPolicy policy for handling errors
 	 */
 	public WeightedAverageStrategy(ErrorPolicy errorPolicy) {
+		this(DEFAULT_THRESHOLD, errorPolicy);
+	}
+
+	/**
+	 * Create a weighted-average strategy with a caller-supplied acceptance bar.
+	 * @param threshold the normalized bar the weighted average must reach, in {@code [0.0, 1.0]}
+	 * @throws IllegalArgumentException if the threshold is not a finite value in
+	 * {@code [0.0, 1.0]}
+	 * @since 0.16.0
+	 */
+	public WeightedAverageStrategy(double threshold) {
+		this(threshold, ErrorPolicy.PROPAGATE);
+	}
+
+	/**
+	 * Create a weighted-average strategy with a caller-supplied acceptance bar and error policy.
+	 * @param threshold the normalized bar the weighted average must reach, in {@code [0.0, 1.0]}
+	 * @param errorPolicy policy for handling errors
+	 * @throws IllegalArgumentException if the threshold is not a finite value in
+	 * {@code [0.0, 1.0]}
+	 * @since 0.16.0
+	 */
+	public WeightedAverageStrategy(double threshold, ErrorPolicy errorPolicy) {
+		if (!Double.isFinite(threshold)) {
+			throw new IllegalArgumentException("threshold must be finite, but was " + threshold);
+		}
+		if (threshold < 0.0 || threshold > 1.0) {
+			throw new IllegalArgumentException("threshold must be between 0.0 and 1.0, but was " + threshold);
+		}
+		this.threshold = threshold;
 		this.errorPolicy = errorPolicy;
+	}
+
+	/**
+	 * The acceptance bar this strategy applies.
+	 * @return the normalized threshold
+	 * @since 0.16.0
+	 */
+	public double getThreshold() {
+		return this.threshold;
 	}
 
 	@Override
@@ -116,14 +168,15 @@ public class WeightedAverageStrategy implements VotingStrategy {
 
 		double weightedAverage = weightedSum / eligibleWeight;
 
-		Judgment aggregate = (weightedAverage >= THRESHOLD ? Judgment.builder().pass() : Judgment.builder().fail())
+		Judgment aggregate = (weightedAverage >= this.threshold ? Judgment.builder().pass() : Judgment.builder().fail())
 			.score(weightedAverage)
 			.reasoning(String.format(
 					"Weighted average: %.2f across %d applicable judge(s) (threshold: %.2f, result: %s)",
-					weightedAverage, population.eligible().size(), THRESHOLD,
-					weightedAverage >= THRESHOLD ? "pass" : "fail"))
+					weightedAverage, population.eligible().size(), this.threshold,
+					weightedAverage >= this.threshold ? "pass" : "fail"))
 			.build();
 		return AggregationEvidence.attach(aggregate, population.evidence(getName())
+			.put(AggregationEvidence.THRESHOLD, this.threshold)
 			.put(AggregationEvidence.INPUT_WEIGHT, inputWeight)
 			.put(AggregationEvidence.ELIGIBLE_WEIGHT, eligibleWeight)
 			.build());

@@ -77,6 +77,31 @@ public final class AggregationEvidence {
 	/** Eligible judgments with FAIL. Emitted only by status-counting strategies. */
 	public static final String FAIL_COUNT = "failCount";
 
+	// ==================== Threshold keys ====================
+
+	/**
+	 * The normalized bar a numeric strategy applied, when the strategy takes one.
+	 * <p>
+	 * Recorded so a stored verdict says which bar produced its outcome. A threshold that
+	 * lives only in a constructor argument cannot be recovered from the result, and a bar
+	 * nobody can read afterwards is a bar nobody can audit.
+	 * </p>
+	 *
+	 * @since 0.16.0
+	 */
+	public static final String THRESHOLD = "threshold";
+
+	/**
+	 * Index, among the submitted judgments, of the judgment that bound the aggregate.
+	 * <p>
+	 * Emitted by {@link ConjunctiveStrategy}. The binding judgment is the diagnosis — it
+	 * names which contributor held the result down, which a mean cannot report.
+	 * </p>
+	 *
+	 * @since 0.16.0
+	 */
+	public static final String BINDING_ELIGIBLE_INDEX = "bindingIndex";
+
 	// ==================== Weighted keys ====================
 
 	/** Sum of resolved weights before eligibility filtering. */

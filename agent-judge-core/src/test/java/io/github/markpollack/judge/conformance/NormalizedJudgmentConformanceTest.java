@@ -326,15 +326,26 @@ class NormalizedJudgmentConformanceTest {
 		void coversEveryEvidenceKey() {
 			JsonNode evidence = fixtureTree().at("/aggregated/metadata/" + Judgment.AGGREGATION_KEY);
 
-			// Weight keys belong to weighted strategies; a status-counting aggregate that
+			// Keys that belong to one strategy family. A status-counting aggregate that
 			// emitted them would be reporting a reduction it never performed.
 			Set<String> weightedOnly = Set.of(AggregationEvidence.INPUT_WEIGHT, AggregationEvidence.ELIGIBLE_WEIGHT);
+			// The bar a numeric strategy applied. A status-counting strategy reasons about
+			// outcomes and never compares a score to a threshold, so it has none to report.
+			Set<String> numericOnly = Set.of(AggregationEvidence.THRESHOLD);
+			// Which contributor held the aggregate down. Only a minimum has a binding input;
+			// a mean, a median and a vote count are not held down by any single judgment.
+			Set<String> conjunctiveOnly = Set.of(AggregationEvidence.BINDING_ELIGIBLE_INDEX);
+
+			Set<String> strategySpecific = new LinkedHashSet<>();
+			strategySpecific.addAll(weightedOnly);
+			strategySpecific.addAll(numericOnly);
+			strategySpecific.addAll(conjunctiveOnly);
 			Set<String> declared = evidenceKeyConstants();
 
 			assertThat(fieldNames(evidence)).containsExactlyInAnyOrderElementsOf(
-					declared.stream().filter(key -> !weightedOnly.contains(key)).toList());
+					declared.stream().filter(key -> !strategySpecific.contains(key)).toList());
 			assertThat(declared).as("a new evidence constant must be classified here before the fixture is trusted")
-				.containsAll(weightedOnly);
+				.containsAll(strategySpecific);
 		}
 
 		@Test
