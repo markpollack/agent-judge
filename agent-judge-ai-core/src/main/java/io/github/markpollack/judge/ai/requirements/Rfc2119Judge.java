@@ -14,6 +14,8 @@ import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Answers every architectural constraint in a design against an implementation.
@@ -53,6 +55,9 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * @see Observation
  */
 public final class Rfc2119Judge {
+
+	/** Flow logging at INFO: what was answered, and what bound the verdict. */
+	private static final Logger logger = LoggerFactory.getLogger(Rfc2119Judge.class);
 
 	/** {@code AppointmentServiceTests.java:191} — the only part of a message we treat as structured. */
 	private static final Pattern LOCATION = Pattern.compile("[A-Za-z0-9_/.]*[A-Za-z0-9_]+\\.(?:java|xml|sql|html|yml|properties):\\d+");
@@ -156,6 +161,10 @@ public final class Rfc2119Judge {
 					+ roster.size() + " constraints, beginning with " + unanswered.get(0));
 			}
 
+			// The guard held. Logged so the passing case is as legible as the failing one:
+			// "N of N answered" is the evidence that the roster was checked, not assumed.
+			logger.info("{} of {} constraints answered", outcome.size(), roster.size());
+
 			List<Check> checks = new ArrayList<>();
 			List<String> abstained = new ArrayList<>();
 			long passed = 0;
@@ -185,6 +194,13 @@ public final class Rfc2119Judge {
 				: JudgmentStatus.PASS;
 
 			String reasoning = summarize(passed, failed, abstained, roster.size());
+
+			// The rollup happens in Java, not in the model, and this line says so: the verdict
+			// and the requirement that bound it. On the ABSTAIN path that identifier is the
+			// fact a jury would otherwise absorb -- see FixedRosterAggregationTests.
+			logger.info("verdict {} - {}", verdict, verdict == JudgmentStatus.PASS ? reasoning
+				: !abstained.isEmpty() && failed == 0 ? abstained.get(0) + " could not be established"
+				: failed + " of " + roster.size() + " violated");
 
 			String unestablished = String.join(",", abstained);
 			// Non-binding: metadata takes no part in the rollup above.

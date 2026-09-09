@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * One acceptance criterion, read from the specification the code was built from.
@@ -26,6 +28,9 @@ import java.util.regex.Pattern;
  * @since 0.16.0
  */
 public record EarsCriterion(String id, String title, String requirement) {
+
+	/** Flow logging at INFO: what was parsed, what was answered, what bound the verdict. */
+	private static final Logger logger = LoggerFactory.getLogger(EarsCriterion.class);
 
 	/** {@code ### UC6-AC5: Permit adjacent future appointments} */
 	private static final Pattern HEADING = Pattern.compile("^### (UC\\d+-AC\\d+): (.+)$");
@@ -59,6 +64,10 @@ public record EarsCriterion(String id, String title, String requirement) {
 			id = null;
 			title = null;
 		}
+		// The denominator comes from the parser, not from the model. Logged before any
+		// answer exists, because that is what makes the roster guard meaningful.
+		logger.info("{} criteria parsed from {}", criteria.size(), criteriaFile.getFileName());
+
 		return List.copyOf(criteria);
 	}
 

@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * One architectural constraint from the design the code was built to.
@@ -30,6 +32,9 @@ import java.util.regex.Pattern;
  * @since 0.16.0
  */
 public record Rfc2119Constraint(String id, String keyword, String requirement, String reason) {
+
+	/** Flow logging at INFO: what was parsed, what was answered, what bound the verdict. */
+	private static final Logger logger = LoggerFactory.getLogger(Rfc2119Constraint.class);
 
 	/** {@code ### RULE-4} or {@code ### UC6-RULE1} */
 	private static final Pattern HEADING = Pattern.compile("^### ((?:UC\\d+-)?RULE-?\\d+)$");
@@ -75,6 +80,10 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 				requirement = null;
 			}
 		}
+		// The denominator comes from the parser, not from the model. Logged before any
+		// answer exists, because that is what makes the roster guard meaningful.
+		logger.info("{} constraints parsed from {}", constraints.size(), rulesFile.getFileName());
+
 		return List.copyOf(constraints);
 	}
 
