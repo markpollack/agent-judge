@@ -5,10 +5,12 @@
 
 package io.github.markpollack.judge.jury;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import io.github.markpollack.judge.description.StrategyDescription;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
 
@@ -115,6 +117,21 @@ public class MajorityVotingStrategy implements VotingStrategy {
 	@Override
 	public String getName() {
 		return "majority";
+	}
+
+	/**
+	 * Declares the error policy and, as the {@code tiePolicy} parameter, the tie policy's
+	 * constant name. This strategy has no threshold.
+	 * @return the declared description
+	 * @since 0.17.0
+	 */
+	@Override
+	public StrategyDescription describe() {
+		Map<String, Object> parameters = new LinkedHashMap<>();
+		if (this.tiePolicy != null) {
+			parameters.put("tiePolicy", this.tiePolicy.name());
+		}
+		return StrategyDescription.declared(this, this.errorPolicy, null, parameters);
 	}
 
 }

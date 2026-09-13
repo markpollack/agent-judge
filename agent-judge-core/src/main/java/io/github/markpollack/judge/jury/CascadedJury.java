@@ -15,6 +15,9 @@ import org.slf4j.LoggerFactory;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.description.CascadedJuryDescription;
+import io.github.markpollack.judge.description.JuryDescription;
+import io.github.markpollack.judge.description.TierDescription;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
 
@@ -55,6 +58,32 @@ public class CascadedJury implements Jury {
 	@Override
 	public VotingStrategy getVotingStrategy() {
 		return null;
+	}
+
+	/**
+	 * Describe this cascade's tiers in evaluation order, each with its policy and jury.
+	 * <p>
+	 * A cascade's verdict copies its aggregate and individual judgments from the tier that
+	 * stopped it. Count per tier against {@code Verdict.compositeAttempts()}, never also the
+	 * top-level aggregate; see {@link CascadedJuryDescription}.
+	 * </p>
+	 * @return a cascaded jury description
+	 * @throws IllegalArgumentException if a tier cannot be described; the message names the
+	 * tier
+	 * @since 0.17.0
+	 */
+	@Override
+	public JuryDescription describe() {
+		List<TierDescription> described = new ArrayList<>(tiers.size());
+		for (TierConfig tier : tiers) {
+			try {
+				described.add(new TierDescription(tier.name(), tier.policy(), tier.jury().describe()));
+			}
+			catch (IllegalArgumentException ex) {
+				throw new IllegalArgumentException("tier '" + tier.name() + "': " + ex.getMessage(), ex);
+			}
+		}
+		return new CascadedJuryDescription(described);
 	}
 
 	@Override

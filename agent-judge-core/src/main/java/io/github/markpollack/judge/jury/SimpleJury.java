@@ -6,15 +6,22 @@
 package io.github.markpollack.judge.jury;
 
 import io.github.markpollack.judge.Judge;
+import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.description.JuryDescription;
+import io.github.markpollack.judge.description.KeySource;
+import io.github.markpollack.judge.description.SeatDescription;
+import io.github.markpollack.judge.description.SimpleJuryDescription;
 import io.github.markpollack.judge.result.Judgment;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
@@ -67,8 +74,11 @@ public class SimpleJury implements Jury {
 
 	private final Executor executor;
 
+	/** Positions whose verdict key {@link Juries#fromJudges} manufactured to break a name collision. */
+	private final Set<Integer> deduplicatedPositions;
+
 	private SimpleJury(List<Judge> judges, VotingStrategy votingStrategy, Map<String, Double> weights, boolean parallel,
-			Executor executor) {
+			Executor executor, Set<Integer> deduplicatedPositions) {
 		if (judges == null || judges.isEmpty()) {
 			throw new IllegalArgumentException("Jury must have at least one judge");
 		}
@@ -80,6 +90,7 @@ public class SimpleJury implements Jury {
 		this.weights = Collections.unmodifiableMap(new LinkedHashMap<>(weights));
 		this.parallel = parallel;
 		this.executor = executor != null ? executor : ForkJoinPool.commonPool();
+		this.deduplicatedPositions = Set.copyOf(deduplicatedPositions);
 	}
 
 	@Override
@@ -90,6 +101,51 @@ public class SimpleJury implements Jury {
 	@Override
 	public VotingStrategy getVotingStrategy() {
 		return votingStrategy;
+	}
+
+	/**
+	 * Describe this jury's strategy and seats, before any vote.
+	 * <p>
+	 * Each seat pairs a zero-based position, which is the index of
+	 * {@link Verdict#individual()} and the key of {@link Verdict#weights()}, with the verdict
+	 * key its judgment is stored under in {@link Verdict#individualByName()} and the weight it
+	 * votes with. The key is {@link KeySource#DECLARED} when the judge declares a name,
+	 * {@link KeySource#DEDUPLICATED} when {@link Juries#fromJudges} suffixed a colliding name,
+	 * and {@link KeySource#POSITIONAL} when the judge declares no name and the key is
+	 * {@code "Judge#" + (position + 1)}.
+	 * </p>
+	 * @return a simple jury description
+	 * @throws IllegalArgumentException if a seat cannot be described, for example because its
+	 * judge declares a non-portable configuration or its weight is not finite; the message
+	 * names the seat
+	 * @since 0.17.0
+	 */
+	@Override
+	public JuryDescription describe() {
+		List<SeatDescription> seats = new ArrayList<>(judges.size());
+		for (int position = 0; position < judges.size(); position++) {
+			Judge judge = judges.get(position);
+			String verdictKey = getJudgeName(judge, position);
+			KeySource keySource;
+			if (deduplicatedPositions.contains(position)) {
+				keySource = KeySource.DEDUPLICATED;
+			}
+			else if (Judges.tryMetadata(judge).map(JudgeMetadata::name).isPresent()) {
+				keySource = KeySource.DECLARED;
+			}
+			else {
+				keySource = KeySource.POSITIONAL;
+			}
+			double weight = weights.getOrDefault(String.valueOf(position), 1.0);
+			try {
+				seats.add(new SeatDescription(position, verdictKey, keySource, weight, Judges.describe(judge)));
+			}
+			catch (IllegalArgumentException ex) {
+				throw new IllegalArgumentException(
+						"seats[" + position + "] ('" + verdictKey + "'): " + ex.getMessage(), ex);
+			}
+		}
+		return new SimpleJuryDescription(votingStrategy.describe(), seats);
 	}
 
 	@Override
@@ -207,6 +263,8 @@ public class SimpleJury implements Jury {
 
 		private Executor executor;
 
+		private final Set<Integer> deduplicated = new HashSet<>();
+
 		/**
 		 * Add a judge with equal weight (1.0).
 		 * @param judge the judge to add
@@ -231,6 +289,18 @@ public class SimpleJury implements Jury {
 			}
 			judges.add(judge);
 			weights.put(String.valueOf(judges.size() - 1), weight);
+			return this;
+		}
+
+		/**
+		 * Add a judge, with equal weight, whose name was suffixed to break a collision, so its
+		 * seat is described as {@link KeySource#DEDUPLICATED}.
+		 * @param judge the renamed judge
+		 * @return this builder
+		 */
+		Builder deduplicatedJudge(Judge judge) {
+			judge(judge);
+			deduplicated.add(judges.size() - 1);
 			return this;
 		}
 
@@ -272,7 +342,7 @@ public class SimpleJury implements Jury {
 			if (votingStrategy == null) {
 				throw new IllegalStateException("Voting strategy is required");
 			}
-			return new SimpleJury(judges, votingStrategy, weights, parallel, executor);
+			return new SimpleJury(judges, votingStrategy, weights, parallel, executor, deduplicated);
 		}
 
 	}

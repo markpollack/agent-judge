@@ -8,6 +8,7 @@ package io.github.markpollack.judge.jury;
 import java.util.List;
 import java.util.Map;
 
+import io.github.markpollack.judge.description.StrategyDescription;
 import io.github.markpollack.judge.result.Judgment;
 
 /**
@@ -141,6 +142,16 @@ public class AverageVotingStrategy implements VotingStrategy {
 	@Override
 	public String getName() {
 		return "average";
+	}
+
+	/**
+	 * Declares the error policy and the threshold.
+	 * @return the declared description
+	 * @since 0.17.0
+	 */
+	@Override
+	public StrategyDescription describe() {
+		return StrategyDescription.declared(this, this.errorPolicy, this.threshold, Map.of());
 	}
 
 }

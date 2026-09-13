@@ -64,4 +64,18 @@ public final class NamedJudge implements JudgeWithMetadata {
 		return this.metadata;
 	}
 
+	/**
+	 * The judge this wrapper delegates to.
+	 * <p>
+	 * A wrapper's metadata names the judge in a verdict, but it says nothing about what
+	 * actually judges. {@link Judges#describe(Judge)} reads through this accessor to describe
+	 * the wrapped judge as well.
+	 * </p>
+	 * @return the wrapped judge
+	 * @since 0.17.0
+	 */
+	public Judge delegate() {
+		return this.delegate;
+	}
+
 }

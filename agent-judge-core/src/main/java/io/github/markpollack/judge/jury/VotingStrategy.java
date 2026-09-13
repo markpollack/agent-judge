@@ -5,6 +5,7 @@
 
 package io.github.markpollack.judge.jury;
 
+import io.github.markpollack.judge.description.StrategyDescription;
 import io.github.markpollack.judge.result.Judgment;
 
 import java.util.List;
@@ -46,5 +47,20 @@ public interface VotingStrategy {
 	 * @return strategy name
 	 */
 	String getName();
+
+	/**
+	 * Describe how this strategy is configured, before it aggregates anything.
+	 * <p>
+	 * The default declares nothing: the description carries this strategy's name and
+	 * implementation with {@code "parameters": {"declared": false}}. Override it to declare the
+	 * parameters that decide the aggregate, such as an error policy or threshold, through
+	 * {@link StrategyDescription#declared}. Every built-in strategy does.
+	 * </p>
+	 * @return the strategy's description
+	 * @since 0.17.0
+	 */
+	default StrategyDescription describe() {
+		return StrategyDescription.undeclared(this);
+	}
 
 }

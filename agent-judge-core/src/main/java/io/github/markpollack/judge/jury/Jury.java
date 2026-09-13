@@ -7,6 +7,7 @@ package io.github.markpollack.judge.jury;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.description.JuryDescription;
 
 import java.util.List;
 
@@ -57,5 +58,23 @@ public interface Jury {
 	 * @return verdict with aggregated and individual judgments
 	 */
 	Verdict vote(JudgmentContext context);
+
+	/**
+	 * Describe this jury's configured structure, available before any vote.
+	 * <p>
+	 * The default describes the jury as {@linkplain JuryDescription#opaque(Jury) opaque}: its
+	 * implementation, its strategy and its flattened judges, without claiming to know how it
+	 * seats, keys or weights them. The library's juries override it with a structural
+	 * description. A jury that composes other juries should override it as well, so that its
+	 * members are described by their own {@code describe()}.
+	 * </p>
+	 * @return the jury's description
+	 * @throws IllegalArgumentException if a judge declares a configuration that is not
+	 * portable; the message names where
+	 * @since 0.17.0
+	 */
+	default JuryDescription describe() {
+		return JuryDescription.opaque(this);
+	}
 
 }

@@ -8,6 +8,7 @@ package io.github.markpollack.judge.jury;
 import java.util.List;
 import java.util.Map;
 
+import io.github.markpollack.judge.description.StrategyDescription;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
 
@@ -134,6 +135,16 @@ public class ConsensusStrategy implements VotingStrategy {
 	@Override
 	public String getName() {
 		return "consensus";
+	}
+
+	/**
+	 * Declares the error policy. This strategy has no threshold.
+	 * @return the declared description
+	 * @since 0.17.0
+	 */
+	@Override
+	public StrategyDescription describe() {
+		return StrategyDescription.declared(this, this.errorPolicy, null, Map.of());
 	}
 
 }
