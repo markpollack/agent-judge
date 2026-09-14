@@ -1,0 +1,42 @@
+[ {
+  "status" : "pass",
+  "reasoning" : "the build succeeded",
+  "checks" : [ ],
+  "metadata" : { }
+}, {
+  "status" : "fail",
+  "reasoning" : "the answer contradicted the retrieved context",
+  "checks" : [ ],
+  "metadata" : { }
+}, {
+  "status" : "fail",
+  "reasonCode" : "subject_empty",
+  "reasoning" : "The diff contained no changed files, so there was nothing to assess",
+  "checks" : [ ],
+  "metadata" : { }
+}, {
+  "status" : "not_applicable",
+  "label" : "no_java_sources",
+  "reasoning" : "The change set contains no Java sources, so the Java style rules do not apply",
+  "checks" : [ ],
+  "metadata" : { }
+}, {
+  "status" : "error",
+  "reasonCode" : "judge_failed",
+  "reasoning" : "Judge 'flaky' threw java.lang.IllegalStateException",
+  "checks" : [ ],
+  "metadata" : { }
+}, {
+  "status" : "error",
+  "reasonCode" : "errors_propagated",
+  "reasoning" : "3 of 4 judgments errored and the error policy is propagate",
+  "checks" : [ ],
+  "metadata" : {
+    "aggregation" : {
+      "errorCodeCounts" : {
+        "judge_reported" : 2,
+        "judge_failed" : 1
+      }
+    }
+  }
+} ]
