@@ -33,18 +33,38 @@ import io.github.markpollack.judge.result.Judgment;
  * They are short-circuit Boolean composition and nothing more.
  * </p>
  * <p>
- * A judgment carries four statuses, and these combinators do not distinguish the other
- * two. {@code ABSTAIN} and {@code ERROR} are "not passed" here, which has two consequences
- * worth knowing before you use them:
+ * A judgment carries five statuses, and these combinators do not distinguish the other
+ * four. {@code FAIL}, {@code ABSTAIN}, {@code NOT_APPLICABLE} and {@code ERROR} are all
+ * "not passed" here. What each combinator then does with such a judgment is worth reading
+ * before composing anything that can produce one:
  * </p>
- * <ul>
- * <li>{@code allOf} and {@code and} short-circuit on an abstaining or errored judge and
- * return that judgment, so later judges do not run;</li>
- * <li>{@code anyOf} and {@code or} return a {@code FAIL} when no judge passed, including
- * when every judge <em>abstained</em>.</li>
- * </ul>
+ * <table border="1">
+ * <caption>What each combinator returns, for any non-PASS X</caption>
+ * <tr><th>Combinator</th><th>Result</th></tr>
+ * <tr><td>{@code and(a, b)}</td><td>{@code a} <b>unchanged</b> unless it passes; otherwise
+ * {@code b}</td></tr>
+ * <tr><td>{@code allOf(...)}</td><td>the first non-PASS judgment <b>unchanged</b>; if all pass,
+ * a fabricated {@code PASS("All checks passed")}</td></tr>
+ * <tr><td>{@code or(a, b)}</td><td>{@code a} if it passes; otherwise {@code b}
+ * <b>unchanged</b>, whatever {@code b} is</td></tr>
+ * <tr><td>{@code anyOf(...)}</td><td>the first passing judgment; if none passes, a
+ * <b>fabricated</b> {@code FAIL("All checks failed")}</td></tr>
+ * </table>
  * <p>
- * ⚠️ If any of your judges can abstain or error, <b>do not compose them here.</b> Use a
+ * The last row is the one that surprises people. {@code anyOf} manufactures a {@code FAIL}
+ * even when every judge abstained, excluded itself, or errored — so a composition that never
+ * established anything about the subject reports a rejection of it. {@code or} does not: it
+ * returns whatever the second judge said, including an {@code ERROR}.
+ * </p>
+ * <p>
+ * The same applies to {@code allOf} and {@code and}, which short-circuit on the first
+ * non-PASS judgment, so later judges do not run.
+ * </p>
+ * <p>
+ * ⚠️ If any of your judges can abstain, exclude a subject, or error, <b>do not compose them
+ * here.</b> These combinators bypass the seat guard as well: a judge reached through a
+ * combinator returns {@code NOT_APPLICABLE} directly to the caller, with nothing checking that
+ * it declared it may. Use a
  * {@link io.github.markpollack.judge.jury.Jury} with an explicit
  * {@link io.github.markpollack.judge.jury.ErrorPolicy}: a jury resolves the population by
  * status, publishes what it actually reduced over in its aggregation evidence, and
@@ -279,7 +299,8 @@ public final class Judges {
 	 * Compose two judges with AND logic.
 	 * <p>
 	 * Returns a judge that executes the first judge, and only if it passes, executes the
-	 * second judge. If the first fails, its judgment is returned immediately
+	 * second judge. If the first does not pass — for any reason, including an abstention, an
+	 * exclusion or an error — its judgment is returned unchanged and immediately
 	 * (short-circuit evaluation). This is analogous to Spring Security's CompositeVoter
 	 * or JUnit's RuleChain pattern.
 	 * </p>
@@ -301,16 +322,18 @@ public final class Judges {
 	/**
 	 * Compose two judges with OR logic.
 	 * <p>
-	 * Returns a judge that executes the first judge, and only if it fails, executes the
-	 * second judge. If the first passes, its judgment is returned immediately
-	 * (short-circuit evaluation).
+	 * Returns a judge that executes the first judge, and only if it <em>does not pass</em>,
+	 * executes the second. That is a wider condition than "fails": an abstention, an exclusion
+	 * and an error all reach the second judge too, and whatever it returns is then the result,
+	 * unchanged. If the first passes, its judgment is returned immediately (short-circuit
+	 * evaluation).
 	 * </p>
 	 * <p>
 	 * Example usage:
 	 * </p>
 	 * See the Agent Judge Tutorial for compiled composition examples.
 	 * @param first the first judge to execute
-	 * @param second the second judge to execute (only if first fails)
+	 * @param second the second judge to execute (only if the first does not pass)
 	 * @return composed judge with OR logic
 	 */
 	public static Judge or(Judge first, Judge second) {
@@ -350,8 +373,10 @@ public final class Judges {
 	 * Compose multiple judges with OR logic (any must pass).
 	 * <p>
 	 * Returns a judge that executes all judges in sequence. If any judge passes, its
-	 * judgment is returned immediately (short-circuit evaluation). If all judges fail, a
-	 * failing judgment is returned. This is analogous to Stream.anyMatch().
+	 * judgment is returned immediately (short-circuit evaluation). If none passes, a
+	 * {@code FAIL} is <em>fabricated</em> — including when every judge abstained, excluded the
+	 * subject, or errored, so a composition that established nothing reports a rejection. This
+	 * is analogous to Stream.anyMatch(), and inherits its vacuous case.
 	 * </p>
 	 * <p>
 	 * Example usage:
