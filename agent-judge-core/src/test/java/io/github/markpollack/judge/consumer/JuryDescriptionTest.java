@@ -47,6 +47,7 @@ import io.github.markpollack.judge.jury.Juries;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.MedianVotingStrategy;
+import io.github.markpollack.judge.jury.NotApplicablePolicy;
 import io.github.markpollack.judge.jury.NamedJury;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.TiePolicy;
@@ -75,12 +76,12 @@ class JuryDescriptionTest {
 	}
 
 	@Test
-	void theDescriptionVersionIsPinnedAtOne() {
+	void theDescriptionVersionIsPinnedAtTwo() {
 		assertThat(JuryDescription.DESCRIPTION_VERSION)
 			.as("increment only for a format change: a key added, removed or renamed at any level; a value "
 					+ "vocabulary added or changed; or a changed derivation rule. Never for a change in what a "
 					+ "judge declares. Re-pin the golden description in CrossJvmDescriptionStabilityTest with it.")
-			.isEqualTo(1);
+			.isEqualTo(2);
 	}
 
 	@Nested
@@ -108,7 +109,8 @@ class JuryDescriptionTest {
 				.containsExactly(tuple(0, "keyword", KeySource.DECLARED, 2.0),
 						tuple(1, "Judge#2", KeySource.POSITIONAL, 1.0), tuple(2, "strict", KeySource.DECLARED, 0.5));
 			assertThat(description.strategy()).isEqualTo(new StrategyDescription("weightedAverage",
-					named(WeightedAverageStrategy.class), ErrorPolicy.IGNORE, 0.6, Map.of()));
+					named(WeightedAverageStrategy.class), ErrorPolicy.IGNORE, NotApplicablePolicy.REFUSE, 0.6,
+					Map.of()));
 		}
 
 		@Test
@@ -314,14 +316,14 @@ class JuryDescriptionTest {
 		void onlyTheRootCarriesTheDescriptionVersion() {
 			Map<String, Object> portable = threeTierCascade().describe().toPortable();
 
-			assertThat(JuryDescription.DESCRIPTION_VERSION).isEqualTo(1);
+			assertThat(JuryDescription.DESCRIPTION_VERSION).isEqualTo(2);
 			assertThat(portable.keySet()).first().isEqualTo("descriptionVersion");
-			assertThat(portable.get("descriptionVersion")).isEqualTo(1);
+			assertThat(portable.get("descriptionVersion")).isEqualTo(2);
 			assertThat((List<Object>) portable.get("tiers"))
 				.allSatisfy(tier -> assertThat((Map<String, Object>) ((Map<String, Object>) tier).get("jury"))
 					.doesNotContainKey("descriptionVersion"));
-			assertThat(Judges.describe(new KeywordJudge("k")).toPortable()).containsEntry("descriptionVersion", 1);
-			assertThat(new ConsensusStrategy().describe().toPortable()).containsEntry("descriptionVersion", 1);
+			assertThat(Judges.describe(new KeywordJudge("k")).toPortable()).containsEntry("descriptionVersion", 2);
+			assertThat(new ConsensusStrategy().describe().toPortable()).containsEntry("descriptionVersion", 2);
 			assertThat(ImplementationIdentity.of(KeywordJudge.class).toPortable())
 				.as("an identity is a fragment, not a description root")
 				.doesNotContainKey("descriptionVersion");
@@ -358,7 +360,8 @@ class JuryDescriptionTest {
 
 			MetaJuryDescription description = (MetaJuryDescription) meta.describe();
 			assertThat(description.strategy()).isEqualTo(new StrategyDescription("majority",
-					named(MajorityVotingStrategy.class), ErrorPolicy.PROPAGATE, null, Map.of("tiePolicy", "FAIL")));
+					named(MajorityVotingStrategy.class), ErrorPolicy.PROPAGATE, NotApplicablePolicy.REFUSE, null,
+					Map.of("tiePolicy", "FAIL")));
 			assertThat(description.members()).extracting(MemberDescription::name).containsExactly("first", "second");
 			SimpleJuryDescription secondJury = (SimpleJuryDescription) description.members().get(1).jury();
 			assertThat(secondJury.seats()).singleElement().satisfies(seat -> {
@@ -394,8 +397,8 @@ class JuryDescriptionTest {
 		@Test
 		void undeclaredAndDeclaredEmptyHaveUnequalPortableForms() throws Exception {
 			ImplementationIdentity same = named(KeywordJudge.class);
-			JudgeDescription undeclared = new JudgeDescription("j", JudgeType.DETERMINISTIC, null, null, same, null);
-			JudgeDescription declaredEmpty = new JudgeDescription("j", JudgeType.DETERMINISTIC, null, null, same,
+			JudgeDescription undeclared = new JudgeDescription("j", JudgeType.DETERMINISTIC, null, null, null, same, null);
+			JudgeDescription declaredEmpty = new JudgeDescription("j", JudgeType.DETERMINISTIC, null, null, null, same,
 					Map.of());
 
 			assertThat(undeclared.toPortable()).isNotEqualTo(declaredEmpty.toPortable());
@@ -447,7 +450,7 @@ class JuryDescriptionTest {
 
 		@Test
 		void metadataWithOnlyATypeDeclaresOnlyThatValue() {
-			JudgeDescription description = new JudgeDescription(null, JudgeType.AGENT, null, null,
+			JudgeDescription description = new JudgeDescription(null, JudgeType.AGENT, null, null, null,
 					named(KeywordJudge.class), null);
 
 			assertThat(description.toPortable().get("metadata"))
@@ -508,7 +511,7 @@ class JuryDescriptionTest {
 
 			assertThat(description).isEqualTo(new StrategyDescription("first",
 					new ImplementationIdentity(Form.ANONYMOUS, null, JuryDescriptionTest.class.getName()), null, null,
-					null));
+					null, null));
 			assertThat(description.toPortable().get("parameters")).isEqualTo(Map.of("declared", false));
 		}
 
@@ -550,7 +553,8 @@ class JuryDescriptionTest {
 
 		private StrategyDescription declared(String name, Class<?> type, ErrorPolicy errorPolicy, Double threshold,
 				Map<String, Object> parameters) {
-			return new StrategyDescription(name, named(type), errorPolicy, threshold, parameters);
+			return new StrategyDescription(name, named(type), errorPolicy, NotApplicablePolicy.REFUSE, threshold,
+					parameters);
 		}
 
 		@Test
@@ -576,11 +580,13 @@ class JuryDescriptionTest {
 		void portableValuesMergeErrorPolicyThresholdAndParametersInKeyOrder() throws Exception {
 			assertThat(JSON.writeValueAsString(
 					new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.IGNORE).describe().toPortable()))
-				.isEqualTo("{\"descriptionVersion\":1,\"name\":\"majority\",\"implementation\":{\"form\":\"NAMED\",\"className\":"
+				.isEqualTo("{\"descriptionVersion\":2,\"name\":\"majority\",\"implementation\":{\"form\":\"NAMED\",\"className\":"
 						+ "\"io.github.markpollack.judge.jury.MajorityVotingStrategy\"},\"parameters\":{\"declared\":true,"
-						+ "\"values\":{\"errorPolicy\":\"ignore\",\"tiePolicy\":\"ABSTAIN\"}}}");
+						+ "\"values\":{\"errorPolicy\":\"ignore\",\"notApplicablePolicy\":\"refuse\","
+						+ "\"tiePolicy\":\"ABSTAIN\"}}}");
 			assertThat(JSON.writeValueAsString(new AverageVotingStrategy().describe().toPortable()))
-				.endsWith("\"parameters\":{\"declared\":true,\"values\":{\"errorPolicy\":\"propagate\",\"threshold\":0.5}}}");
+				.endsWith("\"parameters\":{\"declared\":true,\"values\":{\"errorPolicy\":\"propagate\","
+						+ "\"notApplicablePolicy\":\"refuse\",\"threshold\":0.5}}}");
 		}
 
 		@Test
@@ -698,19 +704,25 @@ class JuryDescriptionTest {
 		void aStrategyDescriptionRefusesInconsistentDeclarations() {
 			ImplementationIdentity identity = named(AverageVotingStrategy.class);
 
-			assertThatThrownBy(() -> new StrategyDescription("s", identity, ErrorPolicy.PROPAGATE, null, null))
+			assertThatThrownBy(() -> new StrategyDescription("s", identity, ErrorPolicy.PROPAGATE, null, null, null))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("empty parameter map");
-			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, 0.5, null))
+			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, NotApplicablePolicy.EXCLUDE, null, null))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("empty parameter map");
+			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, null, 0.5, null))
 				.isInstanceOf(IllegalArgumentException.class);
-			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, Double.NaN, Map.of()))
+			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, null, Double.NaN, Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("finite");
-			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, null, Map.of("threshold", 0.5)))
+			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, null, null, Map.of("threshold", 0.5)))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("their own components");
-			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, null, Map.of("errorPolicy", "ignore")))
+			assertThatThrownBy(
+					() -> new StrategyDescription("s", identity, null, null, null, Map.of("errorPolicy", "ignore")))
 				.isInstanceOf(IllegalArgumentException.class);
+			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, null, null,
+					Map.of("notApplicablePolicy", "exclude"))).isInstanceOf(IllegalArgumentException.class);
 		}
 
 		@Test

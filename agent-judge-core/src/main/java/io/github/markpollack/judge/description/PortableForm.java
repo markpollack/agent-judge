@@ -72,7 +72,7 @@ final class PortableForm {
 	static Map<String, Object> freeze(Map<String, Object> tree, String root) {
 		Judgment carrier;
 		try {
-			carrier = new Judgment(JudgmentStatus.PASS, null, null, "", List.of(), Map.of(root, tree));
+			carrier = new Judgment(JudgmentStatus.PASS, null, null, null, "", List.of(), Map.of(root, tree));
 		}
 		catch (IllegalArgumentException ex) {
 			throw new IllegalArgumentException(relocate(String.valueOf(ex.getMessage())), ex);
@@ -105,6 +105,13 @@ final class PortableForm {
 		Map<String, Object> node = new LinkedHashMap<>();
 		node.put(DECLARED, true);
 		node.put(VALUES, values);
+		return node;
+	}
+
+	static Map<String, Object> declaredString(String value) {
+		Map<String, Object> node = new LinkedHashMap<>();
+		node.put(DECLARED, true);
+		node.put(VALUE, value);
 		return node;
 	}
 

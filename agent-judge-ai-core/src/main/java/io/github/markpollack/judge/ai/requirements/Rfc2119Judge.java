@@ -4,15 +4,20 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static java.util.stream.Collectors.joining;
 
 import io.github.markpollack.judge.ai.JudgmentClassifier;
 import io.github.markpollack.judge.ai.ModelBackedJudge;
 import io.github.markpollack.judge.ai.model.JudgeModel;
+import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentReasonCode;
 import io.github.markpollack.judge.result.JudgmentStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,24 +78,61 @@ public final class Rfc2119Judge {
 	 * business, and keeping it that way is what lets the same judge run on a build server and on a
 	 * laptop with no credentials.
 	 * @param name the judge's name, also used to name its prompt template
-	 * @param constraints the roster of architectural constraints, every one of which must be answered
+	 * @param constraints the roster of architectural constraints, every one of which must be
+	 * answered; must be non-empty
 	 * @param model the backend that answers them
 	 * @return a judge over that roster
+	 * @throws IllegalArgumentException if the roster is empty, since a conjunctive rollup over an
+	 * empty denominator is vacuously satisfied
 	 */
 	public static ModelBackedJudge create(String name, List<Rfc2119Constraint> constraints, JudgeModel model) {
-		return ModelBackedJudge.builder()
+		// A jury assembled around an empty roster is a configuration mistake, and it should never
+		// reach a model: the run would spend an agent to produce a verdict computed over nothing.
+		// The rollup refuses an empty roster too, and that second guard is the one that holds if
+		// this one is ever bypassed.
+		if (constraints == null || constraints.isEmpty()) {
+			throw new IllegalArgumentException("a requirements judge needs at least one constraint; "
+					+ "an empty roster has no denominator, and a conjunctive rollup over one is vacuously satisfied");
+		}
+		ModelBackedJudge.Builder builder = ModelBackedJudge.builder()
 			.name(name)
 			.description("Was the implementation built the way the design said it must be?")
 			.promptTemplate(templateFor(name, constraints))
 			.model(model)
-			.judgmentClassifier(classifier(constraints))
-			.build();
+			.judgmentClassifier(classifier(constraints));
+		// Declared only when the design itself authorized an exclusion, and naming the constraints
+		// it authorized: a jury seating this judge can then see exactly how much of the roster is
+		// allowed to leave the denominator.
+		String conditional = conditionalIds(constraints);
+		if (!conditional.isEmpty()) {
+			builder.notApplicableWhen("constraints " + conditional + " are conditional");
+		}
+		return builder.build();
+	}
+
+	private static String conditionalIds(List<Rfc2119Constraint> constraints) {
+		return constraints.stream()
+			.filter(Rfc2119Constraint::conditional)
+			.map(Rfc2119Constraint::id)
+			.collect(joining(", "));
 	}
 
 	static JudgePromptTemplate templateFor(String name, List<Rfc2119Constraint> constraints) {
 		StringBuilder list = new StringBuilder();
 		constraints.forEach(c -> list.append("  ").append(c.asPrompt()).append('\n'));
 		int n = constraints.size();
+		String conditional = conditionalIds(constraints);
+		// The exclusion is offered only where the design authorized one, and the authorized ids
+		// are named. Offering it everywhere would invite the audit to decide for itself which
+		// constraints it has to answer.
+		String exclusion = conditional.isEmpty() ? "" : """
+
+            NOT_APPLICABLE is available for these constraints only: %s. They carry an "Applies
+            when" clause, and you may answer NOT_APPLICABLE only when that clause does not hold
+            for this implementation. You must give the reason after the dash. Do not use it for
+            any other constraint, and do not use it because a constraint is hard to establish;
+            that is CANNOT_DETERMINE.
+            """.formatted(conditional);
 		return JudgePromptTemplate.fromString(name, """
             You are auditing a Java implementation against the architectural constraints it
             was built to. You are in the implementation's root. Read files, grep, and inspect
@@ -112,6 +154,7 @@ public final class Rfc2119Judge {
             command rather than by reading and estimating.
 
             CANNOT_DETERMINE is a real answer. Use it rather than guessing.
+            %s
 
             Do not state an overall verdict. You assess each constraint; deciding what the set
             of assessments means is not your job.
@@ -127,7 +170,21 @@ public final class Rfc2119Judge {
             THE CONSTRAINTS
 
             %s
-            """.formatted(n, n, n, list.toString()));
+            """.formatted(n, n, n, exclusion, list.toString()));
+	}
+
+	/**
+	 * Classify one answer against a roster, bypassing construction.
+	 *
+	 * <p>The construction guard refuses an empty roster, so this is how the rollup's own guard is
+	 * exercised: it is the guard that holds if the first is ever bypassed.
+	 *
+	 * @param constraints the roster
+	 * @param response the audit to classify
+	 * @return the judgment the rollup produces
+	 */
+	static Judgment rollupFor(List<Rfc2119Constraint> constraints, JudgeModelResponse response) {
+		return classifier(constraints).classify(response);
 	}
 
 	private static JudgmentClassifier classifier(List<Rfc2119Constraint> constraints) {
@@ -147,8 +204,18 @@ public final class Rfc2119Judge {
 				return Judgment.error("No audit was produced for this implementation");
 			}
 
-			Map<String, String> roster = new LinkedHashMap<>();
-			constraints.forEach(c -> roster.put(c.id(), c.title()));
+			if (constraints.isEmpty()) {
+				// An empty roster is a denominator of zero, and a conjunctive rollup over one is
+				// vacuously satisfied: nothing failed, nothing was unestablished, so the subject
+				// "meets the specification". That green judgment is indistinguishable, in every
+				// stored field, from one computed over a specification that was genuinely met.
+				return rollup(JudgmentStatus.ERROR,
+						"The constraints roster is empty, so there was nothing to establish", List.of(), 0, "",
+						List.of(), 0, List.of());
+			}
+
+			Map<String, Rfc2119Constraint> roster = new LinkedHashMap<>();
+			constraints.forEach(c -> roster.put(c.id(), c));
 
 			Map<String, JudgmentStatus> outcome = new LinkedHashMap<>();
 			Map<String, String> evidence = new LinkedHashMap<>();
@@ -167,9 +234,12 @@ public final class Rfc2119Judge {
 
 			List<Check> checks = new ArrayList<>();
 			List<String> abstained = new ArrayList<>();
+			List<Map<String, Object>> excluded = new ArrayList<>();
+			List<String> protocolErrors = new ArrayList<>();
 			long passed = 0;
 			long failed = 0;
-			for (String id : roster.keySet()) {
+			for (Rfc2119Constraint constraint : roster.values()) {
+				String id = constraint.id();
 				JudgmentStatus status = outcome.get(id);
 				String why = evidence.get(id);
 				switch (status) {
@@ -181,6 +251,25 @@ public final class Rfc2119Judge {
 						failed++;
 						checks.add(Check.fail(id, why));
 					}
+					case NOT_APPLICABLE -> {
+						// An excluded constraint is not a Check: nothing about it was assessed.
+						// An illegal exclusion is a protocol error and is never counted as an
+						// authorized one, or the count would launder the thing it records.
+						String reason = why == null ? "" : why;
+						if (!constraint.conditional()) {
+							protocolErrors.add(id + " is unconditional, so NOT_APPLICABLE is not an available answer");
+						}
+						else if (reason.isBlank()) {
+							protocolErrors.add(id + " was excluded with no reason, and an unexplained exclusion "
+								+ "cannot be audited");
+						}
+						else {
+							Map<String, Object> entry = new LinkedHashMap<>();
+							entry.put("id", id);
+							entry.put("reason", reason);
+							excluded.add(entry);
+						}
+					}
 					default -> {
 						abstained.add(id);
 						checks.add(Check.fail(id, "could not be established: " + why));
@@ -188,39 +277,58 @@ public final class Rfc2119Judge {
 				}
 			}
 
-			// PASS means every required constraint was affirmatively established.
-			JudgmentStatus verdict = failed > 0 ? JudgmentStatus.FAIL
+			// PASS means every constraint that applied was affirmatively established.
+			JudgmentStatus verdict = !protocolErrors.isEmpty() ? JudgmentStatus.ERROR
+				: failed > 0 ? JudgmentStatus.FAIL
 				: !abstained.isEmpty() ? JudgmentStatus.ABSTAIN
+				: excluded.size() == roster.size() ? JudgmentStatus.NOT_APPLICABLE
 				: JudgmentStatus.PASS;
 
-			String reasoning = summarize(passed, failed, abstained, roster.size());
+			String reasoning = verdict == JudgmentStatus.ERROR
+				? "The audit broke protocol: " + String.join("; ", protocolErrors)
+				: summarize(passed, failed, abstained, excluded.size(), roster.size());
 
 			// The rollup happens in Java, not in the model, and this line says so: the verdict
 			// and the requirement that bound it. On the ABSTAIN path that identifier is the
 			// fact a jury would otherwise absorb -- see FixedRosterAggregationTests.
 			logger.info("verdict {} - {}", verdict, verdict == JudgmentStatus.PASS ? reasoning
+				: verdict == JudgmentStatus.ERROR ? protocolErrors.get(0)
 				: !abstained.isEmpty() && failed == 0 ? abstained.get(0) + " could not be established"
-				: failed + " of " + roster.size() + " violated");
+				: failed > 0 ? failed + " of " + roster.size() + " violated" : reasoning);
 
-			String unestablished = String.join(",", abstained);
 			// Non-binding: metadata takes no part in the rollup above.
-			List<Map<String, Object>> observations = observations(text, roster).stream()
+			List<Map<String, Object>> observations = observations(text, roster.keySet()).stream()
 				.map(Observation::toMetadata).toList();
-			return switch (verdict) {
-				case PASS -> Judgment.builder().pass().reasoning(reasoning).checks(checks)
-					.metadata("constraintsTotal", roster.size()).metadata("established", passed)
-					.metadata("unestablished", unestablished)
-					.metadata(Observation.METADATA_KEY, observations).build();
-				case FAIL -> Judgment.builder().fail().reasoning(reasoning).checks(checks)
-					.metadata("constraintsTotal", roster.size()).metadata("established", passed)
-					.metadata("unestablished", unestablished)
-					.metadata(Observation.METADATA_KEY, observations).build();
-				default -> Judgment.builder().abstain().reasoning(reasoning).checks(checks)
-					.metadata("constraintsTotal", roster.size()).metadata("established", passed)
-					.metadata("unestablished", unestablished)
-					.metadata(Observation.METADATA_KEY, observations).build();
-			};
+			return rollup(verdict, reasoning, checks, passed, String.join(",", abstained), excluded, roster.size(),
+				observations);
 		};
+	}
+
+	/**
+	 * Build the judgment, with the same evidence on every path.
+	 *
+	 * <p>Sibling checks and the totals survive a protocol error deliberately. A run that broke
+	 * protocol on one constraint still established the others, and throwing that away would make
+	 * the instrument's mistake cost more than it should.
+	 */
+	private static Judgment rollup(JudgmentStatus verdict, String reasoning, List<Check> checks, long established,
+			String unestablished, List<Map<String, Object>> excluded, int total,
+			List<Map<String, Object>> observations) {
+		Judgment.EnrichmentBuilder builder = switch (verdict) {
+			case PASS -> Judgment.builder().pass().reasoning(reasoning);
+			case FAIL -> Judgment.builder().fail().reasoning(reasoning);
+			case ABSTAIN -> Judgment.builder().abstain().reasoning(reasoning);
+			case NOT_APPLICABLE -> Judgment.builder().notApplicable().reasoning(reasoning);
+			case ERROR -> Judgment.builder().error(JudgmentReasonCode.JUDGE_REPORTED).reasoning(reasoning);
+		};
+		return builder.checks(checks)
+			.metadata("constraintsTotal", total)
+			.metadata("established", established)
+			.metadata("unestablished", unestablished)
+			.metadata("notApplicableCount", excluded.size())
+			.metadata("notApplicable", excluded)
+			.metadata(Observation.METADATA_KEY, observations)
+			.build();
 	}
 
 	/**
@@ -228,7 +336,7 @@ public final class Rfc2119Judge {
 	 * observation yields nothing at all — it must never turn a valid judgment into a failure,
 	 * because a cosmetic change in non-binding model prose would then break a valid run.
 	 */
-	private static List<Observation> observations(String text, Map<String, String> roster) {
+	private static List<Observation> observations(String text, Set<String> roster) {
 		List<Observation> found = new ArrayList<>();
 		for (String line : text.lines().map(String::strip).toList()) {
 			if (!line.toUpperCase().startsWith("OBSERVATION")) {
@@ -240,7 +348,7 @@ public final class Rfc2119Judge {
 			}
 			String id = line.substring("OBSERVATION".length(), colon).strip().replaceAll("[^A-Za-z0-9-]", "");
 			String message = line.substring(colon + 1).strip();
-			if (!roster.containsKey(id) || message.isEmpty()) {
+			if (!roster.contains(id) || message.isEmpty()) {
 				continue;
 			}
 			found.add(new Observation(id, message, locationsIn(message)));
@@ -282,18 +390,26 @@ public final class Rfc2119Judge {
 			String upper = rest.toUpperCase();
 			JudgmentStatus status = upper.startsWith("PASS") ? JudgmentStatus.PASS
 				: upper.startsWith("FAIL") ? JudgmentStatus.FAIL
+				: upper.startsWith("NOT_APPLICABLE") ? JudgmentStatus.NOT_APPLICABLE
 				: upper.startsWith("CANNOT") ? JudgmentStatus.ABSTAIN : null;
 			if (status == null) {
 				continue;
 			}
 			int dash = rest.indexOf('-');
 			outcome.put(id, status);
-			evidence.put(id, dash < 0 ? rest : rest.substring(dash + 1).strip());
+			// An exclusion's evidence is its reason, and the reason is what follows the dash. No
+			// dash means no reason was given, which is a protocol error rather than a reason
+			// that happens to read "NOT_APPLICABLE".
+			evidence.put(id, dash < 0 ? (status == JudgmentStatus.NOT_APPLICABLE ? "" : rest)
+				: rest.substring(dash + 1).strip());
 		}
 	}
 
-	private static String summarize(long passed, long failed, List<String> abstained, int total) {
-		if (failed == 0 && abstained.isEmpty()) {
+	private static String summarize(long passed, long failed, List<String> abstained, int excluded, int total) {
+		if (excluded == total) {
+			return "none of the %d constraints applied to this implementation".formatted(total);
+		}
+		if (failed == 0 && abstained.isEmpty() && excluded == 0) {
 			return "all %d constraints hold".formatted(total);
 		}
 		StringBuilder text = new StringBuilder("%d of %d hold".formatted(passed, total));
@@ -302,6 +418,9 @@ public final class Rfc2119Judge {
 		}
 		if (!abstained.isEmpty()) {
 			text.append(", %d could not be established: %s".formatted(abstained.size(), String.join(", ", abstained)));
+		}
+		if (excluded > 0) {
+			text.append(", %d did not apply".formatted(excluded));
 		}
 		return text.toString();
 	}

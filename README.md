@@ -13,15 +13,23 @@ Agent Judge evaluates whether work satisfies an explicit definition of done, usi
 
 ## Result model
 
-Every `Judgment` records a required outcome—`PASS`, `FAIL`, `ABSTAIN`, or `ERROR`—plus an optional normalized score and optional classification label.
+Every `Judgment` records a required outcome—`PASS`, `FAIL`, `ABSTAIN`, `NOT_APPLICABLE`, or `ERROR`—plus an optional normalized score, an optional classification label, and an optional countable reason code.
 These are independent facts: an abstention is not a failing vote, an error is not a negative finding, and a status-only pass does not manufacture a stored score.
+
+The difference between the last three outcomes is what a denominator does with them.
+`ABSTAIN` means the question applied and has no answer yet; `NOT_APPLICABLE` means the question should not have been asked, so the criterion is excluded from the denominator and counted separately; `ERROR` means the instrument never reached a finding.
+A judge may only exclude a subject where it declared in advance that it can—an undeclared exclusion is contained as an error rather than honoured.
+
+Every `ERROR` carries a `JudgmentReasonCode`, because an instrument failure nobody can count is a failure nobody fixes.
+A failure the library's own machinery produced is never converted into a rejection of the subject, under any error policy.
 
 Result metadata is recursively immutable and restricted to ordinary JSON-compatible values.
 Token usage preserves independently reported input, output, reasoning, cache-creation, cache-read, and total quantities; pricing is a downstream derivation.
 
+A `Verdict` records where each judgment sat (`seats`) and what produced its aggregate (`decision`), so a stored composite result can be read correctly without knowing how the jury was built.
 Composite juries return complete ordered execution evidence in `Verdict.compositeAttempts()`.
-Each named attempt contains exactly one returned child verdict or one stable code-only failure, so
-callers can distinguish a negative finding from a stage that did not execute successfully.
+Each named attempt says whether its parent could use what the stage returned, and contains exactly one returned child verdict or one stable code-only failure, so
+callers can distinguish a negative finding from a stage that did not execute successfully—even when a later stage succeeds.
 `CompositePaths.flatten(verdict)` derives deterministic RFC 6901 paths across nested meta-juries and
 cascades without placing paths or runtime exceptions in the wire result.
 
@@ -103,12 +111,14 @@ System.out.println("Overall: " + majorityVerdict.aggregated().status());
 The [Agent Judge Tutorial](https://github.com/markpollack/agent-judge-tutorial) is the canonical executable sample repository.
 Its ten credential-free Maven modules cover core judging, composition, juries, custom judges, model-backed judges, Koog, and LangChain4j.
 
+The narrative guides—writing judges, describing juries, the normalized-`Judgment` handoff, and the migration guides—live on the documentation site.
+This repository keeps the code, the API Javadoc, and the release notes.
+
 - [Getting started](https://lab.pollack.ai/docs/agent-judge/getting-started)
+- [Documentation](https://lab.pollack.ai/docs/agent-judge)
 - [Tutorial source](https://github.com/markpollack/agent-judge-tutorial)
-- [0.13 to 0.14 migration guide](MIGRATION_0.14.md)
-- [Detailed normalized-Judgment handoff](consumer-handoff-normalized-judgment.md)
-- [Describing a jury before it votes](describing-juries.md)
-- [0.14 release notes](RELEASE_NOTES_0.14.md)
+- [0.17 release notes](RELEASE_NOTES_0.17.0.md)
+- [0.16 release notes](RELEASE_NOTES_0.16.0.md)
 
 ## License
 

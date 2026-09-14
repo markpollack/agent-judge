@@ -19,6 +19,7 @@ import io.github.markpollack.judge.description.CascadedJuryDescription;
 import io.github.markpollack.judge.description.JuryDescription;
 import io.github.markpollack.judge.description.TierDescription;
 import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentReasonCode;
 import io.github.markpollack.judge.result.JudgmentStatus;
 
 /**
@@ -61,6 +62,22 @@ public class CascadedJury implements Jury {
 	}
 
 	/**
+	 * Some tier's aggregate may be excluded.
+	 * <p>
+	 * A cascade has no strategy of its own — it adopts a tier's verdict — so its bound is the
+	 * union of its tiers', computed recursively through whatever those tiers are made of. The
+	 * one path that does not widen it is a stop on an individual rejection, whose root the
+	 * cascade builds itself as a machinery error rather than an exclusion.
+	 * </p>
+	 * @return true when this jury's aggregate may be NOT_APPLICABLE
+	 * @since 0.17.0
+	 */
+	@Override
+	public boolean aggregateMayBeNotApplicable() {
+		return tiers.stream().anyMatch(tier -> tier.jury().aggregateMayBeNotApplicable());
+	}
+
+	/**
 	 * Describe this cascade's tiers in evaluation order, each with its policy and jury.
 	 * <p>
 	 * A cascade's verdict copies its aggregate and individual judgments from the tier that
@@ -91,9 +108,24 @@ public class CascadedJury implements Jury {
 		return CompositeExecutionScope.withinCompositeVote(() -> execute(context));
 	}
 
+	/**
+	 * The single rule, applied to each tier in order.
+	 *
+	 * <p>
+	 * There are only three things a tier can do. It can throw; it can return a verdict the
+	 * cascade cannot use; or it can return one the cascade can. The interesting case is the
+	 * middle one, and the rule there is deliberately asymmetric: a tier that did not finish may
+	 * still have established a genuine rejection on the way, and one established violation is
+	 * enough to reject. It is never enough to accept. A broken reduction cannot demonstrate that
+	 * a subject is fine, so {@code ACCEPT_ON_ALL_PASS} never stops on a failed stage and simply
+	 * escalates.
+	 * </p>
+	 *
+	 * @param context the judgment context
+	 * @return the cascade's verdict
+	 */
 	private Verdict execute(JudgmentContext context) {
 		List<CompositeAttempt> attempts = new ArrayList<>();
-		Verdict lastSuccessful = null;
 		for (TierConfig tier : tiers) {
 			Verdict tierVerdict;
 			try {
@@ -104,26 +136,40 @@ public class CascadedJury implements Jury {
 			}
 			catch (Exception ex) {
 				logger.warn("Tier '{}' failed to execute; continuing according to cascade policy", tier.name());
-				attempts.add(new CompositeAttempt(tier.name(), CompositeRelation.CASCADE_TIER, tier.policy(), null,
-						EXECUTION_FAILURE));
+				attempts.add(CompositeAttempt.executionFailed(tier.name(), CompositeRelation.CASCADE_TIER,
+						tier.policy(), EXECUTION_FAILURE));
 				if (tier.policy() == TierPolicy.FINAL_TIER) {
-					return errorVerdict("The final cascade tier failed to execute.", attempts);
+					return noTierDecided(attempts, "The final cascade tier failed to execute.");
 				}
 				continue;
 			}
 
-			attempts.add(new CompositeAttempt(tier.name(), CompositeRelation.CASCADE_TIER, tier.policy(), tierVerdict,
-					null));
-			lastSuccessful = tierVerdict;
+			DispositionReason reason = NotApplicableGuard.stageFailure(tier.jury(), tierVerdict);
+			if (reason != null) {
+				// The tier ran but did not produce a determination this cascade may use. Its
+				// verdict is kept unchanged on the attempt; what changes is the parent's record
+				// of whether it could be used.
+				attempts.add(CompositeAttempt.stageFailed(tier.name(), CompositeRelation.CASCADE_TIER, tier.policy(),
+						reason, tierVerdict));
+				if (tier.policy() == TierPolicy.FINAL_TIER) {
+					return noTierDecided(attempts, "The final cascade tier did not produce a determination.");
+				}
+				if (tier.policy() == TierPolicy.REJECT_ON_ANY_FAIL && hasAnyFail(tierVerdict)) {
+					return individualRejection(tier, tierVerdict, reason, attempts);
+				}
+				continue;
+			}
+
+			attempts.add(CompositeAttempt.used(tier.name(), CompositeRelation.CASCADE_TIER, tier.policy(),
+					tierVerdict));
 			if (shouldStop(tier, tierVerdict)) {
-				return successfulVerdict(tierVerdict, attempts);
+				return tierOutcome(tier.name(), tierVerdict, attempts);
 			}
 		}
-
-		if (lastSuccessful == null) {
-			return errorVerdict("No cascade tier returned a verdict.", attempts);
-		}
-		return successfulVerdict(lastSuccessful, attempts);
+		// The builder requires a FINAL_TIER last, and every path through a final tier returns,
+		// so this is unreachable; it exists so a future policy cannot fall out of the loop with
+		// no verdict at all.
+		return noTierDecided(attempts, "No cascade tier produced a determination.");
 	}
 
 	private boolean shouldStop(TierConfig tier, Verdict verdict) {
@@ -134,6 +180,17 @@ public class CascadedJury implements Jury {
 		};
 	}
 
+	/**
+	 * Whether the tier established a genuine individual rejection.
+	 * <p>
+	 * A FAIL in a tier's {@code individual} is either a leaf judge's own finding or a member
+	 * jury's completed reduction, including one a configured {@code TREAT_AS_FAIL} produced.
+	 * Both are real. What is never here is a machinery error: an error is not a FAIL, and the
+	 * library's own failure never becomes rejection evidence.
+	 * </p>
+	 * @param verdict the tier's verdict
+	 * @return true when at least one individual judgment failed
+	 */
 	private boolean hasAnyFail(Verdict verdict) {
 		return verdict.individual().stream().anyMatch(judgment -> judgment.status() == JudgmentStatus.FAIL);
 	}
@@ -142,19 +199,58 @@ public class CascadedJury implements Jury {
 		return verdict.individual().stream().allMatch(judgment -> judgment.status() == JudgmentStatus.PASS);
 	}
 
-	private Verdict successfulVerdict(Verdict stoppingVerdict, List<CompositeAttempt> attempts) {
+	/** The cascade adopted a tier's own determination. */
+	private Verdict tierOutcome(String name, Verdict stoppingVerdict, List<CompositeAttempt> attempts) {
 		return Verdict.builder()
 			.aggregated(stoppingVerdict.aggregated())
 			.individual(stoppingVerdict.individual())
 			.individualByName(stoppingVerdict.individualByName())
 			.weights(stoppingVerdict.weights())
+			.seats(stoppingVerdict.seats())
+			.decision(Decision.tier(name, DecisionBasis.TIER_OUTCOME))
 			.compositeAttempts(attempts)
 			.build();
 	}
 
-	private Verdict errorVerdict(String reasoning, List<CompositeAttempt> attempts) {
-		Judgment error = Judgment.error(reasoning);
-		return Verdict.builder().aggregated(error).compositeAttempts(attempts).build();
+	/**
+	 * The cascade stopped on a rejection a failed tier had already established.
+	 * <p>
+	 * No FAIL and no score is manufactured. The rejection is carried by the decision, and the
+	 * root aggregate stays an instrument failure, so a reader counts one machinery failure and
+	 * classifies the item as non-pass — rather than reading an error as though the subject had
+	 * been assessed and found wanting.
+	 * </p>
+	 * @param tier the tier that failed
+	 * @param tierVerdict the verdict it returned
+	 * @param reason why the cascade could not use it
+	 * @param attempts the attempts so far
+	 * @return the cascade's verdict
+	 */
+	private Verdict individualRejection(TierConfig tier, Verdict tierVerdict, DispositionReason reason,
+			List<CompositeAttempt> attempts) {
+		Judgment root = reason == DispositionReason.CHILD_UNDECIDED ? tierVerdict.aggregated()
+				: Judgment.error(JudgmentReasonCode.STAGE_FAILED, "Tier '" + tier.name()
+						+ "' returned NOT_APPLICABLE without declaring that its aggregate may be excluded, so its "
+						+ "reduction is a stage failure; the cascade stopped because a genuine individual FAIL in "
+						+ "that tier established the rejection.");
+		return Verdict.builder()
+			.aggregated(root)
+			.individual(tierVerdict.individual())
+			.individualByName(tierVerdict.individualByName())
+			.weights(tierVerdict.weights())
+			.seats(tierVerdict.seats())
+			.decision(Decision.tier(tier.name(), DecisionBasis.INDIVIDUAL_REJECTION))
+			.compositeAttempts(attempts)
+			.build();
+	}
+
+	/** Nothing decided: an empty root, complete attempts, and a machinery error. */
+	private Verdict noTierDecided(List<CompositeAttempt> attempts, String reasoning) {
+		return Verdict.builder()
+			.aggregated(Judgment.error(JudgmentReasonCode.NO_TIER_DECIDED, reasoning))
+			.decision(Decision.undecided())
+			.compositeAttempts(attempts)
+			.build();
 	}
 
 	/**

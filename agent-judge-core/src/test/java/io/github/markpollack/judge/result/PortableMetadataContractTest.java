@@ -53,7 +53,7 @@ class PortableMetadataContractTest {
 	private static final long MAX_INTEROPERABLE_INTEGER = 9007199254740991L;
 
 	private static Judgment withMetadata(Map<String, Object> metadata) {
-		return new Judgment(JudgmentStatus.PASS, null, null, "ok", List.of(), metadata);
+		return new Judgment(JudgmentStatus.PASS, null, null, null, "ok", List.of(), metadata);
 	}
 
 	private static Map<String, Object> singleton(String key, Object value) {
@@ -387,7 +387,7 @@ class PortableMetadataContractTest {
 		@Test
 		@DisplayName("aggregation evidence is frozen at the same depth as any other value")
 		void reservedEvidenceIsFrozenToo() {
-			Judgment judgment = new Judgment(JudgmentStatus.PASS, null, null, "ok", List.of(),
+			Judgment judgment = new Judgment(JudgmentStatus.PASS, null, null, null, "ok", List.of(),
 					Map.of(Judgment.AGGREGATION_KEY, new LinkedHashMap<>(Map.of("strategy", "majority"))));
 
 			@SuppressWarnings("unchecked")

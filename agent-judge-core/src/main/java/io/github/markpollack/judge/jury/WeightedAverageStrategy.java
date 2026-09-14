@@ -63,7 +63,17 @@ import io.github.markpollack.judge.result.Judgment;
  * </p>
  *
  * <p>
- * The judgment passes if the weighted mean is greater than or equal to 0.5.
+ * Abstentions leave the population entirely. Errors are governed by {@link ErrorPolicy}
+ * (default {@code PROPAGATE}) and exclusions by {@link NotApplicablePolicy} (default
+ * {@code REFUSE}); an exclusion honoured as a failure keeps its configured weight, so a
+ * heavily weighted criterion that does not apply counts for as much as it would have.
+ * </p>
+ *
+ * <p>
+ * The judgment passes if the weighted mean reaches the configured threshold, which defaults to
+ * {@link #DEFAULT_THRESHOLD}. That default is a convention rather than a derivation: it knows
+ * nothing about the scale your judges score on. Prefer a bar derived from the rubric that
+ * produced the scores.
  * </p>
  *
  * <p>
@@ -92,6 +102,8 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	private final double threshold;
 
 	private final ErrorPolicy errorPolicy;
+
+	private final NotApplicablePolicy notApplicablePolicy;
 
 	/**
 	 * Create a weighted average strategy with the default error policy.
@@ -129,6 +141,25 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	 * @since 0.16.0
 	 */
 	public WeightedAverageStrategy(double threshold, ErrorPolicy errorPolicy) {
+		this(threshold, errorPolicy, NotApplicablePolicy.REFUSE);
+	}
+
+	/**
+	 * Create a weighted-average strategy with a caller-supplied acceptance bar and both
+	 * policies.
+	 * @param threshold the normalized bar the weighted average must reach, in {@code [0.0, 1.0]}
+	 * @param errorPolicy policy for handling errors
+	 * @param notApplicablePolicy policy for handling excluded judgments
+	 * @throws IllegalArgumentException if the threshold is not a finite value in
+	 * {@code [0.0, 1.0]}, or if either policy is null
+	 * @since 0.17.0
+	 */
+	public WeightedAverageStrategy(double threshold, ErrorPolicy errorPolicy,
+			NotApplicablePolicy notApplicablePolicy) {
+		if (notApplicablePolicy == null) {
+			throw new IllegalArgumentException("notApplicablePolicy must not be null");
+		}
+		this.notApplicablePolicy = notApplicablePolicy;
 		if (!Double.isFinite(threshold)) {
 			throw new IllegalArgumentException("threshold must be finite, but was " + threshold);
 		}
@@ -153,7 +184,8 @@ public class WeightedAverageStrategy implements VotingStrategy {
 
 	@Override
 	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
-		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy);
+		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
+				this.notApplicablePolicy);
 
 		double[] resolved = resolveWeights(population.inputCount(), weights);
 		double inputWeight = 0.0;
@@ -165,8 +197,8 @@ public class WeightedAverageStrategy implements VotingStrategy {
 					"All weights are zero, so no judge could influence the result; check the weight configuration");
 		}
 
-		if (population.propagateError()) {
-			return population.propagatedError(getName());
+		if (population.hasPolicyExit()) {
+			return population.policyExitAggregate(getName());
 		}
 
 		double weightedSum = 0.0;
@@ -274,7 +306,15 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	 */
 	@Override
 	public StrategyDescription describe() {
-		return StrategyDescription.declared(this, this.errorPolicy, this.threshold, Map.of());
+		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, this.threshold,
+				Map.of());
 	}
+
+	/** {@inheritDoc} */
+	@Override
+	public NotApplicablePolicy notApplicablePolicy() {
+		return this.notApplicablePolicy;
+	}
+
 
 }

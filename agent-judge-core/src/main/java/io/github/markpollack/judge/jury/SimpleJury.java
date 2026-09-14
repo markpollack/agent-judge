@@ -15,6 +15,8 @@ import io.github.markpollack.judge.description.KeySource;
 import io.github.markpollack.judge.description.SeatDescription;
 import io.github.markpollack.judge.description.SimpleJuryDescription;
 import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentReasonCode;
+import io.github.markpollack.judge.result.JudgmentStatus;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -85,8 +87,19 @@ public class SimpleJury implements Jury {
 	/** Positions whose verdict key {@link Juries#fromJudges} manufactured to break a name collision. */
 	private final Set<Integer> deduplicatedPositions;
 
+	/**
+	 * Each seat's declared exclusion capability, read once at construction.
+	 * <p>
+	 * Read here, not at vote time, for two reasons. The composition check below needs it before
+	 * anything is spent, and the guard must honour what was validated: a judge whose metadata
+	 * changed between construction and the vote does not get to acquire a capability the jury
+	 * was never built with.
+	 * </p>
+	 */
+	private final List<String> declaredCapabilities;
+
 	private SimpleJury(List<Judge> judges, VotingStrategy votingStrategy, Map<String, Double> weights, boolean parallel,
-			Executor executor, Set<Integer> deduplicatedPositions) {
+			Executor executor, Set<Integer> deduplicatedPositions, boolean requireDeclaredNames) {
 		if (judges == null || judges.isEmpty()) {
 			throw new IllegalArgumentException("Jury must have at least one judge");
 		}
@@ -99,6 +112,103 @@ public class SimpleJury implements Jury {
 		this.parallel = parallel;
 		this.executor = executor != null ? executor : ForkJoinPool.commonPool();
 		this.deduplicatedPositions = Set.copyOf(deduplicatedPositions);
+		this.declaredCapabilities = readCapabilities(this.judges);
+		requireCoherentExclusionPolicy(this.judges, this.declaredCapabilities, votingStrategy);
+		if (requireDeclaredNames) {
+			requireDeclaredNames(this.judges, this.deduplicatedPositions);
+		}
+	}
+
+	/**
+	 * Read every seat's declared exclusion capability.
+	 * <p>
+	 * A judge whose metadata cannot be read has declared nothing, and is recorded as declaring
+	 * nothing rather than failing construction. It never gets to exercise the absent capability
+	 * either: the jury cannot tell what it is called, so it does not run it, and the seat is an
+	 * {@code ERROR judge_metadata_unreadable}. Describing such a jury still fails loudly, which
+	 * is where an unreadable judge is actually reported.
+	 * </p>
+	 * @param judges the configured judges
+	 * @return the declaration per position, with null for a seat that declares none
+	 */
+	private static List<String> readCapabilities(List<Judge> judges) {
+		List<String> capabilities = new ArrayList<>(judges.size());
+		for (Judge judge : judges) {
+			String declared;
+			try {
+				declared = Judges.notApplicableCapability(judge).orElse(null);
+			}
+			catch (IllegalArgumentException ex) {
+				declared = null;
+			}
+			capabilities.add(declared);
+		}
+		return Collections.unmodifiableList(capabilities);
+	}
+
+	/**
+	 * Refuse a jury whose strategy would not honour an exclusion one of its seats declares.
+	 * <p>
+	 * Cheap configuration is validated at build time rather than contained at vote time: the
+	 * contradiction is visible in the jury as assembled, and every run of it would waste a
+	 * judge's work to reach the same error.
+	 * </p>
+	 * @param judges the configured judges
+	 * @param capabilities each seat's declaration
+	 * @param strategy the configured strategy
+	 */
+	private static void requireCoherentExclusionPolicy(List<Judge> judges, List<String> capabilities,
+			VotingStrategy strategy) {
+		if (strategy.notApplicablePolicy() != NotApplicablePolicy.REFUSE) {
+			return;
+		}
+		for (int position = 0; position < capabilities.size(); position++) {
+			String declared = capabilities.get(position);
+			if (declared != null) {
+				throw new IllegalArgumentException("seats[" + position + "] declares that it may return NOT_APPLICABLE ("
+						+ declared + "), but strategy '" + strategy.getName()
+						+ "' refuses exclusions; configure NotApplicablePolicy.EXCLUDE or TREAT_AS_FAIL, "
+						+ "or seat a judge that does not exclude");
+			}
+		}
+	}
+
+	/**
+	 * Refuse a jury whose seats are not all identified by a name their judges declared.
+	 * @param judges the configured judges
+	 * @param deduplicated positions whose key was manufactured to break a collision
+	 */
+	private static void requireDeclaredNames(List<Judge> judges, Set<Integer> deduplicated) {
+		Map<String, Integer> byKey = new LinkedHashMap<>();
+		for (int position = 0; position < judges.size(); position++) {
+			SeatKey key = SeatKey.of(judges.get(position), position);
+			if (!key.declared() && !deduplicated.contains(position)) {
+				throw new IllegalArgumentException("seats[" + position + "] has no declared name, so its verdict key '"
+						+ key.verdictKey() + "' identifies a position rather than a judge; "
+						+ "name it, or drop requireDeclaredNames()");
+			}
+			Integer earlier = byKey.putIfAbsent(key.verdictKey(), position);
+			if (earlier != null) {
+				throw new IllegalArgumentException("seats[" + position + "] and seats[" + earlier
+						+ "] share the verdict key '" + key.verdictKey()
+						+ "', so one judgment would overwrite the other in individualByName");
+			}
+		}
+	}
+
+	/**
+	 * A capable seat exists and the strategy is configured to honour an exclusion.
+	 * <p>
+	 * Both halves are needed, and the conjunction is what makes this bound conservative: a
+	 * capable seat under a refusing strategy produces an error, never an excluded aggregate.
+	 * </p>
+	 * @return true when this jury's aggregate may be NOT_APPLICABLE
+	 * @since 0.17.0
+	 */
+	@Override
+	public boolean aggregateMayBeNotApplicable() {
+		return votingStrategy.notApplicablePolicy() == NotApplicablePolicy.EXCLUDE
+				&& declaredCapabilities.stream().anyMatch(declared -> declared != null);
 	}
 
 	@Override
@@ -148,7 +258,10 @@ public class SimpleJury implements Jury {
 			try {
 				// Judges.describe refuses metadata it cannot read, rather than describing the
 				// judge as undeclared.
-				seats.add(new SeatDescription(position, key.verdictKey(), keySource, weight, Judges.describe(judge)));
+				SeatDescription seat = new SeatDescription(position, key.verdictKey(), keySource, weight,
+						Judges.describe(judge));
+				requireStableCapability(position, seat.judge().notApplicableWhen());
+				seats.add(seat);
 			}
 			catch (IllegalArgumentException ex) {
 				throw new IllegalArgumentException(
@@ -156,6 +269,29 @@ public class SimpleJury implements Jury {
 			}
 		}
 		return new SimpleJuryDescription(votingStrategy.describe(), seats);
+	}
+
+	/**
+	 * Refuse to describe a seat whose declaration has changed since the jury was built.
+	 * <p>
+	 * The description and the guard must agree, or the description is a claim about a jury that
+	 * does not exist. A judge whose {@code metadata()} answers differently on each call would
+	 * otherwise be described as capable while being guarded as incapable, or the reverse.
+	 * </p>
+	 * @param position the seat's position
+	 * @param described what the judge declares now
+	 */
+	private void requireStableCapability(int position, String described) {
+		String built = declaredCapabilities.get(position);
+		if (!java.util.Objects.equals(built, described)) {
+			throw new IllegalArgumentException("its exclusion capability changed after the jury was built: "
+					+ "it declared " + describeCapability(built) + " at construction and "
+					+ describeCapability(described) + " now");
+		}
+	}
+
+	private static String describeCapability(String declared) {
+		return declared == null ? "none" : "'" + declared + "'";
 	}
 
 	@Override
@@ -188,22 +324,44 @@ public class SimpleJury implements Jury {
 				.toList();
 		}
 
-		// Build identity map (preserves order via LinkedHashMap)
+		// Build identity map (preserves order via LinkedHashMap) and the seats that join it to
+		// the ordered list.
 		Map<String, Judgment> judgmentByName = new LinkedHashMap<>();
+		List<Seat> seats = new ArrayList<>(judges.size());
 		for (int i = 0; i < judges.size(); i++) {
 			judgmentByName.put(keys.get(i).verdictKey(), individualJudgments.get(i));
+			seats.add(new Seat(i, keys.get(i).verdictKey(), keySourceAt(i, keys.get(i))));
 		}
 
-		// Aggregate using voting strategy
-		Judgment aggregated = votingStrategy.aggregate(individualJudgments, weights);
+		Judgment aggregated = aggregateWithinBoundary(individualJudgments);
 
 		return Verdict.builder()
 			.aggregated(aggregated)
 			.individual(individualJudgments)
 			.individualByName(judgmentByName)
 			.weights(weights)
+			.seats(seats)
+			.decision(AggregationBoundary.decisionFor(aggregated))
 			.compositeAttempts(List.of())
 			.build();
+	}
+
+	private KeySource keySourceAt(int position, SeatKey key) {
+		if (deduplicatedPositions.contains(position)) {
+			return KeySource.DEDUPLICATED;
+		}
+		return key.declared() ? KeySource.DECLARED : KeySource.POSITIONAL;
+	}
+
+	/**
+	 * Call the strategy inside the shared boundary, so a broken reduction becomes a contained,
+	 * countable error instead of an exception that discards every judge that succeeded.
+	 * @param individualJudgments the judgments to reduce
+	 * @return the strategy's aggregate, or the contained error that replaces it
+	 */
+	private Judgment aggregateWithinBoundary(List<Judgment> individualJudgments) {
+		return AggregationBoundary.aggregate(votingStrategy, individualJudgments, weights,
+				aggregateMayBeNotApplicable(), logger);
 	}
 
 	/**
@@ -224,24 +382,50 @@ public class SimpleJury implements Jury {
 		if (key.metadataFailure() != null) {
 			String reasoning = key.unreadableMetadata();
 			logger.warn("{}; recording an ERROR for the error policy to resolve", reasoning, key.cause());
-			return Judgment.error(reasoning);
+			return Judgment.error(JudgmentReasonCode.JUDGE_METADATA_UNREADABLE, reasoning);
 		}
 		Judge judge = judges.get(index);
 		String name = key.verdictKey();
 		try {
-			Judgment judgment = judge.judge(context);
+			Judgment judgment = guardExclusion(index, name, judge.judge(context));
 			if (judgment == null) {
 				logger.warn("Judge '{}' returned no judgment; recording an ERROR for the error policy to resolve",
 						name);
-				return Judgment.error("Judge '" + name + "' returned no judgment");
+				return Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "Judge '" + name + "' returned no judgment");
 			}
 			return judgment;
 		}
 		catch (Exception ex) {
 			logger.warn("Judge '{}' threw {}; recording an ERROR for the error policy to resolve", name,
 					ex.getClass().getName(), ex);
-			return Judgment.error("Judge '" + name + "' threw " + ex.getClass().getName() + describeCause(ex));
+			return Judgment.error(JudgmentReasonCode.JUDGE_FAILED,
+					"Judge '" + name + "' threw " + ex.getClass().getName() + describeCause(ex));
 		}
+	}
+
+	/**
+	 * Convert an exclusion from a seat that never declared one into an error.
+	 * <p>
+	 * Exclusion is the only outcome that removes a judge from its own denominator, so it is the
+	 * one a judge could use to dodge a criterion it does not like the look of. A seat that
+	 * declared the capability in advance is honoured; a seat that did not gets an
+	 * {@code ERROR undeclared_not_applicable}, which is a judge-origin error and therefore the
+	 * configured {@link ErrorPolicy}'s to resolve, exactly like any other judge failure.
+	 * </p>
+	 * @param index the seat's position
+	 * @param name the seat's verdict key
+	 * @param judgment the judge's result, possibly null
+	 * @return the judgment, or the error that replaces an undeclared exclusion
+	 */
+	private Judgment guardExclusion(int index, String name, Judgment judgment) {
+		if (judgment == null || judgment.status() != JudgmentStatus.NOT_APPLICABLE
+				|| declaredCapabilities.get(index) != null) {
+			return judgment;
+		}
+		String reasoning = "Judge '" + name + "' returned NOT_APPLICABLE without declaring that it may exclude a "
+				+ "subject, so the exclusion is not honoured: " + judgment.reasoning();
+		logger.warn("{}; recording an ERROR for the error policy to resolve", reasoning);
+		return Judgment.error(JudgmentReasonCode.UNDECLARED_NOT_APPLICABLE, reasoning);
 	}
 
 	private static String describeCause(Exception ex) {
@@ -324,6 +508,8 @@ public class SimpleJury implements Jury {
 
 		private final Set<Integer> deduplicated = new HashSet<>();
 
+		private boolean requireDeclaredNames;
+
 		/**
 		 * Add a judge with equal weight (1.0).
 		 * @param judge the judge to add
@@ -400,6 +586,29 @@ public class SimpleJury implements Jury {
 		}
 
 		/**
+		 * Require every seat to be identified by a name its judge declared, and require those
+		 * names to be unique.
+		 * <p>
+		 * Opt-in, because it is a real constraint and existing juries seat unnamed lambdas
+		 * freely. Turn it on where the verdict is going to be <em>stored</em> and read later:
+		 * without it a seat can be keyed {@code "Judge#2"}, which identifies a position rather
+		 * than a judge and silently means something else the moment a judge is inserted above
+		 * it — and a judge that declares the name {@code "Judge#2"} collides with exactly that
+		 * key, so one judgment overwrites the other in {@code individualByName}.
+		 * </p>
+		 * <p>
+		 * {@link #build()} then rejects a positional seat, a duplicate declared name, and a
+		 * declared name that collides with a positional key.
+		 * </p>
+		 * @return this builder
+		 * @since 0.17.0
+		 */
+		public Builder requireDeclaredNames() {
+			this.requireDeclaredNames = true;
+			return this;
+		}
+
+		/**
 		 * Build the SimpleJury instance.
 		 * @return configured SimpleJury
 		 */
@@ -407,7 +616,8 @@ public class SimpleJury implements Jury {
 			if (votingStrategy == null) {
 				throw new IllegalStateException("Voting strategy is required");
 			}
-			return new SimpleJury(judges, votingStrategy, weights, parallel, executor, deduplicated);
+			return new SimpleJury(judges, votingStrategy, weights, parallel, executor, deduplicated,
+					requireDeclaredNames);
 		}
 
 	}

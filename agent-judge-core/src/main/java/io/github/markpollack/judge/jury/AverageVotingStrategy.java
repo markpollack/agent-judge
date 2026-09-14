@@ -23,12 +23,17 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * Abstentions leave the population entirely — excluded from both the numerator and the
  * denominator, because "no assessment" is not the assessment zero. Errors are governed by
- * {@link ErrorPolicy} (default {@code PROPAGATE}). If nothing is eligible the result is
- * {@code ABSTAIN} rather than a manufactured failing score.
+ * {@link ErrorPolicy} (default {@code PROPAGATE}) and exclusions by
+ * {@link NotApplicablePolicy} (default {@code REFUSE}). If nothing is eligible the result is
+ * {@code ABSTAIN} rather than a manufactured failing score, or {@code NOT_APPLICABLE} when
+ * every input was an exclusion this strategy was configured to honour.
  * </p>
  *
  * <p>
- * The judgment passes if the mean is greater than or equal to 0.5.
+ * The judgment passes if the mean reaches the configured threshold, which defaults to
+ * {@link #DEFAULT_THRESHOLD}. That default is a convention rather than a derivation: it knows
+ * nothing about the scale your judges score on. Prefer a bar derived from the rubric that
+ * produced the scores.
  * </p>
  *
  * <p>
@@ -57,6 +62,8 @@ public class AverageVotingStrategy implements VotingStrategy {
 	private final double threshold;
 
 	private final ErrorPolicy errorPolicy;
+
+	private final NotApplicablePolicy notApplicablePolicy;
 
 	/**
 	 * Create an average strategy with the default error policy.
@@ -94,6 +101,24 @@ public class AverageVotingStrategy implements VotingStrategy {
 	 * @since 0.16.0
 	 */
 	public AverageVotingStrategy(double threshold, ErrorPolicy errorPolicy) {
+		this(threshold, errorPolicy, NotApplicablePolicy.REFUSE);
+	}
+
+	/**
+	 * Create an average strategy with a caller-supplied acceptance bar and both policies.
+	 * @param threshold the normalized bar the average must reach, in {@code [0.0, 1.0]}
+	 * @param errorPolicy policy for handling errors
+	 * @param notApplicablePolicy policy for handling excluded judgments
+	 * @throws IllegalArgumentException if the threshold is not a finite value in
+	 * {@code [0.0, 1.0]}, or if either policy is null
+	 * @since 0.17.0
+	 */
+	public AverageVotingStrategy(double threshold, ErrorPolicy errorPolicy,
+			NotApplicablePolicy notApplicablePolicy) {
+		if (notApplicablePolicy == null) {
+			throw new IllegalArgumentException("notApplicablePolicy must not be null");
+		}
+		this.notApplicablePolicy = notApplicablePolicy;
 		if (!Double.isFinite(threshold)) {
 			throw new IllegalArgumentException("threshold must be finite, but was " + threshold);
 		}
@@ -118,10 +143,11 @@ public class AverageVotingStrategy implements VotingStrategy {
 
 	@Override
 	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
-		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy);
+		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
+				this.notApplicablePolicy);
 
-		if (population.propagateError()) {
-			return population.propagatedError(getName());
+		if (population.hasPolicyExit()) {
+			return population.policyExitAggregate(getName());
 		}
 		if (population.isEmpty()) {
 			return population.noResult(getName(), Map.of());
@@ -155,7 +181,15 @@ public class AverageVotingStrategy implements VotingStrategy {
 	 */
 	@Override
 	public StrategyDescription describe() {
-		return StrategyDescription.declared(this, this.errorPolicy, this.threshold, Map.of());
+		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, this.threshold,
+				Map.of());
 	}
+
+	/** {@inheritDoc} */
+	@Override
+	public NotApplicablePolicy notApplicablePolicy() {
+		return this.notApplicablePolicy;
+	}
+
 
 }

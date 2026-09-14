@@ -21,6 +21,25 @@ import java.util.Map;
  * {@link Judgment#effectiveScore()} view.
  * </p>
  *
+ * <h2>Writing your own</h2>
+ * <p>
+ * A custom strategy is not only an arithmetic choice; it is also the place a result format is
+ * either kept honest or quietly broken. Three obligations, none of them optional:
+ * </p>
+ * <ul>
+ * <li><b>Apply not-applicable accounting.</b> An exclusion is not a vote and not an
+ * abstention. Resolve the population the way the built-ins do rather than filtering by hand,
+ * or a criterion that left the denominator becomes indistinguishable from one that was
+ * decided.</li>
+ * <li><b>Write the universal evidence keys.</b> {@link AggregationEvidence} is how a reader
+ * derives a rate from a stored result. A strategy that reduces without publishing what it
+ * reduced over produces a number nobody can check.</li>
+ * <li><b>Never return {@link io.github.markpollack.judge.result.JudgmentStatus#NOT_APPLICABLE}
+ * unless the jury is capable of it.</b> Excluding a criterion the jury never declared it could
+ * exclude is the one move that silently shrinks a denominator, so a jury contains an
+ * unauthorized exclusion as an {@code ERROR} rather than honouring it.</li>
+ * </ul>
+ *
  * <p>
  * Example usage:
  * </p>
@@ -61,6 +80,29 @@ public interface VotingStrategy {
 	 */
 	default StrategyDescription describe() {
 		return StrategyDescription.undeclared(this);
+	}
+
+	/**
+	 * How this strategy treats a {@link io.github.markpollack.judge.result.JudgmentStatus#NOT_APPLICABLE}
+	 * input.
+	 * <p>
+	 * The default is {@link NotApplicablePolicy#REFUSE}: a strategy that says nothing has not
+	 * decided that its denominator may shrink, and honouring an exclusion it was never
+	 * configured for would make that decision on the author's behalf.
+	 * </p>
+	 * <p>
+	 * This exists so composition can be validated <em>before</em> anything runs. A jury whose
+	 * strategy refuses exclusions cannot seat a judge that declares it may exclude; the
+	 * contradiction is a construction error rather than a surprise at vote time, which is the
+	 * difference between a build that fails and a spend that produces an unusable result. It is
+	 * a declaration, not the enforcement: the reduction applies the policy itself, and the
+	 * jury contains an aggregate it was not entitled to produce.
+	 * </p>
+	 * @return the declared not-applicable policy; never null
+	 * @since 0.17.0
+	 */
+	default NotApplicablePolicy notApplicablePolicy() {
+		return NotApplicablePolicy.REFUSE;
 	}
 
 }

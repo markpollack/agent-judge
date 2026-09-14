@@ -94,7 +94,7 @@ class DescriptionPortabilityTest {
 	@Test
 	void strategyParametersAreHeldToTheSameRules() {
 		assertThatThrownBy(() -> new StrategyDescription("s", ImplementationIdentity.of(MajorityVotingStrategy.class),
-				null, null, Map.of("clock", Duration.ZERO)))
+				null, null, null, Map.of("clock", Duration.ZERO)))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageStartingWith("parameters.clock: java.time.Duration is not a portable");
 	}

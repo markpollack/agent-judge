@@ -1,0 +1,201 @@
+{
+  "aggregated" : {
+    "status" : "error",
+    "reasonCode" : "stage_failed",
+    "reasoning" : "One or more jury members did not produce a usable determination, so this jury reduced nothing.",
+    "checks" : [ ],
+    "metadata" : { }
+  },
+  "individual" : [ {
+    "status" : "pass",
+    "reasoning" : "Unanimous consensus: all 1 applicable judge(s) passed",
+    "checks" : [ ],
+    "metadata" : {
+      "aggregation" : {
+        "strategy" : "consensus",
+        "errorPolicy" : "propagate",
+        "notApplicablePolicy" : "refuse",
+        "inputCount" : 1,
+        "eligibleCount" : 1,
+        "explicitAbstainCount" : 0,
+        "notApplicableCount" : 0,
+        "errorCount" : 0,
+        "ignoredErrorCount" : 0,
+        "errorsTreatedAsAbstainCount" : 0,
+        "errorsTreatedAsFailCount" : 0,
+        "notApplicableTreatedAsFailCount" : 0,
+        "errorCodeCounts" : { },
+        "passCount" : 1,
+        "failCount" : 0
+      }
+    }
+  } ],
+  "individualByName" : {
+    "pipeline" : {
+      "status" : "pass",
+      "reasoning" : "Unanimous consensus: all 1 applicable judge(s) passed",
+      "checks" : [ ],
+      "metadata" : {
+        "aggregation" : {
+          "strategy" : "consensus",
+          "errorPolicy" : "propagate",
+          "notApplicablePolicy" : "refuse",
+          "inputCount" : 1,
+          "eligibleCount" : 1,
+          "explicitAbstainCount" : 0,
+          "notApplicableCount" : 0,
+          "errorCount" : 0,
+          "ignoredErrorCount" : 0,
+          "errorsTreatedAsAbstainCount" : 0,
+          "errorsTreatedAsFailCount" : 0,
+          "notApplicableTreatedAsFailCount" : 0,
+          "errorCodeCounts" : { },
+          "passCount" : 1,
+          "failCount" : 0
+        }
+      }
+    }
+  },
+  "weights" : { },
+  "seats" : [ {
+    "position" : 0,
+    "verdictKey" : "pipeline",
+    "keySource" : "DECLARED"
+  } ],
+  "decision" : {
+    "kind" : "undecided"
+  },
+  "compositeAttempts" : [ {
+    "name" : "pipeline",
+    "relation" : "meta_member",
+    "disposition" : "used",
+    "verdict" : {
+      "aggregated" : {
+        "status" : "pass",
+        "reasoning" : "Unanimous consensus: all 1 applicable judge(s) passed",
+        "checks" : [ ],
+        "metadata" : {
+          "aggregation" : {
+            "strategy" : "consensus",
+            "errorPolicy" : "propagate",
+            "notApplicablePolicy" : "refuse",
+            "inputCount" : 1,
+            "eligibleCount" : 1,
+            "explicitAbstainCount" : 0,
+            "notApplicableCount" : 0,
+            "errorCount" : 0,
+            "ignoredErrorCount" : 0,
+            "errorsTreatedAsAbstainCount" : 0,
+            "errorsTreatedAsFailCount" : 0,
+            "notApplicableTreatedAsFailCount" : 0,
+            "errorCodeCounts" : { },
+            "passCount" : 1,
+            "failCount" : 0
+          }
+        }
+      },
+      "individual" : [ {
+        "status" : "pass",
+        "reasoning" : "Semantic fallback accepted",
+        "checks" : [ ],
+        "metadata" : { }
+      } ],
+      "individualByName" : {
+        "semantic-check" : {
+          "status" : "pass",
+          "reasoning" : "Semantic fallback accepted",
+          "checks" : [ ],
+          "metadata" : { }
+        }
+      },
+      "weights" : {
+        "0" : 1.0
+      },
+      "seats" : [ {
+        "position" : 0,
+        "verdictKey" : "semantic-check",
+        "keySource" : "DECLARED"
+      } ],
+      "decision" : {
+        "kind" : "tier",
+        "tier" : "semantic-check",
+        "basis" : "tier_outcome"
+      },
+      "compositeAttempts" : [ {
+        "name" : "broken-check",
+        "relation" : "cascade_tier",
+        "policy" : "REJECT_ON_ANY_FAIL",
+        "disposition" : "stage_failed",
+        "dispositionReason" : "execution_failed",
+        "failure" : {
+          "code" : "jury_execution_failed"
+        }
+      }, {
+        "name" : "semantic-check",
+        "relation" : "cascade_tier",
+        "policy" : "FINAL_TIER",
+        "disposition" : "used",
+        "verdict" : {
+          "aggregated" : {
+            "status" : "pass",
+            "reasoning" : "Unanimous consensus: all 1 applicable judge(s) passed",
+            "checks" : [ ],
+            "metadata" : {
+              "aggregation" : {
+                "strategy" : "consensus",
+                "errorPolicy" : "propagate",
+                "notApplicablePolicy" : "refuse",
+                "inputCount" : 1,
+                "eligibleCount" : 1,
+                "explicitAbstainCount" : 0,
+                "notApplicableCount" : 0,
+                "errorCount" : 0,
+                "ignoredErrorCount" : 0,
+                "errorsTreatedAsAbstainCount" : 0,
+                "errorsTreatedAsFailCount" : 0,
+                "notApplicableTreatedAsFailCount" : 0,
+                "errorCodeCounts" : { },
+                "passCount" : 1,
+                "failCount" : 0
+              }
+            }
+          },
+          "individual" : [ {
+            "status" : "pass",
+            "reasoning" : "Semantic fallback accepted",
+            "checks" : [ ],
+            "metadata" : { }
+          } ],
+          "individualByName" : {
+            "semantic-check" : {
+              "status" : "pass",
+              "reasoning" : "Semantic fallback accepted",
+              "checks" : [ ],
+              "metadata" : { }
+            }
+          },
+          "weights" : {
+            "0" : 1.0
+          },
+          "seats" : [ {
+            "position" : 0,
+            "verdictKey" : "semantic-check",
+            "keySource" : "DECLARED"
+          } ],
+          "decision" : {
+            "kind" : "own"
+          },
+          "compositeAttempts" : [ ]
+        }
+      } ]
+    }
+  }, {
+    "name" : "audit",
+    "relation" : "meta_member",
+    "disposition" : "stage_failed",
+    "dispositionReason" : "execution_failed",
+    "failure" : {
+      "code" : "jury_execution_failed"
+    }
+  } ]
+}

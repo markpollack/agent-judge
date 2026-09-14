@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,13 +22,56 @@ import org.slf4j.LoggerFactory;
  * lets the roster notice a missing answer. A specification with 52 criteria has 52; a judge that
  * answers five of them has sampled it, not evaluated it.
  *
+ * <h2>Conditional criteria</h2>
+ *
+ * <p>Some criteria only apply to some subjects — a rule about Java sources against a change set
+ * that contains none. {@code applicability} states that condition, and stating it is what makes
+ * {@code NOT_APPLICABLE} an available answer for this criterion. A criterion with no
+ * applicability clause is unconditional: it applies to every subject, and an audit that tries to
+ * exclude it is making a protocol error rather than a finding.
+ *
+ * <p>The asymmetry is deliberate. Excluding a criterion removes it from the denominator, so the
+ * condition under which that is legitimate belongs in the document, written before the subject
+ * was seen, rather than in an answer written after.
+ *
  * @param id the specification's own identifier, such as {@code UC6-AC41}
  * @param title the criterion's heading text
  * @param requirement the criterion sentence, verbatim from the specification
+ * @param applicability the condition under which this criterion applies, or null when it always
+ * does; must be non-blank when present
  * @author Mark Pollack
  * @since 0.16.0
  */
-public record EarsCriterion(String id, String title, String requirement) {
+public record EarsCriterion(String id, String title, String requirement, @Nullable String applicability) {
+
+	/**
+	 * Validate the applicability clause.
+	 * @throws IllegalArgumentException if {@code applicability} is present and blank
+	 */
+	public EarsCriterion {
+		if (applicability != null && applicability.isBlank()) {
+			throw new IllegalArgumentException(
+					"applicability must be non-blank when present; use null for an unconditional criterion");
+		}
+	}
+
+	/**
+	 * An unconditional criterion, which applies to every subject.
+	 * @param id the specification's own identifier
+	 * @param title the criterion's heading text
+	 * @param requirement the criterion sentence, verbatim
+	 */
+	public EarsCriterion(String id, String title, String requirement) {
+		this(id, title, requirement, null);
+	}
+
+	/**
+	 * Whether this criterion may be answered {@code NOT_APPLICABLE}.
+	 * @return true when the document states a condition under which it applies
+	 */
+	public boolean conditional() {
+		return this.applicability != null;
+	}
 
 	/** Flow logging at INFO: what was parsed, what was answered, what bound the verdict. */
 	private static final Logger logger = LoggerFactory.getLogger(EarsCriterion.class);
@@ -94,7 +138,8 @@ public record EarsCriterion(String id, String title, String requirement) {
 	 * @return the identifier and the requirement sentence
 	 */
 	public String asPrompt() {
-		return id + ": " + requirement;
+		return applicability == null ? id + ": " + requirement
+				: id + ": " + requirement + " (Applies when: " + applicability + ")";
 	}
 
 	private static String read(Path path) {

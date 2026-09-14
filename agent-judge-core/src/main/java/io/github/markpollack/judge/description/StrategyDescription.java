@@ -13,6 +13,7 @@ import java.util.TreeMap;
 import org.jspecify.annotations.Nullable;
 
 import io.github.markpollack.judge.jury.ErrorPolicy;
+import io.github.markpollack.judge.jury.NotApplicablePolicy;
 import io.github.markpollack.judge.jury.VotingStrategy;
 
 /**
@@ -38,21 +39,29 @@ import io.github.markpollack.judge.jury.VotingStrategy;
  *   "descriptionVersion": 1,
  *   "name": "majority",
  *   "implementation": {"form": "NAMED", "className": "..."},
- *   "parameters": {"declared": true, "values": {"errorPolicy": "propagate", "tiePolicy": "FAIL"}}
+ *   "parameters": {"declared": true, "values": {"errorPolicy": "propagate",
+ *                    "notApplicablePolicy": "refuse", "tiePolicy": "FAIL"}}
  * }
  * </pre>
  * <p>
- * Declared {@code values} hold {@code errorPolicy} (its
- * {@linkplain ErrorPolicy#token() token}) and {@code threshold} when present, together with
+ * Declared {@code values} hold {@code errorPolicy} and {@code notApplicablePolicy} (their
+ * {@linkplain ErrorPolicy#token() tokens}) and {@code threshold} when present, together with
  * the other parameters, in ascending key order. A strategy that has no threshold has no
  * {@code threshold} key: the declared map is the whole declaration. An undeclared strategy
  * carries {@code "parameters": {"declared": false}}.
+ * </p>
+ * <p>
+ * {@code notApplicablePolicy} is what makes a jury's
+ * {@code aggregateMayBeNotApplicable} derivable from its description alone: a reader holding
+ * only the portable form can tell whether this strategy would honour an exclusion, without
+ * having to run the jury to find out.
  * </p>
  *
  * @param name the strategy's {@link VotingStrategy#getName() name}
  * @param implementation the class that implements the strategy
  * @param errorPolicy the declared error policy, or null when undeclared or when the strategy
  * has none
+ * @param notApplicablePolicy the declared not-applicable policy, or null when undeclared
  * @param threshold the declared normalized threshold, or null when undeclared or when the
  * strategy has none
  * @param parameters the other declared parameters, ordered by key; null when the strategy
@@ -61,9 +70,12 @@ import io.github.markpollack.judge.jury.VotingStrategy;
  * @since 0.17.0
  */
 public record StrategyDescription(String name, ImplementationIdentity implementation, @Nullable ErrorPolicy errorPolicy,
-		@Nullable Double threshold, @Nullable Map<String, Object> parameters) {
+		@Nullable NotApplicablePolicy notApplicablePolicy, @Nullable Double threshold,
+		@Nullable Map<String, Object> parameters) {
 
 	private static final String ERROR_POLICY = "errorPolicy";
+
+	private static final String NOT_APPLICABLE_POLICY = "notApplicablePolicy";
 
 	private static final String THRESHOLD = "threshold";
 
@@ -77,15 +89,16 @@ public record StrategyDescription(String name, ImplementationIdentity implementa
 		Objects.requireNonNull(name, "name must not be null");
 		Objects.requireNonNull(implementation, "implementation must not be null");
 		if (parameters == null) {
-			if (errorPolicy != null || threshold != null) {
-				throw new IllegalArgumentException("A strategy that declares an error policy or a threshold has "
+			if (errorPolicy != null || notApplicablePolicy != null || threshold != null) {
+				throw new IllegalArgumentException("A strategy that declares a policy or a threshold has "
 						+ "declared its parameters; pass an empty parameter map rather than null");
 			}
 		}
 		else {
-			if (parameters.containsKey(ERROR_POLICY) || parameters.containsKey(THRESHOLD)) {
-				throw new IllegalArgumentException(
-						"'errorPolicy' and 'threshold' are declared through their own components, not as parameters");
+			if (parameters.containsKey(ERROR_POLICY) || parameters.containsKey(NOT_APPLICABLE_POLICY)
+					|| parameters.containsKey(THRESHOLD)) {
+				throw new IllegalArgumentException("'errorPolicy', 'notApplicablePolicy' and 'threshold' are declared "
+						+ "through their own components, not as parameters");
 			}
 			parameters = PortableForm.ordered(parameters, "parameters");
 		}
@@ -102,23 +115,26 @@ public record StrategyDescription(String name, ImplementationIdentity implementa
 	public static StrategyDescription undeclared(VotingStrategy strategy) {
 		Objects.requireNonNull(strategy, "strategy must not be null");
 		return new StrategyDescription(strategy.getName(), ImplementationIdentity.of(strategy.getClass()), null, null,
-				null);
+				null, null);
 	}
 
 	/**
 	 * Describe a strategy that declares its parameters.
 	 * @param strategy the strategy
 	 * @param errorPolicy its error policy, or null when it has none
+	 * @param notApplicablePolicy its not-applicable policy, or null when it has none
 	 * @param threshold its normalized threshold, or null when it has none
 	 * @param parameters any other parameters; empty when there are none
 	 * @return a declared description
+	 * @since 0.17.0
 	 */
 	public static StrategyDescription declared(VotingStrategy strategy, @Nullable ErrorPolicy errorPolicy,
-			@Nullable Double threshold, Map<String, Object> parameters) {
+			@Nullable NotApplicablePolicy notApplicablePolicy, @Nullable Double threshold,
+			Map<String, Object> parameters) {
 		Objects.requireNonNull(strategy, "strategy must not be null");
 		Objects.requireNonNull(parameters, "parameters must not be null");
 		return new StrategyDescription(strategy.getName(), ImplementationIdentity.of(strategy.getClass()), errorPolicy,
-				threshold, parameters);
+				notApplicablePolicy, threshold, parameters);
 	}
 
 	/**
@@ -142,6 +158,10 @@ public record StrategyDescription(String name, ImplementationIdentity implementa
 			ErrorPolicy policy = errorPolicy;
 			if (policy != null) {
 				values.put(ERROR_POLICY, policy.token());
+			}
+			NotApplicablePolicy exclusions = notApplicablePolicy;
+			if (exclusions != null) {
+				values.put(NOT_APPLICABLE_POLICY, exclusions.token());
 			}
 			Double bar = threshold;
 			if (bar != null) {

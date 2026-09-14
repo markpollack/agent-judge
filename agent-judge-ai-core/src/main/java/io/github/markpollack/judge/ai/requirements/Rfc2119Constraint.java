@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,15 +24,57 @@ import org.slf4j.LoggerFactory;
  * telling us how strictly to read the requirement. A document whose rules are all {@code MUST}
  * does not depend on it; it is recorded so a later {@code SHOULD} does not have to be guessed at.
  *
+ * <h2>Conditional constraints</h2>
+ *
+ * <p>Some constraints only apply to some implementations — a rule about a persistence layer
+ * against a service that has none. {@code applicability} states that condition, and stating it is
+ * what makes {@code NOT_APPLICABLE} an available answer. A constraint with no applicability clause
+ * is unconditional: an audit that tries to exclude it is making a protocol error rather than a
+ * finding, because excluding a constraint removes it from the denominator and the condition for
+ * that belongs in the design rather than in an answer written after the code was read.
+ *
  * @param id the document's own identifier, such as {@code RULE-4}
  * @param keyword MUST, MUST NOT, SHOULD, SHOULD NOT or MAY
  * @param requirement the constraint text
  * @param reason why the design chose it, which travels with the rule into the prompt
+ * @param applicability the condition under which this constraint applies, or null when it always
+ * does; must be non-blank when present
  *
  * @author Mark Pollack
  * @since 0.16.0
  */
-public record Rfc2119Constraint(String id, String keyword, String requirement, String reason) {
+public record Rfc2119Constraint(String id, String keyword, String requirement, String reason,
+		@Nullable String applicability) {
+
+	/**
+	 * Validate the applicability clause.
+	 * @throws IllegalArgumentException if {@code applicability} is present and blank
+	 */
+	public Rfc2119Constraint {
+		if (applicability != null && applicability.isBlank()) {
+			throw new IllegalArgumentException(
+					"applicability must be non-blank when present; use null for an unconditional constraint");
+		}
+	}
+
+	/**
+	 * An unconditional constraint, which applies to every implementation.
+	 * @param id the document's own identifier
+	 * @param keyword the RFC 2119 keyword
+	 * @param requirement the constraint text
+	 * @param reason why the design chose it
+	 */
+	public Rfc2119Constraint(String id, String keyword, String requirement, String reason) {
+		this(id, keyword, requirement, reason, null);
+	}
+
+	/**
+	 * Whether this constraint may be answered {@code NOT_APPLICABLE}.
+	 * @return true when the design states a condition under which it applies
+	 */
+	public boolean conditional() {
+		return this.applicability != null;
+	}
 
 	/** Flow logging at INFO: what was parsed, what was answered, what bound the verdict. */
 	private static final Logger logger = LoggerFactory.getLogger(Rfc2119Constraint.class);
@@ -112,7 +155,8 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 	 * @return the identifier, keyword, requirement and reason as one line
 	 */
 	public String asPrompt() {
-		return id + ": " + keyword.toUpperCase(Locale.ROOT) + " " + requirement + " (Reason: " + reason + ")";
+		String base = id + ": " + keyword.toUpperCase(Locale.ROOT) + " " + requirement + " (Reason: " + reason + ")";
+		return applicability == null ? base : base + " (Applies when: " + applicability + ")";
 	}
 
 	private static String read(Path path) {
