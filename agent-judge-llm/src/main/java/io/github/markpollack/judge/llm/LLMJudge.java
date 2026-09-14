@@ -58,7 +58,8 @@ public abstract class LLMJudge implements JudgeWithMetadata {
 	 * testing)
 	 */
 	protected LLMJudge(String name, String description, ChatClient.Builder chatClientBuilder) {
-		this.metadata = new JudgeMetadata(name, description, JudgeType.LLM_POWERED);
+		// No exclusion capability: this judge always answers its question, or errors trying.
+		this.metadata = new JudgeMetadata(name, description, JudgeType.LLM_POWERED, null);
 		this.chatClient = chatClientBuilder != null ? chatClientBuilder.build() : null;
 	}
 

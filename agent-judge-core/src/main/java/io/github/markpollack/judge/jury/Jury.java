@@ -77,4 +77,26 @@ public interface Jury {
 		return JuryDescription.opaque(this);
 	}
 
+	/**
+	 * Whether this jury's aggregate may be
+	 * {@link io.github.markpollack.judge.result.JudgmentStatus#NOT_APPLICABLE}.
+	 * <p>
+	 * A conservative bound, declared before any vote. True means the jury is permitted to
+	 * exclude the subject; false means a built-in parent that receives an excluded aggregate
+	 * from it will treat that as a stage failure rather than honour it.
+	 * </p>
+	 * <p>
+	 * The default is {@code false}, which is the safe direction and the honest one: a jury this
+	 * library cannot inspect has made no pre-spend guarantee about its own denominator, so it is
+	 * checked at runtime wherever a built-in parent receives its output. Override it only if the
+	 * jury really can return an excluded aggregate — and then it must, because otherwise its
+	 * legitimate exclusions will be contained as errors.
+	 * </p>
+	 * @return true when the aggregate may be not applicable; false by default
+	 * @since 0.17.0
+	 */
+	default boolean aggregateMayBeNotApplicable() {
+		return false;
+	}
+
 }

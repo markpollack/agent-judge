@@ -397,8 +397,8 @@ class JuryDescriptionTest {
 		@Test
 		void undeclaredAndDeclaredEmptyHaveUnequalPortableForms() throws Exception {
 			ImplementationIdentity same = named(KeywordJudge.class);
-			JudgeDescription undeclared = new JudgeDescription("j", JudgeType.DETERMINISTIC, null, null, same, null);
-			JudgeDescription declaredEmpty = new JudgeDescription("j", JudgeType.DETERMINISTIC, null, null, same,
+			JudgeDescription undeclared = new JudgeDescription("j", JudgeType.DETERMINISTIC, null, null, null, same, null);
+			JudgeDescription declaredEmpty = new JudgeDescription("j", JudgeType.DETERMINISTIC, null, null, null, same,
 					Map.of());
 
 			assertThat(undeclared.toPortable()).isNotEqualTo(declaredEmpty.toPortable());
@@ -450,7 +450,7 @@ class JuryDescriptionTest {
 
 		@Test
 		void metadataWithOnlyATypeDeclaresOnlyThatValue() {
-			JudgeDescription description = new JudgeDescription(null, JudgeType.AGENT, null, null,
+			JudgeDescription description = new JudgeDescription(null, JudgeType.AGENT, null, null, null,
 					named(KeywordJudge.class), null);
 
 			assertThat(description.toPortable().get("metadata"))

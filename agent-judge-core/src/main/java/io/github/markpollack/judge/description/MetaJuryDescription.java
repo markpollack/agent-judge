@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import io.github.markpollack.judge.jury.NotApplicablePolicy;
+
 /**
  * A meta-jury as configured: the strategy that aggregates its members' verdicts, and its
  * named members in execution order.
@@ -24,7 +26,8 @@ import java.util.Objects;
  *
  * <h2>Portable form</h2>
  * <pre>
- * {"descriptionVersion": 1, "kind": "META", "strategy": {...}, "members": [{...}, ...]}
+ * {"descriptionVersion": 2, "kind": "META", "aggregateMayBeNotApplicable": false,
+ *  "strategy": {...}, "members": [{...}, ...]}
  * </pre>
  *
  * @param strategy the strategy over member aggregates
@@ -42,6 +45,17 @@ public record MetaJuryDescription(StrategyDescription strategy, List<MemberDescr
 		members = List.copyOf(Objects.requireNonNull(members, "members must not be null"));
 	}
 
+	/**
+	 * A member whose aggregate may be excluded exists, and the strategy is configured to honour
+	 * an exclusion.
+	 * @return true when the aggregate may be not applicable
+	 */
+	@Override
+	public boolean aggregateMayBeNotApplicable() {
+		return strategy.notApplicablePolicy() == NotApplicablePolicy.EXCLUDE
+				&& members.stream().anyMatch(member -> member.jury().aggregateMayBeNotApplicable());
+	}
+
 	@Override
 	public Map<String, Object> toPortable() {
 		return PortableForm.freezeRoot(portableTree(), "jury");
@@ -54,6 +68,7 @@ public record MetaJuryDescription(StrategyDescription strategy, List<MemberDescr
 		}
 		Map<String, Object> tree = new LinkedHashMap<>();
 		tree.put("kind", "META");
+		tree.put("aggregateMayBeNotApplicable", aggregateMayBeNotApplicable());
 		tree.put("strategy", strategy.portableTree());
 		tree.put("members", memberTrees);
 		return tree;

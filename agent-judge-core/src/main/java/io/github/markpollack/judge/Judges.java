@@ -105,7 +105,9 @@ public final class Judges {
 	 * @return named judge with metadata
 	 */
 	public static NamedJudge named(Judge judge, String name, String description, JudgeType type) {
-		return new NamedJudge(judge, new JudgeMetadata(name, description, type));
+		// Absence, deliberately: a wrapper that manufactured a capability would let any judge
+		// exclude a criterion simply by being renamed.
+		return new NamedJudge(judge, new JudgeMetadata(name, description, type, null));
 	}
 
 	/**
@@ -142,6 +144,50 @@ public final class Judges {
 	}
 
 	/**
+	 * Read a judge's declared exclusion capability, looking through {@link NamedJudge} wrappers.
+	 * <p>
+	 * This is the one lookup. {@link io.github.markpollack.judge.jury.Jury#describe()}, jury
+	 * construction and the seat guard all read the capability through it, so a judge cannot be
+	 * described as incapable and then be honoured as capable, or the reverse.
+	 * </p>
+	 * <p>
+	 * The chain is walked from the outside in, and the first declaration present wins. A wrapper
+	 * that declares nothing is transparent — which is what keeps a deduplicating rename from
+	 * stripping the capability off the judge underneath — and a wrapper that declares something
+	 * overrides what it wraps, because the outer declaration is the one the jury seated. If the
+	 * outer condition differs from the inner one, the outer is the effective claim; the
+	 * difference is an author's assertion worth inspecting rather than something this method can
+	 * adjudicate.
+	 * </p>
+	 * <p>
+	 * Absence is not a blank declaration. A judge that says nothing never excludes, and a judge
+	 * that tries to say nothing in a non-empty way is refused when its metadata is constructed.
+	 * </p>
+	 * @param judge the judge
+	 * @return the condition under which the judge may return {@code NOT_APPLICABLE}, or empty
+	 * when it declares none
+	 * @throws IllegalArgumentException if a judge in the chain is a {@link JudgeWithMetadata}
+	 * whose {@code metadata()} returns null or throws, since reading that as absence would
+	 * silently turn an unreadable judge into an incapable one
+	 * @since 0.17.0
+	 */
+	public static Optional<String> notApplicableCapability(Judge judge) {
+		Objects.requireNonNull(judge, "judge must not be null");
+		Judge current = judge;
+		while (true) {
+			JudgeMetadata metadata = readableMetadataOf(current,
+					"Judge implemented by " + ImplementationIdentity.of(current.getClass()).toPortable());
+			if (metadata != null && metadata.notApplicableWhen() != null) {
+				return Optional.of(metadata.notApplicableWhen());
+			}
+			if (!(current instanceof NamedJudge wrapper)) {
+				return Optional.empty();
+			}
+			current = Objects.requireNonNull(wrapper.delegate(), "a NamedJudge must wrap a judge");
+		}
+	}
+
+	/**
 	 * Describe a judge as configured, looking through {@link NamedJudge} wrappers.
 	 * <p>
 	 * The description carries the outer metadata, which names the judge in a verdict, and the
@@ -152,7 +198,9 @@ public final class Judges {
 	 * {@link ImplementationIdentity#of(Class)}, so a lambda, including every combinator in
 	 * this class, is described as {@code HIDDEN} with no class name. The configuration is that
 	 * judge's {@link ConfiguredJudge#configuration()}, or undeclared when it does not
-	 * implement {@link ConfiguredJudge}.
+	 * implement {@link ConfiguredJudge}. The exclusion capability is the effective one from
+	 * {@link #notApplicableCapability(Judge)}, so the description says what a jury would actually
+	 * honour rather than what the outermost wrapper happens to hold.
 	 * </p>
 	 * @param judge the judge to describe
 	 * @return its description
@@ -190,8 +238,8 @@ public final class Judges {
 		}
 		try {
 			return new JudgeDescription(outer == null ? null : outer.name(), outer == null ? null : outer.type(),
-					inner == null ? null : inner.name(), inner == null ? null : inner.type(), implementation,
-					configuration);
+					inner == null ? null : inner.name(), inner == null ? null : inner.type(),
+					notApplicableCapability(judge).orElse(null), implementation, configuration);
 		}
 		catch (IllegalArgumentException ex) {
 			String label = (outer != null && outer.name() != null) ? "'" + outer.name() + "'"

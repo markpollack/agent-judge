@@ -359,7 +359,7 @@ public final class JudgeTestFixtures {
 		private final List<JudgmentContext> invocations = new ArrayList<>();
 
 		public RecordingJudge(String name, Judgment result) {
-			this.metadata = new JudgeMetadata(name, "Recording judge", JudgeType.DETERMINISTIC);
+			this.metadata = new JudgeMetadata(name, "Recording judge", JudgeType.DETERMINISTIC, null);
 			this.result = result;
 		}
 

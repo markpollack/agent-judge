@@ -27,6 +27,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import io.github.markpollack.judge.Judge;
+import io.github.markpollack.judge.JudgeMetadata;
+import io.github.markpollack.judge.JudgeType;
+import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
@@ -533,7 +536,7 @@ class NormalizedJudgmentConformanceTest {
 			.judge(Judges.named(context -> buildSuccess(), "build-success"))
 			.judge(Judges.named(context -> modelBackedCorrectness(), MODEL_BACKED_JUDGE))
 			.judge(Judges.named(context -> securityScan(), "security-scan"))
-			.judge(Judges.named(context -> javaStyle(), "java-style"))
+			.judge(new ConditionalJudge("java-style"))
 			.judge(Judges.named(context -> licenceAudit(), "licence-audit"))
 			.build();
 
@@ -641,13 +644,31 @@ class NormalizedJudgmentConformanceTest {
 			.build();
 	}
 
-	/** NOT_APPLICABLE carrying a label but no score: the question should not have been asked. */
-	private static Judgment javaStyle() {
-		return Judgment.builder()
-			.notApplicable()
-			.reasoning("The change set contains no Java sources, so the Java style rules do not apply")
-			.label("no_java_sources")
-			.build();
+	/**
+	 * NOT_APPLICABLE carrying a label but no score: the question should not have been asked.
+	 * <p>
+	 * It declares the capability, because a jury honours an exclusion only from a seat that said
+	 * in advance it might exclude. An undeclared seat returning the same judgment would be
+	 * contained as {@code ERROR undeclared_not_applicable}, which is the point.
+	 * </p>
+	 */
+	private record ConditionalJudge(String name) implements JudgeWithMetadata {
+
+		@Override
+		public Judgment judge(JudgmentContext context) {
+			return Judgment.builder()
+				.notApplicable()
+				.reasoning("The change set contains no Java sources, so the Java style rules do not apply")
+				.label("no_java_sources")
+				.build();
+		}
+
+		@Override
+		public JudgeMetadata metadata() {
+			return new JudgeMetadata(this.name, "Java style rules", JudgeType.DETERMINISTIC,
+					"the change set contains no Java sources");
+		}
+
 	}
 
 	/** ERROR carrying neither optional and no Throwable. */
