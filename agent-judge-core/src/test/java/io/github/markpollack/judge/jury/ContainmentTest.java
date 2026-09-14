@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.Judges;
@@ -327,6 +328,46 @@ class ContainmentTest {
 			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
 		}
 
+		@ParameterizedTest
+		@MethodSource("io.github.markpollack.judge.jury.ContainmentTest#stageFailureMatrix")
+		@DisplayName("every machinery cause, every stage-failure reason, every error policy: never a rejection")
+		void theWholeMatrix(ErrorPolicy errorPolicy, JudgmentReasonCode machineryCode, DispositionReason reason) {
+			Jury member = memberFailing(reason, machineryCode);
+
+			Verdict verdict = Juries
+				.meta(new AllMustPassStrategy(errorPolicy, NotApplicablePolicy.EXCLUDE),
+						new NamedJury("broken", member),
+						new NamedJury("healthy", returning(Verdict.single("b", PASS))))
+				.vote(CONTEXT);
+
+			CompositeAttempt attempt = verdict.compositeAttempts().get(0);
+			assertThat(attempt.disposition()).as("%s / %s / %s", errorPolicy, machineryCode, reason)
+				.isEqualTo(AttemptDisposition.STAGE_FAILED);
+			assertThat(attempt.dispositionReason()).isEqualTo(reason);
+			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+			assertThat(verdict.decision()).isEqualTo(Decision.undecided());
+			assertThat(verdict.aggregated().status()).as("a contained failure never becomes a rejection")
+				.isNotEqualTo(JudgmentStatus.FAIL);
+			assertThat(verdict.aggregated().score()).as("and never a score of zero").isNull();
+			assertThat(verdict.individualByName()).as("the members that worked are kept")
+				.containsOnlyKeys("healthy");
+		}
+
+		/** A member that fails its stage in the way the matrix asks for. */
+		private Jury memberFailing(DispositionReason reason, JudgmentReasonCode machineryCode) {
+			return switch (reason) {
+				case EXECUTION_FAILED -> throwing(new IllegalStateException("boom"));
+				case CHILD_UNDECIDED -> returning(Verdict.builder()
+					.aggregated(Judgment.error(machineryCode, "the stage reached no outcome"))
+					.decision(Decision.undecided())
+					.build());
+				case UNDECLARED_NOT_APPLICABLE -> returning(Verdict.builder()
+					.aggregated(Judgment.notApplicable("nothing here applies"))
+					.decision(Decision.own())
+					.build());
+			};
+		}
+
 		@Test
 		@DisplayName("a nested meta-jury contains its child's failure rather than inheriting it")
 		void nestedMetaJuriesContainTheirChildren() {
@@ -347,6 +388,27 @@ class ContainmentTest {
 	}
 
 	// ==================== Helpers ====================
+
+	/**
+	 * Every combination the design pins: four error policies, four machinery causes, three ways a
+	 * stage can fail. The matrix exists because the rule it checks has no exceptions, and a rule
+	 * with no exceptions is exactly the kind that acquires one quietly.
+	 * @return the arguments
+	 */
+	static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> stageFailureMatrix() {
+		List<JudgmentReasonCode> machinery = List.of(JudgmentReasonCode.AGGREGATION_FAILED,
+				JudgmentReasonCode.STAGE_FAILED, JudgmentReasonCode.NO_TIER_DECIDED,
+				JudgmentReasonCode.NOT_APPLICABLE_REFUSED);
+		java.util.List<org.junit.jupiter.params.provider.Arguments> arguments = new java.util.ArrayList<>();
+		for (ErrorPolicy errorPolicy : ErrorPolicy.values()) {
+			for (JudgmentReasonCode code : machinery) {
+				for (DispositionReason reason : DispositionReason.values()) {
+					arguments.add(org.junit.jupiter.params.provider.Arguments.of(errorPolicy, code, reason));
+				}
+			}
+		}
+		return arguments.stream();
+	}
 
 	static Verdict undecidedVerdict() {
 		return Verdict.builder()
