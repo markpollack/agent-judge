@@ -603,4 +603,34 @@ class CascadedJuryTest {
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
+	@Test
+	@SuppressWarnings("unchecked")
+	void judgeWhoseMetadataFailsDoesNotCollapseItsCascadeTier() {
+		// Before the fix, reading the judge's name threw out of SimpleJury.vote() and the
+		// cascade recorded the whole tier as JURY_EXECUTION_FAILED.
+		Jury scoring = SimpleJury.builder()
+			.judge(alwaysPass("Build"))
+			.judge(nullMetadata(booleanPass("never kept")))
+			.judge(throwingMetadata(new IllegalStateException("registry offline"), booleanPass("never kept")))
+			.judge(alwaysPass("Style"))
+			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.build();
+
+		CascadedJury jury = CascadedJury.builder().tier("scoring", scoring, TierPolicy.FINAL_TIER).build();
+
+		Verdict verdict = jury.vote(context);
+
+		assertThat(verdict.compositeAttempts()).hasSize(1);
+		CompositeAttempt attempt = verdict.compositeAttempts().get(0);
+		assertThat(attempt.failure()).isNull();
+		assertThat(attempt.verdict()).isNotNull();
+		assertThat(verdict.individual()).extracting(io.github.markpollack.judge.result.Judgment::status)
+			.containsExactly(JudgmentStatus.PASS, JudgmentStatus.ERROR, JudgmentStatus.ERROR, JudgmentStatus.PASS);
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat((java.util.Map<String, Object>) verdict.aggregated()
+			.metadata()
+			.get(io.github.markpollack.judge.result.Judgment.AGGREGATION_KEY))
+			.containsEntry(AggregationEvidence.INPUT_COUNT, 4);
+	}
+
 }

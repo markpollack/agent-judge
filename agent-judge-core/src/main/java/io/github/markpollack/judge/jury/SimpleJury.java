@@ -7,6 +7,7 @@ package io.github.markpollack.judge.jury;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.JudgeMetadata;
+import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.description.JuryDescription;
@@ -50,6 +51,13 @@ import org.slf4j.LoggerFactory;
  * silently score with fewer judges than it lists, or report nothing where most judges
  * succeeded. The count that actually voted is recoverable from the
  * {@link AggregationEvidence} block on the aggregate.
+ * </p>
+ *
+ * <p>
+ * The same holds for a {@link JudgeWithMetadata} whose {@code metadata()} returns
+ * {@code null} or throws. The jury cannot tell what the judge is called, so it does not run
+ * it: the seat's judgment is an {@code ERROR} naming its position and the metadata failure,
+ * stored under the positional key {@code "Judge#" + (position + 1)}.
  * </p>
  *
  * <p>
@@ -116,7 +124,7 @@ public class SimpleJury implements Jury {
 	 * </p>
 	 * @return a simple jury description
 	 * @throws IllegalArgumentException if a seat cannot be described, for example because its
-	 * judge declares a non-portable configuration or its weight is not finite; the message
+	 * judge declares a non-portable configuration or its metadata cannot be read; the message
 	 * names the seat
 	 * @since 0.17.0
 	 */
@@ -125,12 +133,12 @@ public class SimpleJury implements Jury {
 		List<SeatDescription> seats = new ArrayList<>(judges.size());
 		for (int position = 0; position < judges.size(); position++) {
 			Judge judge = judges.get(position);
-			String verdictKey = getJudgeName(judge, position);
+			SeatKey key = SeatKey.of(judge, position);
 			KeySource keySource;
 			if (deduplicatedPositions.contains(position)) {
 				keySource = KeySource.DEDUPLICATED;
 			}
-			else if (Judges.tryMetadata(judge).map(JudgeMetadata::name).isPresent()) {
+			else if (key.declared()) {
 				keySource = KeySource.DECLARED;
 			}
 			else {
@@ -138,11 +146,13 @@ public class SimpleJury implements Jury {
 			}
 			double weight = weights.getOrDefault(String.valueOf(position), 1.0);
 			try {
-				seats.add(new SeatDescription(position, verdictKey, keySource, weight, Judges.describe(judge)));
+				// Judges.describe refuses metadata it cannot read, rather than describing the
+				// judge as undeclared.
+				seats.add(new SeatDescription(position, key.verdictKey(), keySource, weight, Judges.describe(judge)));
 			}
 			catch (IllegalArgumentException ex) {
 				throw new IllegalArgumentException(
-						"seats[" + position + "] ('" + verdictKey + "'): " + ex.getMessage(), ex);
+						"seats[" + position + "] ('" + key.verdictKey() + "'): " + ex.getMessage(), ex);
 			}
 		}
 		return new SimpleJuryDescription(votingStrategy.describe(), seats);
@@ -150,12 +160,19 @@ public class SimpleJury implements Jury {
 
 	@Override
 	public Verdict vote(JudgmentContext context) {
+		// Read every seat's key once, on the caller's thread and before any judge runs, so a
+		// judge whose metadata cannot be read becomes an ERROR seat instead of an exception.
+		List<SeatKey> keys = IntStream.range(0, judges.size())
+			.mapToObj(index -> SeatKey.of(judges.get(index), index))
+			.toList();
+
 		List<Judgment> individualJudgments;
 
 		if (parallel) {
 			// Parallel execution using CompletableFuture
 			List<CompletableFuture<Judgment>> futures = IntStream.range(0, judges.size())
-				.mapToObj(index -> CompletableFuture.supplyAsync(() -> invokeJudge(index, context), executor))
+				.mapToObj(index -> CompletableFuture.supplyAsync(() -> invokeJudge(index, keys.get(index), context),
+						executor))
 				.toList();
 
 			// Wait for all to complete
@@ -166,15 +183,15 @@ public class SimpleJury implements Jury {
 		}
 		else {
 			// Sequential execution
-			individualJudgments = IntStream.range(0, judges.size()).mapToObj(index -> invokeJudge(index, context))
+			individualJudgments = IntStream.range(0, judges.size())
+				.mapToObj(index -> invokeJudge(index, keys.get(index), context))
 				.toList();
 		}
 
 		// Build identity map (preserves order via LinkedHashMap)
 		Map<String, Judgment> judgmentByName = new LinkedHashMap<>();
 		for (int i = 0; i < judges.size(); i++) {
-			String name = getJudgeName(judges.get(i), i);
-			judgmentByName.put(name, individualJudgments.get(i));
+			judgmentByName.put(keys.get(i).verdictKey(), individualJudgments.get(i));
 		}
 
 		// Aggregate using voting strategy
@@ -199,12 +216,18 @@ public class SimpleJury implements Jury {
 	 * can report on.
 	 * </p>
 	 * @param index the judge's position in the configured list
+	 * @param key the seat's key, read before any judge ran
 	 * @param context the judgment context
 	 * @return the judge's judgment, or an ERROR judgment naming the judge and the cause
 	 */
-	private Judgment invokeJudge(int index, JudgmentContext context) {
+	private Judgment invokeJudge(int index, SeatKey key, JudgmentContext context) {
+		if (key.metadataFailure() != null) {
+			String reasoning = key.unreadableMetadata();
+			logger.warn("{}; recording an ERROR for the error policy to resolve", reasoning, key.cause());
+			return Judgment.error(reasoning);
+		}
 		Judge judge = judges.get(index);
-		String name = getJudgeName(judge, index);
+		String name = key.verdictKey();
 		try {
 			Judgment judgment = judge.judge(context);
 			if (judgment == null) {
@@ -227,13 +250,49 @@ public class SimpleJury implements Jury {
 	}
 
 	/**
-	 * Get judge name from metadata or generate default.
-	 * @param judge the judge
-	 * @param index the judge index
-	 * @return judge name
+	 * The key a seat's judgment is stored under in {@link Verdict#individualByName()}, read
+	 * from its judge's metadata without letting a failure to read it escape.
+	 *
+	 * @param position the seat's zero-based position
+	 * @param verdictKey the declared name, or {@code "Judge#" + (position + 1)} when the judge
+	 * declares none or its metadata cannot be read
+	 * @param declared whether the judge declared the name
+	 * @param metadataFailure why the metadata could not be read, or {@code null} when it could
+	 * @param cause the exception {@code metadata()} threw, or {@code null}
 	 */
-	private String getJudgeName(Judge judge, int index) {
-		return Judges.tryMetadata(judge).map(m -> m.name()).orElse("Judge#" + (index + 1));
+	record SeatKey(int position, String verdictKey, boolean declared, String metadataFailure, Exception cause) {
+
+		static SeatKey of(Judge judge, int position) {
+			String positional = "Judge#" + (position + 1);
+			if (!(judge instanceof JudgeWithMetadata withMetadata)) {
+				return new SeatKey(position, positional, false, null, null);
+			}
+			JudgeMetadata metadata;
+			try {
+				metadata = withMetadata.metadata();
+			}
+			catch (Exception ex) {
+				return new SeatKey(position, positional, false,
+						"metadata() threw " + ex.getClass().getName() + describeCause(ex), ex);
+			}
+			if (metadata == null) {
+				return new SeatKey(position, positional, false, "metadata() returned null", null);
+			}
+			if (metadata.name() == null) {
+				return new SeatKey(position, positional, false, null, null);
+			}
+			return new SeatKey(position, metadata.name(), true, null, null);
+		}
+
+		/**
+		 * State the metadata failure, naming the seat.
+		 * @return a sentence naming the position, the positional key and the failure
+		 */
+		String unreadableMetadata() {
+			return "Judge at position " + position + " ('" + verdictKey + "') has unreadable metadata: "
+					+ metadataFailure;
+		}
+
 	}
 
 	/**
@@ -277,12 +336,18 @@ public class SimpleJury implements Jury {
 		/**
 		 * Add a judge with a custom weight.
 		 * @param judge the judge to add
-		 * @param weight the weight for this judge
+		 * @param weight the weight for this judge; finite and not negative
 		 * @return this builder
+		 * @throws IllegalArgumentException if the judge is null, or the weight is not finite or
+		 * is negative
 		 */
 		public Builder judge(Judge judge, double weight) {
 			if (judge == null) {
 				throw new IllegalArgumentException("Judge cannot be null");
+			}
+			// Checked before the sign: NaN < 0 is false, so a sign check alone accepts NaN.
+			if (!Double.isFinite(weight)) {
+				throw new IllegalArgumentException("Weight must be finite, but was " + weight);
 			}
 			if (weight < 0) {
 				throw new IllegalArgumentException("Weight must be non-negative");

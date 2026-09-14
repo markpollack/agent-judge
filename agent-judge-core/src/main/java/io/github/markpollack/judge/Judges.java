@@ -157,21 +157,29 @@ public final class Judges {
 	 * @param judge the judge to describe
 	 * @return its description
 	 * @throws IllegalArgumentException if the judge declares a configuration that is not
-	 * portable; the message names the judge and the path of the offending value
+	 * portable, the message naming the judge and the path of the offending value; or if the
+	 * judge, or the judge a {@code NamedJudge} wraps directly, is a {@link JudgeWithMetadata}
+	 * whose {@code metadata()} returns null or throws, since describing it as undeclared would
+	 * misstate it
 	 * @since 0.17.0
 	 */
 	public static JudgeDescription describe(Judge judge) {
 		Objects.requireNonNull(judge, "judge must not be null");
-		JudgeMetadata outer = metadataOf(judge);
 		Judge innermost = judge;
 		while (innermost instanceof NamedJudge named) {
 			innermost = Objects.requireNonNull(named.delegate(), "a NamedJudge must wrap a judge");
 		}
+		ImplementationIdentity implementation = ImplementationIdentity.of(innermost.getClass());
+		JudgeMetadata outer = readableMetadataOf(judge, "Judge implemented by " + implementation.toPortable());
 		// The delegate metadata is what the directly wrapped judge declares. For the NamedJudge
 		// around a NamedJudge that Juries.fromJudges builds for a duplicate name, that is the
 		// caller's own label and type, not the innermost implementation's (usually none).
-		JudgeMetadata inner = (judge instanceof NamedJudge wrapper) ? metadataOf(wrapper.delegate()) : null;
-		ImplementationIdentity implementation = ImplementationIdentity.of(innermost.getClass());
+		JudgeMetadata inner = null;
+		if (judge instanceof NamedJudge wrapper) {
+			String outerLabel = (outer != null && outer.name() != null) ? "'" + outer.name() + "'"
+					: "implemented by " + implementation.toPortable();
+			inner = readableMetadataOf(wrapper.delegate(), "The judge wrapped by judge " + outerLabel);
+		}
 		Map<String, Object> configuration = null;
 		if (innermost instanceof ConfiguredJudge configured) {
 			configuration = configured.configuration();
@@ -193,8 +201,30 @@ public final class Judges {
 		}
 	}
 
-	private static JudgeMetadata metadataOf(Judge judge) {
-		return (judge instanceof JudgeWithMetadata withMetadata) ? withMetadata.metadata() : null;
+	/**
+	 * Read a judge's metadata for a description.
+	 * @param judge the judge
+	 * @param subject how to name the judge if its metadata cannot be read
+	 * @return its metadata, or null when the judge does not implement {@link JudgeWithMetadata}
+	 * @throws IllegalArgumentException if {@code metadata()} returns null or throws
+	 */
+	private static JudgeMetadata readableMetadataOf(Judge judge, String subject) {
+		if (!(judge instanceof JudgeWithMetadata withMetadata)) {
+			return null;
+		}
+		JudgeMetadata metadata;
+		try {
+			metadata = withMetadata.metadata();
+		}
+		catch (Exception ex) {
+			String message = ex.getMessage();
+			throw new IllegalArgumentException(subject + " cannot be described: metadata() threw "
+					+ ex.getClass().getName() + ((message == null || message.isBlank()) ? "" : ": " + message), ex);
+		}
+		if (metadata == null) {
+			throw new IllegalArgumentException(subject + " cannot be described: metadata() returned null");
+		}
+		return metadata;
 	}
 
 	/**

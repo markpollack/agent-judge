@@ -90,6 +90,28 @@ class JuriesTest {
 			.isInstanceOf(IllegalArgumentException.class);
 	}
 
+	@Test
+	void fromJudgesNamesThePositionOfAJudgeWithNullMetadata() {
+		assertThatThrownBy(() -> Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("Build"),
+				nullMetadata(booleanPass("never kept"))))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("position 1")
+			.hasMessageContaining("metadata() returned null");
+	}
+
+	@Test
+	void fromJudgesNamesThePositionOfAJudgeWhoseMetadataThrows() {
+		IllegalStateException failure = new IllegalStateException("registry offline");
+
+		assertThatThrownBy(() -> Juries.fromJudges(new MajorityVotingStrategy(),
+				throwingMetadata(failure, booleanPass("never kept")), alwaysPass("Build")))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("position 0")
+			.hasMessageContaining("metadata() threw")
+			.hasMessageContaining("registry offline")
+			.hasCause(failure);
+	}
+
 	// ==================== combine() Tests ====================
 
 	@Test

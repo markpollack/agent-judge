@@ -678,10 +678,11 @@ right fix is usually to put independent questions in separate juries rather than
 A `Judgment` carries `status`, `score`, `label`, `reasoning`, `checks`, `metadata` — and **no judge
 identity**. This has three consequences you must design around. `[OURS]`
 
-**Always name your judges.** `SimpleJury` resolves a name via `Judges.tryMetadata(judge)` and falls
+**Always name your judges.** `SimpleJury` resolves a name from the judge's `JudgeMetadata` and falls
 back to `"Judge#" + (index + 1)` for anonymous lambdas. A named judge appears in
 `Verdict.individualByName()`; an anonymous one appears as a position that changes when you insert a
-judge above it.
+judge above it. A `JudgeWithMetadata` whose `metadata()` returns `null` or throws is not run: its
+seat is keyed by position and records an `ERROR` naming the failure, for the `ErrorPolicy` to resolve.
 
 ```java
 tier.judge(Judges.named(new DddReviewQualityJudge(), "dddQuality"));   // do this
