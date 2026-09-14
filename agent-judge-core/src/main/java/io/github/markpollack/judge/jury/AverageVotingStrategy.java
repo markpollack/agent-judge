@@ -68,6 +68,7 @@ public class AverageVotingStrategy implements VotingStrategy {
 	/**
 	 * Create an average strategy with a custom error policy.
 	 * @param errorPolicy policy for handling errors
+	 * @throws IllegalArgumentException if {@code errorPolicy} is null
 	 */
 	public AverageVotingStrategy(ErrorPolicy errorPolicy) {
 		this(DEFAULT_THRESHOLD, errorPolicy);
@@ -89,7 +90,7 @@ public class AverageVotingStrategy implements VotingStrategy {
 	 * @param threshold the normalized bar the average must reach, in {@code [0.0, 1.0]}
 	 * @param errorPolicy policy for handling errors
 	 * @throws IllegalArgumentException if the threshold is not a finite value in
-	 * {@code [0.0, 1.0]}
+	 * {@code [0.0, 1.0]}, or if {@code errorPolicy} is null
 	 * @since 0.16.0
 	 */
 	public AverageVotingStrategy(double threshold, ErrorPolicy errorPolicy) {
@@ -98,6 +99,9 @@ public class AverageVotingStrategy implements VotingStrategy {
 		}
 		if (threshold < 0.0 || threshold > 1.0) {
 			throw new IllegalArgumentException("threshold must be between 0.0 and 1.0, but was " + threshold);
+		}
+		if (errorPolicy == null) {
+			throw new IllegalArgumentException("errorPolicy must not be null");
 		}
 		this.threshold = threshold;
 		this.errorPolicy = errorPolicy;

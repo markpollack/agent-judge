@@ -100,7 +100,7 @@ public class ConjunctiveStrategy implements VotingStrategy {
 	 * {@code [0.0, 1.0]}
 	 * @param errorPolicy policy for handling errors
 	 * @throws IllegalArgumentException if the threshold is not a finite value in
-	 * {@code [0.0, 1.0]}
+	 * {@code [0.0, 1.0]}, or if {@code errorPolicy} is null
 	 */
 	public ConjunctiveStrategy(double threshold, ErrorPolicy errorPolicy) {
 		if (!Double.isFinite(threshold)) {
@@ -108,6 +108,9 @@ public class ConjunctiveStrategy implements VotingStrategy {
 		}
 		if (threshold < 0.0 || threshold > 1.0) {
 			throw new IllegalArgumentException("threshold must be between 0.0 and 1.0, but was " + threshold);
+		}
+		if (errorPolicy == null) {
+			throw new IllegalArgumentException("errorPolicy must not be null");
 		}
 		this.threshold = threshold;
 		this.errorPolicy = errorPolicy;

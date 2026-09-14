@@ -82,8 +82,12 @@ public class ConsensusStrategy implements VotingStrategy {
 	/**
 	 * Create a consensus strategy with a custom error policy.
 	 * @param errorPolicy policy for handling errors
+	 * @throws IllegalArgumentException if {@code errorPolicy} is null
 	 */
 	public ConsensusStrategy(ErrorPolicy errorPolicy) {
+		if (errorPolicy == null) {
+			throw new IllegalArgumentException("errorPolicy must not be null");
+		}
 		this.errorPolicy = errorPolicy;
 	}
 

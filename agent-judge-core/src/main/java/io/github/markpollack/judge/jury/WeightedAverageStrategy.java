@@ -48,6 +48,20 @@ import io.github.markpollack.judge.result.Judgment;
  * false.
  * </p>
  *
+ * <h2>Weight totals beyond the range of a double</h2>
+ * <p>
+ * Each weight must be finite, but the total need not fit in a {@code double}. When finite
+ * weights sum past {@link Double#MAX_VALUE}, the eligible weights are rescaled by a power of
+ * two before averaging, so the result is still their weighted mean. Previously the total
+ * overflowed to {@code Infinity} and the aggregation threw. A total that fits is computed
+ * exactly as before.
+ * </p>
+ * <p>
+ * In the evidence, a weight total that exceeded the largest finite {@code double} is reported
+ * as {@link Double#MAX_VALUE}, so the evidence remains a finite, portable number. A total
+ * that fits is reported exactly.
+ * </p>
+ *
  * <p>
  * The judgment passes if the weighted mean is greater than or equal to 0.5.
  * </p>
@@ -89,6 +103,7 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	/**
 	 * Create a weighted average strategy with a custom error policy.
 	 * @param errorPolicy policy for handling errors
+	 * @throws IllegalArgumentException if {@code errorPolicy} is null
 	 */
 	public WeightedAverageStrategy(ErrorPolicy errorPolicy) {
 		this(DEFAULT_THRESHOLD, errorPolicy);
@@ -110,7 +125,7 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	 * @param threshold the normalized bar the weighted average must reach, in {@code [0.0, 1.0]}
 	 * @param errorPolicy policy for handling errors
 	 * @throws IllegalArgumentException if the threshold is not a finite value in
-	 * {@code [0.0, 1.0]}
+	 * {@code [0.0, 1.0]}, or if {@code errorPolicy} is null
 	 * @since 0.16.0
 	 */
 	public WeightedAverageStrategy(double threshold, ErrorPolicy errorPolicy) {
@@ -119,6 +134,9 @@ public class WeightedAverageStrategy implements VotingStrategy {
 		}
 		if (threshold < 0.0 || threshold > 1.0) {
 			throw new IllegalArgumentException("threshold must be between 0.0 and 1.0, but was " + threshold);
+		}
+		if (errorPolicy == null) {
+			throw new IllegalArgumentException("errorPolicy must not be null");
 		}
 		this.threshold = threshold;
 		this.errorPolicy = errorPolicy;
@@ -160,14 +178,20 @@ public class WeightedAverageStrategy implements VotingStrategy {
 			eligibleWeight += weight;
 		}
 
-		Map<String, Object> weightEvidence = Map.of(AggregationEvidence.INPUT_WEIGHT, inputWeight,
-				AggregationEvidence.ELIGIBLE_WEIGHT, eligibleWeight);
+		Map<String, Object> weightEvidence = Map.of(AggregationEvidence.INPUT_WEIGHT, portableTotal(inputWeight),
+				AggregationEvidence.ELIGIBLE_WEIGHT, portableTotal(eligibleWeight));
 
 		if (population.isEmpty() || eligibleWeight == 0.0) {
 			return population.noResult(getName(), weightEvidence);
 		}
 
-		double weightedAverage = weightedSum / eligibleWeight;
+		// Scores lie in [0.0, 1.0] and weights are not negative, so weightedSum never exceeds
+		// eligibleWeight, and eligibleWeight never exceeds inputWeight: an overflow anywhere
+		// shows up as an infinite total. Only then is the rescaled path taken. Any total that
+		// fits in a double runs the original arithmetic unchanged, so its result is
+		// bit-identical to what it was.
+		double weightedAverage = Double.isInfinite(eligibleWeight) ? rescaledWeightedAverage(population, resolved)
+				: weightedSum / eligibleWeight;
 
 		Judgment aggregate = (weightedAverage >= this.threshold ? Judgment.builder().pass() : Judgment.builder().fail())
 			.score(weightedAverage)
@@ -178,9 +202,46 @@ public class WeightedAverageStrategy implements VotingStrategy {
 			.build();
 		return AggregationEvidence.attach(aggregate, population.evidence(getName())
 			.put(AggregationEvidence.THRESHOLD, this.threshold)
-			.put(AggregationEvidence.INPUT_WEIGHT, inputWeight)
-			.put(AggregationEvidence.ELIGIBLE_WEIGHT, eligibleWeight)
+			.put(AggregationEvidence.INPUT_WEIGHT, portableTotal(inputWeight))
+			.put(AggregationEvidence.ELIGIBLE_WEIGHT, portableTotal(eligibleWeight))
 			.build());
+	}
+
+	/**
+	 * The weighted mean of the eligible judgments when their weight total overflows.
+	 * <p>
+	 * Each eligible weight is divided by the same power of two, chosen so that the largest
+	 * becomes a value in {@code [1.0, 2.0)}. Scaling by a power of two is exact, so the
+	 * weights keep their proportions and the totals stay finite.
+	 * </p>
+	 * @param population the resolved population, with at least one positive eligible weight
+	 * @param resolved the resolved weights, indexed by submitted position
+	 * @return the weighted mean, in {@code [0.0, 1.0]}
+	 */
+	private static double rescaledWeightedAverage(AggregationPopulation population, double[] resolved) {
+		double largest = 0.0;
+		for (int index : population.eligibleIndices()) {
+			largest = Math.max(largest, resolved[index]);
+		}
+		int exponent = Math.getExponent(largest);
+		double weightedSum = 0.0;
+		double eligibleWeight = 0.0;
+		for (int i = 0; i < population.eligible().size(); i++) {
+			double weight = Math.scalb(resolved[population.eligibleIndices().get(i)], -exponent);
+			weightedSum += population.eligible().get(i).effectiveScore().orElseThrow() * weight;
+			eligibleWeight += weight;
+		}
+		return weightedSum / eligibleWeight;
+	}
+
+	/**
+	 * A weight total as the evidence reports it: exact when it is finite, and
+	 * {@link Double#MAX_VALUE} when the sum of finite weights exceeded it.
+	 * @param total the computed total
+	 * @return a finite, portable total
+	 */
+	private static double portableTotal(double total) {
+		return Double.isInfinite(total) ? Double.MAX_VALUE : total;
 	}
 
 	private static double[] resolveWeights(int count, Map<String, Double> weights) {
