@@ -19,7 +19,9 @@ import org.junit.jupiter.api.Test;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.description.KeySource;
 import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentReasonCode;
 import io.github.markpollack.judge.result.JudgmentStatus;
 
 import static io.github.markpollack.judge.JudgeTestFixtures.booleanPass;
@@ -34,13 +36,18 @@ class CompositeResultContractTest {
 	private static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("test composite result").build();
 
 	@Test
-	void verdictDeclarationAndJsonExposeOnlyTheCorrectedFiveComponentTruth() throws Exception {
+	void verdictDeclarationAndJsonExposeOnlyTheCorrectedSevenComponentTruth() throws Exception {
 		assertThat(Arrays.stream(Verdict.class.getRecordComponents()).map(RecordComponent::getName))
-			.containsExactly("aggregated", "individual", "individualByName", "weights", "compositeAttempts");
+			.containsExactly("aggregated", "individual", "individualByName", "weights", "seats", "decision",
+					"compositeAttempts");
 
 		JsonNode json = MAPPER.readTree(MAPPER.writeValueAsString(Verdict.single("leaf", booleanPass("passed"))));
 		assertThat(json.fieldNames()).toIterable()
-			.containsExactly("aggregated", "individual", "individualByName", "weights", "compositeAttempts");
+			.containsExactly("aggregated", "individual", "individualByName", "weights", "seats", "decision",
+					"compositeAttempts");
+		assertThat(json.at("/seats/0").toString())
+			.isEqualTo("{\"position\":0,\"verdictKey\":\"leaf\",\"keySource\":\"DECLARED\"}");
+		assertThat(json.at("/decision").toString()).isEqualTo("{\"kind\":\"own\"}");
 		assertThat(json.has("sub" + "Verdicts")).isFalse();
 	}
 
@@ -49,18 +56,19 @@ class CompositeResultContractTest {
 		Verdict verdict = leaf("returned");
 		CompositeFailure failure = executionFailure();
 
-		assertThatThrownBy(() -> new CompositeAttempt("stage", CompositeRelation.META_MEMBER, null, null, null))
+		assertThatThrownBy(() -> new CompositeAttempt("stage", CompositeRelation.META_MEMBER, null,
+				AttemptDisposition.USED, null, null, null))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("exactly one");
-		assertThatThrownBy(
-				() -> new CompositeAttempt("stage", CompositeRelation.META_MEMBER, null, verdict, failure))
+		assertThatThrownBy(() -> new CompositeAttempt("stage", CompositeRelation.META_MEMBER, null,
+				AttemptDisposition.USED, null, verdict, failure))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("exactly one");
-		assertThatThrownBy(() -> new CompositeAttempt("stage", CompositeRelation.CASCADE_TIER, null, verdict, null))
+		assertThatThrownBy(() -> CompositeAttempt.used("stage", CompositeRelation.CASCADE_TIER, null, verdict))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("requires a policy");
-		assertThatThrownBy(() -> new CompositeAttempt("stage", CompositeRelation.META_MEMBER,
-				TierPolicy.FINAL_TIER, verdict, null))
+		assertThatThrownBy(
+				() -> CompositeAttempt.used("stage", CompositeRelation.META_MEMBER, TierPolicy.FINAL_TIER, verdict))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("forbids a policy");
 	}
@@ -153,6 +161,8 @@ class CompositeResultContractTest {
 			.individual(List.of(contained))
 			.individualByName(byName)
 			.weights(weights)
+			.seats(List.of(new Seat(0, "second", KeySource.DECLARED)))
+			.decision(Decision.own())
 			.build();
 		CascadedJury cascade = CascadedJury.builder()
 			.tier("broken", throwing(new IllegalStateException("must not disappear")),
@@ -217,7 +227,8 @@ class CompositeResultContractTest {
 
 		assertThat(strategyCalls).hasValue(0);
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(verdict.aggregated().reasoning()).isEqualTo("One or more jury members failed to execute.");
+		assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+		assertThat(verdict.decision()).isEqualTo(Decision.undecided());
 		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name)
 			.containsExactly("first", "broken", "last");
 		assertThat(verdict.individual()).containsExactly(first, last);
@@ -325,6 +336,7 @@ class CompositeResultContractTest {
 		CompositeAttempt second = successAttempt("same", leaf("two"), CompositeRelation.META_MEMBER, null);
 		assertThatThrownBy(() -> Verdict.builder()
 			.aggregated(booleanPass("root"))
+			.decision(Decision.own())
 			.compositeAttempts(List.of(first, second))
 			.build())
 			.isInstanceOf(IllegalArgumentException.class)
@@ -336,6 +348,7 @@ class CompositeResultContractTest {
 		for (int current = depth; current > 0; current--) {
 			verdict = Verdict.builder()
 				.aggregated(verdict.aggregated())
+				.decision(Decision.own())
 				.compositeAttempts(List.of(successAttempt("level-" + current, verdict,
 						CompositeRelation.META_MEMBER, null)))
 				.build();
@@ -348,7 +361,11 @@ class CompositeResultContractTest {
 		for (int index = 1; index <= attempts; index++) {
 			authored.add(successAttempt("member-" + index, leaf("leaf"), CompositeRelation.META_MEMBER, null));
 		}
-		return Verdict.builder().aggregated(booleanPass("root")).compositeAttempts(authored).build();
+		return Verdict.builder()
+			.aggregated(booleanPass("root"))
+			.decision(Decision.own())
+			.compositeAttempts(authored)
+			.build();
 	}
 
 	private static Verdict manualBranched(int rootAttempts, int descendantDepth) {
@@ -356,6 +373,7 @@ class CompositeResultContractTest {
 		for (int level = descendantDepth; level > 0; level--) {
 			descendant = Verdict.builder()
 				.aggregated(descendant.aggregated())
+				.decision(Decision.own())
 				.compositeAttempts(List.of(successAttempt("descendant-" + level, descendant,
 						CompositeRelation.META_MEMBER, null)))
 				.build();
@@ -365,7 +383,11 @@ class CompositeResultContractTest {
 			authored.add(successAttempt("member-" + index, leaf("leaf"), CompositeRelation.META_MEMBER, null));
 		}
 		authored.add(successAttempt("member-" + rootAttempts, descendant, CompositeRelation.META_MEMBER, null));
-		return Verdict.builder().aggregated(booleanPass("root")).compositeAttempts(authored).build();
+		return Verdict.builder()
+			.aggregated(booleanPass("root"))
+			.decision(Decision.own())
+			.compositeAttempts(authored)
+			.build();
 	}
 
 	private static Jury nestedCascade(int depth, AtomicInteger leafCalls) {
@@ -388,7 +410,7 @@ class CompositeResultContractTest {
 
 	private static CompositeAttempt successAttempt(String name, Verdict verdict, CompositeRelation relation,
 			TierPolicy policy) {
-		return new CompositeAttempt(name, relation, policy, verdict, null);
+		return CompositeAttempt.used(name, relation, policy, verdict);
 	}
 
 	private static CompositeFailure executionFailure() {

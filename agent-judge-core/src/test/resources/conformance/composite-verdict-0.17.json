@@ -1,8 +1,8 @@
 {
   "aggregated" : {
     "status" : "error",
-    "reasonCode" : "judge_reported",
-    "reasoning" : "One or more jury members failed to execute.",
+    "reasonCode" : "stage_failed",
+    "reasoning" : "One or more jury members did not produce a usable determination, so this jury reduced nothing.",
     "checks" : [ ],
     "metadata" : { }
   },
@@ -57,9 +57,18 @@
     }
   },
   "weights" : { },
+  "seats" : [ {
+    "position" : 0,
+    "verdictKey" : "pipeline",
+    "keySource" : "DECLARED"
+  } ],
+  "decision" : {
+    "kind" : "undecided"
+  },
   "compositeAttempts" : [ {
     "name" : "pipeline",
     "relation" : "meta_member",
+    "disposition" : "used",
     "verdict" : {
       "aggregated" : {
         "status" : "pass",
@@ -102,10 +111,22 @@
       "weights" : {
         "0" : 1.0
       },
+      "seats" : [ {
+        "position" : 0,
+        "verdictKey" : "semantic-check",
+        "keySource" : "DECLARED"
+      } ],
+      "decision" : {
+        "kind" : "tier",
+        "tier" : "semantic-check",
+        "basis" : "tier_outcome"
+      },
       "compositeAttempts" : [ {
         "name" : "broken-check",
         "relation" : "cascade_tier",
         "policy" : "REJECT_ON_ANY_FAIL",
+        "disposition" : "stage_failed",
+        "dispositionReason" : "execution_failed",
         "failure" : {
           "code" : "jury_execution_failed"
         }
@@ -113,6 +134,7 @@
         "name" : "semantic-check",
         "relation" : "cascade_tier",
         "policy" : "FINAL_TIER",
+        "disposition" : "used",
         "verdict" : {
           "aggregated" : {
             "status" : "pass",
@@ -155,6 +177,14 @@
           "weights" : {
             "0" : 1.0
           },
+          "seats" : [ {
+            "position" : 0,
+            "verdictKey" : "semantic-check",
+            "keySource" : "DECLARED"
+          } ],
+          "decision" : {
+            "kind" : "own"
+          },
           "compositeAttempts" : [ ]
         }
       } ]
@@ -162,6 +192,8 @@
   }, {
     "name" : "audit",
     "relation" : "meta_member",
+    "disposition" : "stage_failed",
+    "dispositionReason" : "execution_failed",
     "failure" : {
       "code" : "jury_execution_failed"
     }

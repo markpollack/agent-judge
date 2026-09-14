@@ -7,6 +7,9 @@ package io.github.markpollack.judge;
 
 import io.github.markpollack.judge.context.ExecutionStatus;
 import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.description.KeySource;
+import io.github.markpollack.judge.jury.Decision;
+import io.github.markpollack.judge.jury.Seat;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.result.Judgment;
 
@@ -14,7 +17,9 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -280,7 +285,7 @@ public final class JudgeTestFixtures {
 	 */
 	public static Verdict unanimousPass(int judgeCount) {
 		List<Judgment> individual = new ArrayList<>();
-		Map<String, Judgment> byName = new HashMap<>();
+		Map<String, Judgment> byName = new LinkedHashMap<>();
 
 		for (int i = 0; i < judgeCount; i++) {
 			Judgment j = booleanPass("Judge " + (i + 1) + " passed");
@@ -292,7 +297,27 @@ public final class JudgeTestFixtures {
 			.aggregated(booleanPass("Unanimous pass"))
 			.individual(individual)
 			.individualByName(byName)
+			.seats(positionalSeats(byName.keySet()))
+			.decision(Decision.own())
 			.build();
+	}
+
+	/**
+	 * Seats for a fixture verdict, one per key, in the order the map holds them.
+	 * <p>
+	 * {@code POSITIONAL} because these are manufactured {@code Judge#N} keys: a fixture should
+	 * not claim an identity a judge never declared.
+	 * </p>
+	 * @param verdictKeys the verdict keys in order
+	 * @return the seats
+	 */
+	public static List<Seat> positionalSeats(Collection<String> verdictKeys) {
+		List<Seat> seats = new ArrayList<>(verdictKeys.size());
+		int position = 0;
+		for (String key : verdictKeys) {
+			seats.add(new Seat(position++, key, KeySource.POSITIONAL));
+		}
+		return seats;
 	}
 
 	/**
@@ -303,7 +328,7 @@ public final class JudgeTestFixtures {
 	 */
 	public static Verdict split(int passCount, int failCount) {
 		List<Judgment> individual = new ArrayList<>();
-		Map<String, Judgment> byName = new HashMap<>();
+		Map<String, Judgment> byName = new LinkedHashMap<>();
 
 		for (int i = 0; i < passCount; i++) {
 			Judgment j = booleanPass("Pass " + (i + 1));
@@ -320,7 +345,13 @@ public final class JudgeTestFixtures {
 		boolean majorityPass = passCount > failCount;
 		Judgment aggregated = majorityPass ? booleanPass("Majority passed") : booleanFail("Majority failed");
 
-		return Verdict.builder().aggregated(aggregated).individual(individual).individualByName(byName).build();
+		return Verdict.builder()
+			.aggregated(aggregated)
+			.individual(individual)
+			.individualByName(byName)
+			.seats(positionalSeats(byName.keySet()))
+			.decision(Decision.own())
+			.build();
 	}
 
 	/**
@@ -330,7 +361,7 @@ public final class JudgeTestFixtures {
 	 */
 	public static Verdict allAbstain(int judgeCount) {
 		List<Judgment> individual = new ArrayList<>();
-		Map<String, Judgment> byName = new HashMap<>();
+		Map<String, Judgment> byName = new LinkedHashMap<>();
 
 		for (int i = 0; i < judgeCount; i++) {
 			Judgment j = Judgment.abstain("Cannot evaluate");
@@ -342,6 +373,8 @@ public final class JudgeTestFixtures {
 			.aggregated(Judgment.abstain("All judges abstained"))
 			.individual(individual)
 			.individualByName(byName)
+			.seats(positionalSeats(byName.keySet()))
+			.decision(Decision.own())
 			.build();
 	}
 
