@@ -13,6 +13,7 @@ import static java.util.stream.Collectors.joining;
 import io.github.markpollack.judge.ai.JudgmentClassifier;
 import io.github.markpollack.judge.ai.ModelBackedJudge;
 import io.github.markpollack.judge.ai.model.JudgeModel;
+import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
 import io.github.markpollack.judge.result.Check;
 import io.github.markpollack.judge.result.Judgment;
@@ -73,11 +74,22 @@ public final class EarsJudge {
 	 * business, and keeping it that way is what lets the same judge run on a build server and on a
 	 * laptop with no credentials.
 	 * @param name the judge's name, also used to name its prompt template
-	 * @param criteria the roster of acceptance criteria, every one of which must be answered
+	 * @param criteria the roster of acceptance criteria, every one of which must be answered; must
+	 * be non-empty
 	 * @param model the backend that answers them
 	 * @return a judge over that roster
+	 * @throws IllegalArgumentException if the roster is empty, since a conjunctive rollup over an
+	 * empty denominator is vacuously satisfied
 	 */
 	public static ModelBackedJudge create(String name, List<EarsCriterion> criteria, JudgeModel model) {
+		// A jury assembled around an empty roster is a configuration mistake, and it should never
+		// reach a model: the run would spend an agent to produce a verdict computed over nothing.
+		// The rollup refuses an empty roster too, and that second guard is the one that holds if
+		// this one is ever bypassed.
+		if (criteria == null || criteria.isEmpty()) {
+			throw new IllegalArgumentException("a requirements judge needs at least one acceptance criterion; "
+					+ "an empty roster has no denominator, and a conjunctive rollup over one is vacuously satisfied");
+		}
 		ModelBackedJudge.Builder builder = ModelBackedJudge.builder()
 			.name(name)
 			.description("Did the implementation satisfy the acceptance criteria it was built from?")
@@ -154,6 +166,20 @@ public final class EarsJudge {
             """.formatted(n, n, n, exclusion, list.toString()));
 	}
 
+	/**
+	 * Classify one answer against a roster, bypassing construction.
+	 *
+	 * <p>The construction guard refuses an empty roster, so this is how the rollup's own guard is
+	 * exercised: it is the guard that holds if the first is ever bypassed.
+	 *
+	 * @param criteria the roster
+	 * @param response the audit to classify
+	 * @return the judgment the rollup produces
+	 */
+	static Judgment rollupFor(List<EarsCriterion> criteria, JudgeModelResponse response) {
+		return classifier(criteria).classify(response);
+	}
+
 	private static JudgmentClassifier classifier(List<EarsCriterion> criteria) {
 		return response -> {
 			String text = response.text() == null ? "" : response.text().strip();
@@ -170,12 +196,15 @@ public final class EarsJudge {
 			if (text.isEmpty()) {
 				return Judgment.error("No audit was produced for this implementation");
 			}
+
 			if (criteria.isEmpty()) {
-				// An empty roster is not a specification that everything satisfies; it is a
-				// specification nobody supplied. PASS over nothing is the defect this refuses.
+				// An empty roster is a denominator of zero, and a conjunctive rollup over one is
+				// vacuously satisfied: nothing failed, nothing was unestablished, so the subject
+				// "meets the specification". That green judgment is indistinguishable, in every
+				// stored field, from one computed over a specification that was genuinely met.
 				return rollup(JudgmentStatus.ERROR,
-						"The criteria roster is empty, so there was nothing to establish", List.of(), 0, "", List.of(),
-						0, List.of());
+						"The criteria roster is empty, so there was nothing to establish", List.of(), 0, "",
+						List.of(), 0, List.of());
 			}
 
 			Map<String, EarsCriterion> roster = new LinkedHashMap<>();
