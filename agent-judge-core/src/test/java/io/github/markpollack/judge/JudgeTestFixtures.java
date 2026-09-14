@@ -96,6 +96,46 @@ public final class JudgeTestFixtures {
 	}
 
 	/**
+	 * Create a judge that violates the {@link JudgeWithMetadata} contract by returning no
+	 * metadata at all.
+	 * @param result judgment the judge would return if asked
+	 * @return judge whose {@code metadata()} returns null
+	 */
+	public static Judge nullMetadata(Judgment result) {
+		return new JudgeWithMetadata() {
+			@Override
+			public Judgment judge(JudgmentContext context) {
+				return result;
+			}
+
+			@Override
+			public JudgeMetadata metadata() {
+				return null;
+			}
+		};
+	}
+
+	/**
+	 * Create a judge whose {@code metadata()} throws.
+	 * @param failure the exception {@code metadata()} throws
+	 * @param result judgment the judge would return if asked
+	 * @return judge whose metadata cannot be read
+	 */
+	public static Judge throwingMetadata(RuntimeException failure, Judgment result) {
+		return new JudgeWithMetadata() {
+			@Override
+			public Judgment judge(JudgmentContext context) {
+				return result;
+			}
+
+			@Override
+			public JudgeMetadata metadata() {
+				throw failure;
+			}
+		};
+	}
+
+	/**
 	 * Create a judge that returns a specific score.
 	 * @param name judge name
 	 * @param score numerical score value

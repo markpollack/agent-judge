@@ -49,6 +49,9 @@ public final class Juries {
 	 * @param strategy the voting strategy
 	 * @param judges the judges to include
 	 * @return a simple jury with named judges
+	 * @throws IllegalArgumentException if no judges are given, or a judge's metadata cannot be
+	 * read because its {@code metadata()} returns null or throws; the message names the
+	 * position
 	 */
 	public static Jury fromJudges(VotingStrategy strategy, Judge... judges) {
 		if (judges == null || judges.length == 0) {
@@ -61,7 +64,13 @@ public final class Juries {
 
 		for (int i = 0; i < judges.length; i++) {
 			Judge judge = judges[i];
-			String baseName = Judges.tryMetadata(judge).map(m -> m.name()).orElse("Judge#" + (i + 1));
+			// Names are needed now to break collisions, so unreadable metadata is a construction
+			// error here rather than an ERROR seat at vote time.
+			SimpleJury.SeatKey key = SimpleJury.SeatKey.of(judge, i);
+			if (key.metadataFailure() != null) {
+				throw new IllegalArgumentException(key.unreadableMetadata(), key.cause());
+			}
+			String baseName = key.verdictKey();
 
 			// Handle duplicate names with suffix
 			String uniqueName = baseName;

@@ -203,6 +203,34 @@ class SimpleJuryTest {
 	}
 
 	@Test
+	void builderShouldRejectNonFiniteWeights() {
+		// NaN < 0 is false, so a negative-only guard let NaN and both infinities through to a
+		// jury that could vote with them but could not be described.
+		for (double weight : new double[] { Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY }) {
+			assertThatThrownBy(() -> SimpleJury.builder().judge(alwaysPass("Judge1"), weight))
+				.as("weight %s", weight)
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("Weight must be finite");
+		}
+	}
+
+	@Test
+	void builderShouldStillAcceptFiniteAndZeroWeights() {
+		SimpleJury jury = SimpleJury.builder()
+			.judge(alwaysPass("Zero"), 0.0)
+			.judge(alwaysPass("Tiny"), Double.MIN_VALUE)
+			.judge(alwaysPass("Heavy"), 2.5)
+			.votingStrategy(new MajorityVotingStrategy())
+			.build();
+
+		Verdict verdict = jury.vote(simpleContext("Test goal"));
+
+		assertThat(verdict.weights()).containsEntry("0", 0.0)
+			.containsEntry("1", Double.MIN_VALUE)
+			.containsEntry("2", 2.5);
+	}
+
+	@Test
 	void builderShouldAcceptZeroWeight() {
 		// Zero weight is valid - judge participates but with no influence
 		SimpleJury jury = SimpleJury.builder()
@@ -389,6 +417,70 @@ class SimpleJuryTest {
 			.containsEntry(AggregationEvidence.ELIGIBLE_COUNT, 2)
 			.containsEntry(AggregationEvidence.ERROR_COUNT, 1)
 			.containsEntry(AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT, 1);
+	}
+
+	// ==================== A judge whose metadata fails still votes ====================
+	//
+	// Regression guards for the defect where the jury read a judge's name outside its
+	// failure handling, so a JudgeWithMetadata whose metadata() returned null or threw
+	// escaped vote() and erased every other judge's result.
+
+	@Test
+	void judgesWhoseMetadataFailsBecomeErrorSeatsInParallel() {
+		assertMetadataFailuresBecomeErrorSeats(juryWithUnreadableMetadata(true));
+	}
+
+	@Test
+	void judgesWhoseMetadataFailsBecomeErrorSeatsSequentially() {
+		assertMetadataFailuresBecomeErrorSeats(juryWithUnreadableMetadata(false));
+	}
+
+	private static SimpleJury juryWithUnreadableMetadata(boolean parallel) {
+		return SimpleJury.builder()
+			.judge(alwaysPass("Build"))
+			.judge(nullMetadata(Judgment.pass("a judgment the jury must not keep")))
+			.judge(withScore("Scorer", 0.9))
+			.judge(throwingMetadata(new IllegalStateException("registry offline"),
+					Judgment.pass("a judgment the jury must not keep")))
+			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.parallel(parallel)
+			.build();
+	}
+
+	@SuppressWarnings("unchecked")
+	private static void assertMetadataFailuresBecomeErrorSeats(SimpleJury jury) {
+		Verdict verdict = jury.vote(simpleContext("Test goal"));
+
+		// The judges whose metadata could be read keep their judgments.
+		assertThat(verdict.individual()).hasSize(4);
+		assertThat(verdict.individual().get(0).status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.individual().get(2).status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.individual().get(2).score()).isEqualTo(0.9);
+
+		// Each failure is visible as an ERROR naming the seat and the failure, not a
+		// silently unnamed judge whose judgment was kept.
+		Judgment nullSeat = verdict.individual().get(1);
+		assertThat(nullSeat.status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(nullSeat.reasoning()).contains("position 1").contains("metadata() returned null");
+		Judgment throwingSeat = verdict.individual().get(3);
+		assertThat(throwingSeat.status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(throwingSeat.reasoning()).contains("position 3")
+			.contains("metadata() threw")
+			.contains(IllegalStateException.class.getName())
+			.contains("registry offline");
+
+		assertThat(verdict.individualByName().keySet()).containsExactly("Build", "Judge#2", "Scorer", "Judge#4");
+		assertThat(verdict.individualByName().get("Judge#2")).isSameAs(nullSeat);
+		assertThat(verdict.individualByName().get("Judge#4")).isSameAs(throwingSeat);
+
+		// The error policy governs the failures, and the evidence counts every configured judge.
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		Map<String, Object> evidence = (Map<String, Object>) verdict.aggregated()
+			.metadata()
+			.get(Judgment.AGGREGATION_KEY);
+		assertThat(evidence).containsEntry(AggregationEvidence.INPUT_COUNT, jury.getJudges().size())
+			.containsEntry(AggregationEvidence.ELIGIBLE_COUNT, 2)
+			.containsEntry(AggregationEvidence.ERROR_COUNT, 2);
 	}
 
 }

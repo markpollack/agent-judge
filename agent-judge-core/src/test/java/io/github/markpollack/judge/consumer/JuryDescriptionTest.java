@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import io.github.markpollack.judge.Judge;
+import io.github.markpollack.judge.JudgeTestFixtures;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.NamedJudge;
@@ -188,14 +189,54 @@ class JuryDescriptionTest {
 		}
 
 		@Test
-		void aWeightWithNoJsonRepresentationCannotBeDescribed() {
+		void aWeightWithNoJsonRepresentationIsRefusedBeforeAJuryCanBeDescribed() {
+			// Until 0.17.0 the builder accepted NaN and infinite weights, and only describe()
+			// refused them. The seat description still refuses them; see
+			// aSeatDescriptionRefusesImpossibleSeats.
+			assertThatThrownBy(() -> SimpleJury.builder().judge(ctx -> Judgment.pass("a"), Double.NaN))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("Weight must be finite");
+		}
+
+		@Test
+		void aSeatWhoseMetadataIsNullCannotBeDescribed() {
 			SimpleJury jury = SimpleJury.builder()
-				.judge(ctx -> Judgment.pass("a"), Double.NaN)
+				.judge(Judges.named(new KeywordJudge("done"), "keyword"))
+				.judge(JudgeTestFixtures.nullMetadata(Judgment.pass("never kept")))
 				.votingStrategy(new MajorityVotingStrategy())
 				.build();
 
 			assertThatThrownBy(jury::describe).isInstanceOf(IllegalArgumentException.class)
-				.hasMessageStartingWith("seats[0] ('Judge#1'): weight must be finite");
+				.hasMessageStartingWith("seats[1] ('Judge#2'): ")
+				.hasMessageContaining("metadata() returned null");
+		}
+
+		@Test
+		void aSeatWhoseMetadataThrowsCannotBeDescribed() {
+			IllegalStateException failure = new IllegalStateException("registry offline");
+			SimpleJury jury = SimpleJury.builder()
+				.judge(JudgeTestFixtures.throwingMetadata(failure, Judgment.pass("never kept")))
+				.votingStrategy(new MajorityVotingStrategy())
+				.build();
+
+			assertThatThrownBy(jury::describe).isInstanceOf(IllegalArgumentException.class)
+				.hasMessageStartingWith("seats[0] ('Judge#1'): ")
+				.hasMessageContaining("metadata() threw " + IllegalStateException.class.getName() + ": registry offline")
+				.hasRootCause(failure);
+		}
+
+		@Test
+		void aNamedJudgeWrappingAJudgeWithNullMetadataCannotBeDescribed() {
+			// The wrapper's own name is readable, so the seat votes; the wrapped judge's metadata
+			// is not, and describing it as undeclared would misstate what the judge declares.
+			SimpleJury jury = SimpleJury.builder()
+				.judge(Judges.named(JudgeTestFixtures.nullMetadata(Judgment.pass("kept")), "outer"))
+				.votingStrategy(new MajorityVotingStrategy())
+				.build();
+
+			assertThatThrownBy(jury::describe).isInstanceOf(IllegalArgumentException.class)
+				.hasMessageStartingWith("seats[0] ('outer'): ")
+				.hasMessageContaining("metadata() returned null");
 		}
 
 	}
