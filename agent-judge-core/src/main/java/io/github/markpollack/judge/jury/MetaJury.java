@@ -12,15 +12,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.description.JuryDescription;
+import io.github.markpollack.judge.description.KeySource;
 import io.github.markpollack.judge.description.MemberDescription;
 import io.github.markpollack.judge.description.MetaJuryDescription;
 import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentReasonCode;
 
 /** Package-private named jury-of-juries implementation used by {@link Juries}. */
 class MetaJury implements Jury {
+
+	private static final Logger logger = LoggerFactory.getLogger(MetaJury.class);
 
 	private static final CompositeFailure EXECUTION_FAILURE =
 			new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED);
@@ -114,33 +121,79 @@ class MetaJury implements Jury {
 		List<CompositeAttempt> attempts = new ArrayList<>();
 		List<Judgment> successful = new ArrayList<>();
 		Map<String, Judgment> successfulByName = new LinkedHashMap<>();
-		boolean anyFailure = false;
+		List<Seat> seats = new ArrayList<>();
+		boolean anyStageFailed = false;
 
-		for (NamedJury member : members) {
+		for (int position = 0; position < members.size(); position++) {
+			NamedJury member = members.get(position);
+			Verdict verdict;
 			try {
-				Verdict verdict = CompositeExecutionScope.invokeChild(() -> member.jury().vote(context));
-				attempts.add(new CompositeAttempt(member.name(), CompositeRelation.META_MEMBER, null, verdict, null));
-				successful.add(verdict.aggregated());
-				successfulByName.put(member.name(), verdict.aggregated());
+				verdict = CompositeExecutionScope.invokeChild(() -> member.jury().vote(context));
 			}
 			catch (CompositeLimitExceededException ex) {
 				throw ex;
 			}
 			catch (Exception ex) {
-				anyFailure = true;
-				attempts.add(new CompositeAttempt(member.name(), CompositeRelation.META_MEMBER, null, null,
+				logger.warn("Member '{}' threw {}; recording a stage failure", member.name(), ex.getClass().getName(),
+						ex);
+				attempts.add(CompositeAttempt.executionFailed(member.name(), CompositeRelation.META_MEMBER, null,
 						EXECUTION_FAILURE));
+				anyStageFailed = true;
+				continue;
 			}
+
+			DispositionReason reason = NotApplicableGuard.stageFailure(member.jury(), verdict);
+			if (reason != null) {
+				// The member's own verdict is kept exactly as it came back. The parent records
+				// that it could not use it, which is a different fact from what the member said.
+				attempts.add(CompositeAttempt.stageFailed(member.name(), CompositeRelation.META_MEMBER, null, reason,
+						verdict));
+				anyStageFailed = true;
+				continue;
+			}
+
+			attempts.add(CompositeAttempt.used(member.name(), CompositeRelation.META_MEMBER, null, verdict));
+			successful.add(verdict.aggregated());
+			successfulByName.put(member.name(), verdict.aggregated());
+			// Seats are the configured positions of the members that were used, so a gap in the
+			// positions is itself the record that a member between them failed.
+			seats.add(new Seat(position, member.name(), KeySource.DECLARED));
 		}
 
-		Judgment aggregate = anyFailure ? Judgment.error("One or more jury members failed to execute.")
-				: metaStrategy.aggregate(successful, Map.of());
+		if (anyStageFailed) {
+			// Successful members are kept: their work is evidence, and discarding it would make
+			// a single broken member indistinguishable from a jury that ran nothing.
+			Judgment aggregate = Judgment.error(JudgmentReasonCode.STAGE_FAILED,
+					"One or more jury members did not produce a usable determination, so this jury reduced nothing.");
+			return Verdict.builder()
+				.aggregated(aggregate)
+				.individual(successful)
+				.individualByName(successfulByName)
+				.seats(seats)
+				.decision(Decision.undecided())
+				.compositeAttempts(attempts)
+				.build();
+		}
+
+		Judgment aggregate = aggregateWithinBoundary(successful);
 		return Verdict.builder()
 			.aggregated(aggregate)
 			.individual(successful)
 			.individualByName(successfulByName)
+			.seats(seats)
+			.decision(AggregationBoundary.decisionFor(aggregate))
 			.compositeAttempts(attempts)
 			.build();
+	}
+
+	/**
+	 * Call the meta-strategy inside the same boundary a SimpleJury uses.
+	 * @param successful the aggregates of the members that were used
+	 * @return the strategy's aggregate, or the contained error that replaces it
+	 */
+	private Judgment aggregateWithinBoundary(List<Judgment> successful) {
+		return AggregationBoundary.aggregate(metaStrategy, successful, Map.of(), aggregateMayBeNotApplicable(),
+				logger);
 	}
 
 }

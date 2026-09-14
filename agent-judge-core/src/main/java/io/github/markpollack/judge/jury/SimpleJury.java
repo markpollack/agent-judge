@@ -324,22 +324,44 @@ public class SimpleJury implements Jury {
 				.toList();
 		}
 
-		// Build identity map (preserves order via LinkedHashMap)
+		// Build identity map (preserves order via LinkedHashMap) and the seats that join it to
+		// the ordered list.
 		Map<String, Judgment> judgmentByName = new LinkedHashMap<>();
+		List<Seat> seats = new ArrayList<>(judges.size());
 		for (int i = 0; i < judges.size(); i++) {
 			judgmentByName.put(keys.get(i).verdictKey(), individualJudgments.get(i));
+			seats.add(new Seat(i, keys.get(i).verdictKey(), keySourceAt(i, keys.get(i))));
 		}
 
-		// Aggregate using voting strategy
-		Judgment aggregated = votingStrategy.aggregate(individualJudgments, weights);
+		Judgment aggregated = aggregateWithinBoundary(individualJudgments);
 
 		return Verdict.builder()
 			.aggregated(aggregated)
 			.individual(individualJudgments)
 			.individualByName(judgmentByName)
 			.weights(weights)
+			.seats(seats)
+			.decision(AggregationBoundary.decisionFor(aggregated))
 			.compositeAttempts(List.of())
 			.build();
+	}
+
+	private KeySource keySourceAt(int position, SeatKey key) {
+		if (deduplicatedPositions.contains(position)) {
+			return KeySource.DEDUPLICATED;
+		}
+		return key.declared() ? KeySource.DECLARED : KeySource.POSITIONAL;
+	}
+
+	/**
+	 * Call the strategy inside the shared boundary, so a broken reduction becomes a contained,
+	 * countable error instead of an exception that discards every judge that succeeded.
+	 * @param individualJudgments the judgments to reduce
+	 * @return the strategy's aggregate, or the contained error that replaces it
+	 */
+	private Judgment aggregateWithinBoundary(List<Judgment> individualJudgments) {
+		return AggregationBoundary.aggregate(votingStrategy, individualJudgments, weights,
+				aggregateMayBeNotApplicable(), logger);
 	}
 
 	/**
