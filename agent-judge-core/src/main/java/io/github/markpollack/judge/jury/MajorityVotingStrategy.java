@@ -5,7 +5,6 @@
 
 package io.github.markpollack.judge.jury;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -64,8 +63,16 @@ public class MajorityVotingStrategy implements VotingStrategy {
 	 * Create majority voting strategy with custom policies.
 	 * @param tiePolicy policy for handling ties
 	 * @param errorPolicy policy for handling errors
+	 * @throws IllegalArgumentException if {@code tiePolicy} or {@code errorPolicy} is null;
+	 * a null tie policy is refused here rather than at the first tie
 	 */
 	public MajorityVotingStrategy(TiePolicy tiePolicy, ErrorPolicy errorPolicy) {
+		if (tiePolicy == null) {
+			throw new IllegalArgumentException("tiePolicy must not be null");
+		}
+		if (errorPolicy == null) {
+			throw new IllegalArgumentException("errorPolicy must not be null");
+		}
 		this.tiePolicy = tiePolicy;
 		this.errorPolicy = errorPolicy;
 	}
@@ -127,11 +134,7 @@ public class MajorityVotingStrategy implements VotingStrategy {
 	 */
 	@Override
 	public StrategyDescription describe() {
-		Map<String, Object> parameters = new LinkedHashMap<>();
-		if (this.tiePolicy != null) {
-			parameters.put("tiePolicy", this.tiePolicy.name());
-		}
-		return StrategyDescription.declared(this, this.errorPolicy, null, parameters);
+		return StrategyDescription.declared(this, this.errorPolicy, null, Map.of("tiePolicy", this.tiePolicy.name()));
 	}
 
 }

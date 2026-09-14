@@ -84,8 +84,12 @@ public class AllMustPassStrategy implements VotingStrategy {
 	/**
 	 * Create a gate strategy with a custom error policy.
 	 * @param errorPolicy policy for handling errors
+	 * @throws IllegalArgumentException if {@code errorPolicy} is null
 	 */
 	public AllMustPassStrategy(ErrorPolicy errorPolicy) {
+		if (errorPolicy == null) {
+			throw new IllegalArgumentException("errorPolicy must not be null");
+		}
 		this.errorPolicy = errorPolicy;
 	}
 

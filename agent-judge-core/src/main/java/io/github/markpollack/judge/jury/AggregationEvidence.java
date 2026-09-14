@@ -104,10 +104,16 @@ public final class AggregationEvidence {
 
 	// ==================== Weighted keys ====================
 
-	/** Sum of resolved weights before eligibility filtering. */
+	/**
+	 * Sum of resolved weights before eligibility filtering. A sum beyond the largest finite
+	 * {@code double} is reported as {@link Double#MAX_VALUE}.
+	 */
 	public static final String INPUT_WEIGHT = "inputWeight";
 
-	/** Sum of resolved weights after eligibility filtering. */
+	/**
+	 * Sum of resolved weights after eligibility filtering. A sum beyond the largest finite
+	 * {@code double} is reported as {@link Double#MAX_VALUE}.
+	 */
 	public static final String ELIGIBLE_WEIGHT = "eligibleWeight";
 
 	private AggregationEvidence() {
