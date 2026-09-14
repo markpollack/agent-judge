@@ -28,7 +28,8 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * <ul>
  * <li>Ties: resolved by {@link TiePolicy} (default {@code FAIL}).</li>
  * <li>Errors: resolved by {@link ErrorPolicy} (default {@code PROPAGATE}).</li>
- * <li>Abstentions: excluded — a judge that does not apply casts no vote.</li>
+ * <li>Abstentions: excluded — a judge that reached no decision casts no vote.</li>
+ * <li>Exclusions: resolved by {@link NotApplicablePolicy} (default {@code REFUSE}).</li>
  * <li>Nothing eligible: {@code ABSTAIN}, with evidence naming the cause.</li>
  * </ul>
  *
@@ -52,6 +53,8 @@ public class MajorityVotingStrategy implements VotingStrategy {
 
 	private final ErrorPolicy errorPolicy;
 
+	private final NotApplicablePolicy notApplicablePolicy;
+
 	/**
 	 * Create majority voting strategy with default policies.
 	 */
@@ -67,22 +70,41 @@ public class MajorityVotingStrategy implements VotingStrategy {
 	 * a null tie policy is refused here rather than at the first tie
 	 */
 	public MajorityVotingStrategy(TiePolicy tiePolicy, ErrorPolicy errorPolicy) {
+		this(tiePolicy, errorPolicy, NotApplicablePolicy.REFUSE);
+	}
+
+	/**
+	 * Create majority voting strategy with custom tie, error and not-applicable policies.
+	 * @param tiePolicy policy for handling ties
+	 * @param errorPolicy policy for handling errors
+	 * @param notApplicablePolicy policy for handling excluded judgments
+	 * @throws IllegalArgumentException if any policy is null; a null tie policy is refused here
+	 * rather than at the first tie
+	 * @since 0.17.0
+	 */
+	public MajorityVotingStrategy(TiePolicy tiePolicy, ErrorPolicy errorPolicy,
+			NotApplicablePolicy notApplicablePolicy) {
 		if (tiePolicy == null) {
 			throw new IllegalArgumentException("tiePolicy must not be null");
 		}
 		if (errorPolicy == null) {
 			throw new IllegalArgumentException("errorPolicy must not be null");
 		}
+		if (notApplicablePolicy == null) {
+			throw new IllegalArgumentException("notApplicablePolicy must not be null");
+		}
 		this.tiePolicy = tiePolicy;
 		this.errorPolicy = errorPolicy;
+		this.notApplicablePolicy = notApplicablePolicy;
 	}
 
 	@Override
 	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
-		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy);
+		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
+				this.notApplicablePolicy);
 
-		if (population.propagateError()) {
-			return population.propagatedError(getName());
+		if (population.hasPolicyExit()) {
+			return population.policyExitAggregate(getName());
 		}
 		if (population.isEmpty()) {
 			return population.noResult(getName(), Map.of());
@@ -113,7 +135,8 @@ public class MajorityVotingStrategy implements VotingStrategy {
 			case PASS -> Judgment.builder().pass().reasoning(reasoning).build();
 			case FAIL -> Judgment.builder().fail().reasoning(reasoning).build();
 			case ABSTAIN -> Judgment.builder().abstain().reasoning(reasoning).build();
-			case ERROR -> throw new IllegalStateException("Majority cannot produce ERROR after population resolution");
+			case NOT_APPLICABLE, ERROR ->
+				throw new IllegalStateException("Majority cannot produce " + status + " after population resolution");
 		};
 		return AggregationEvidence.attach(aggregate, population.evidence(getName())
 				.put(AggregationEvidence.PASS_COUNT, passCount)
@@ -134,7 +157,15 @@ public class MajorityVotingStrategy implements VotingStrategy {
 	 */
 	@Override
 	public StrategyDescription describe() {
-		return StrategyDescription.declared(this, this.errorPolicy, null, Map.of("tiePolicy", this.tiePolicy.name()));
+		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, null,
+				Map.of("tiePolicy", this.tiePolicy.name()));
 	}
+
+	/** {@inheritDoc} */
+	@Override
+	public NotApplicablePolicy notApplicablePolicy() {
+		return this.notApplicablePolicy;
+	}
+
 
 }

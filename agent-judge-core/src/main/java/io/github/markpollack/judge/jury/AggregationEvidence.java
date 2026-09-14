@@ -48,6 +48,13 @@ public final class AggregationEvidence {
 	/** Which policy was applied to errored judgments. */
 	public static final String ERROR_POLICY = "errorPolicy";
 
+	/**
+	 * Which policy was applied to excluded judgments.
+	 *
+	 * @since 0.17.0
+	 */
+	public static final String NOT_APPLICABLE_POLICY = "notApplicablePolicy";
+
 	/** How many judgments were submitted. */
 	public static final String INPUT_COUNT = "inputCount";
 
@@ -56,6 +63,19 @@ public final class AggregationEvidence {
 
 	/** How many arrived with ABSTAIN — the judge's own abstention. */
 	public static final String EXPLICIT_ABSTAIN_COUNT = "explicitAbstainCount";
+
+	/**
+	 * How many arrived with NOT_APPLICABLE — the judge's own exclusion.
+	 * <p>
+	 * Counted on the submitted originals under every policy, including
+	 * {@link NotApplicablePolicy#REFUSE}, so a reader can always say how much of a rubric the
+	 * instrument claimed did not apply. The <em>rate</em> is the reader's to derive; a result
+	 * stores counts.
+	 * </p>
+	 *
+	 * @since 0.17.0
+	 */
+	public static final String NOT_APPLICABLE_COUNT = "notApplicableCount";
 
 	/** How many arrived with ERROR. */
 	public static final String ERROR_COUNT = "errorCount";
@@ -68,6 +88,31 @@ public final class AggregationEvidence {
 
 	/** Errors that participated as FAIL under TREAT_AS_FAIL. */
 	public static final String ERRORS_TREATED_AS_FAIL_COUNT = "errorsTreatedAsFailCount";
+
+	/**
+	 * Exclusions that participated as FAIL under {@link NotApplicablePolicy#TREAT_AS_FAIL}.
+	 *
+	 * @since 0.17.0
+	 */
+	public static final String NOT_APPLICABLE_TREATED_AS_FAIL_COUNT = "notApplicableTreatedAsFailCount";
+
+	/**
+	 * The terminal causes behind the errored inputs, as wire name to count.
+	 * <p>
+	 * Flattened through propagating wrappers, so the block names causes rather than the fact
+	 * that something propagated. A total here may exceed {@link #ERROR_COUNT}, which counts the
+	 * immediate errored inputs: one propagating input can stand for several failures.
+	 * </p>
+	 * <p>
+	 * On an aggregate coded
+	 * {@link io.github.markpollack.judge.result.JudgmentReasonCode#ERRORS_PROPAGATED} this block
+	 * is not merely evidence but the invariant that makes the code legal, and
+	 * {@link Judgment} refuses the code without it.
+	 * </p>
+	 *
+	 * @since 0.17.0
+	 */
+	public static final String ERROR_CODE_COUNTS = Judgment.ERROR_CODE_COUNTS_KEY;
 
 	// ==================== Status-counting keys ====================
 
@@ -124,11 +169,31 @@ public final class AggregationEvidence {
 		return new Builder();
 	}
 
+	/**
+	 * Replace a judgment's evidence block, preserving an origin the replacement omits.
+	 * <p>
+	 * A propagating aggregate carries its origin inside the same reserved block, and a
+	 * judgment's construction refuses the code without it. Overwriting the block with evidence
+	 * that does not name the origin would destroy the fact that made the code legal, so the
+	 * existing origin is carried across rather than dropped.
+	 * </p>
+	 * @param judgment the aggregate
+	 * @param evidence the replacement evidence block
+	 * @return the aggregate carrying that evidence
+	 */
 	static Judgment attach(Judgment judgment, Map<String, Object> evidence) {
+		Map<String, Object> block = new LinkedHashMap<>(evidence);
+		if (!block.containsKey(Judgment.ERROR_CODE_COUNTS_KEY)
+				&& judgment.metadata().get(Judgment.AGGREGATION_KEY) instanceof Map<?, ?> existing) {
+			Object origin = existing.get(Judgment.ERROR_CODE_COUNTS_KEY);
+			if (origin != null) {
+				block.put(Judgment.ERROR_CODE_COUNTS_KEY, origin);
+			}
+		}
 		Map<String, Object> metadata = new LinkedHashMap<>(judgment.metadata());
-		metadata.put(Judgment.AGGREGATION_KEY, evidence);
-		return new Judgment(judgment.status(), judgment.score(), judgment.label(), judgment.reasoning(), judgment.checks(),
-				metadata);
+		metadata.put(Judgment.AGGREGATION_KEY, block);
+		return new Judgment(judgment.status(), judgment.score(), judgment.label(), judgment.reasonCode(),
+				judgment.reasoning(), judgment.checks(), metadata);
 	}
 
 	/**
@@ -153,6 +218,22 @@ public final class AggregationEvidence {
 
 		Builder put(String key, String value) {
 			this.entries.put(key, value);
+			return this;
+		}
+
+		/**
+		 * Record a nested block of portable values, such as a count keyed by cause.
+		 * <p>
+		 * A flat key per cause would put a growing vocabulary into the evidence's own
+		 * namespace, where a new code could collide with a strategy's parameter. One block
+		 * keeps the vocabulary where it belongs.
+		 * </p>
+		 * @param key the evidence key
+		 * @param value the block, copied in encounter order
+		 * @return this builder
+		 */
+		Builder put(String key, Map<String, Object> value) {
+			this.entries.put(key, new LinkedHashMap<>(value));
 			return this;
 		}
 

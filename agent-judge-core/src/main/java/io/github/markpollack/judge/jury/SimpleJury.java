@@ -15,6 +15,7 @@ import io.github.markpollack.judge.description.KeySource;
 import io.github.markpollack.judge.description.SeatDescription;
 import io.github.markpollack.judge.description.SimpleJuryDescription;
 import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentReasonCode;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -224,7 +225,7 @@ public class SimpleJury implements Jury {
 		if (key.metadataFailure() != null) {
 			String reasoning = key.unreadableMetadata();
 			logger.warn("{}; recording an ERROR for the error policy to resolve", reasoning, key.cause());
-			return Judgment.error(reasoning);
+			return Judgment.error(JudgmentReasonCode.JUDGE_METADATA_UNREADABLE, reasoning);
 		}
 		Judge judge = judges.get(index);
 		String name = key.verdictKey();
@@ -233,14 +234,15 @@ public class SimpleJury implements Jury {
 			if (judgment == null) {
 				logger.warn("Judge '{}' returned no judgment; recording an ERROR for the error policy to resolve",
 						name);
-				return Judgment.error("Judge '" + name + "' returned no judgment");
+				return Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "Judge '" + name + "' returned no judgment");
 			}
 			return judgment;
 		}
 		catch (Exception ex) {
 			logger.warn("Judge '{}' threw {}; recording an ERROR for the error policy to resolve", name,
 					ex.getClass().getName(), ex);
-			return Judgment.error("Judge '" + name + "' threw " + ex.getClass().getName() + describeCause(ex));
+			return Judgment.error(JudgmentReasonCode.JUDGE_FAILED,
+					"Judge '" + name + "' threw " + ex.getClass().getName() + describeCause(ex));
 		}
 	}
 

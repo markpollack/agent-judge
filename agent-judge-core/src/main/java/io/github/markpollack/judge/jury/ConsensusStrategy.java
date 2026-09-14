@@ -20,10 +20,17 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * </p>
  *
  * <p>
- * {@link JudgmentStatus#ABSTAIN} means "not applicable to this run" — it is not a vote at
- * all, so it is excluded from the population and consensus is computed over the applicable
- * judges. A judge added precisely because it cannot evaluate every case must not be able to
- * break unanimity by declining.
+ * {@link JudgmentStatus#ABSTAIN} means the judge reached no decision, so it casts no vote and
+ * is excluded from the population; consensus is computed over the judges that did decide. A
+ * judge that could not settle its question must not be able to break unanimity by failing to
+ * answer it.
+ * </p>
+ *
+ * <p>
+ * {@link JudgmentStatus#NOT_APPLICABLE} is a different claim — the question should not have
+ * been asked here — and is governed by {@link NotApplicablePolicy}, which defaults to refusing
+ * it. An exclusion is not silently absorbed into an abstention, because the two produce
+ * different denominators.
  * </p>
  *
  * <table border="1">
@@ -72,6 +79,8 @@ public class ConsensusStrategy implements VotingStrategy {
 
 	private final ErrorPolicy errorPolicy;
 
+	private final NotApplicablePolicy notApplicablePolicy;
+
 	/**
 	 * Create a consensus strategy with the default error policy.
 	 */
@@ -85,18 +94,34 @@ public class ConsensusStrategy implements VotingStrategy {
 	 * @throws IllegalArgumentException if {@code errorPolicy} is null
 	 */
 	public ConsensusStrategy(ErrorPolicy errorPolicy) {
+		this(errorPolicy, NotApplicablePolicy.REFUSE);
+	}
+
+	/**
+	 * Create a consensus strategy with custom error and not-applicable policies.
+	 * @param errorPolicy policy for handling errors
+	 * @param notApplicablePolicy policy for handling excluded judgments
+	 * @throws IllegalArgumentException if either policy is null
+	 * @since 0.17.0
+	 */
+	public ConsensusStrategy(ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
 		if (errorPolicy == null) {
 			throw new IllegalArgumentException("errorPolicy must not be null");
 		}
+		if (notApplicablePolicy == null) {
+			throw new IllegalArgumentException("notApplicablePolicy must not be null");
+		}
 		this.errorPolicy = errorPolicy;
+		this.notApplicablePolicy = notApplicablePolicy;
 	}
 
 	@Override
 	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
-		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy);
+		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
+				this.notApplicablePolicy);
 
-		if (population.propagateError()) {
-			return population.propagatedError(getName());
+		if (population.hasPolicyExit()) {
+			return population.policyExitAggregate(getName());
 		}
 		if (population.isEmpty()) {
 			return population.noResult(getName(), Map.of());
@@ -128,7 +153,8 @@ public class ConsensusStrategy implements VotingStrategy {
 			case PASS -> Judgment.builder().pass().reasoning(reasoning).build();
 			case FAIL -> Judgment.builder().fail().reasoning(reasoning).build();
 			case ABSTAIN -> Judgment.builder().abstain().reasoning(reasoning).build();
-			case ERROR -> throw new IllegalStateException("Consensus produced an unexpected status: " + status);
+			case NOT_APPLICABLE, ERROR ->
+				throw new IllegalStateException("Consensus produced an unexpected status: " + status);
 		};
 		return AggregationEvidence.attach(aggregate, population.evidence(getName())
 				.put(AggregationEvidence.PASS_COUNT, passCount)
@@ -142,13 +168,20 @@ public class ConsensusStrategy implements VotingStrategy {
 	}
 
 	/**
-	 * Declares the error policy. This strategy has no threshold.
+	 * Declares both policies. This strategy has no threshold.
 	 * @return the declared description
 	 * @since 0.17.0
 	 */
 	@Override
 	public StrategyDescription describe() {
-		return StrategyDescription.declared(this, this.errorPolicy, null, Map.of());
+		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, null, Map.of());
 	}
+
+	/** {@inheritDoc} */
+	@Override
+	public NotApplicablePolicy notApplicablePolicy() {
+		return this.notApplicablePolicy;
+	}
+
 
 }

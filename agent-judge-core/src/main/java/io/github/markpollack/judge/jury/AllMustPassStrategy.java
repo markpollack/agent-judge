@@ -60,9 +60,11 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * </p>
  *
  * <p>
- * Abstentions leave the population, because a judge that does not apply is not a
- * requirement this subject has to meet. Errors are governed by {@link ErrorPolicy} (default
- * {@code PROPAGATE}), so a requirement that could not be evaluated does not quietly pass.
+ * Abstentions leave the population, because a requirement nobody could settle is not a
+ * requirement this subject was shown to meet or to miss. Errors are governed by
+ * {@link ErrorPolicy} (default {@code PROPAGATE}), so a requirement that could not be
+ * evaluated does not quietly pass, and exclusions by {@link NotApplicablePolicy} (default
+ * {@code REFUSE}), so a gate does not silently shrink its own definition of done.
  * </p>
  *
  * @author Mark Pollack
@@ -73,6 +75,8 @@ import io.github.markpollack.judge.result.JudgmentStatus;
 public class AllMustPassStrategy implements VotingStrategy {
 
 	private final ErrorPolicy errorPolicy;
+
+	private final NotApplicablePolicy notApplicablePolicy;
 
 	/**
 	 * Create a gate strategy with the default error policy.
@@ -87,18 +91,34 @@ public class AllMustPassStrategy implements VotingStrategy {
 	 * @throws IllegalArgumentException if {@code errorPolicy} is null
 	 */
 	public AllMustPassStrategy(ErrorPolicy errorPolicy) {
+		this(errorPolicy, NotApplicablePolicy.REFUSE);
+	}
+
+	/**
+	 * Create a gate strategy with custom error and not-applicable policies.
+	 * @param errorPolicy policy for handling errors
+	 * @param notApplicablePolicy policy for handling excluded judgments
+	 * @throws IllegalArgumentException if either policy is null
+	 * @since 0.17.0
+	 */
+	public AllMustPassStrategy(ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
 		if (errorPolicy == null) {
 			throw new IllegalArgumentException("errorPolicy must not be null");
 		}
+		if (notApplicablePolicy == null) {
+			throw new IllegalArgumentException("notApplicablePolicy must not be null");
+		}
 		this.errorPolicy = errorPolicy;
+		this.notApplicablePolicy = notApplicablePolicy;
 	}
 
 	@Override
 	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
-		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy);
+		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
+				this.notApplicablePolicy);
 
-		if (population.propagateError()) {
-			return population.propagatedError(getName());
+		if (population.hasPolicyExit()) {
+			return population.policyExitAggregate(getName());
 		}
 		if (population.isEmpty()) {
 			// Never PASS. An empty conjunction is vacuously true, and a gate that passes
@@ -137,13 +157,19 @@ public class AllMustPassStrategy implements VotingStrategy {
 	}
 
 	/**
-	 * Declares the error policy. This strategy has no threshold.
+	 * Declares both policies. This strategy has no threshold.
 	 * @return the declared description
 	 * @since 0.17.0
 	 */
 	@Override
 	public StrategyDescription describe() {
-		return StrategyDescription.declared(this, this.errorPolicy, null, Map.of());
+		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, null, Map.of());
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public NotApplicablePolicy notApplicablePolicy() {
+		return this.notApplicablePolicy;
 	}
 
 }
