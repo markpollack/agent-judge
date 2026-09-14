@@ -17,13 +17,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Why the strict rollup lives inside the judge and not in a voting strategy.
  *
- * <p>{@code ABSTAIN} means two different things in this library, and both readings are correct in
- * their own place. A jury reads it as "this judge does not apply, so it casts no vote", and
- * therefore drops it from the eligible population. These judges read it as "a required requirement
- * could not be established", which is not a thing that can be dropped.
+ * <p>{@code ABSTAIN} means the same thing in both places now — the question applied and has no
+ * answer — but the two layers do different things with it, and both are right where they are. A
+ * jury treats an undecided judge as casting no vote and drops it from the population, because the
+ * judges in a jury are a panel and a silent panellist should not be able to break unanimity. These
+ * judges treat an unsettled requirement as fatal to the claim, because the judges here are a roster
+ * and the claim is "every requirement was established".
  *
- * <p>These cases pin that divergence so it stays a documented design decision rather than becoming
- * a surprise. Reconciling the two — a roster-aware aggregation — would be a deliberate change, and
+ * <p>So the divergence is about what is being counted, not about what the status means. Fifty-one
+ * of fifty-two established is not the specification passing; but one abstaining judge among five on
+ * a panel is simply four votes.
+ *
+ * <p>Exclusion is the status that is genuinely different in kind, and it is now available in both
+ * layers under the same rule: a criterion, or a judge, may only remove itself from a denominator if
+ * it declared in advance that it can. That is what keeps "this does not apply" from becoming the
+ * universal escape hatch — see {@code ConditionalCriterionTests}.
+ *
+ * <p>These cases pin the divergence so it stays a documented design decision rather than becoming a
+ * surprise. Reconciling the two — a roster-aware aggregation — would be a deliberate change, and
  * these tests are what would notice it.
  */
 class FixedRosterAggregationTests {
@@ -43,7 +54,8 @@ class FixedRosterAggregationTests {
 	void aVotingStrategyWouldAbsorbThatAbstentionIntoAPass() {
 		// Documented, deliberate, and the reason these judgments must not be routed through a
 		// jury that resolves its population first. Two of three requirements established plus a
-		// passing judge from elsewhere would report the specification as satisfied.
+		// passing judge from elsewhere would report the specification as satisfied — the roster
+		// is lost with the abstention, and nothing downstream can tell that it ever existed.
 		Judgment aggregated = new AllMustPassStrategy()
 			.aggregate(List.of(almostEverythingEstablished(), somethingElseThatPassed()), Map.of());
 

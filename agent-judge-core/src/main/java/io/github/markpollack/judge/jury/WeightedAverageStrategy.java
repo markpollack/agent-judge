@@ -70,7 +70,10 @@ import io.github.markpollack.judge.result.Judgment;
  * </p>
  *
  * <p>
- * The judgment passes if the weighted mean is greater than or equal to 0.5.
+ * The judgment passes if the weighted mean reaches the configured threshold, which defaults to
+ * {@link #DEFAULT_THRESHOLD}. That default is a convention rather than a derivation: it knows
+ * nothing about the scale your judges score on. Prefer a bar derived from the rubric that
+ * produced the scores.
  * </p>
  *
  * <p>
