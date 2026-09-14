@@ -33,8 +33,9 @@ import io.github.markpollack.judge.jury.VotingStrategy;
  * <h2>Portable form</h2>
  * <pre>
  * {
- *   "descriptionVersion": 1,
+ *   "descriptionVersion": 2,
  *   "kind": "OPAQUE",
+ *   "aggregateMayBeNotApplicable": false,
  *   "implementation": {...},
  *   "strategy": {"declared": true, "value": {...}},
  *   "judges": [{...}, ...]
@@ -45,13 +46,15 @@ import io.github.markpollack.judge.jury.VotingStrategy;
  * </p>
  *
  * @param implementation the class that implements the jury
+ * @param aggregateMayBeNotApplicable what the jury itself declared, since an opaque jury's
+ * structure gives no way to derive it
  * @param strategy the jury's strategy, or null when it reports none
  * @param judges the jury's flattened judges, in the order it reports them
  * @author Mark Pollack
  * @since 0.17.0
  */
-public record OpaqueJuryDescription(ImplementationIdentity implementation, @Nullable StrategyDescription strategy,
-		List<JudgeDescription> judges) implements JuryDescription {
+public record OpaqueJuryDescription(ImplementationIdentity implementation, boolean aggregateMayBeNotApplicable,
+		@Nullable StrategyDescription strategy, List<JudgeDescription> judges) implements JuryDescription {
 
 	/** Validate the implementation and copy the judges. */
 	public OpaqueJuryDescription {
@@ -73,7 +76,8 @@ public record OpaqueJuryDescription(ImplementationIdentity implementation, @Null
 				throw new IllegalArgumentException("judges[" + index + "]: " + ex.getMessage(), ex);
 			}
 		}
-		return new OpaqueJuryDescription(ImplementationIdentity.of(jury.getClass()), strategy, judges);
+		return new OpaqueJuryDescription(ImplementationIdentity.of(jury.getClass()),
+				jury.aggregateMayBeNotApplicable(), strategy, judges);
 	}
 
 	@Override
@@ -88,6 +92,7 @@ public record OpaqueJuryDescription(ImplementationIdentity implementation, @Null
 		}
 		Map<String, Object> tree = new LinkedHashMap<>();
 		tree.put("kind", "OPAQUE");
+		tree.put("aggregateMayBeNotApplicable", aggregateMayBeNotApplicable);
 		tree.put("implementation", implementation.portableTree());
 		StrategyDescription reported = strategy;
 		tree.put("strategy",

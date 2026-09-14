@@ -51,7 +51,8 @@ public abstract class DeterministicJudge implements io.github.markpollack.judge.
 	 * @param description human-readable purpose
 	 */
 	protected DeterministicJudge(String name, String description) {
-		this.metadata = new JudgeMetadata(name, description, JudgeType.DETERMINISTIC);
+		// No exclusion capability: a deterministic judge that cannot evaluate abstains.
+		this.metadata = new JudgeMetadata(name, description, JudgeType.DETERMINISTIC, null);
 	}
 
 	/**

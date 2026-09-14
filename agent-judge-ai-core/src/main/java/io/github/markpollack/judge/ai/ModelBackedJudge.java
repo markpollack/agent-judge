@@ -33,6 +33,11 @@ import io.github.markpollack.judge.result.Judgment;
  * renders and the classifier that reads the answer. It declares no model, because a
  * {@link JudgeModel} does not state which model it will call.
  *
+ * <p>Its metadata carries the exclusion capability, if any. A judge whose rubric is partly
+ * conditional declares that through {@link Builder#notApplicableWhen(String)} while the jury is
+ * being assembled; a judge that does not declare it cannot exclude a criterion after seeing the
+ * subject.
+ *
  * <p>Example:
  * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
@@ -159,6 +164,8 @@ public final class ModelBackedJudge implements JudgeWithMetadata, ConfiguredJudg
 
 		private JudgeModel model;
 
+		private String notApplicableWhen;
+
 		/**
 		 * Set the judge name.
 		 * @param name judge name
@@ -210,6 +217,25 @@ public final class ModelBackedJudge implements JudgeWithMetadata, ConfiguredJudg
 		}
 
 		/**
+		 * Declare that this judge may return
+		 * {@link io.github.markpollack.judge.result.JudgmentStatus#NOT_APPLICABLE}, and under
+		 * what condition.
+		 * <p>
+		 * Omit it and the judge declares no exclusion capability, which is the default: a jury
+		 * then contains an exclusion from this seat as an error rather than honouring it. State
+		 * a condition a reader could check against the subject, not the fact that the judge
+		 * sometimes excludes.
+		 * </p>
+		 * @param notApplicableWhen the condition; must be non-blank
+		 * @return this builder
+		 * @since 0.17.0
+		 */
+		public Builder notApplicableWhen(String notApplicableWhen) {
+			this.notApplicableWhen = notApplicableWhen;
+			return this;
+		}
+
+		/**
 		 * Build the configured judge.
 		 * @return a model-backed judge
 		 */
@@ -226,7 +252,7 @@ public final class ModelBackedJudge implements JudgeWithMetadata, ConfiguredJudg
 			if (model == null) {
 				throw new IllegalStateException("Judge model is required");
 			}
-			JudgeMetadata metadata = new JudgeMetadata(name, description, JudgeType.LLM_POWERED);
+			JudgeMetadata metadata = new JudgeMetadata(name, description, JudgeType.LLM_POWERED, notApplicableWhen);
 			return new ModelBackedJudge(metadata, promptTemplate, classifier, model);
 		}
 

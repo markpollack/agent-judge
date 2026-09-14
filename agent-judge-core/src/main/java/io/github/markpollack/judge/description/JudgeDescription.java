@@ -30,12 +30,19 @@ import io.github.markpollack.judge.JudgeType;
  * <pre>
  * {
  *   "descriptionVersion": 1,
- *   "metadata":         {"declared": true, "values": {"name": "...", "type": "LLM_POWERED"}},
- *   "delegateMetadata": {"declared": false},
- *   "implementation":   {"form": "NAMED", "className": "..."},
- *   "configuration":    {"declared": true, "values": {...}}
+ *   "metadata":           {"declared": true, "values": {"name": "...", "type": "LLM_POWERED"}},
+ *   "delegateMetadata":   {"declared": false},
+ *   "notApplicableWhen":  {"declared": true, "value": "the repository contains no Java sources"},
+ *   "implementation":     {"form": "NAMED", "className": "..."},
+ *   "configuration":      {"declared": true, "values": {...}}
  * }
  * </pre>
+ * <p>
+ * {@code notApplicableWhen} is the <em>effective</em> declaration — the first one found walking
+ * the wrapper chain outward in, which is the one a jury honours — rather than whatever the
+ * outermost wrapper happens to hold. A reader can therefore tell from the description alone
+ * whether this seat is permitted to leave the denominator.
+ * </p>
  * <p>
  * A metadata node is declared when a name or a type is present, and its {@code values} hold
  * only those present. {@code "configuration": {"declared": false}} means the judge does not
@@ -49,6 +56,8 @@ import io.github.markpollack.judge.JudgeType;
  * null when nothing is wrapped or that judge declares none
  * @param delegateType the type declared by the judge the outer wrapper wraps directly, or
  * null when nothing is wrapped or that judge declares none
+ * @param notApplicableWhen the effective condition under which this judge may return
+ * {@code NOT_APPLICABLE}, or null when it declares none
  * @param implementation the class of the innermost judge that is not a wrapper
  * @param configuration the declared configuration, ordered by key; null when undeclared,
  * empty when declared empty
@@ -56,7 +65,7 @@ import io.github.markpollack.judge.JudgeType;
  * @since 0.17.0
  */
 public record JudgeDescription(@Nullable String name, @Nullable JudgeType type, @Nullable String delegateName,
-		@Nullable JudgeType delegateType, ImplementationIdentity implementation,
+		@Nullable JudgeType delegateType, @Nullable String notApplicableWhen, ImplementationIdentity implementation,
 		@Nullable Map<String, Object> configuration) {
 
 	/**
@@ -66,6 +75,9 @@ public record JudgeDescription(@Nullable String name, @Nullable JudgeType type, 
 	 */
 	public JudgeDescription {
 		Objects.requireNonNull(implementation, "implementation must not be null");
+		if (notApplicableWhen != null && notApplicableWhen.isBlank()) {
+			throw new IllegalArgumentException("notApplicableWhen must be non-blank when present");
+		}
 		if (configuration != null) {
 			configuration = PortableForm.ordered(configuration, "configuration");
 		}
@@ -83,6 +95,9 @@ public record JudgeDescription(@Nullable String name, @Nullable JudgeType type, 
 		Map<String, Object> tree = new LinkedHashMap<>();
 		tree.put("metadata", metadataNode(name, type));
 		tree.put("delegateMetadata", metadataNode(delegateName, delegateType));
+		String capability = notApplicableWhen;
+		tree.put("notApplicableWhen",
+				capability == null ? PortableForm.undeclared() : PortableForm.declaredString(capability));
 		tree.put("implementation", implementation.portableTree());
 		Map<String, Object> declared = configuration;
 		tree.put("configuration", declared == null ? PortableForm.undeclared() : PortableForm.declaredValues(declared));

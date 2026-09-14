@@ -108,6 +108,13 @@ final class PortableForm {
 		return node;
 	}
 
+	static Map<String, Object> declaredString(String value) {
+		Map<String, Object> node = new LinkedHashMap<>();
+		node.put(DECLARED, true);
+		node.put(VALUE, value);
+		return node;
+	}
+
 	static Map<String, Object> declaredValue(Map<String, Object> value) {
 		Map<String, Object> node = new LinkedHashMap<>();
 		node.put(DECLARED, true);

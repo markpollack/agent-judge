@@ -61,6 +61,22 @@ public class CascadedJury implements Jury {
 	}
 
 	/**
+	 * Some tier's aggregate may be excluded.
+	 * <p>
+	 * A cascade has no strategy of its own — it adopts a tier's verdict — so its bound is the
+	 * union of its tiers', computed recursively through whatever those tiers are made of. The
+	 * one path that does not widen it is a stop on an individual rejection, whose root the
+	 * cascade builds itself as a machinery error rather than an exclusion.
+	 * </p>
+	 * @return true when this jury's aggregate may be NOT_APPLICABLE
+	 * @since 0.17.0
+	 */
+	@Override
+	public boolean aggregateMayBeNotApplicable() {
+		return tiers.stream().anyMatch(tier -> tier.jury().aggregateMayBeNotApplicable());
+	}
+
+	/**
 	 * Describe this cascade's tiers in evaluation order, each with its policy and jury.
 	 * <p>
 	 * A cascade's verdict copies its aggregate and individual judgments from the tier that

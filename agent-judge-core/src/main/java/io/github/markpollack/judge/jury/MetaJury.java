@@ -29,6 +29,17 @@ class MetaJury implements Jury {
 
 	private final VotingStrategy metaStrategy;
 
+	/**
+	 * A member whose aggregate may be excluded exists, and the strategy is configured to honour
+	 * an exclusion.
+	 * @return true when this jury's aggregate may be NOT_APPLICABLE
+	 */
+	@Override
+	public boolean aggregateMayBeNotApplicable() {
+		return metaStrategy.notApplicablePolicy() == NotApplicablePolicy.EXCLUDE
+				&& members.stream().anyMatch(member -> member.jury().aggregateMayBeNotApplicable());
+	}
+
 	MetaJury(List<NamedJury> members, VotingStrategy metaStrategy) {
 		if (members == null || members.isEmpty()) {
 			throw new IllegalArgumentException("At least one named jury is required");
@@ -47,6 +58,17 @@ class MetaJury implements Jury {
 		}
 		this.members = List.copyOf(members);
 		this.metaStrategy = metaStrategy;
+		if (metaStrategy.notApplicablePolicy() == NotApplicablePolicy.REFUSE) {
+			for (NamedJury member : this.members) {
+				if (member.jury().aggregateMayBeNotApplicable()) {
+					throw new IllegalArgumentException("member '" + member.name()
+							+ "' declares that its aggregate may be NOT_APPLICABLE, but strategy '"
+							+ metaStrategy.getName()
+							+ "' refuses exclusions; configure NotApplicablePolicy.EXCLUDE or TREAT_AS_FAIL, "
+							+ "or compose a member that does not exclude");
+				}
+			}
+		}
 	}
 
 	@Override

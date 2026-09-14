@@ -26,7 +26,8 @@ import java.util.Objects;
  *
  * <h2>Portable form</h2>
  * <pre>
- * {"descriptionVersion": 1, "kind": "CASCADED", "tiers": [{...}, ...]}
+ * {"descriptionVersion": 2, "kind": "CASCADED", "aggregateMayBeNotApplicable": false,
+ *  "tiers": [{...}, ...]}
  * </pre>
  *
  * @param tiers the tiers, in evaluation order
@@ -41,6 +42,20 @@ public record CascadedJuryDescription(List<TierDescription> tiers) implements Ju
 		tiers = List.copyOf(Objects.requireNonNull(tiers, "tiers must not be null"));
 	}
 
+	/**
+	 * Some tier's aggregate may be excluded.
+	 * <p>
+	 * A cascade has no strategy of its own: it adopts a tier's verdict, so its bound is the
+	 * union of its tiers'. A cascade that stops on an individual rejection builds a machinery
+	 * error rather than an exclusion, so that path never widens this bound.
+	 * </p>
+	 * @return true when the aggregate may be not applicable
+	 */
+	@Override
+	public boolean aggregateMayBeNotApplicable() {
+		return tiers.stream().anyMatch(tier -> tier.jury().aggregateMayBeNotApplicable());
+	}
+
 	@Override
 	public Map<String, Object> toPortable() {
 		return PortableForm.freezeRoot(portableTree(), "jury");
@@ -53,6 +68,7 @@ public record CascadedJuryDescription(List<TierDescription> tiers) implements Ju
 		}
 		Map<String, Object> tree = new LinkedHashMap<>();
 		tree.put("kind", "CASCADED");
+		tree.put("aggregateMayBeNotApplicable", aggregateMayBeNotApplicable());
 		tree.put("tiers", tierTrees);
 		return tree;
 	}

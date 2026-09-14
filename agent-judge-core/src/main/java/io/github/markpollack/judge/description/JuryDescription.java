@@ -83,6 +83,26 @@ public sealed interface JuryDescription
 	Map<String, Object> toPortable();
 
 	/**
+	 * A conservative bound on whether this jury's aggregate may be
+	 * {@link io.github.markpollack.judge.result.JudgmentStatus#NOT_APPLICABLE}.
+	 * <p>
+	 * True means the jury is <em>permitted</em> to exclude the subject, not that it will. False
+	 * is the load-bearing direction: a built-in parent that receives a
+	 * {@code NOT_APPLICABLE} aggregate from a child whose bound is false treats it as a stage
+	 * failure rather than honouring it, so a jury cannot acquire the right to shrink a
+	 * denominator by being nested inside something.
+	 * </p>
+	 * <p>
+	 * Every variant derives this from what it already carries — a strategy's not-applicable
+	 * policy and its seats' declared capabilities, its members', or its tiers' — so a reader
+	 * holding only the portable form reaches the same answer the jury does, without running it.
+	 * </p>
+	 * @return true when the aggregate may be not applicable
+	 * @since 0.17.0
+	 */
+	boolean aggregateMayBeNotApplicable();
+
+	/**
 	 * Describe a jury from its public view only: its implementation, its strategy and its
 	 * flattened judges.
 	 * <p>

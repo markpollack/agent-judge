@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import io.github.markpollack.judge.jury.NotApplicablePolicy;
+
 /**
  * A {@link io.github.markpollack.judge.jury.SimpleJury} as configured: its strategy and its
  * seats in order.
@@ -22,7 +24,8 @@ import java.util.Objects;
  *
  * <h2>Portable form</h2>
  * <pre>
- * {"descriptionVersion": 1, "kind": "SIMPLE", "strategy": {...}, "seats": [{...}, ...]}
+ * {"descriptionVersion": 2, "kind": "SIMPLE", "aggregateMayBeNotApplicable": false,
+ *  "strategy": {...}, "seats": [{...}, ...]}
  * </pre>
  * <p>
  * Nested in a tier or member, the version is omitted; it belongs to the root.
@@ -52,6 +55,21 @@ public record SimpleJuryDescription(StrategyDescription strategy, List<SeatDescr
 		}
 	}
 
+	/**
+	 * A capable seat exists and the strategy is configured to honour an exclusion.
+	 * <p>
+	 * Both halves are needed. A capable seat under a strategy that refuses exclusions produces
+	 * an error rather than an excluded aggregate, and a strategy that would honour one has
+	 * nothing to honour when no seat may exclude.
+	 * </p>
+	 * @return true when the aggregate may be not applicable
+	 */
+	@Override
+	public boolean aggregateMayBeNotApplicable() {
+		return strategy.notApplicablePolicy() == NotApplicablePolicy.EXCLUDE
+				&& seats.stream().anyMatch(seat -> seat.judge().notApplicableWhen() != null);
+	}
+
 	@Override
 	public Map<String, Object> toPortable() {
 		return PortableForm.freezeRoot(portableTree(), "jury");
@@ -64,6 +82,7 @@ public record SimpleJuryDescription(StrategyDescription strategy, List<SeatDescr
 		}
 		Map<String, Object> tree = new LinkedHashMap<>();
 		tree.put("kind", "SIMPLE");
+		tree.put("aggregateMayBeNotApplicable", aggregateMayBeNotApplicable());
 		tree.put("strategy", strategy.portableTree());
 		tree.put("seats", seatTrees);
 		return tree;
