@@ -14,6 +14,9 @@ import java.util.Set;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.description.JuryDescription;
+import io.github.markpollack.judge.description.MemberDescription;
+import io.github.markpollack.judge.description.MetaJuryDescription;
 import io.github.markpollack.judge.result.Judgment;
 
 /** Package-private named jury-of-juries implementation used by {@link Juries}. */
@@ -54,6 +57,30 @@ class MetaJury implements Jury {
 	@Override
 	public VotingStrategy getVotingStrategy() {
 		return metaStrategy;
+	}
+
+	/**
+	 * Describe this meta-jury's strategy and its named members in execution order.
+	 * <p>
+	 * {@link #getJudges()} is empty for a meta-jury, so this description is the only view of
+	 * its members before a vote.
+	 * </p>
+	 * @return a meta-jury description
+	 * @throws IllegalArgumentException if a member cannot be described; the message names the
+	 * member
+	 */
+	@Override
+	public JuryDescription describe() {
+		List<MemberDescription> described = new ArrayList<>(members.size());
+		for (NamedJury member : members) {
+			try {
+				described.add(new MemberDescription(member.name(), member.jury().describe()));
+			}
+			catch (IllegalArgumentException ex) {
+				throw new IllegalArgumentException("member '" + member.name() + "': " + ex.getMessage(), ex);
+			}
+		}
+		return new MetaJuryDescription(metaStrategy.describe(), described);
 	}
 
 	@Override

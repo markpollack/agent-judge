@@ -1,5 +1,12 @@
 package io.github.markpollack.judge.ai;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.JudgeWithMetadata;
@@ -8,6 +15,8 @@ import io.github.markpollack.judge.ai.model.JudgeModelRequest;
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
 import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.description.ConfiguredJudge;
+import io.github.markpollack.judge.description.ImplementationIdentity;
 import io.github.markpollack.judge.result.Judgment;
 
 /**
@@ -20,13 +29,45 @@ import io.github.markpollack.judge.result.Judgment;
  *   <li>{@link JudgmentClassifier} maps the model response into a {@link Judgment}</li>
  * </ol>
  *
+ * <p>It is a {@link ConfiguredJudge}: {@link #configuration()} declares the prompt it
+ * renders and the classifier that reads the answer. It declares no model, because a
+ * {@link JudgeModel} does not state which model it will call.
+ *
  * <p>Example:
  * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.10.0
  */
-public final class ModelBackedJudge implements JudgeWithMetadata {
+public final class ModelBackedJudge implements JudgeWithMetadata, ConfiguredJudge {
+
+	/**
+	 * Configuration key for the prompt template's {@linkplain JudgePromptTemplate#name() name}.
+	 * @since 0.17.0
+	 */
+	public static final String PROMPT_TEMPLATE_KEY = "promptTemplate";
+
+	/**
+	 * Configuration key for the lowercase hexadecimal SHA-256 digest of the template text,
+	 * encoded as UTF-8, before rendering.
+	 * @since 0.17.0
+	 */
+	public static final String PROMPT_TEMPLATE_SHA256_KEY = "promptTemplateSha256";
+
+	/**
+	 * Configuration key for the template's
+	 * {@linkplain JudgePromptTemplate#missingVariablePolicy() missing-variable policy}, as its
+	 * constant name.
+	 * @since 0.17.0
+	 */
+	public static final String MISSING_VARIABLE_POLICY_KEY = "missingVariablePolicy";
+
+	/**
+	 * Configuration key for the judgment classifier's implementation, in the portable form of
+	 * {@link ImplementationIdentity}, so a lambda classifier records no unstable class name.
+	 * @since 0.17.0
+	 */
+	public static final String JUDGMENT_CLASSIFIER_KEY = "judgmentClassifier";
 
 	private final JudgeMetadata metadata;
 
@@ -54,6 +95,43 @@ public final class ModelBackedJudge implements JudgeWithMetadata {
 	@Override
 	public JudgeMetadata metadata() {
 		return metadata;
+	}
+
+	/**
+	 * The configuration this judge's verdicts depend on, as known before any call.
+	 * <p>
+	 * Declares the prompt template's name ({@value #PROMPT_TEMPLATE_KEY}), the SHA-256 of its
+	 * text before rendering ({@value #PROMPT_TEMPLATE_SHA256_KEY}), its missing-variable policy
+	 * ({@value #MISSING_VARIABLE_POLICY_KEY}) and the classifier's implementation
+	 * ({@value #JUDGMENT_CLASSIFIER_KEY}).
+	 * </p>
+	 * <p>
+	 * There is no model key. A {@link JudgeModel} does not state which model it will call, and
+	 * an adapter such as a chat client may choose at call time, so any value here would be a
+	 * guess. The model a call actually used is reported afterwards, in
+	 * {@link JudgeModelResponse#model()}.
+	 * </p>
+	 * @return the declared configuration, in declaration order
+	 * @since 0.17.0
+	 */
+	@Override
+	public Map<String, Object> configuration() {
+		Map<String, Object> configuration = new LinkedHashMap<>();
+		configuration.put(PROMPT_TEMPLATE_KEY, promptTemplate.name());
+		configuration.put(PROMPT_TEMPLATE_SHA256_KEY, sha256(promptTemplate.source().load()));
+		configuration.put(MISSING_VARIABLE_POLICY_KEY, promptTemplate.missingVariablePolicy().name());
+		configuration.put(JUDGMENT_CLASSIFIER_KEY, ImplementationIdentity.of(classifier.getClass()).toPortable());
+		return configuration;
+	}
+
+	private static String sha256(String text) {
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+			return HexFormat.of().formatHex(digest.digest(text.getBytes(StandardCharsets.UTF_8)));
+		}
+		catch (NoSuchAlgorithmException ex) {
+			throw new IllegalStateException("SHA-256 is required on every Java platform", ex);
+		}
 	}
 
 	/**

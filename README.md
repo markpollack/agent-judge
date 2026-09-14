@@ -107,6 +107,7 @@ Its ten credential-free Maven modules cover core judging, composition, juries, c
 - [Tutorial source](https://github.com/markpollack/agent-judge-tutorial)
 - [0.13 to 0.14 migration guide](MIGRATION_0.14.md)
 - [Detailed normalized-Judgment handoff](consumer-handoff-normalized-judgment.md)
+- [Describing a jury before it votes](describing-juries.md)
 - [0.14 release notes](RELEASE_NOTES_0.14.md)
 
 ## License

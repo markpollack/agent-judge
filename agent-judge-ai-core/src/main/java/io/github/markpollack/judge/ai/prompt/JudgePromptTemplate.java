@@ -146,6 +146,20 @@ public final class JudgePromptTemplate {
 		return missingVariablePolicy;
 	}
 
+	/**
+	 * Return the source of this template's text, before rendering.
+	 * <p>
+	 * The sources created by {@link TextSources} replay text captured at construction, so
+	 * loading from them does no I/O. A judge reads the text through this accessor to declare
+	 * a digest of the prompt it renders.
+	 * </p>
+	 * @return the template text source
+	 * @since 0.17.0
+	 */
+	public TextSource source() {
+		return source;
+	}
+
 	private String applyMissingVariablePolicy(String rendered) {
 		return switch (missingVariablePolicy) {
 			case STRICT -> {

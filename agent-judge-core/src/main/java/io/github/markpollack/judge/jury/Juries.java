@@ -74,12 +74,13 @@ public final class Juries {
 				nameCount.put(baseName, 1);
 			}
 
-			// Wrap with unique name if needed
+			// Wrap with unique name if needed, and record that the key was manufactured here
 			if (!uniqueName.equals(baseName)) {
-				judge = Judges.named(judge, uniqueName, null, JudgeType.DETERMINISTIC);
+				builder.deduplicatedJudge(Judges.named(judge, uniqueName, null, JudgeType.DETERMINISTIC));
 			}
-
-			builder.judge(judge);
+			else {
+				builder.judge(judge);
+			}
 		}
 
 		return builder.build();

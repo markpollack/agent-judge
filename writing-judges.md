@@ -701,7 +701,9 @@ In practice:
 - The hazard is a weight map assembled anywhere else, and it is real in the serialized result:
   **`Verdict.weights()` is keyed by position while `Verdict.individualByName()` is keyed by name.**
   A consumer reading a stored verdict cannot join them, so it cannot say which judge carried which
-  weight. That is the concrete cost today.
+  weight. To join them, describe the jury before it votes and store that description beside the
+  verdict. Each seat in `jury.describe()` pairs a position, a verdict key and a weight; see
+  [Describing a jury before it votes](describing-juries.md).
 - **Persist the judge name yourself** into whatever run record you keep. Do not rely on ordinal
   position surviving a configuration change.
 

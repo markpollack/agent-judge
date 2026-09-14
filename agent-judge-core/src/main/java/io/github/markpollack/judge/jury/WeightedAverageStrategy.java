@@ -8,6 +8,7 @@ package io.github.markpollack.judge.jury;
 import java.util.List;
 import java.util.Map;
 
+import io.github.markpollack.judge.description.StrategyDescription;
 import io.github.markpollack.judge.result.Judgment;
 
 /**
@@ -202,6 +203,17 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	@Override
 	public String getName() {
 		return "weightedAverage";
+	}
+
+	/**
+	 * Declares the error policy and the threshold. Weights are the jury's configuration, not
+	 * this strategy's, and appear on the jury's seats.
+	 * @return the declared description
+	 * @since 0.17.0
+	 */
+	@Override
+	public StrategyDescription describe() {
+		return StrategyDescription.declared(this, this.errorPolicy, this.threshold, Map.of());
 	}
 
 }

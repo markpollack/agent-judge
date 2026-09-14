@@ -31,7 +31,8 @@
         </dependency>
 
         <!--
-            Nullness declarations for io.github.markpollack.judge.result. Normal compile scope:
+            Nullness declarations for io.github.markpollack.judge.result and
+            io.github.markpollack.judge.description. Normal compile scope:
             these type-use annotations are part of the published API contract and must remain
             visible to downstream tools and reflection.
         -->
@@ -58,21 +59,29 @@
             <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Architecture rules, such as no reflection in the description package -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
             <!--
                 NullAway enforces the @NullMarked declarations in
-                io.github.markpollack.judge.result. JSpecify ships annotations only, so without
-                a checker the contract would be prose the build never verifies.
+                io.github.markpollack.judge.result and io.github.markpollack.judge.description.
+                JSpecify ships annotations only, so without a checker the contract would be
+                prose the build never verifies.
 
                 - default-compile only: test sources sit in the same package names and inherit
                   @NullMarked, where the checker reports assertion-shaped noise rather than defects.
                 - XepDisableAllChecks: this act enforces nullness, not lint. Stock Error Prone
                   checks scope to the module, not to @NullMarked packages.
                 - OnlyNullMarked + JSpecifyMode: adoption is per package, and only the result
-                  package has opted in.
+                  and description packages have opted in.
                 - No <fork>: compiler-plugin 3.14.0 swallows Error Prone diagnostics when forking.
 
                 Error Prone needs javac internals opened; see .mvn/jvm.config.

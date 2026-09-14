@@ -23,9 +23,10 @@
  *
  * <p>JSpecify supplies vocabulary, not enforcement. Main sources in this package are checked
  * by NullAway at {@code ERROR} during {@code default-compile}, in JSpecify mode with
- * {@code OnlyNullMarked=true}; see {@code agent-judge-core/pom.xml}. Adoption is deliberately
- * bounded to this package — extending {@code @NullMarked} to another package is separate work
- * with its own diagnostic triage.
+ * {@code OnlyNullMarked=true}; see {@code agent-judge-core/pom.xml}. Adoption is per package:
+ * this package and {@code io.github.markpollack.judge.description} have opted in, and
+ * extending {@code @NullMarked} to another package is separate work with its own diagnostic
+ * triage.
  */
 @NullMarked
 package io.github.markpollack.judge.result;
