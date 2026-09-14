@@ -34,9 +34,31 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * them as interchangeable is what previously collapsed {@code IGNORE} into a duplicate.
  * </p>
  *
+ * <h2>This policy governs judges, not machinery</h2>
+ * <p>
+ * It applies to an error a configured <em>judge</em> produced. It does not apply to an error
+ * the library's own composition or reduction produced: a strategy that threw, a member stage
+ * that failed, a cascade that decided nothing. Those carry a machinery
+ * {@link io.github.markpollack.judge.result.JudgmentReasonCode}, and they are never converted
+ * into a failing contribution — <em>not even under</em> {@link #TREAT_AS_FAIL}.
+ * </p>
+ * <p>
+ * The reason is worth stating plainly, because the alternative looks harmless. If a broken
+ * reduction could become a FAIL, the subject would be rejected for something it did not do,
+ * and the resulting rejection would be indistinguishable from a real one in every stored
+ * field. Machinery failure never supplies rejection evidence; a run that hits one is reported
+ * as an instrument failure and excluded from the subject's denominator, so the number that
+ * survives is smaller and true rather than larger and wrong. Under {@code TREAT_AS_FAIL} such
+ * an input propagates instead, coded
+ * {@link io.github.markpollack.judge.result.JudgmentReasonCode#ERRORS_PROPAGATED}, with the
+ * configured policy still recorded as {@code treatAsFail}: the evidence says what was
+ * configured, and the reasoning says why it did not apply.
+ * </p>
+ *
  * @author Mark Pollack
  * @since 0.1.0
  * @see AggregationEvidence
+ * @see NotApplicablePolicy
  */
 public enum ErrorPolicy {
 

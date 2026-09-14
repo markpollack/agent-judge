@@ -23,8 +23,9 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * Abstentions leave the population entirely rather than participating as zero — under the
  * old behaviour two abstentions could drag the median to zero and flip the verdict. Errors
- * are governed by {@link ErrorPolicy} (default {@code PROPAGATE}). If nothing is eligible
- * the result is {@code ABSTAIN}.
+ * are governed by {@link ErrorPolicy} (default {@code PROPAGATE}) and exclusions by
+ * {@link NotApplicablePolicy} (default {@code REFUSE}). If nothing is eligible the result is
+ * {@code ABSTAIN}, or {@code NOT_APPLICABLE} when every input was an honoured exclusion.
  * </p>
  *
  * <p>
@@ -59,6 +60,8 @@ public class MedianVotingStrategy implements VotingStrategy {
 	private final double threshold;
 
 	private final ErrorPolicy errorPolicy;
+
+	private final NotApplicablePolicy notApplicablePolicy;
 
 	/**
 	 * Create a median strategy with the default error policy.
@@ -96,6 +99,23 @@ public class MedianVotingStrategy implements VotingStrategy {
 	 * @since 0.16.0
 	 */
 	public MedianVotingStrategy(double threshold, ErrorPolicy errorPolicy) {
+		this(threshold, errorPolicy, NotApplicablePolicy.REFUSE);
+	}
+
+	/**
+	 * Create a median strategy with a caller-supplied acceptance bar and both policies.
+	 * @param threshold the normalized bar the median must reach, in {@code [0.0, 1.0]}
+	 * @param errorPolicy policy for handling errors
+	 * @param notApplicablePolicy policy for handling excluded judgments
+	 * @throws IllegalArgumentException if the threshold is not a finite value in
+	 * {@code [0.0, 1.0]}, or if either policy is null
+	 * @since 0.17.0
+	 */
+	public MedianVotingStrategy(double threshold, ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
+		if (notApplicablePolicy == null) {
+			throw new IllegalArgumentException("notApplicablePolicy must not be null");
+		}
+		this.notApplicablePolicy = notApplicablePolicy;
 		if (!Double.isFinite(threshold)) {
 			throw new IllegalArgumentException("threshold must be finite, but was " + threshold);
 		}
@@ -120,10 +140,11 @@ public class MedianVotingStrategy implements VotingStrategy {
 
 	@Override
 	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
-		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy);
+		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
+				this.notApplicablePolicy);
 
-		if (population.propagateError()) {
-			return population.propagatedError(getName());
+		if (population.hasPolicyExit()) {
+			return population.policyExitAggregate(getName());
 		}
 		if (population.isEmpty()) {
 			return population.noResult(getName(), Map.of());
@@ -160,7 +181,15 @@ public class MedianVotingStrategy implements VotingStrategy {
 	 */
 	@Override
 	public StrategyDescription describe() {
-		return StrategyDescription.declared(this, this.errorPolicy, this.threshold, Map.of());
+		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, this.threshold,
+				Map.of());
 	}
+
+	/** {@inheritDoc} */
+	@Override
+	public NotApplicablePolicy notApplicablePolicy() {
+		return this.notApplicablePolicy;
+	}
+
 
 }

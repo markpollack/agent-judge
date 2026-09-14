@@ -37,7 +37,7 @@ class JudgmentTest {
 		@Test
 		@DisplayName("status is required")
 		void statusRequired() {
-			assertThatThrownBy(() -> new Judgment(null, null, null, "x", List.of(), Map.of()))
+			assertThatThrownBy(() -> new Judgment(null, null, null, null, "x", List.of(), Map.of()))
 				.isInstanceOf(NullPointerException.class)
 				.hasMessageContaining("status");
 		}
@@ -45,13 +45,13 @@ class JudgmentTest {
 		@Test
 		@DisplayName("reasoning, checks and metadata are required")
 		void othersRequired() {
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, null, null, null, List.of(), Map.of()))
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, null, null, null, null, List.of(), Map.of()))
 				.isInstanceOf(NullPointerException.class)
 				.hasMessageContaining("reasoning");
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, null, null, "x", null, Map.of()))
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, null, null, null, "x", null, Map.of()))
 				.isInstanceOf(NullPointerException.class)
 				.hasMessageContaining("checks");
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, null, null, "x", List.of(), null))
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, null, null, null, "x", List.of(), null))
 				.isInstanceOf(NullPointerException.class)
 				.hasMessageContaining("metadata");
 		}
@@ -71,7 +71,7 @@ class JudgmentTest {
 		void scoreRejected() {
 			for (double bad : new double[] { -0.1, 1.1, Double.NaN, Double.POSITIVE_INFINITY,
 					Double.NEGATIVE_INFINITY }) {
-				assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, bad, null, "x", List.of(), Map.of()))
+				assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, bad, null, null, "x", List.of(), Map.of()))
 					.as("score %s", bad)
 					.isInstanceOf(IllegalArgumentException.class);
 			}
@@ -90,10 +90,10 @@ class JudgmentTest {
 		@Test
 		@DisplayName("ABSTAIN and ERROR must not carry a score")
 		void noScoreForNonMeasurements() {
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ABSTAIN, 0.5, null, "x", List.of(), Map.of()))
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ABSTAIN, 0.5, null, null, "x", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("no completed measurement");
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, 0.0, null, "x", List.of(), Map.of()))
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, 0.0, null, JudgmentReasonCode.JUDGE_REPORTED, "x", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("no completed measurement");
 		}
@@ -104,7 +104,7 @@ class JudgmentTest {
 			assertThat(Judgment.builder().pass().label("relevant").reasoning("x").build().label())
 				.isEqualTo("relevant");
 			assertThat(Judgment.pass("ok").label()).isNull();
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, null, "  ", "x", List.of(), Map.of()))
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, null, "  ", null, "x", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("non-blank");
 		}
@@ -112,10 +112,10 @@ class JudgmentTest {
 		@Test
 		@DisplayName("ABSTAIN may carry a label; ERROR may not")
 		void labelAllowedOnAbstainOnly() {
-			assertThatCode(() -> new Judgment(JudgmentStatus.ABSTAIN, null, "not_applicable", "x", List.of(), Map.of()))
+			assertThatCode(() -> new Judgment(JudgmentStatus.ABSTAIN, null, "not_applicable", null, "x", List.of(), Map.of()))
 				.doesNotThrowAnyException();
 			assertThatThrownBy(
-					() -> new Judgment(JudgmentStatus.ERROR, null, "not_applicable", "x", List.of(), Map.of()))
+					() -> new Judgment(JudgmentStatus.ERROR, null, "not_applicable", JudgmentReasonCode.JUDGE_REPORTED, "x", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("must not carry a label");
 		}
@@ -123,13 +123,13 @@ class JudgmentTest {
 		@Test
 		@DisplayName("ABSTAIN and ERROR require non-blank reasoning; others do not")
 		void reasoningRequiredForNonFindings() {
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ABSTAIN, null, null, "  ", List.of(), Map.of()))
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ABSTAIN, null, null, null, "  ", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("non-blank reasoning");
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, null, null, "", List.of(), Map.of()))
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, null, null, JudgmentReasonCode.JUDGE_REPORTED, "", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("non-blank reasoning");
-			assertThatCode(() -> new Judgment(JudgmentStatus.PASS, null, null, "", List.of(), Map.of()))
+			assertThatCode(() -> new Judgment(JudgmentStatus.PASS, null, null, null, "", List.of(), Map.of()))
 				.doesNotThrowAnyException();
 		}
 
@@ -328,7 +328,7 @@ class JudgmentTest {
 		@Test
 		@DisplayName("reservation is namespacing, not provenance authentication")
 		void publicConstructionDoesNotAuthenticateEvidence() {
-			Judgment direct = new Judgment(JudgmentStatus.PASS, null, null, "x", List.of(),
+			Judgment direct = new Judgment(JudgmentStatus.PASS, null, null, null, "x", List.of(),
 					Map.of(Judgment.AGGREGATION_KEY, Map.of("strategy", "caller")));
 
 			assertThat(direct.metadata()).containsKey(Judgment.AGGREGATION_KEY);
@@ -387,8 +387,8 @@ class JudgmentTest {
 		void errorWire() throws Exception {
 			String json = MAPPER.writeValueAsString(Judgment.error("Judge invocation timed out"));
 
-			assertThat(json).isEqualTo(
-					"{\"status\":\"error\",\"reasoning\":\"Judge invocation timed out\",\"checks\":[],\"metadata\":{}}");
+			assertThat(json).isEqualTo("{\"status\":\"error\",\"reasonCode\":\"judge_reported\","
+					+ "\"reasoning\":\"Judge invocation timed out\",\"checks\":[],\"metadata\":{}}");
 			assertThat(json).doesNotContain("stackTrace").doesNotContain("cause").doesNotContain("Exception");
 		}
 

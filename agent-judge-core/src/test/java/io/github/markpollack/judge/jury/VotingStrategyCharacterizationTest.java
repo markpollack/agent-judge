@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.result.JudgmentReasonCode;
 import io.github.markpollack.judge.result.JudgmentStatus;
 import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.DisplayName;
@@ -44,7 +45,8 @@ class VotingStrategyCharacterizationTest {
 		Judgment.FindingBuilder builder = switch (status) {
 			case PASS -> Judgment.builder().pass();
 			case FAIL -> Judgment.builder().fail();
-			case ABSTAIN, ERROR -> throw new IllegalArgumentException("A numeric judgment requires PASS or FAIL");
+			case ABSTAIN, NOT_APPLICABLE, ERROR ->
+				throw new IllegalArgumentException("A numeric judgment requires PASS or FAIL");
 		};
 		return builder.score(normalized).reasoning("numeric " + normalized).build();
 	}
@@ -58,6 +60,7 @@ class VotingStrategyCharacterizationTest {
 			case PASS -> Judgment.builder().pass().label(label).reasoning("classified " + label).build();
 			case FAIL -> Judgment.builder().fail().label(label).reasoning("classified " + label).build();
 			case ABSTAIN -> Judgment.builder().abstain().reasoning("classified " + label).label(label).build();
+			case NOT_APPLICABLE -> Judgment.builder().notApplicable().reasoning("classified " + label).label(label).build();
 			case ERROR -> throw new IllegalArgumentException("ERROR cannot carry a classification label");
 		};
 	}
@@ -67,6 +70,7 @@ class VotingStrategyCharacterizationTest {
 			case PASS -> Judgment.builder().pass().reasoning("status only " + status).build();
 			case FAIL -> Judgment.builder().fail().reasoning("status only " + status).build();
 			case ABSTAIN -> Judgment.builder().abstain().reasoning("status only " + status).build();
+			case NOT_APPLICABLE -> Judgment.builder().notApplicable().reasoning("status only " + status).build();
 			case ERROR -> Judgment.builder().error().reasoning("status only " + status).build();
 		};
 	}
@@ -118,7 +122,7 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: a null status is refused (was constructible)")
 		void nullStatusRefused() {
-			assertThatThrownBy(() -> new Judgment(null, null, null, "x", List.of(), Map.of()))
+			assertThatThrownBy(() -> new Judgment(null, null, null, null, "x", List.of(), Map.of()))
 				.isInstanceOf(NullPointerException.class)
 				.hasMessageContaining("status");
 		}
@@ -126,10 +130,10 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: score and status can no longer contradict (was constructible)")
 		void contradictionRefused() {
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ABSTAIN, 0.4, null, "x", List.of(), Map.of()))
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ABSTAIN, 0.4, null, null, "x", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("no completed measurement");
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, 0.0, null, "x", List.of(), Map.of()))
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, 0.0, null, JudgmentReasonCode.JUDGE_REPORTED, "x", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("no completed measurement");
 		}

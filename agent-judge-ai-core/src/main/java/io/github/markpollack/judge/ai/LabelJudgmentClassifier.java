@@ -83,7 +83,8 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 				.reasoning(raw)
 				.label(normalized)
 				.metadata("rawJudgeOutput", raw);
-			case ERROR -> throw new IllegalStateException("A recognized classification label cannot map to ERROR");
+			case NOT_APPLICABLE, ERROR ->
+				throw new IllegalStateException("A recognized classification label cannot map to " + status);
 		};
 
 		addResponseMetadata(builder, response);

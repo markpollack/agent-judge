@@ -46,11 +46,13 @@ class WeightedAverageOverflowTest {
 	private static final double MAX = Double.MAX_VALUE;
 
 	private static final List<String> WEIGHTED_EVIDENCE_KEYS = List.of(AggregationEvidence.STRATEGY,
-			AggregationEvidence.ERROR_POLICY, AggregationEvidence.INPUT_COUNT, AggregationEvidence.ELIGIBLE_COUNT,
-			AggregationEvidence.EXPLICIT_ABSTAIN_COUNT, AggregationEvidence.ERROR_COUNT,
-			AggregationEvidence.IGNORED_ERROR_COUNT, AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT,
-			AggregationEvidence.ERRORS_TREATED_AS_FAIL_COUNT, AggregationEvidence.THRESHOLD,
-			AggregationEvidence.INPUT_WEIGHT, AggregationEvidence.ELIGIBLE_WEIGHT);
+			AggregationEvidence.ERROR_POLICY, AggregationEvidence.NOT_APPLICABLE_POLICY,
+			AggregationEvidence.INPUT_COUNT, AggregationEvidence.ELIGIBLE_COUNT,
+			AggregationEvidence.EXPLICIT_ABSTAIN_COUNT, AggregationEvidence.NOT_APPLICABLE_COUNT,
+			AggregationEvidence.ERROR_COUNT, AggregationEvidence.IGNORED_ERROR_COUNT,
+			AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT, AggregationEvidence.ERRORS_TREATED_AS_FAIL_COUNT,
+			AggregationEvidence.NOT_APPLICABLE_TREATED_AS_FAIL_COUNT, AggregationEvidence.ERROR_CODE_COUNTS,
+			AggregationEvidence.THRESHOLD, AggregationEvidence.INPUT_WEIGHT, AggregationEvidence.ELIGIBLE_WEIGHT);
 
 	@Test
 	void twoJudgesWeightedMaxValueProduceTheirWeightedMean() {

@@ -53,7 +53,7 @@ class WeightedAverageBitIdentityTest {
 
 	private static final double MAX = Double.MAX_VALUE;
 
-	private static final String UNIVERSAL_PASS_2 = "errorCount=0, errorPolicy=propagate, "
+	private static final String UNIVERSAL_PASS_2 = "errorCodeCounts={}, errorCount=0, errorPolicy=propagate, "
 			+ "errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=0, ";
 
 	private record Case(String name, WeightedAverageStrategy strategy, List<Judgment> judgments,
@@ -65,104 +65,104 @@ class WeightedAverageBitIdentityTest {
 		List<Case> cases = new ArrayList<>();
 		cases.add(new Case("empty weight map", standard, List.of(passJudgment(0.8), passJudgment(0.6)), Map.of(),
 				"PASS score=3fe6666666666666 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.70 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=2.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=2.0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("null weight map", standard, List.of(passJudgment(0.8), passJudgment(0.6)), null,
 				"PASS score=3fe6666666666666 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.70 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=2.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=2.0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("weights summing to one", standard, List.of(passJudgment(0.8), passJudgment(0.6)),
 				Map.of("0", 0.3, "1", 0.7),
 				"PASS score=3fe51eb851eb851e label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.66 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=1.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("unnormalized weights", standard, List.of(passJudgment(0.8), passJudgment(0.6)),
 				Map.of("0", 3.0, "1", 7.0),
 				"PASS score=3fe51eb851eb851f label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.66 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=10.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=10.0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=10.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("missing weights default to one", standard,
 				List.of(passJudgment(0.8), passJudgment(0.6), passJudgment(0.4)), Map.of("0", 2.0),
 				"PASS score=3fe4cccccccccccd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.65 across 3 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=3, eligibleWeight=4.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=3, inputWeight=4.0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=3, inputWeight=4.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("boolean outcomes", standard, List.of(booleanPass("a"), booleanFail("b")),
 				Map.of("0", 0.7, "1", 0.3),
 				"PASS score=3fe6666666666666 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.70 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=1.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("an individual zero weight", standard, List.of(passJudgment(0.8), passJudgment(0.2)),
 				Map.of("0", 1.0, "1", 0.0),
 				"PASS score=3fe999999999999a label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.80 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=1.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("below the default bar", standard, List.of(passJudgment(0.8), failJudgment(0.2)),
 				Map.of("0", 0.2, "1", 0.8),
 				"FAIL score=3fd47ae147ae147c label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.32 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=1.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("exactly the default bar", standard, List.of(passJudgment(1.0), failJudgment(0.0)),
 				Map.of("0", 1.0, "1", 1.0),
 				"PASS score=3fe0000000000000 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.50 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=2.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=2.0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("rounding-sensitive tenths", standard,
 				List.of(passJudgment(0.1), passJudgment(0.2), failJudgment(0.3)), Map.of("0", 0.1, "1", 0.2, "2", 0.7),
 				"FAIL score=3fd0a3d70a3d70a4 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.26 across 3 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=3, eligibleWeight=1.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=3, inputWeight=1.0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=3, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("a single MAX_VALUE weight", standard, List.of(passJudgment(0.8)), Map.of("0", MAX),
 				"PASS score=3fe999999999999a label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.80 across 1 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=1, eligibleWeight=1.7976931348623157E308, "
 						+ UNIVERSAL_PASS_2
-						+ "inputCount=1, inputWeight=1.7976931348623157E308, strategy=weightedAverage, threshold=0.5}"));
+						+ "inputCount=1, inputWeight=1.7976931348623157E308, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("two halves of MAX_VALUE total exactly MAX_VALUE", standard,
 				List.of(passJudgment(0.9), failJudgment(0.1)), Map.of("0", MAX / 2, "1", MAX / 2),
 				"PASS score=3fe0000000000000 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.50 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=1.7976931348623157E308, "
 						+ UNIVERSAL_PASS_2
-						+ "inputCount=2, inputWeight=1.7976931348623157E308, strategy=weightedAverage, threshold=0.5}"));
+						+ "inputCount=2, inputWeight=1.7976931348623157E308, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("large weights just below overflow", standard,
 				List.of(passJudgment(0.75), failJudgment(0.25), passJudgment(0.5)),
 				Map.of("0", 1e308, "1", 5e307, "2", 1e307),
 				"PASS score=3fe2800000000001 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.58 across 3 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=3, eligibleWeight=1.6E308, "
-						+ UNIVERSAL_PASS_2 + "inputCount=3, inputWeight=1.6E308, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=3, inputWeight=1.6E308, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("MAX_VALUE absorbs small weights without overflowing", standard,
 				List.of(passJudgment(0.9), failJudgment(0.1), failJudgment(0.2)), Map.of("0", MAX, "1", 1.0, "2", 3.0),
 				"PASS score=3feccccccccccccd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.90 across 3 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=3, eligibleWeight=1.7976931348623157E308, "
 						+ UNIVERSAL_PASS_2
-						+ "inputCount=3, inputWeight=1.7976931348623157E308, strategy=weightedAverage, threshold=0.5}"));
+						+ "inputCount=3, inputWeight=1.7976931348623157E308, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("subnormal weights", standard, List.of(passJudgment(0.8), failJudgment(0.3)),
 				Map.of("0", Double.MIN_VALUE, "1", 3 * Double.MIN_VALUE),
 				"PASS score=3fe0000000000000 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.50 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=2.0E-323, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=2.0E-323, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=2.0E-323, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("extreme weight ratio", standard, List.of(passJudgment(0.9), failJudgment(0.1)),
 				Map.of("0", 1e-300, "1", 1e300),
 				"FAIL score=3fb999999999999a label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.10 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=1.0E300, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0E300, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0E300, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("a stated bar", new WeightedAverageStrategy(0.8),
 				List.of(passJudgment(0.7), passJudgment(0.9)), Map.of("0", 1.0, "1", 3.0),
 				"PASS score=3feb333333333334 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.85 across 2 applicable judge(s) (threshold: 0.80, result: pass) evidence={eligibleCount=2, eligibleWeight=4.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=4.0, strategy=weightedAverage, threshold=0.8}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=4.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.8}"));
 		cases.add(new Case("IGNORE drops a heavily weighted error", new WeightedAverageStrategy(ErrorPolicy.IGNORE),
 				List.of(Judgment.error("boom"), passJudgment(0.6), failJudgment(0.4)),
 				Map.of("0", 5.0, "1", 1.0, "2", 2.0),
-				"FAIL score=3fdddddddddddddd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.47 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=3.0, errorCount=1, errorPolicy=ignore, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=1, inputCount=3, inputWeight=8.0, strategy=weightedAverage, threshold=0.5}"));
+				"FAIL score=3fdddddddddddddd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.47 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=3.0, errorCodeCounts={judge_reported=1}, errorCount=1, errorPolicy=ignore, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=1, inputCount=3, inputWeight=8.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("TREAT_AS_FAIL keeps the error's weight",
 				new WeightedAverageStrategy(ErrorPolicy.TREAT_AS_FAIL), List.of(Judgment.error("boom"), passJudgment(0.9)),
 				Map.of("0", 1.0, "1", 1.0),
-				"FAIL score=3fdccccccccccccd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.45 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=2.0, errorCount=1, errorPolicy=treatAsFail, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=1, explicitAbstainCount=0, ignoredErrorCount=0, inputCount=2, inputWeight=2.0, strategy=weightedAverage, threshold=0.5}"));
+				"FAIL score=3fdccccccccccccd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.45 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=2.0, errorCodeCounts={judge_reported=1}, errorCount=1, errorPolicy=treatAsFail, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=1, explicitAbstainCount=0, ignoredErrorCount=0, inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("TREAT_AS_ABSTAIN removes the error's weight",
 				new WeightedAverageStrategy(ErrorPolicy.TREAT_AS_ABSTAIN),
 				List.of(Judgment.error("boom"), passJudgment(0.9)), Map.of("0", 2.0, "1", 1.0),
-				"PASS score=3feccccccccccccd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.90 across 1 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=1, eligibleWeight=1.0, errorCount=1, errorPolicy=treatAsAbstain, errorsTreatedAsAbstainCount=1, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=0, inputCount=2, inputWeight=3.0, strategy=weightedAverage, threshold=0.5}"));
+				"PASS score=3feccccccccccccd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.90 across 1 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=1, eligibleWeight=1.0, errorCodeCounts={judge_reported=1}, errorCount=1, errorPolicy=treatAsAbstain, errorsTreatedAsAbstainCount=1, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=0, inputCount=2, inputWeight=3.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("PROPAGATE returns ERROR", standard, List.of(Judgment.error("boom"), passJudgment(0.9)),
 				Map.of(),
-				"ERROR score=none label=null checks=0 metadataKeys=[aggregation] reasoning=1 of 2 judgments errored and the error policy is propagate evidence={eligibleCount=0, errorCount=1, errorPolicy=propagate, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=0, inputCount=2, strategy=weightedAverage}"));
+				"ERROR score=none label=null checks=0 metadataKeys=[aggregation] reasoning=1 of 2 judgments errored and the error policy is propagate evidence={eligibleCount=0, errorCodeCounts={judge_reported=1}, errorCount=1, errorPolicy=propagate, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=0, inputCount=2, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage}"));
 		cases.add(new Case("PROPAGATE returns ERROR even with overflowing weights", standard,
 				List.of(Judgment.error("boom"), passJudgment(0.9)), Map.of("0", MAX, "1", MAX),
-				"ERROR score=none label=null checks=0 metadataKeys=[aggregation] reasoning=1 of 2 judgments errored and the error policy is propagate evidence={eligibleCount=0, errorCount=1, errorPolicy=propagate, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=0, inputCount=2, strategy=weightedAverage}"));
+				"ERROR score=none label=null checks=0 metadataKeys=[aggregation] reasoning=1 of 2 judgments errored and the error policy is propagate evidence={eligibleCount=0, errorCodeCounts={judge_reported=1}, errorCount=1, errorPolicy=propagate, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=0, inputCount=2, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage}"));
 		cases.add(new Case("positive input weight, zero eligible weight", standard,
 				List.of(Judgment.abstain("n/a"), passJudgment(0.8)), Map.of("0", 1.0, "1", 0.0),
-				"ABSTAIN score=none label=null checks=0 metadataKeys=[aggregation] reasoning=No eligible judgments among 2 submitted evidence={eligibleCount=1, eligibleWeight=0.0, errorCount=0, errorPolicy=propagate, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=1, ignoredErrorCount=0, inputCount=2, inputWeight=1.0, strategy=weightedAverage}"));
+				"ABSTAIN score=none label=null checks=0 metadataKeys=[aggregation] reasoning=No eligible judgments among 2 submitted evidence={eligibleCount=1, eligibleWeight=0.0, errorCodeCounts={}, errorCount=0, errorPolicy=propagate, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=1, ignoredErrorCount=0, inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage}"));
 		cases.add(new Case("every judge abstains", standard, List.of(Judgment.abstain("n/a"), Judgment.abstain("n/a")),
 				Map.of(),
-				"ABSTAIN score=none label=null checks=0 metadataKeys=[aggregation] reasoning=All 2 judge(s) abstained evidence={eligibleCount=0, eligibleWeight=0.0, errorCount=0, errorPolicy=propagate, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=2, ignoredErrorCount=0, inputCount=2, inputWeight=2.0, strategy=weightedAverage}"));
+				"ABSTAIN score=none label=null checks=0 metadataKeys=[aggregation] reasoning=All 2 judge(s) abstained evidence={eligibleCount=0, eligibleWeight=0.0, errorCodeCounts={}, errorCount=0, errorPolicy=propagate, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=2, ignoredErrorCount=0, inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage}"));
 		cases.add(new Case("IGNORE empties the population", new WeightedAverageStrategy(ErrorPolicy.IGNORE),
 				List.of(Judgment.error("boom"), Judgment.error("boom")), Map.of("0", 2.0),
-				"ABSTAIN score=none label=null checks=0 metadataKeys=[aggregation] reasoning=No eligible judgments; 2 error(s) ignored evidence={eligibleCount=0, eligibleWeight=0.0, errorCount=2, errorPolicy=ignore, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=2, inputCount=2, inputWeight=3.0, strategy=weightedAverage}"));
+				"ABSTAIN score=none label=null checks=0 metadataKeys=[aggregation] reasoning=No eligible judgments; 2 error(s) ignored evidence={eligibleCount=0, eligibleWeight=0.0, errorCodeCounts={judge_reported=2}, errorCount=2, errorPolicy=ignore, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=2, inputCount=2, inputWeight=3.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage}"));
 		cases.add(new Case("an abstention leaves the denominator", standard,
 				List.of(Judgment.abstain("n/a"), passJudgment(0.8), failJudgment(0.2)),
 				Map.of("0", 100.0, "1", 1.0, "2", 3.0),
-				"FAIL score=3fd6666666666667 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.35 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=4.0, errorCount=0, errorPolicy=propagate, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=1, ignoredErrorCount=0, inputCount=3, inputWeight=104.0, strategy=weightedAverage, threshold=0.5}"));
+				"FAIL score=3fd6666666666667 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.35 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=4.0, errorCodeCounts={}, errorCount=0, errorPolicy=propagate, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=1, ignoredErrorCount=0, inputCount=3, inputWeight=104.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		List<Judgment> ten = new ArrayList<>();
 		Map<String, Double> tenWeights = new HashMap<>();
 		for (int i = 0; i < 10; i++) {
@@ -171,7 +171,7 @@ class WeightedAverageBitIdentityTest {
 		}
 		cases.add(new Case("ten judges with fractional weights", standard, ten, tenWeights,
 				"PASS score=3fe3ae147ae147af label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.62 across 10 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=10, eligibleWeight=50.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=10, inputWeight=50.0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2 + "inputCount=10, inputWeight=50.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		return cases;
 	}
 

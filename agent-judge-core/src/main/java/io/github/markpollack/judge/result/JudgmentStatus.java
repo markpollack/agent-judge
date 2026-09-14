@@ -19,9 +19,19 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * </p>
  *
  * <p>
- * The central distinction this enum draws:
+ * The central distinction this enum draws is between three ways of not passing:
  * </p>
+ * <table border="1">
+ * <caption>Not passing, told apart</caption>
+ * <tr><th>Status</th><th>The question</th><th>What a denominator does with it</th></tr>
+ * <tr><td>{@link #FAIL}</td><td>asked, and answered no</td><td>counted, against the subject</td></tr>
+ * <tr><td>{@link #ABSTAIN}</td><td>asked, and undecided</td><td>counted; no vote cast</td></tr>
+ * <tr><td>{@link #NOT_APPLICABLE}</td><td>should not have been asked</td><td>excluded, and counted separately</td></tr>
+ * <tr><td>{@link #ERROR}</td><td>never reached</td><td>excluded from the subject denominator</td></tr>
+ * </table>
+ * <p>
  * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * </p>
  *
  * <h2>Wire representation</h2>
  * <p>
@@ -51,9 +61,36 @@ public enum JudgmentStatus {
 	FAIL("fail"),
 
 	/**
-	 * Judge cannot or chooses not to evaluate (insufficient information, not applicable).
+	 * The criterion applies and this is the right instrument, but the judge could not decide.
+	 * <p>
+	 * Missing evidence, an ambiguous artifact, a model that would not commit: the question was
+	 * the right one to ask and it has no answer yet. A judge that reached no decision casts no
+	 * vote, so an abstention leaves the population a strategy reduces over.
+	 * </p>
+	 * <p>
+	 * This is <em>not</em> "does not apply"; that is {@link #NOT_APPLICABLE}, which is excluded
+	 * from a denominator rather than merely undecided within it.
+	 * </p>
 	 */
 	ABSTAIN("abstain"),
+
+	/**
+	 * The criterion does not apply to this subject, so the question should not have been asked.
+	 * <p>
+	 * Reserved for a subject that by definition lacks what the criterion is about — a Java
+	 * style rule against a repository with no Java in it. Missing evidence is
+	 * {@link #ABSTAIN}, not this.
+	 * </p>
+	 * <p>
+	 * It is excluded from the denominator and counted, so a rubric can report honestly how much
+	 * of it applied. Because that exclusion is also the easiest way for an instrument to dodge a
+	 * criterion, a judge or jury may only return it where it declared in advance that it can:
+	 * an undeclared exclusion is contained as an error rather than honoured.
+	 * </p>
+	 *
+	 * @since 0.17.0
+	 */
+	NOT_APPLICABLE("not_applicable"),
 
 	/**
 	 * Judge encountered an error during evaluation.

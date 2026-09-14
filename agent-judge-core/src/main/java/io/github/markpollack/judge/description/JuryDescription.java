@@ -62,8 +62,15 @@ public sealed interface JuryDescription
 	 * different map under the same version. That is a change in the description of the
 	 * instrument, not a change of format.
 	 * </p>
+	 * <p>
+	 * <b>Version 2</b> adds what a reader needs in order to tell an exclusion from an abstention
+	 * <em>before</em> the jury runs: a strategy's {@code notApplicablePolicy} parameter, a
+	 * judge's {@code notApplicableWhen} capability node, and each jury's
+	 * {@code aggregateMayBeNotApplicable}. The same configured jury produces a different map
+	 * than it did at version 1, which is what the version is for.
+	 * </p>
 	 */
-	int DESCRIPTION_VERSION = 1;
+	int DESCRIPTION_VERSION = 2;
 
 	/**
 	 * The portable form: an ordered map of JSON-compatible values, validated by the same
