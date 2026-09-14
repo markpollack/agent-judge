@@ -1,0 +1,73 @@
+{
+  "aggregated" : {
+    "status" : "error",
+    "reasonCode" : "stage_failed",
+    "reasoning" : "Tier 'rubric' returned NOT_APPLICABLE without declaring that its aggregate may be excluded, so its reduction is a stage failure; the cascade stopped because a genuine individual FAIL in that tier established the rejection.",
+    "checks" : [ ],
+    "metadata" : { }
+  },
+  "individual" : [ {
+    "status" : "fail",
+    "reasoning" : "a requirement was not met",
+    "checks" : [ ],
+    "metadata" : { }
+  } ],
+  "individualByName" : {
+    "strict" : {
+      "status" : "fail",
+      "reasoning" : "a requirement was not met",
+      "checks" : [ ],
+      "metadata" : { }
+    }
+  },
+  "weights" : { },
+  "seats" : [ {
+    "position" : 0,
+    "verdictKey" : "strict",
+    "keySource" : "DECLARED"
+  } ],
+  "decision" : {
+    "kind" : "tier",
+    "tier" : "rubric",
+    "basis" : "individual_rejection"
+  },
+  "compositeAttempts" : [ {
+    "name" : "rubric",
+    "relation" : "cascade_tier",
+    "policy" : "REJECT_ON_ANY_FAIL",
+    "disposition" : "stage_failed",
+    "dispositionReason" : "undeclared_not_applicable",
+    "verdict" : {
+      "aggregated" : {
+        "status" : "not_applicable",
+        "reasoning" : "nothing in this rubric applies",
+        "checks" : [ ],
+        "metadata" : { }
+      },
+      "individual" : [ {
+        "status" : "fail",
+        "reasoning" : "a requirement was not met",
+        "checks" : [ ],
+        "metadata" : { }
+      } ],
+      "individualByName" : {
+        "strict" : {
+          "status" : "fail",
+          "reasoning" : "a requirement was not met",
+          "checks" : [ ],
+          "metadata" : { }
+        }
+      },
+      "weights" : { },
+      "seats" : [ {
+        "position" : 0,
+        "verdictKey" : "strict",
+        "keySource" : "DECLARED"
+      } ],
+      "decision" : {
+        "kind" : "own"
+      },
+      "compositeAttempts" : [ ]
+    }
+  } ]
+}
