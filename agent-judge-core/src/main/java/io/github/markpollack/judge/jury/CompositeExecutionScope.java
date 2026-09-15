@@ -43,7 +43,21 @@ final class CompositeExecutionScope {
 		}
 	}
 
-	static Verdict invokeChild(Supplier<Verdict> invocation) {
+	/**
+	 * Invoke a child jury within the parent's budget, and require it to have produced something.
+	 * <p>
+	 * The non-null check belongs <em>here</em>, inside the invocation, because this is the
+	 * boundary the parent wraps in its failure handler. A child that returns nothing produced
+	 * nothing, exactly like one that threw; checked one line later, in the parent, the resulting
+	 * {@code NullPointerException} would be raised outside that handler and would take the whole
+	 * parent down — a meta-jury losing the members that succeeded, a cascade never reaching the
+	 * healthy final tier behind the broken one.
+	 * </p>
+	 * @param child the child's configured name, for the failure the parent records
+	 * @param invocation the child's vote
+	 * @return the child's verdict, never null
+	 */
+	static Verdict invokeChild(String child, Supplier<Verdict> invocation) {
 		CompositeExecutionScope scope = CURRENT.get();
 		if (scope == null) {
 			throw new IllegalStateException("composite execution scope is not installed");
@@ -59,7 +73,11 @@ final class CompositeExecutionScope {
 		int parentDepth = scope.depth;
 		scope.depth = destinationDepth;
 		try {
-			return invocation.get();
+			Verdict verdict = invocation.get();
+			if (verdict == null) {
+				throw new IllegalStateException("Jury '" + child + "' returned no verdict");
+			}
+			return verdict;
 		}
 		finally {
 			scope.depth = parentDepth;

@@ -128,14 +128,14 @@ class MetaJury implements Jury {
 			NamedJury member = members.get(position);
 			Verdict verdict;
 			try {
-				verdict = CompositeExecutionScope.invokeChild(() -> member.jury().vote(context));
+				verdict = CompositeExecutionScope.invokeChild(member.name(), () -> member.jury().vote(context));
 			}
 			catch (CompositeLimitExceededException ex) {
 				throw ex;
 			}
 			catch (Exception ex) {
-				logger.warn("Member '{}' threw {}; recording a stage failure", member.name(), ex.getClass().getName(),
-						ex);
+				logger.warn("Member '{}' did not produce a verdict ({}); recording a stage failure", member.name(),
+						ex.getClass().getName(), ex);
 				attempts.add(CompositeAttempt.executionFailed(member.name(), CompositeRelation.META_MEMBER, null,
 						EXECUTION_FAILURE));
 				anyStageFailed = true;

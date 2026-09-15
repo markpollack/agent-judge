@@ -129,13 +129,14 @@ public class CascadedJury implements Jury {
 		for (TierConfig tier : tiers) {
 			Verdict tierVerdict;
 			try {
-				tierVerdict = CompositeExecutionScope.invokeChild(() -> tier.jury().vote(context));
+				tierVerdict = CompositeExecutionScope.invokeChild(tier.name(), () -> tier.jury().vote(context));
 			}
 			catch (CompositeLimitExceededException ex) {
 				throw ex;
 			}
 			catch (Exception ex) {
-				logger.warn("Tier '{}' failed to execute; continuing according to cascade policy", tier.name());
+				logger.warn("Tier '{}' did not produce a verdict ({}); continuing according to cascade policy",
+						tier.name(), ex.getClass().getName(), ex);
 				attempts.add(CompositeAttempt.executionFailed(tier.name(), CompositeRelation.CASCADE_TIER,
 						tier.policy(), EXECUTION_FAILURE));
 				if (tier.policy() == TierPolicy.FINAL_TIER) {
