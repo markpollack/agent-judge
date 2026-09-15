@@ -149,6 +149,65 @@ class CascadeRuleTest {
 			.build();
 	}
 
+	/**
+	 * The cascade tests 10 and 11 share: a "rubric" tier that excludes without declaring it may,
+	 * over a genuine leaf FAIL, so the cascade stops on that established rejection with a
+	 * parent-built {@code ERROR stage_failed} root and never reaches its final tier.
+	 * @return the inner cascade
+	 */
+	private static Jury boundaryRejectingCascade(Jury finalTier) {
+		return CascadedJury.builder()
+			.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.REJECT_ON_ANY_FAIL)
+			.tier("semantic", finalTier, TierPolicy.FINAL_TIER)
+			.build();
+	}
+
+	/**
+	 * Assert that a recorded child really did stop on a boundary-rejected D1.
+	 * <p>
+	 * A parent that only inspects its own outcome cannot tell this apart from a cascade that
+	 * refused the exclusion and then walked on to a passing final tier, because both leave the
+	 * parent a usable child. So the rule is asserted where it happens: the D1 decision, the
+	 * parent-built machinery root, the refused child kept unchanged, and the genuine FAIL that
+	 * established the rejection.
+	 * </p>
+	 * @param inner the child cascade's verdict, as the parent recorded it
+	 */
+	private static void assertIsABoundaryRejectedD1(Verdict inner) {
+		assertThat(inner.decision()).as("the inner cascade stopped on the rejection the refused tier had established")
+			.isEqualTo(new Decision(DecisionKind.TIER, "rubric", DecisionBasis.INDIVIDUAL_REJECTION));
+		assertThat(inner.aggregated().status()).as("no FAIL is manufactured").isEqualTo(JudgmentStatus.ERROR);
+		assertThat(inner.aggregated().reasonCode()).as("the root is the parent-built machinery error")
+			.isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+		assertThat(inner.aggregated().score()).as("and no score of zero either").isNull();
+
+		assertThat(inner.compositeAttempts()).extracting(CompositeAttempt::name)
+			.as("the cascade stopped at the rubric tier, so its final tier never ran")
+			.containsExactly("rubric");
+		CompositeAttempt refused = inner.compositeAttempts().get(0);
+		assertThat(refused.disposition()).isEqualTo(AttemptDisposition.STAGE_FAILED);
+		assertThat(refused.dispositionReason()).isEqualTo(DispositionReason.UNDECLARED_NOT_APPLICABLE);
+		assertThat(refused.verdict().aggregated().status()).as("the child's own claim is kept unchanged")
+			.isEqualTo(JudgmentStatus.NOT_APPLICABLE);
+		assertThat(inner.individual()).extracting(Judgment::status)
+			.as("the rejecting tier's individuals are copied, FAIL included")
+			.containsExactly(JudgmentStatus.PASS, JudgmentStatus.FAIL);
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Map<String, Object> evidenceOf(Judgment judgment) {
+		Object block = judgment.metadata().get(Judgment.AGGREGATION_KEY);
+		assertThat(block).as("the aggregate carries an evidence block").isInstanceOf(Map.class);
+		return (Map<String, Object>) block;
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Map<String, Object> originOf(Judgment judgment) {
+		Object origin = evidenceOf(judgment).get(AggregationEvidence.ERROR_CODE_COUNTS);
+		assertThat(origin).as("the aggregate names the causes it counted").isInstanceOf(Map.class);
+		return (Map<String, Object>) origin;
+	}
+
 	@Test
 	@DisplayName("1. a genuine FAIL plus a broken reduction stops the cascade with a rejection")
 	void genuineFailPlusBrokenReductionStops() {
@@ -463,11 +522,7 @@ class CascadeRuleTest {
 		 * @return the inner cascade
 		 */
 		private Jury rejectingCascade(boolean innerCapable) {
-			return CascadedJury.builder()
-				.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")),
-						TierPolicy.REJECT_ON_ANY_FAIL)
-				.tier("semantic", innerCapable ? capableTier() : passingTier("OK"), TierPolicy.FINAL_TIER)
-				.build();
+			return boundaryRejectingCascade(innerCapable ? capableTier() : passingTier("OK"));
 		}
 
 		/** A tier that declares its aggregate may be excluded, so the cascade holding it is capable. */
@@ -500,27 +555,6 @@ class CascadeRuleTest {
 			return current;
 		}
 
-		/** Assert that the inner cascade really did stop on a boundary-rejected D1. */
-		private void assertInnerIsABoundaryRejectedD1(Verdict inner) {
-			assertThat(inner.decision())
-				.as("the inner cascade stopped on the rejection the refused tier had established")
-				.isEqualTo(new Decision(DecisionKind.TIER, "rubric", DecisionBasis.INDIVIDUAL_REJECTION));
-			assertThat(inner.aggregated().status()).as("no FAIL is manufactured").isEqualTo(JudgmentStatus.ERROR);
-			assertThat(inner.aggregated().reasonCode()).as("the root is the parent-built machinery error")
-				.isEqualTo(JudgmentReasonCode.STAGE_FAILED);
-			assertThat(inner.aggregated().score()).as("and no score of zero either").isNull();
-
-			CompositeAttempt refused = inner.compositeAttempts().get(0);
-			assertThat(refused.name()).isEqualTo("rubric");
-			assertThat(refused.disposition()).isEqualTo(AttemptDisposition.STAGE_FAILED);
-			assertThat(refused.dispositionReason()).isEqualTo(DispositionReason.UNDECLARED_NOT_APPLICABLE);
-			assertThat(refused.verdict().aggregated().status()).as("the child's own claim is kept unchanged")
-				.isEqualTo(JudgmentStatus.NOT_APPLICABLE);
-			assertThat(inner.individual()).extracting(Judgment::status)
-				.as("the rejecting tier's individuals are copied, FAIL included")
-				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.FAIL);
-		}
-
 		@ParameterizedTest
 		@ValueSource(booleans = { true, false })
 		@DisplayName("the outer cascade adopts it as a tier outcome and never re-rejects")
@@ -537,7 +571,7 @@ class CascadeRuleTest {
 			assertThat(verdict.compositeAttempts().get(0).disposition()).isEqualTo(AttemptDisposition.USED);
 
 			// What the outer copy marker alone never established: that there was a D1 to adopt.
-			assertInnerIsABoundaryRejectedD1(verdict.compositeAttempts().get(0).verdict());
+			assertIsABoundaryRejectedD1(verdict.compositeAttempts().get(0).verdict());
 
 			Verdict selected = selectedDetermination(verdict);
 			assertThat(selected.decision().basis()).as("the chain ends at the inner rejection")
@@ -564,7 +598,7 @@ class CascadeRuleTest {
 				.isEqualTo(JudgmentReasonCode.STAGE_FAILED);
 			assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name).containsExactly("inner");
 
-			assertInnerIsABoundaryRejectedD1(verdict.compositeAttempts().get(0).verdict());
+			assertIsABoundaryRejectedD1(verdict.compositeAttempts().get(0).verdict());
 
 			Verdict selected = selectedDetermination(verdict);
 			assertThat(selected.decision().basis()).isEqualTo(DecisionBasis.INDIVIDUAL_REJECTION);
@@ -573,30 +607,74 @@ class CascadeRuleTest {
 
 	}
 
+	/**
+	 * 11. R-D's cascade&rarr;meta case, under every error policy.
+	 *
+	 * <p>
+	 * Two rules meet here, and the healthy sibling hides them both from an outcome assertion. The
+	 * member must actually <em>be</em> a boundary-rejected D1 — not a cascade that refused the
+	 * exclusion and walked on to its passing final tier — and its machinery ERROR must be a
+	 * non-vote under {@code IGNORE} and {@code TREAT_AS_ABSTAIN} rather than a contribution. With
+	 * one healthy PASS beside it, a correctly excluded error and an error wrongly counted as a
+	 * passing vote produce the same aggregate PASS, so the aggregate cannot witness D4 at all.
+	 * </p>
+	 *
+	 * <p>
+	 * So the member is inspected where the D1 happens, and the non-vote is asserted on the
+	 * population and its counters: one error submitted, one error counted under the matching
+	 * treatment, exactly one eligible contribution, and the machinery cause named in the origin.
+	 * </p>
+	 *
+	 * @param errorPolicy the meta-strategy's configured error policy
+	 */
 	@ParameterizedTest
 	@EnumSource(ErrorPolicy.class)
 	@DisplayName("11. a rejecting cascade as a meta member is a determination, and is never scored")
 	void aRejectingCascadeAsAMetaMember(ErrorPolicy errorPolicy) {
-		Jury inner = CascadedJury.builder()
-			.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")),
-					TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
-			.build();
+		Jury inner = boundaryRejectingCascade(passingTier("OK"));
 
 		Verdict verdict = Juries
 			.meta(new AllMustPassStrategy(errorPolicy, NotApplicablePolicy.EXCLUDE), new NamedJury("inner", inner),
 					new NamedJury("healthy", returning(Verdict.single("b", Judgment.pass("ok")))))
 			.vote(CONTEXT);
 
-		assertThat(verdict.compositeAttempts().get(0).disposition()).as("a determined verdict, not a stage failure")
+		CompositeAttempt member = verdict.compositeAttempts().get(0);
+		assertThat(member.name()).isEqualTo("inner");
+		assertThat(member.disposition()).as("a determined verdict, not a stage failure")
 			.isEqualTo(AttemptDisposition.USED);
+		assertIsABoundaryRejectedD1(member.verdict());
+
+		assertThat(verdict.individual()).extracting(Judgment::status)
+			.as("the machinery error reached the reduction, so how it was treated is a decision, not an absence")
+			.containsExactly(JudgmentStatus.ERROR, JudgmentStatus.PASS);
 		assertThat(verdict.aggregated().status()).as("the meta-jury never rejects the subject on machinery's behalf")
 			.isNotEqualTo(JudgmentStatus.FAIL);
+
 		if (errorPolicy == ErrorPolicy.PROPAGATE || errorPolicy == ErrorPolicy.TREAT_AS_FAIL) {
 			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.ERRORS_PROPAGATED);
+			assertThat(originOf(verdict.aggregated())).as("the machinery cause is carried up by name, counted once")
+				.containsOnlyKeys(JudgmentReasonCode.STAGE_FAILED.wireName())
+				.containsEntry(JudgmentReasonCode.STAGE_FAILED.wireName(), 1);
+			assertThat(evidenceOf(verdict.aggregated()))
+				.as("a policy exit reduces nothing, so no treatment was performed")
+				.containsEntry(AggregationEvidence.ELIGIBLE_COUNT, 0)
+				.containsEntry(AggregationEvidence.ERRORS_TREATED_AS_FAIL_COUNT, 0);
 		}
 		else {
 			assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+			String treatment = errorPolicy == ErrorPolicy.IGNORE ? AggregationEvidence.IGNORED_ERROR_COUNT
+					: AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT;
+			assertThat(evidenceOf(verdict.aggregated()))
+				.as("D4: the error was counted and excluded, leaving the healthy member alone eligible")
+				.containsEntry(AggregationEvidence.INPUT_COUNT, 2)
+				.containsEntry(AggregationEvidence.ERROR_COUNT, 1)
+				.containsEntry(treatment, 1)
+				.containsEntry(AggregationEvidence.ELIGIBLE_COUNT, 1)
+				.containsEntry(AggregationEvidence.PASS_COUNT, 1)
+				.containsEntry(AggregationEvidence.FAIL_COUNT, 0);
+			assertThat(originOf(verdict.aggregated())).as("and the excluded cause is named, not merely missing")
+				.containsOnlyKeys(JudgmentReasonCode.STAGE_FAILED.wireName())
+				.containsEntry(JudgmentReasonCode.STAGE_FAILED.wireName(), 1);
 		}
 	}
 
