@@ -237,6 +237,15 @@ and rates are derived, so a reader that persisted a pass rate should recompute i
 A legacy `ABSTAIN` carrying the label `not_applicable` is **never** reinterpreted automatically. A
 deliberate re-curation records that it reclassified.
 
+A **hand-built** `Verdict` — a test fixture, a re-scorer, a replay tool, a fake jury in a consumer
+test — now needs `seats` that line up with `individual` and `individualByName`, and a `decision`;
+`build()` throws without one. For the ordinary case, `Verdict.of(aggregated, individualByName)` is the
+whole call: it takes the individuals from the map's values in encounter order, seats each entry as
+`DECLARED` at 0..n-1, and records `Decision.own()`. Pass an ordered map (`LinkedHashMap`) if the
+positions matter — `Map.of` does not specify an order. `Verdict.single(name, judgment)` still covers
+one judge. Duplicate declared names, positional keys, weights, seat gaps, and any decision other than
+`own` are still built with `Verdict.builder()` and explicit seats.
+
 `JudgeMetadata`'s three-argument constructor — `new JudgeMetadata(name, description, type)` — is
 **retained**, and delegates to the canonical four-argument one with a `null` condition. A judge that
 never excludes a subject needs **no change**: absence of `notApplicableWhen` is the statement that it

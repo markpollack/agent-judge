@@ -252,14 +252,8 @@ class ItemAccountingTest {
 	/** The same shape, but holding a genuine individual FAIL the cascade can reject on. */
 	private static Jury rejectableExcludingTier() {
 		Judgment failing = Judgment.fail("a requirement was not met");
-		return opaque(Verdict.builder()
-			.aggregated(Judgment.notApplicable("nothing here applies"))
-			.individual(List.of(failing))
-			.individualByName(java.util.Map.of("strict", failing))
-			.seats(List.of(new io.github.markpollack.judge.jury.Seat(0, "strict",
-					io.github.markpollack.judge.description.KeySource.DECLARED)))
-			.decision(Decision.own())
-			.build());
+		return opaque(
+				Verdict.of(Judgment.notApplicable("nothing here applies"), java.util.Map.of("strict", failing)));
 	}
 
 	/** A judge that declared, in advance, that it may exclude a subject. */

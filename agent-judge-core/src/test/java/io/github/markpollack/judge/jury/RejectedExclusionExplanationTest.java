@@ -5,7 +5,6 @@
 
 package io.github.markpollack.judge.jury;
 
-import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.DisplayName;
@@ -14,7 +13,6 @@ import org.junit.jupiter.api.Test;
 
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.description.KeySource;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentReasonCode;
 
@@ -53,14 +51,8 @@ class RejectedExclusionExplanationTest {
 
 	/** An opaque child that excludes the subject while declaring no capability to do so. */
 	private static Jury excluding(Judgment... individuals) {
-		Verdict verdict = Verdict.builder()
-			.aggregated(Judgment.notApplicable("the change set contains no Java sources"))
-			.individual(List.of(individuals))
-			.individualByName(byName(individuals))
-			.seats(seats(individuals.length))
-			.decision(Decision.own())
-			.build();
-		return returning(verdict);
+		return returning(
+				Verdict.of(Judgment.notApplicable("the change set contains no Java sources"), byName(individuals)));
 	}
 
 	private static Map<String, Judgment> byName(Judgment... individuals) {
@@ -69,14 +61,6 @@ class RejectedExclusionExplanationTest {
 			map.put("judge-" + (index + 1), individuals[index]);
 		}
 		return map;
-	}
-
-	private static List<Seat> seats(int count) {
-		List<Seat> seats = new java.util.ArrayList<>(count);
-		for (int index = 0; index < count; index++) {
-			seats.add(new Seat(index, "judge-" + (index + 1), KeySource.DECLARED));
-		}
-		return seats;
 	}
 
 	private static Jury passing() {

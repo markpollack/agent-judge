@@ -50,13 +50,7 @@ class AttemptDispositionAgreementTest {
 
 	/** A child that reduced normally and passed. */
 	private static Verdict decided() {
-		return Verdict.builder()
-			.aggregated(Judgment.pass("every requirement was met"))
-			.individual(List.of(FAILING))
-			.individualByName(Map.of("strict", FAILING))
-			.seats(List.of(new Seat(0, "strict", KeySource.DECLARED)))
-			.decision(Decision.own())
-			.build();
+		return Verdict.of(Judgment.pass("every requirement was met"), Map.of("strict", FAILING));
 	}
 
 	/** A child whose reduction broke, so it determined nothing. */
@@ -72,13 +66,7 @@ class AttemptDispositionAgreementTest {
 
 	/** A child that excluded the whole subject. */
 	private static Verdict excluded() {
-		return Verdict.builder()
-			.aggregated(Judgment.notApplicable("nothing in this rubric applies"))
-			.individual(List.of(FAILING))
-			.individualByName(Map.of("strict", FAILING))
-			.seats(List.of(new Seat(0, "strict", KeySource.DECLARED)))
-			.decision(Decision.own())
-			.build();
+		return Verdict.of(Judgment.notApplicable("nothing in this rubric applies"), Map.of("strict", FAILING));
 	}
 
 	private static CompositeAttempt attempt(AttemptDisposition disposition, DispositionReason reason, Verdict verdict) {
