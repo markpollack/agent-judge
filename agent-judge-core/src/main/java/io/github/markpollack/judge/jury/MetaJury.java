@@ -163,8 +163,12 @@ class MetaJury implements Jury {
 		if (anyStageFailed) {
 			// Successful members are kept: their work is evidence, and discarding it would make
 			// a single broken member indistinguishable from a jury that ran nothing.
+			// Any exclusion this jury refused is named: a meta-jury has no later tier whose
+			// reasoning could explain the outcome instead, so R-E's enum-only allowance does not
+			// reach here and §7.3's free-text requirement stands.
 			Judgment aggregate = Judgment.error(JudgmentReasonCode.STAGE_FAILED,
-					"One or more jury members did not produce a usable determination, so this jury reduced nothing.");
+					"One or more jury members did not produce a usable determination, so this jury reduced nothing."
+							+ NotApplicableGuard.refusedExclusionNote(attempts, "Member"));
 			return Verdict.builder()
 				.aggregated(aggregate)
 				.individual(successful)
