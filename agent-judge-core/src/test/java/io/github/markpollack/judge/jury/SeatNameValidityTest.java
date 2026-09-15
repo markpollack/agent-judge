@@ -58,7 +58,7 @@ class SeatNameValidityTest {
 
 		@Override
 		public JudgeMetadata metadata() {
-			return new JudgeMetadata(this.name, "built on demand", JudgeType.DETERMINISTIC, null);
+			return new JudgeMetadata(this.name, "built on demand", JudgeType.DETERMINISTIC);
 		}
 
 	}
