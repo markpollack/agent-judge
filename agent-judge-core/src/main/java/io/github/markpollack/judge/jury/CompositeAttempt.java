@@ -11,6 +11,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import org.jspecify.annotations.Nullable;
 
+import io.github.markpollack.judge.result.JudgmentStatus;
+
 /**
  * One named composite stage that was entered during jury execution.
  *
@@ -60,7 +62,9 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 							+ disposition + " with " + (dispositionReason == null ? "no reason" : dispositionReason));
 		}
 		// The reason must agree with what the attempt actually holds, or the marker describes a
-		// stage other than the one recorded.
+		// stage other than the one recorded. Presence of a verdict is not enough: a reader counts
+		// these markers by reason and cannot re-derive them, so a marker that can be false is
+		// worse than one that is absent — absence at least says "not recorded".
 		if (disposition == AttemptDisposition.USED && verdict == null) {
 			throw new IllegalArgumentException("a USED attempt consumed a verdict, so it must carry one");
 		}
@@ -72,6 +76,37 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 				|| dispositionReason == DispositionReason.UNDECLARED_NOT_APPLICABLE) && verdict == null) {
 			throw new IllegalArgumentException(dispositionReason
 					+ " describes a verdict the stage returned, so the attempt must keep it");
+		}
+		if (verdict != null) {
+			requireReasonMatchesVerdict(name, disposition, dispositionReason, verdict);
+		}
+	}
+
+	/**
+	 * Enforce that a disposition describes the verdict the attempt actually holds.
+	 * @param name the stage's configured name
+	 * @param disposition whether the parent could use the stage
+	 * @param reason why not, or null
+	 * @param verdict the verdict the stage returned
+	 */
+	private static void requireReasonMatchesVerdict(String name, AttemptDisposition disposition,
+			@Nullable DispositionReason reason, Verdict verdict) {
+		boolean undecided = verdict.decision().kind() == DecisionKind.UNDECIDED;
+		if (reason == DispositionReason.CHILD_UNDECIDED && !undecided) {
+			throw new IllegalArgumentException("CHILD_UNDECIDED says stage '" + name
+					+ "' determined nothing, but its verdict decided " + verdict.decision().kind()
+					+ " with aggregate " + verdict.aggregated().status());
+		}
+		if (reason == DispositionReason.UNDECLARED_NOT_APPLICABLE
+				&& verdict.aggregated().status() != JudgmentStatus.NOT_APPLICABLE) {
+			throw new IllegalArgumentException("UNDECLARED_NOT_APPLICABLE says stage '" + name
+					+ "' returned an exclusion the parent would not honour, but its aggregate was "
+					+ verdict.aggregated().status());
+		}
+		if (disposition == AttemptDisposition.USED && undecided) {
+			throw new IllegalArgumentException("a USED attempt consumed stage '" + name
+					+ "' as a determination, but its verdict decided nothing; that is a stage failure, "
+					+ "not a use");
 		}
 	}
 
