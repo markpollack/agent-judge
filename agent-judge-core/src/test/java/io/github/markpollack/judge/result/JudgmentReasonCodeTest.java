@@ -158,7 +158,7 @@ class JudgmentReasonCodeTest {
 		@DisplayName("a propagated error built through its factory carries a valid origin")
 		void factoryBuildsAValidOrigin() {
 			Judgment propagated = Judgment.propagatedError(
-					Map.of(JudgmentReasonCode.JUDGE_REPORTED, 2, JudgmentReasonCode.JUDGE_FAILED, 1),
+					Map.of(JudgmentReasonCode.JUDGE_REPORTED, 2L, JudgmentReasonCode.JUDGE_FAILED, 1L),
 					"3 of 4 judgments errored and the error policy is propagate");
 
 			assertThat(propagated.reasonCode()).isEqualTo(JudgmentReasonCode.ERRORS_PROPAGATED);
@@ -187,7 +187,7 @@ class JudgmentReasonCodeTest {
 			assertThatThrownBy(() -> propagatedWith(Map.of("errors_propagated", 1)))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("errors_propagated");
-			assertThatThrownBy(() -> Judgment.propagatedError(Map.of(JudgmentReasonCode.ERRORS_PROPAGATED, 1), "boom"))
+			assertThatThrownBy(() -> Judgment.propagatedError(Map.of(JudgmentReasonCode.ERRORS_PROPAGATED, 1L), "boom"))
 				.isInstanceOf(IllegalArgumentException.class);
 		}
 
@@ -224,7 +224,7 @@ class JudgmentReasonCodeTest {
 		@Test
 		@DisplayName("a machinery origin is legal structurally; what it means is the error policy's business")
 		void machineryOriginIsStructurallyValid() {
-			Judgment propagated = Judgment.propagatedError(Map.of(JudgmentReasonCode.STAGE_FAILED, 1),
+			Judgment propagated = Judgment.propagatedError(Map.of(JudgmentReasonCode.STAGE_FAILED, 1L),
 					"a member stage failed and the error policy is propagate");
 
 			assertThat(origin(propagated)).containsOnly(Map.entry("stage_failed", 1));

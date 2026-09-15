@@ -150,7 +150,7 @@ class ContainmentTest {
 					() -> Judgment.error(JudgmentReasonCode.NOT_APPLICABLE_REFUSED, "an input was excluded")))
 				.vote(CONTEXT);
 			Verdict propagated = juryWith(new Misbehaving("propagating",
-					() -> Judgment.propagatedError(Map.of(JudgmentReasonCode.JUDGE_REPORTED, 1), "an input errored")))
+					() -> Judgment.propagatedError(Map.of(JudgmentReasonCode.JUDGE_REPORTED, 1L), "an input errored")))
 				.vote(CONTEXT);
 
 			assertThat(refused.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.NOT_APPLICABLE_REFUSED);
@@ -290,7 +290,7 @@ class ContainmentTest {
 		@EnumSource(ErrorPolicy.class)
 		@DisplayName("a member's own policy error is ordinary strategy input, governed by the origin rule")
 		void anOwnErrorIsStrategyInput(ErrorPolicy errorPolicy) {
-			Judgment propagated = Judgment.propagatedError(Map.of(JudgmentReasonCode.JUDGE_REPORTED, 1),
+			Judgment propagated = Judgment.propagatedError(Map.of(JudgmentReasonCode.JUDGE_REPORTED, 1L),
 					"1 of 1 judgments errored and the error policy is propagate");
 			Verdict member = Verdict.builder()
 				.aggregated(propagated)

@@ -89,7 +89,7 @@ class HistoricalBoundaryTest {
 					.build(),
 				Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "Judge 'flaky' threw java.lang.IllegalStateException"),
 				Judgment.propagatedError(
-						Map.of(JudgmentReasonCode.JUDGE_REPORTED, 2, JudgmentReasonCode.JUDGE_FAILED, 1),
+						Map.of(JudgmentReasonCode.JUDGE_REPORTED, 2L, JudgmentReasonCode.JUDGE_FAILED, 1L),
 						"3 of 4 judgments errored and the error policy is propagate"));
 	}
 
