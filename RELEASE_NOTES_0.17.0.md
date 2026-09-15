@@ -237,4 +237,12 @@ and rates are derived, so a reader that persisted a pass rate should recompute i
 A legacy `ABSTAIN` carrying the label `not_applicable` is **never** reinterpreted automatically. A
 deliberate re-curation records that it reclassified.
 
+`JudgeMetadata`'s three-argument constructor — `new JudgeMetadata(name, description, type)` — is
+**retained**, and delegates to the canonical four-argument one with a `null` condition. A judge that
+never excludes a subject needs **no change**: absence of `notApplicableWhen` is the statement that it
+never excludes, not a blank or missing declaration, and it is what
+`Judges.notApplicableCapability(Judge)` and the seat guard read. Declaring `notApplicableWhen` is the
+deliberate opt-in, taken by naming the condition through the four-argument constructor. The name
+validation above applies either way.
+
 The full 0.17 migration guide lives on the documentation site.
