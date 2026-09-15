@@ -100,13 +100,8 @@ class HistoricalBoundaryTest {
 	 */
 	static Verdict boundaryRejection() {
 		Judgment failing = Judgment.fail("a requirement was not met");
-		Verdict excluded = Verdict.builder()
-			.aggregated(Judgment.notApplicable("nothing in this rubric applies"))
-			.individual(List.of(failing))
-			.individualByName(Map.of("strict", failing))
-			.seats(List.of(new Seat(0, "strict", KeySource.DECLARED)))
-			.decision(Decision.own())
-			.build();
+		Verdict excluded = Verdict.of(Judgment.notApplicable("nothing in this rubric applies"),
+				Map.of("strict", failing));
 
 		return CascadedJury.builder()
 			.tier("rubric", opaque(excluded), TierPolicy.REJECT_ON_ANY_FAIL)

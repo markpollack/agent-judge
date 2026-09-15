@@ -116,14 +116,7 @@ class CascadeRuleTest {
 	 * capability, so a parent must refuse it.
 	 */
 	private static Jury opaqueExcludingTier(Judgment... individuals) {
-		Verdict verdict = Verdict.builder()
-			.aggregated(Judgment.notApplicable(EXCLUSION))
-			.individual(List.of(individuals))
-			.individualByName(namedOf(individuals))
-			.seats(seatsFor(individuals.length))
-			.decision(Decision.own())
-			.build();
-		return returning(verdict);
+		return returning(Verdict.of(Judgment.notApplicable(EXCLUSION), namedOf(individuals)));
 	}
 
 	private static Map<String, Judgment> namedOf(Judgment... individuals) {
