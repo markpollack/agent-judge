@@ -268,7 +268,11 @@ public class SimpleJury implements Jury {
 						"seats[" + position + "] ('" + key.verdictKey() + "'): " + ex.getMessage(), ex);
 			}
 		}
-		return new SimpleJuryDescription(votingStrategy.describe(), seats);
+		// The capability is stated by the jury rather than re-derived from the strategy's
+		// description: a custom strategy may declare its policy only through
+		// notApplicablePolicy(), which a default describe() does not carry, and a derivation
+		// would then publish a confident false about a jury that can exclude.
+		return new SimpleJuryDescription(votingStrategy.describe(), seats, aggregateMayBeNotApplicable());
 	}
 
 	/**

@@ -109,7 +109,7 @@ class MetaJury implements Jury {
 				throw new IllegalArgumentException("member '" + member.name() + "': " + ex.getMessage(), ex);
 			}
 		}
-		return new MetaJuryDescription(metaStrategy.describe(), described);
+		return new MetaJuryDescription(metaStrategy.describe(), described, aggregateMayBeNotApplicable());
 	}
 
 	@Override

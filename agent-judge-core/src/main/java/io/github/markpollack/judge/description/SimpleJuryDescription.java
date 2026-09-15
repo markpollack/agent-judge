@@ -31,18 +31,40 @@ import io.github.markpollack.judge.jury.NotApplicablePolicy;
  * Nested in a tier or member, the version is omitted; it belongs to the root.
  * </p>
  *
+ * <h2>Why the capability is carried rather than derived</h2>
+ * <p>
+ * The bound is "a capable seat exists <em>and</em> the strategy honours an exclusion", and the
+ * second half is only derivable from a description when the strategy declared its
+ * not-applicable policy. A custom strategy may legitimately override
+ * {@link io.github.markpollack.judge.jury.VotingStrategy#notApplicablePolicy()} and leave
+ * {@code describe()} at its supported default, and a derivation would then read that absence as
+ * {@code REFUSE} and publish {@code false} for a jury that will happily return an exclusion. A
+ * confident {@code false} is worse than an absent value: absence says "not recorded" and a
+ * reader can go and find out, whereas a false {@code false} is indistinguishable from a jury
+ * that really cannot exclude — and the reason to publish the capability at all is so a reader
+ * need not run the jury to learn it.
+ * </p>
+ * <p>
+ * So the jury states what it is, and a description whose strategy <em>did</em> declare its
+ * policy is cross-checked against the derivation, which makes a contradictory hand-built
+ * description a construction error rather than a stored claim nobody can check.
+ * </p>
+ *
  * @param strategy the voting strategy
  * @param seats the seats, in position order
+ * @param aggregateMayBeNotApplicable whether this jury's aggregate may be
+ * {@code NOT_APPLICABLE}, as the jury itself reports it
  * @author Mark Pollack
  * @since 0.17.0
  * @see SeatDescription
  */
-public record SimpleJuryDescription(StrategyDescription strategy, List<SeatDescription> seats)
-		implements JuryDescription {
+public record SimpleJuryDescription(StrategyDescription strategy, List<SeatDescription> seats,
+		boolean aggregateMayBeNotApplicable) implements JuryDescription {
 
 	/**
-	 * Validate and copy the seats.
-	 * @throws IllegalArgumentException if a seat's position is not its index in the list
+	 * Validate and copy the seats, and check the stated capability against what is derivable.
+	 * @throws IllegalArgumentException if a seat's position is not its index in the list, or if
+	 * the strategy declared a not-applicable policy that contradicts the stated capability
 	 */
 	public SimpleJuryDescription {
 		Objects.requireNonNull(strategy, "strategy must not be null");
@@ -53,21 +75,16 @@ public record SimpleJuryDescription(StrategyDescription strategy, List<SeatDescr
 						+ seats.get(index).position() + "; positions must match seat order");
 			}
 		}
-	}
-
-	/**
-	 * A capable seat exists and the strategy is configured to honour an exclusion.
-	 * <p>
-	 * Both halves are needed. A capable seat under a strategy that refuses exclusions produces
-	 * an error rather than an excluded aggregate, and a strategy that would honour one has
-	 * nothing to honour when no seat may exclude.
-	 * </p>
-	 * @return true when the aggregate may be not applicable
-	 */
-	@Override
-	public boolean aggregateMayBeNotApplicable() {
-		return strategy.notApplicablePolicy() == NotApplicablePolicy.EXCLUDE
-				&& seats.stream().anyMatch(seat -> seat.judge().notApplicableWhen() != null);
+		NotApplicablePolicy declared = strategy.notApplicablePolicy();
+		if (declared != null) {
+			boolean derived = declared == NotApplicablePolicy.EXCLUDE
+					&& seats.stream().anyMatch(seat -> seat.judge().notApplicableWhen() != null);
+			if (derived != aggregateMayBeNotApplicable) {
+				throw new IllegalArgumentException("strategy '" + strategy.name() + "' declares notApplicablePolicy "
+						+ declared + " over " + seats.size() + " seat(s), from which aggregateMayBeNotApplicable is "
+						+ derived + "; the description states " + aggregateMayBeNotApplicable);
+			}
+		}
 	}
 
 	@Override
