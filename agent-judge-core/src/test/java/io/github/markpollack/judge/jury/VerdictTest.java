@@ -538,6 +538,60 @@ class VerdictTest {
 				.hasMessageContaining("copies its individuals, map, weights and seats");
 		}
 
+		/*
+		 * The copy rule is four independent equalities, and the case above changes three of
+		 * them at once. A guard that only ever sees several fields wrong together cannot tell
+		 * which equality caught it, so any one of them could be removed without turning
+		 * anything red. Each case below changes exactly one field and leaves the rest of the
+		 * verdict a faithful, self-coherent copy, so it can only be rejected by the equality
+		 * it names.
+		 */
+
+		@Test
+		@DisplayName("the copied individuals keep their order, even when the map and seats still match")
+		void copiedIndividualsKeepTheirOrder() {
+			Verdict tier = undecidedTier();
+			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
+
+			assertThatCode(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build())
+				.as("the faithful copy that each of these counterexamples changes exactly one field of")
+				.doesNotThrowAnyException();
+			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
+				.individual(List.of(FAILED, PASSED))
+				.build(),
+					"reordering the copy attributes seat 0's judgment to the judge who did not make it")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("copies its individuals, map, weights and seats");
+		}
+
+		@Test
+		@DisplayName("the copied keyed judgments keep their values, even when the order and seats still match")
+		void copiedKeyedJudgmentsKeepTheirValues() {
+			Verdict tier = undecidedTier();
+			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
+
+			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
+				.individualByName(named("first", FAILED, "second", PASSED))
+				.build(),
+					"the same keys and seats over swapped judgments say the wrong judge rejected the subject")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("copies its individuals, map, weights and seats");
+		}
+
+		@Test
+		@DisplayName("the copied seats keep their positions, even when the order and map still match")
+		void copiedSeatsKeepTheirPositions() {
+			Verdict tier = undecidedTier();
+			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
+
+			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
+				.seats(List.of(new Seat(2, "first", KeySource.DECLARED), new Seat(3, "second", KeySource.DECLARED)))
+				.build(),
+					"positions are what the weights join to, so moving them reports a configuration nobody set")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("copies its individuals, map, weights and seats");
+		}
+
 	}
 
 	@Nested
