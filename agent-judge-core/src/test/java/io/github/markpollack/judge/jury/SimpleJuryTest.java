@@ -207,8 +207,7 @@ class SimpleJuryTest {
 		// NaN < 0 is false, so a negative-only guard let NaN and both infinities through to a
 		// jury that could vote with them but could not be described.
 		for (double weight : new double[] { Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY }) {
-			assertThatThrownBy(() -> SimpleJury.builder().judge(alwaysPass("Judge1"), weight))
-				.as("weight %s", weight)
+			assertThatThrownBy(() -> SimpleJury.builder().judge(alwaysPass("Judge1"), weight), "weight %s", weight)
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("Weight must be finite");
 		}

@@ -167,6 +167,31 @@ class LabelJudgmentClassifierTests {
 			.hasMessageContaining("non-blank");
 	}
 
+	/**
+	 * A declared score is a normalized score like any other, and the label rule above says
+	 * nothing about it: every score the other cases supply is valid, so the range check had no
+	 * input of its own. The label is valid in each case here so that only the score can be what
+	 * is refused, and the message must name the label whose declaration was wrong.
+	 */
+	@Test
+	void builderRejectsDeclaredScoresOutsideTheNormalizedRange() {
+		for (double bad : new double[] { -0.1, 1.1, Double.NaN, Double.POSITIVE_INFINITY,
+				Double.NEGATIVE_INFINITY }) {
+			assertThatThrownBy(() -> LabelJudgmentClassifier.builder().pass("excellent", bad), "pass score %s", bad)
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessage("Score for label 'excellent' must be finite and between 0.0 and 1.0, but was " + bad);
+			assertThatThrownBy(() -> LabelJudgmentClassifier.builder().fail("poor", bad), "fail score %s", bad)
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessage("Score for label 'poor' must be finite and between 0.0 and 1.0, but was " + bad);
+		}
+
+		// The endpoints of the range are declarations, not violations.
+		var classifier = LabelJudgmentClassifier.builder().pass("excellent", 1.0).fail("poor", 0.0).build();
+
+		assertThat(classifier.scoreFor("excellent")).hasValue(1.0);
+		assertThat(classifier.scoreFor("poor")).hasValue(0.0);
+	}
+
 	@Test
 	void laterUnscoredMappingClearsEarlierDeclaredScore() {
 		var classifier = LabelJudgmentClassifier.builder().pass("review", 0.8).abstain("review").build();

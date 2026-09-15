@@ -244,6 +244,16 @@ class PortableMetadataContractTest {
 			assertThatThrownBy(() -> withMetadata(singleton("lonelyLow", "\uDC4D")))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("metadata.lonelyLow");
+			// Both cases above have a unit after the surrogate to inspect. A high surrogate in
+			// the last position has none, and the scan must report that rather than read past
+			// the end of the string, so the expected type carries the claim here.
+			assertThatThrownBy(() -> withMetadata(singleton("trailingHigh", "ok\uD83D")),
+					"a string whose last unit is a high surrogate")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("metadata.trailingHigh")
+				.hasMessageContaining("unpaired surrogate at index 2");
+			// The paired form of the same character is still accepted.
+			assertThatCode(() -> withMetadata(singleton("paired", "ok🚀"))).doesNotThrowAnyException();
 		}
 
 		@Test
@@ -294,12 +304,12 @@ class PortableMetadataContractTest {
 			assertThatThrownBy(() -> withMetadata(singleton("instant", Instant.EPOCH)))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("metadata.instant");
-			assertThatThrownBy(() -> withMetadata(singleton("status", JudgmentStatus.PASS)))
-				.as("an enum is a Java identity, not a portable value; project it to its wire token")
+			assertThatThrownBy(() -> withMetadata(singleton("status", JudgmentStatus.PASS)),
+					"an enum is a Java identity, not a portable value; project it to its wire token")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("metadata.status");
-			assertThatThrownBy(() -> withMetadata(singleton("precise", new BigDecimal("0.1"))))
-				.as("arbitrary-precision types promise exactness that ordinary JSON consumers cannot keep")
+			assertThatThrownBy(() -> withMetadata(singleton("precise", new BigDecimal("0.1"))),
+					"arbitrary-precision types promise exactness that ordinary JSON consumers cannot keep")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("metadata.precise");
 			assertThatThrownBy(() -> withMetadata(singleton("huge", BigInteger.TEN)))

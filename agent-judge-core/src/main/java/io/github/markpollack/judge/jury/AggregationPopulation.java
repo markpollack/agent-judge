@@ -8,7 +8,6 @@ package io.github.markpollack.judge.jury;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -65,7 +64,7 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  */
 record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndices, int inputCount,
 		int explicitAbstainCount, int notApplicableCount, int errorCount,
-		Map<JudgmentReasonCode, Integer> errorCodeCounts, int ignoredErrorCount, int errorsTreatedAsAbstainCount,
+		Map<JudgmentReasonCode, Long> errorCodeCounts, int ignoredErrorCount, int errorsTreatedAsAbstainCount,
 		int errorsTreatedAsFailCount, int notApplicableTreatedAsFailCount, ErrorPolicy errorPolicy,
 		NotApplicablePolicy notApplicablePolicy, @Nullable PolicyExit policyExit) {
 
@@ -103,7 +102,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 		int notApplicableCount = 0;
 		int errorCount = 0;
 		int machineryOriginErrorCount = 0;
-		Map<JudgmentReasonCode, Integer> errorCodeCounts = new EnumMap<>(JudgmentReasonCode.class);
+		Map<JudgmentReasonCode, Long> errorCodeCounts = new EnumMap<>(JudgmentReasonCode.class);
 
 		for (Judgment judgment : judgments) {
 			JudgmentStatus status = judgment.status();
@@ -245,7 +244,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 		if (code != JudgmentReasonCode.ERRORS_PROPAGATED) {
 			return false;
 		}
-		Map<JudgmentReasonCode, Integer> origin = new EnumMap<>(JudgmentReasonCode.class);
+		Map<JudgmentReasonCode, Long> origin = new EnumMap<>(JudgmentReasonCode.class);
 		flattenOrigin(judgment, origin);
 		if (origin.isEmpty()) {
 			return true;
@@ -263,16 +262,23 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * causes would disappear one level up. Totals may therefore exceed the number of errored
 	 * inputs, which is correct — one wrapper can stand for several failures.
 	 * </p>
+	 * <p>
+	 * The accumulator is the same {@code long} domain the counts were validated in, so a count
+	 * cannot be narrowed on its way through a reduction. A total that would leave the domain
+	 * cannot be recorded, and {@link Judgment}'s portable-value validation refuses it by name
+	 * when the aggregate is built — loudly, rather than as a smaller number that reads exactly
+	 * like a real one.
+	 * </p>
 	 * @param judgment an errored judgment
 	 * @param totals the running total, keyed by terminal code
 	 */
-	private static void flattenOrigin(Judgment judgment, Map<JudgmentReasonCode, Integer> totals) {
+	private static void flattenOrigin(Judgment judgment, Map<JudgmentReasonCode, Long> totals) {
 		JudgmentReasonCode code = judgment.reasonCode();
 		if (code == null) {
 			return;
 		}
 		if (code != JudgmentReasonCode.ERRORS_PROPAGATED) {
-			totals.merge(code, 1, Integer::sum);
+			totals.merge(code, 1L, AggregationPopulation::addCounts);
 			return;
 		}
 		if (!(judgment.metadata().get(Judgment.AGGREGATION_KEY) instanceof Map<?, ?> evidence)) {
@@ -282,13 +288,27 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 			return;
 		}
 		origin.forEach((key, value) -> {
+			// The wrapper's own construction validated every count as a positive portable
+			// integer, so the long view is the exact value rather than a conversion of it.
 			if (value instanceof Number count) {
-				totals.merge(JudgmentReasonCode.fromWire(String.valueOf(key)), count.intValue(), Integer::sum);
+				totals.merge(JudgmentReasonCode.fromWire(String.valueOf(key)), count.longValue(),
+						AggregationPopulation::addCounts);
 			}
 		});
 	}
 
-	private static Map<JudgmentReasonCode, Integer> freeze(Map<JudgmentReasonCode, Integer> counts) {
+	/**
+	 * Add two origin counts without wrapping.
+	 * @param first a running total
+	 * @param second the count to add
+	 * @return the sum
+	 * @throws ArithmeticException if the sum leaves the {@code long} domain
+	 */
+	private static Long addCounts(Long first, Long second) {
+		return Math.addExact(first, second);
+	}
+
+	private static Map<JudgmentReasonCode, Long> freeze(Map<JudgmentReasonCode, Long> counts) {
 		return counts.isEmpty() ? Map.of() : Collections.unmodifiableMap(new EnumMap<>(counts));
 	}
 
@@ -325,9 +345,9 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 
 	/** @return the flattened origin totals as portable wire-name keys */
 	private Map<String, Object> portableErrorCodeCounts() {
-		Map<String, Object> portable = new LinkedHashMap<>();
-		this.errorCodeCounts.forEach((code, count) -> portable.put(code.wireName(), count));
-		return portable;
+		// Projected by the type that owns the origin invariant, so the evidence block and the
+		// block a propagating aggregate carries are the same block built the same way.
+		return Judgment.portableOriginCounts(this.errorCodeCounts);
 	}
 
 	/**

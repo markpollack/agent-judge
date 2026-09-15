@@ -743,7 +743,7 @@ class JuryDescriptionTest {
 			SeatDescription misplaced = new SeatDescription(1, "k", KeySource.DECLARED, 1.0,
 					Judges.describe(new KeywordJudge("k")));
 
-			assertThatThrownBy(() -> new SimpleJuryDescription(strategy, List.of(misplaced)))
+			assertThatThrownBy(() -> new SimpleJuryDescription(strategy, List.of(misplaced), false))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("positions must match seat order");
 		}
@@ -752,7 +752,8 @@ class JuryDescriptionTest {
 		void descriptionsCopyTheListsTheyAreGiven() {
 			List<SeatDescription> seats = new ArrayList<>(List.of(new SeatDescription(0, "k", KeySource.DECLARED, 1.0,
 					Judges.describe(new KeywordJudge("k")))));
-			SimpleJuryDescription description = new SimpleJuryDescription(new ConsensusStrategy().describe(), seats);
+			SimpleJuryDescription description = new SimpleJuryDescription(new ConsensusStrategy().describe(), seats,
+					false);
 
 			seats.clear();
 

@@ -115,8 +115,8 @@ class CompositeResultContractTest {
 		for (String invalid : List.of("", " ", " leading", "trailing\u2003", "\u00A0leading", "trailing\u00A0",
 				"e\u0301", "bad\u0001name",
 				"bad\u200Ename", "bad\u2028name", "bad\uD800name", "a".repeat(65))) {
-			assertThatThrownBy(() -> new NamedJury(invalid, returning(leaf("ok"))))
-				.as("invalid configured name %s", printable(invalid))
+			assertThatThrownBy(() -> new NamedJury(invalid, returning(leaf("ok"))), "invalid configured name %s",
+					printable(invalid))
 				.isInstanceOfAny(IllegalArgumentException.class, NullPointerException.class);
 		}
 
@@ -133,6 +133,42 @@ class CompositeResultContractTest {
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Duplicate");
 		assertThat(invocations).hasValue(0);
+	}
+
+	/**
+	 * The case above asks only that an invalid name is refused, which cannot tell one rejection
+	 * rule from another: a single input can satisfy several of them, and a rule with no input of
+	 * its own is pinned by nothing. These inputs each reach one operand of the validator and are
+	 * checked against the diagnostic that operand raises, so deleting an operand shows up as a
+	 * missing throwable or the wrong exception rather than as silence.
+	 */
+	@Test
+	void eachConfiguredNameRejectionRuleHasItsOwnInputAndItsOwnDiagnostic() {
+		// LINE_SEPARATOR and PARAGRAPH_SEPARATOR are separate Character types, so the line
+		// separator the case above supplies is not a witness for the paragraph separator.
+		for (String separator : List.of("bad name", "bad name")) {
+			assertThatThrownBy(() -> new NamedJury(separator, returning(leaf("ok"))), "separator %s",
+					printable(separator))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("forbidden Unicode code point");
+		}
+
+		// A high surrogate at the end of the name has no following unit to pair with. The
+		// validator owes the caller that diagnostic rather than a read past the end of the
+		// string, so the expected type is what distinguishes the bound from its absence.
+		assertThatThrownBy(() -> new NamedJury("a\uD800", returning(leaf("ok"))),
+				"a name whose last unit is a high surrogate")
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("Unicode scalar values");
+		assertThatThrownBy(() -> new NamedJury("bad\uD800name", returning(leaf("ok"))),
+				"a high surrogate followed by an ordinary character")
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("Unicode scalar values");
+
+		// Near misses that are still valid names: a paired astral character is one scalar, and
+		// an interior SPACE_SEPARATOR is neither a line nor a paragraph separator.
+		assertThat(new NamedJury("a🚀b", returning(leaf("ok"))).name()).isEqualTo("a🚀b");
+		assertThat(new NamedJury("two words", returning(leaf("ok"))).name()).isEqualTo("two words");
 	}
 
 	@Test

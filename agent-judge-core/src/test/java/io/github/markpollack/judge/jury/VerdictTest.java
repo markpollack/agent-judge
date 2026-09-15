@@ -288,7 +288,7 @@ class VerdictTest {
 			assertThatThrownBy(() -> Verdict.builder()
 				.aggregated(Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "a judge failed"))
 				.decision(Decision.undecided())
-				.build()).as("a judge's failure is not the instrument reaching no outcome")
+				.build(), "a judge's failure is not the instrument reaching no outcome")
 				.isInstanceOf(IllegalArgumentException.class);
 			assertThatCode(() -> Verdict.builder()
 				.aggregated(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
@@ -322,6 +322,20 @@ class VerdictTest {
 		}
 
 		@Test
+		@DisplayName("a decision that names a tier which returned nothing determines nothing")
+		void tierNamedMustHaveReturnedAVerdict() {
+			CompositeAttempt threw = CompositeAttempt.executionFailed("gate", CompositeRelation.CASCADE_TIER,
+					TierPolicy.REJECT_ON_ANY_FAIL, new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED));
+
+			assertThatThrownBy(() -> Verdict.builder()
+				.aggregated(booleanPass("ok"))
+				.decision(Decision.tier("gate", DecisionBasis.TIER_OUTCOME))
+				.compositeAttempts(List.of(threw))
+				.build()).isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("returned no verdict");
+		}
+
+		@Test
 		@DisplayName("wire names round-trip exactly")
 		void wireNames() {
 			assertThat(DecisionKind.fromWire("undecided")).isEqualTo(DecisionKind.UNDECIDED);
@@ -330,6 +344,256 @@ class VerdictTest {
 			assertThat(DispositionReason.fromWire("child_undecided")).isEqualTo(DispositionReason.CHILD_UNDECIDED);
 			assertThatThrownBy(() -> DecisionKind.fromWire("OWN")).isInstanceOf(IllegalArgumentException.class);
 			assertThatThrownBy(() -> DispositionReason.fromWire("nope")).isInstanceOf(IllegalArgumentException.class);
+		}
+
+	}
+
+	/**
+	 * The cross-checks a {@code TIER} decision owes the verdict that carries it.
+	 *
+	 * <p>
+	 * A cascade's root is a copy: its aggregate, individuals, map, weights and seats come from
+	 * the tier the decision names, and a reader counts on that without being able to re-derive
+	 * it. Each rule in §7.2 is therefore checked here against the attempt the verdict itself
+	 * carries — including R-D's amendment, where the one root that is <em>not</em> a copy must
+	 * be a parent-authored {@code ERROR stage_failed}.
+	 * </p>
+	 *
+	 * <p>
+	 * These are negative tests by necessity. Every cascade the library builds satisfies the
+	 * rules, so an assertion about a cascade's output cannot tell an enforced invariant from an
+	 * unenforced one; only a verdict deliberately built wrong can.
+	 * </p>
+	 */
+	@Nested
+	@DisplayName("A TIER decision is checked against the tier it names")
+	class TierDecisions {
+
+		private static final Judgment PASSED = booleanPass("the first judge was satisfied");
+
+		private static final Judgment FAILED = booleanFail("the second judge was not");
+
+		private static final Judgment BROKEN =
+				Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw");
+
+		private static Map<String, Judgment> individuals(Judgment second) {
+			return named("first", PASSED, "second", second);
+		}
+
+		/** A tier holding a genuine FAIL, with the aggregate and decision a caller chooses. */
+		private static Verdict tier(Judgment aggregate, Decision decision, Judgment second) {
+			Map<String, Judgment> byName = individuals(second);
+			return Verdict.builder()
+				.aggregated(aggregate)
+				.individual(List.copyOf(byName.values()))
+				.individualByName(byName)
+				.seats(declaredSeats("first", "second"))
+				.decision(decision)
+				.build();
+		}
+
+		private static Verdict undecidedTier() {
+			return tier(BROKEN, Decision.undecided(), FAILED);
+		}
+
+		private static Verdict excludedTier() {
+			return tier(Judgment.notApplicable("no Java sources"), Decision.own(), FAILED);
+		}
+
+		private static CompositeAttempt used(Verdict verdict) {
+			return CompositeAttempt.used("gate", CompositeRelation.CASCADE_TIER, TierPolicy.REJECT_ON_ANY_FAIL,
+					verdict);
+		}
+
+		private static CompositeAttempt refused(Verdict verdict, TierPolicy policy) {
+			DispositionReason reason = verdict.decision().kind() == DecisionKind.UNDECIDED
+					? DispositionReason.CHILD_UNDECIDED : DispositionReason.UNDECLARED_NOT_APPLICABLE;
+			return CompositeAttempt.stageFailed("gate", CompositeRelation.CASCADE_TIER, policy, reason, verdict);
+		}
+
+		/** A root that copies everything the named tier holds, with a chosen aggregate. */
+		private static Verdict.Builder root(Judgment aggregate, Verdict tier, CompositeAttempt attempt,
+				DecisionBasis basis) {
+			return Verdict.builder()
+				.aggregated(aggregate)
+				.individual(tier.individual())
+				.individualByName(tier.individualByName())
+				.weights(tier.weights())
+				.seats(tier.seats())
+				.decision(Decision.tier("gate", basis))
+				.compositeAttempts(List.of(attempt));
+		}
+
+		@Test
+		@DisplayName("TIER_OUTCOME adopts a determination, so the tier must have been used")
+		void tierOutcomeRequiresAUsedAttempt() {
+			Verdict tier = undecidedTier();
+
+			assertThatThrownBy(() -> root(BROKEN, tier, refused(tier, TierPolicy.REJECT_ON_ANY_FAIL),
+					DecisionBasis.TIER_OUTCOME).build()).isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("must be USED");
+		}
+
+		@Test
+		@DisplayName("TIER_OUTCOME copies the tier's aggregate exactly; a near copy is not a copy")
+		void tierOutcomeCopiesTheAggregate() {
+			Verdict tier = tier(booleanPass("the tier was satisfied"), Decision.own(), PASSED);
+
+			assertThatThrownBy(() -> root(booleanPass("a sentence of the parent's own"), tier, used(tier),
+					DecisionBasis.TIER_OUTCOME).build()).isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("the aggregate differs");
+			assertThatCode(() -> root(tier.aggregated(), tier, used(tier), DecisionBasis.TIER_OUTCOME).build())
+				.doesNotThrowAnyException();
+		}
+
+		@Test
+		@DisplayName("INDIVIDUAL_REJECTION is a stop on a tier the cascade could not use")
+		void rejectionRequiresAFailedStage() {
+			Verdict tier = tier(booleanFail("the tier rejected the subject"), Decision.own(), FAILED);
+
+			assertThatThrownBy(() -> root(BROKEN, tier, used(tier), DecisionBasis.INDIVIDUAL_REJECTION).build())
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("must be STAGE_FAILED");
+		}
+
+		@Test
+		@DisplayName("only REJECT_ON_ANY_FAIL stops on a rejection; a broken stage accepts nothing")
+		void rejectionRequiresTheRejectingPolicy() {
+			Verdict tier = undecidedTier();
+
+			assertThatThrownBy(() -> root(BROKEN, tier, refused(tier, TierPolicy.ACCEPT_ON_ALL_PASS),
+					DecisionBasis.INDIVIDUAL_REJECTION).build()).isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("only REJECT_ON_ANY_FAIL");
+		}
+
+		@Test
+		@DisplayName("a rejection needs a genuine FAIL: neither a pass nor a machinery error is one")
+		void rejectionRequiresAGenuineFail() {
+			Verdict allPassed = tier(BROKEN, Decision.undecided(), PASSED);
+			assertThatThrownBy(() -> root(BROKEN, allPassed, refused(allPassed, TierPolicy.REJECT_ON_ANY_FAIL),
+					DecisionBasis.INDIVIDUAL_REJECTION).build()).isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("requires a genuine FAIL");
+
+			// The claim D4 rests on: the library's own failure is not rejection evidence, so a
+			// tier whose individuals are machinery errors has established nothing to stop on.
+			Verdict machineryOnly = tier(BROKEN, Decision.undecided(),
+					Judgment.error(JudgmentReasonCode.STAGE_FAILED, "a member did not produce a determination"));
+			assertThatThrownBy(() -> root(BROKEN, machineryOnly, refused(machineryOnly, TierPolicy.REJECT_ON_ANY_FAIL),
+					DecisionBasis.INDIVIDUAL_REJECTION).build()).isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("a broken stage on its own justifies nothing");
+		}
+
+		@Test
+		@DisplayName("a CHILD_UNDECIDED rejection keeps the child's own machinery error as its root")
+		void childUndecidedKeepsTheChildsCode() {
+			Verdict tier = undecidedTier();
+			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
+
+			assertThatThrownBy(() -> root(Judgment.error(JudgmentReasonCode.STAGE_FAILED, "a root of the parent's own"),
+					tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build())
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("keeps the child's own machinery error");
+			assertThatCode(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build())
+				.doesNotThrowAnyException();
+		}
+
+		@Test
+		@DisplayName("R-D: a rejection on a refused exclusion builds a parent-authored stage_failed root")
+		void refusedExclusionBuildsAStageFailedRoot() {
+			Verdict tier = excludedTier();
+			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
+
+			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build(),
+					"copying the exclusion the cascade just refused would adopt the claim it rejected")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("parent-authored");
+			assertThatThrownBy(() -> root(BROKEN, tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build(),
+					"and any other machinery code would name a cause the parent did not observe")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("parent-authored");
+			assertThatCode(() -> root(Judgment.error(JudgmentReasonCode.STAGE_FAILED,
+					"tier 'gate' returned NOT_APPLICABLE without declaring that its aggregate may be excluded"), tier,
+					attempt, DecisionBasis.INDIVIDUAL_REJECTION).build()).doesNotThrowAnyException();
+		}
+
+		@Test
+		@DisplayName("what a cascade copies must really have been copied, whichever basis it stopped on")
+		void everythingElseIsCopied() {
+			Verdict tier = undecidedTier();
+			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
+
+			assertThatThrownBy(
+					() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
+						.individual(List.of(FAILED))
+						.individualByName(Map.of("second", FAILED))
+						.seats(List.of(new Seat(0, "second", KeySource.DECLARED)))
+						.build(),
+					"a root that keeps only the failing individual has rewritten the tier's evidence")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("copies its individuals, map, weights and seats");
+
+			Verdict decided = tier(booleanPass("the tier was satisfied"), Decision.own(), PASSED);
+			assertThatThrownBy(
+					() -> root(decided.aggregated(), decided, used(decided), DecisionBasis.TIER_OUTCOME)
+						.weights(Map.of("0", 2.0))
+						.build(),
+					"the weights are part of the copy, because they are the join to the seats")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("copies its individuals, map, weights and seats");
+		}
+
+		/*
+		 * The copy rule is four independent equalities, and the case above changes three of
+		 * them at once. A guard that only ever sees several fields wrong together cannot tell
+		 * which equality caught it, so any one of them could be removed without turning
+		 * anything red. Each case below changes exactly one field and leaves the rest of the
+		 * verdict a faithful, self-coherent copy, so it can only be rejected by the equality
+		 * it names.
+		 */
+
+		@Test
+		@DisplayName("the copied individuals keep their order, even when the map and seats still match")
+		void copiedIndividualsKeepTheirOrder() {
+			Verdict tier = undecidedTier();
+			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
+
+			assertThatCode(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build())
+				.as("the faithful copy that each of these counterexamples changes exactly one field of")
+				.doesNotThrowAnyException();
+			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
+				.individual(List.of(FAILED, PASSED))
+				.build(),
+					"reordering the copy attributes seat 0's judgment to the judge who did not make it")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("copies its individuals, map, weights and seats");
+		}
+
+		@Test
+		@DisplayName("the copied keyed judgments keep their values, even when the order and seats still match")
+		void copiedKeyedJudgmentsKeepTheirValues() {
+			Verdict tier = undecidedTier();
+			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
+
+			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
+				.individualByName(named("first", FAILED, "second", PASSED))
+				.build(),
+					"the same keys and seats over swapped judgments say the wrong judge rejected the subject")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("copies its individuals, map, weights and seats");
+		}
+
+		@Test
+		@DisplayName("the copied seats keep their positions, even when the order and map still match")
+		void copiedSeatsKeepTheirPositions() {
+			Verdict tier = undecidedTier();
+			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
+
+			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
+				.seats(List.of(new Seat(2, "first", KeySource.DECLARED), new Seat(3, "second", KeySource.DECLARED)))
+				.build(),
+					"positions are what the weights join to, so moving them reports a configuration nobody set")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("copies its individuals, map, weights and seats");
 		}
 
 	}
@@ -385,9 +649,21 @@ class VerdictTest {
 					AttemptDisposition.STAGE_FAILED, DispositionReason.EXECUTION_FAILED, child, null))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("EXECUTION_FAILED");
+			// Both reasons describe a verdict the stage returned, and the rule is one claim per
+			// reason rather than one claim about the pair. Asserting only CHILD_UNDECIDED would
+			// leave the other reason free to lose its verdict with nothing turning red, so each
+			// is witnessed on its own and named in what it is asserted to report.
 			assertThatThrownBy(() -> new CompositeAttempt("m", CompositeRelation.META_MEMBER, null,
 					AttemptDisposition.STAGE_FAILED, DispositionReason.CHILD_UNDECIDED, null, failure))
 				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("CHILD_UNDECIDED")
+				.hasMessageContaining("must keep it");
+			assertThatThrownBy(() -> new CompositeAttempt("m", CompositeRelation.META_MEMBER, null,
+					AttemptDisposition.STAGE_FAILED, DispositionReason.UNDECLARED_NOT_APPLICABLE, null, failure),
+					"an attempt claiming the child returned an exclusion the parent refused, while keeping no "
+							+ "verdict, is the false marker this rule exists to refuse")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("UNDECLARED_NOT_APPLICABLE")
 				.hasMessageContaining("must keep it");
 		}
 

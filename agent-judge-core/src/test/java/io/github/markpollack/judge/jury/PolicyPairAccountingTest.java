@@ -313,7 +313,7 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("a wrapper carrying a machinery cause is machinery-origin too")
 		void wrappersAreFlattenedForOrigin() {
-			Judgment wrapped = Judgment.propagatedError(Map.of(JudgmentReasonCode.STAGE_FAILED, 1),
+			Judgment wrapped = Judgment.propagatedError(Map.of(JudgmentReasonCode.STAGE_FAILED, 1L),
 					"a member stage failed and the error policy is propagate");
 
 			Judgment aggregate = aggregate(ErrorPolicy.TREAT_AS_FAIL, NotApplicablePolicy.EXCLUDE,
@@ -354,7 +354,7 @@ class PolicyPairAccountingTest {
 		@DisplayName("a wrapper's causes may outnumber the errored inputs")
 		void originMayExceedErrorCount() {
 			Judgment wrapped = Judgment.propagatedError(
-					Map.of(JudgmentReasonCode.JUDGE_FAILED, 2, JudgmentReasonCode.JUDGE_REPORTED, 1),
+					Map.of(JudgmentReasonCode.JUDGE_FAILED, 2L, JudgmentReasonCode.JUDGE_REPORTED, 1L),
 					"3 of 3 judgments errored and the error policy is propagate");
 
 			Judgment aggregate = aggregate(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE, List.of(PASS, wrapped));

@@ -8,6 +8,7 @@ package io.github.markpollack.judge.result;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -174,6 +175,12 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	 * under it, inside the reserved {@value #AGGREGATION_KEY} block. Strategies write it through
 	 * the jury package's evidence contract, which re-exports this same constant.
 	 * </p>
+	 * <p>
+	 * <strong>The count domain is {@code long}</strong>, bounded by the portable integer range
+	 * the metadata algebra already enforces. Counts are carried, merged and emitted in that one
+	 * domain: a narrower accumulator anywhere would not reject a large count, it would
+	 * <em>change</em> it, and a corrupted count is indistinguishable from a correct one.
+	 * </p>
 	 *
 	 * @since 0.17.0
 	 */
@@ -278,8 +285,11 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	 * Enforce the origin a propagating aggregate owes.
 	 * <p>
 	 * Validation reads the already-frozen metadata, so what is checked is exactly what the
-	 * judgment will hold. It validates structure, not authenticity: it proves the aggregate
-	 * names terminal causes with positive counts, not that those causes really occurred.
+	 * judgment will hold — including the portable integer range, which
+	 * {@link PortableValues} has already applied to every count. This is therefore the single
+	 * place the count domain is decided: a positive integral value within that range, read as a
+	 * {@code long}. It validates structure, not authenticity: it proves the aggregate names
+	 * terminal causes with positive counts, not that those causes really occurred.
 	 * </p>
 	 * @param metadata the frozen metadata
 	 */
@@ -301,8 +311,11 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 						+ "' holds terminal instrument causes only, but was given " + code.wireName());
 			}
 			Object count = entry.getValue();
-			boolean positiveInteger = (count instanceof Integer || count instanceof Long)
-					&& ((Number) count).longValue() > 0L;
+			// Any integral box the portable algebra admits, read in the one count domain.
+			// Reading it as an int here instead would make the accepted domain wider than the
+			// checked one, which is how a count survives validation and is then corrupted.
+			boolean positiveInteger = (count instanceof Byte || count instanceof Short || count instanceof Integer
+					|| count instanceof Long) && ((Number) count).longValue() > 0L;
 			if (!positiveInteger) {
 				throw new IllegalArgumentException("'" + ERROR_CODE_COUNTS_KEY + "' counts must be positive integers, but "
 						+ code.wireName() + " was given " + count);
@@ -489,26 +502,60 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	 * never {@code errors_propagated} itself. Counts may therefore exceed the number of errored
 	 * inputs.
 	 * </p>
-	 * @param origin terminal codes to positive counts; must be non-empty and must not contain
-	 * {@link JudgmentReasonCode#ERRORS_PROPAGATED}
+	 * <p>
+	 * Counts are {@code long} because that is the domain the wire and the constructor already
+	 * accept: a portable integer reaches 9,007,199,254,740,991. A narrower parameter here would
+	 * silently narrow every count that passes through a reduction, which is corruption rather
+	 * than rejection.
+	 * </p>
+	 * @param origin terminal codes to positive counts within the portable integer range; must be
+	 * non-empty and must not contain {@link JudgmentReasonCode#ERRORS_PROPAGATED}
 	 * @param reasoning why the aggregate is an error; must be non-blank
 	 * @return the propagating error judgment, carrying its origin
 	 * @throws IllegalArgumentException if the origin is empty, holds a non-terminal key, or
-	 * holds a count that is not positive
+	 * holds a count that is not a positive portable integer
 	 * @since 0.17.0
 	 */
-	public static Judgment propagatedError(Map<JudgmentReasonCode, Integer> origin, String reasoning) {
-		Objects.requireNonNull(origin, "origin must not be null");
-		Map<String, Object> counts = new LinkedHashMap<>();
-		origin.forEach((code, count) -> counts.put(
-				Objects.requireNonNull(code, "origin must not contain a null code").wireName(),
-				Objects.requireNonNull(count, "origin must not contain a null count")));
+	public static Judgment propagatedError(Map<JudgmentReasonCode, Long> origin, String reasoning) {
 		Map<String, Object> evidence = new LinkedHashMap<>();
-		evidence.put(ERROR_CODE_COUNTS_KEY, counts);
+		evidence.put(ERROR_CODE_COUNTS_KEY, portableOriginCounts(origin));
 		Map<String, Object> metadata = new LinkedHashMap<>();
 		metadata.put(AGGREGATION_KEY, evidence);
 		return new Judgment(JudgmentStatus.ERROR, null, null, JudgmentReasonCode.ERRORS_PROPAGATED, reasoning, List.of(),
 				metadata);
+	}
+
+	/**
+	 * Project origin counts into the portable block that lives under
+	 * {@value #ERROR_CODE_COUNTS_KEY}.
+	 * <p>
+	 * This is the one place the portable form of a count is decided, so the block a jury writes
+	 * as evidence and the block a propagating aggregate carries as its invariant cannot drift
+	 * apart. A custom strategy writing the universal evidence keys itself uses it for the same
+	 * reason.
+	 * </p>
+	 * <p>
+	 * Each count is boxed as the narrowest integer type that holds it <em>exactly</em> — which
+	 * is the type a JSON reader produces for the same number, so a judgment in memory and the
+	 * same judgment read back from the wire are equal. The value is never changed; only its box
+	 * is chosen. The domain is {@code long} throughout, because a count is a portable integer and
+	 * those reach far beyond {@code int}.
+	 * </p>
+	 * @param origin terminal codes to positive counts within the portable integer range
+	 * @return wire name to count, in encounter order
+	 * @since 0.17.0
+	 */
+	public static Map<String, Object> portableOriginCounts(Map<JudgmentReasonCode, Long> origin) {
+		Objects.requireNonNull(origin, "origin must not be null");
+		Map<String, Object> counts = new LinkedHashMap<>();
+		origin.forEach((code, count) -> counts.put(
+				Objects.requireNonNull(code, "origin must not contain a null code").wireName(),
+				portableCount(Objects.requireNonNull(count, "origin must not contain a null count"))));
+		return Collections.unmodifiableMap(counts);
+	}
+
+	private static Object portableCount(long count) {
+		return count >= Integer.MIN_VALUE && count <= Integer.MAX_VALUE ? (Object) (int) count : (Object) count;
 	}
 
 	/**

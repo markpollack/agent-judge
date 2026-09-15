@@ -129,13 +129,14 @@ public class CascadedJury implements Jury {
 		for (TierConfig tier : tiers) {
 			Verdict tierVerdict;
 			try {
-				tierVerdict = CompositeExecutionScope.invokeChild(() -> tier.jury().vote(context));
+				tierVerdict = CompositeExecutionScope.invokeChild(tier.name(), () -> tier.jury().vote(context));
 			}
 			catch (CompositeLimitExceededException ex) {
 				throw ex;
 			}
 			catch (Exception ex) {
-				logger.warn("Tier '{}' failed to execute; continuing according to cascade policy", tier.name());
+				logger.warn("Tier '{}' did not produce a verdict ({}); continuing according to cascade policy",
+						tier.name(), ex.getClass().getName(), ex);
 				attempts.add(CompositeAttempt.executionFailed(tier.name(), CompositeRelation.CASCADE_TIER,
 						tier.policy(), EXECUTION_FAILURE));
 				if (tier.policy() == TierPolicy.FINAL_TIER) {
@@ -244,10 +245,23 @@ public class CascadedJury implements Jury {
 			.build();
 	}
 
-	/** Nothing decided: an empty root, complete attempts, and a machinery error. */
+	/**
+	 * Nothing decided: an empty root, complete attempts, and a machinery error.
+	 * <p>
+	 * Any exclusion this cascade refused along the way is named here, because no later tier's
+	 * reasoning survives to explain the outcome and the disposition enum alone leaves a reader
+	 * unable to tell a refused exclusion from a tier that simply broke. R-E's enum-only allowance
+	 * is scoped to the case where a later selected tier supplies the root, which never reaches
+	 * this method.
+	 * </p>
+	 * @param attempts the attempts recorded so far
+	 * @param reasoning why no tier decided
+	 * @return the undecided verdict
+	 */
 	private Verdict noTierDecided(List<CompositeAttempt> attempts, String reasoning) {
 		return Verdict.builder()
-			.aggregated(Judgment.error(JudgmentReasonCode.NO_TIER_DECIDED, reasoning))
+			.aggregated(Judgment.error(JudgmentReasonCode.NO_TIER_DECIDED,
+					reasoning + NotApplicableGuard.refusedExclusionNote(attempts, "Tier")))
 			.decision(Decision.undecided())
 			.compositeAttempts(attempts)
 			.build();

@@ -5,7 +5,9 @@
 
 package io.github.markpollack.judge.jury;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.jspecify.annotations.Nullable;
 
@@ -63,6 +65,38 @@ public final class NotApplicableGuard {
 			return DispositionReason.UNDECLARED_NOT_APPLICABLE;
 		}
 		return null;
+	}
+
+	/**
+	 * Say, in the parent's own words, which stages tried to exclude the subject and were refused.
+	 * <p>
+	 * The disposition enum makes the refusal countable; this makes it legible. A root that only
+	 * says a stage "did not produce a determination" describes a stage that threw, a stage whose
+	 * reduction broke, and a stage that tried to exclude the subject in exactly the same words —
+	 * and the child's own verdict is no help, because it asserts that the criterion did not
+	 * apply, which is precisely the claim the parent rejected.
+	 * </p>
+	 * <p>
+	 * The one case this deliberately does not cover is R-E's: a boundary rejection followed by a
+	 * later selected tier, whose reasoning belongs to that tier and which a parent note would
+	 * displace. That path never reaches here, because it builds no parent-authored root.
+	 * </p>
+	 * @param attempts the attempts recorded so far
+	 * @param stage what this parent calls its children, such as "Tier" or "Member"
+	 * @return a sentence naming the refused exclusions, or an empty string when there were none
+	 */
+	static String refusedExclusionNote(List<CompositeAttempt> attempts, String stage) {
+		List<String> refused = attempts.stream()
+			.filter(attempt -> attempt.dispositionReason() == DispositionReason.UNDECLARED_NOT_APPLICABLE)
+			.map(CompositeAttempt::name)
+			.toList();
+		if (refused.isEmpty()) {
+			return "";
+		}
+		String names = refused.stream().collect(Collectors.joining("', '", "'", "'"));
+		return " " + stage + (refused.size() == 1 ? " " + names + " returned" : "s " + names + " each returned")
+				+ " NOT_APPLICABLE without declaring that its aggregate may be excluded, so the exclusion was not "
+				+ "honoured and the stage counts as a failure rather than as a subject the criteria did not apply to.";
 	}
 
 }
