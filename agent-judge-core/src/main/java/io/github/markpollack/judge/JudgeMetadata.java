@@ -80,4 +80,35 @@ public record JudgeMetadata(String name, String description, JudgeType type, @Nu
 		}
 	}
 
+	/**
+	 * Metadata for a judge that never excludes a subject.
+	 * <p>
+	 * This is the ordinary case, and it is what most judges are: the judge answers the question
+	 * it was seated to answer, every time, so it has no exclusion condition to state. Use this
+	 * constructor for those.
+	 * </p>
+	 * <p>
+	 * Declaring {@code notApplicableWhen} is a deliberate opt-in, taken by naming the condition
+	 * through the four-argument constructor. Not taking it is not a blank or incomplete
+	 * declaration — absence <em>is</em> the statement that this judge never excludes, and it is
+	 * the statement {@link Judges#notApplicableCapability(Judge)} reads and a jury's seat guard
+	 * enforces. A judge that returns
+	 * {@link io.github.markpollack.judge.result.JudgmentStatus#NOT_APPLICABLE} from a seat built
+	 * on this metadata has its exclusion contained as an error, which is the intended outcome.
+	 * </p>
+	 * <p>
+	 * This delegates to the canonical constructor and is validated by it: the name must be
+	 * non-null and non-blank here exactly as it is there.
+	 * </p>
+	 * @param name the judge name (e.g., "FileExistsJudge", "CorrectnessJudge"); must be non-blank
+	 * @param description human-readable description of what this judge evaluates
+	 * @param type the judge type (deterministic, LLM-powered, hybrid, or agent)
+	 * @throws IllegalArgumentException if {@code name} is blank
+	 * @throws NullPointerException if {@code name} is null
+	 * @since 0.1.0
+	 */
+	public JudgeMetadata(String name, String description, JudgeType type) {
+		this(name, description, type, null);
+	}
+
 }
