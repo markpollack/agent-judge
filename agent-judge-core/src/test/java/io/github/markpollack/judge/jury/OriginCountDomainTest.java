@@ -77,9 +77,13 @@ class OriginCountDomainTest {
 	}
 
 	@SuppressWarnings("unchecked")
+	private static Map<String, Object> evidenceOf(Judgment judgment) {
+		return (Map<String, Object>) judgment.metadata().get(Judgment.AGGREGATION_KEY);
+	}
+
+	@SuppressWarnings("unchecked")
 	private static Map<String, Object> originOf(Judgment judgment) {
-		Map<String, Object> aggregation = (Map<String, Object>) judgment.metadata().get(Judgment.AGGREGATION_KEY);
-		return (Map<String, Object>) aggregation.get(Judgment.ERROR_CODE_COUNTS_KEY);
+		return (Map<String, Object>) evidenceOf(judgment).get(Judgment.ERROR_CODE_COUNTS_KEY);
 	}
 
 	@Nested
@@ -193,6 +197,40 @@ class OriginCountDomainTest {
 
 			assertThat(originOf(propagated)).containsEntry("judge_reported", 2);
 			assertThat(MAPPER.readValue(MAPPER.writeValueAsString(propagated), Judgment.class)).isEqualTo(propagated);
+		}
+
+		@Test
+		@DisplayName("replacing the evidence block preserves an origin the replacement omits")
+		void reattachingEvidenceKeepsTheOrigin() {
+			// The origin lives inside the same reserved block as the rest of the evidence, so
+			// rebuilding that block without naming the origin would destroy the fact that makes
+			// errors_propagated legal. Every built-in reduction writes the key, which is exactly
+			// why the obligation needs its own witness: nothing in a normal reduction would
+			// notice this carry-across going missing.
+			Judgment propagated = Judgment.propagatedError(Map.of(JudgmentReasonCode.JUDGE_REPORTED, 2L),
+					"2 of 3 judgments errored and the error policy is propagate");
+
+			Judgment reattached = AggregationEvidence.attach(propagated,
+					Map.of(AggregationEvidence.STRATEGY, "custom", AggregationEvidence.INPUT_COUNT, 3));
+
+			assertThat(reattached.reasonCode()).isEqualTo(JudgmentReasonCode.ERRORS_PROPAGATED);
+			assertThat(originOf(reattached)).as("the origin survives an evidence block that never mentioned it")
+				.containsEntry("judge_reported", 2);
+			assertThat(evidenceOf(reattached)).containsEntry(AggregationEvidence.STRATEGY, "custom")
+				.containsEntry(AggregationEvidence.INPUT_COUNT, 3);
+		}
+
+		@Test
+		@DisplayName("an origin the replacement does name is the one that is kept")
+		void aNamedOriginIsNotMergedWithTheOldOne() {
+			Judgment propagated = Judgment.propagatedError(Map.of(JudgmentReasonCode.JUDGE_REPORTED, 2L),
+					"2 of 3 judgments errored and the error policy is propagate");
+
+			Judgment reattached = AggregationEvidence.attach(propagated,
+					Map.of(AggregationEvidence.ERROR_CODE_COUNTS,
+							Judgment.portableOriginCounts(Map.of(JudgmentReasonCode.JUDGE_FAILED, 1L))));
+
+			assertThat(originOf(reattached)).containsOnlyKeys("judge_failed");
 		}
 
 	}

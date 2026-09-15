@@ -732,6 +732,60 @@ class CascadeRuleTest {
 	@Test
 	@DisplayName("a machinery error is never a genuine FAIL, so it stops nothing on its own")
 	void machineryErrorsAreNotGenuineFails() {
+		// The tier must actually hold a machinery error where a genuine FAIL would sit, or the
+		// claim is untested: a tier whose individuals are empty escalates whatever the rule says.
+		// So its one usable member is a determined D1, whose aggregate is a machinery ERROR, and a
+		// second member breaks the tier so the cascade reaches the rule at all.
+		Jury tier = Juries.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+				new NamedJury("rejected", boundaryRejectingCascade(passingTier("OK"))),
+				new NamedJury("broken", throwing(new IllegalStateException("boom"))));
+
+		Verdict verdict = CascadedJury.builder()
+			.tier("review", tier, TierPolicy.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+			.build()
+			.vote(CONTEXT);
+
+		CompositeAttempt reviewed = verdict.compositeAttempts().get(0);
+		assertThat(reviewed.dispositionReason()).isEqualTo(DispositionReason.CHILD_UNDECIDED);
+		assertThat(reviewed.verdict().individual()).extracting(Judgment::status)
+			.as("a machinery error is standing exactly where a genuine FAIL would stop the cascade")
+			.containsExactly(JudgmentStatus.ERROR);
+		assertThat(reviewed.verdict().individual().get(0).reasonCode())
+			.isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+
+		assertThat(verdict.decision()).as("and the cascade escalated past it rather than rejecting on it")
+			.isEqualTo(Decision.tier("semantic", DecisionBasis.TIER_OUTCOME));
+		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+	}
+
+	@Test
+	@DisplayName("nor does an errored individual in a tier that did complete: only a FAIL stops one")
+	void anErroredIndividualIsNotAFail() {
+		Jury tier = SimpleJury.builder()
+			.judge(Judges.named(context -> Judgment.error("the index was unreachable"), "flaky"))
+			.judge(Judges.named(context -> Judgment.pass("fine"), "ok"))
+			.votingStrategy(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE))
+			.build();
+
+		Verdict verdict = CascadedJury.builder()
+			.tier("review", tier, TierPolicy.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+			.build()
+			.vote(CONTEXT);
+
+		CompositeAttempt reviewed = verdict.compositeAttempts().get(0);
+		assertThat(reviewed.disposition()).as("this tier finished; it simply has an errored individual")
+			.isEqualTo(AttemptDisposition.USED);
+		assertThat(reviewed.verdict().individual()).extracting(Judgment::status)
+			.containsExactly(JudgmentStatus.ERROR, JudgmentStatus.PASS);
+		assertThat(verdict.decision()).as("an error is not a rejection, so the cascade walked on")
+			.isEqualTo(Decision.tier("semantic", DecisionBasis.TIER_OUTCOME));
+	}
+
+	@Test
+	@DisplayName("an undecided tier holding nothing at all escalates: there is no rejection to adopt")
+	void anEmptyUndecidedTierEscalates() {
 		Jury tier = Juries.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
 				new NamedJury("broken", returning(undecidedVerdict())));
 
@@ -741,6 +795,7 @@ class CascadeRuleTest {
 			.build()
 			.vote(CONTEXT);
 
+		assertThat(verdict.compositeAttempts().get(0).verdict().individual()).isEmpty();
 		assertThat(verdict.decision()).isEqualTo(Decision.tier("semantic", DecisionBasis.TIER_OUTCOME));
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
 	}
