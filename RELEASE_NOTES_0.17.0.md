@@ -106,6 +106,79 @@ produce a rejection indistinguishable from a real one in every stored field.
 - When it stops that way, no `FAIL` and no score is manufactured. The rejection is carried by the
   *decision*; the root aggregate stays a machinery error.
 
+### A judge whose metadata cannot be read
+
+A `JudgeWithMetadata` whose `metadata()` returned `null` or threw used to escape `SimpleJury.vote()`:
+the seat's name was read outside the failure handling, so every other judge's result was lost and an
+enclosing cascade recorded the tier as `JURY_EXECUTION_FAILED`.
+
+The jury now reads every seat's key once, on the caller's thread and before any judge runs. Such a
+seat becomes `ERROR judge_metadata_unreadable`, keyed `Judge#N`, naming its position and the failure,
+for the `ErrorPolicy` to resolve — and the judge does not run, so it cannot exercise a capability the
+jury was never built with. `describe()` refuses the seat loudly and by name, including a `NamedJudge`
+whose wrapped judge's metadata cannot be read, and `Juries.fromJudges` fails at construction naming
+the position.
+
+## Configuration is refused at construction, not at the first vote
+
+Cheap configuration mistakes are now build-time errors. Each of these used to fail later, after
+judges had already run, or not at all:
+
+| Was | Now |
+|---|---|
+| `null` `ErrorPolicy` — every aggregation threw `NullPointerException` out of `vote()`, even when every judge passed | `IllegalArgumentException("errorPolicy must not be null")` from all ten strategy constructors |
+| ⚠️ `null` `TiePolicy` — **failed only at the first tie**, so a jury could run for months and then break on one input | `MajorityVotingStrategy` refuses it at construction |
+| `null` `NotApplicablePolicy` | refused at construction |
+| A `NaN` or infinite judge weight — `NaN < 0` is false, so the sign check let both through | `SimpleJury.Builder` rejects any non-finite weight |
+
+An invalid threshold is still reported first. The no-argument constructors already passed
+`PROPAGATE` (and `TiePolicy.FAIL`) and are unchanged.
+
+**This is a behaviour change, not only a message change:** a jury that was constructed with a `null`
+`TiePolicy` and never tied used to build and run. It now fails to build.
+
+### Weighted average survives an overflowing weight total
+
+`WeightedAverageStrategy` threw when finite weights summed past `Double.MAX_VALUE`: the total became
+`Infinity`, the score `NaN`, and the infinite evidence value was then refused by `Judgment`
+construction.
+
+Scores lie in `[0, 1]` and weights are non-negative, so any overflow shows up as an infinite total,
+and only then are the eligible weights rescaled by a power of two before averaging. **Every total
+that fits runs the original arithmetic, so results that worked before are bit-identical** — pinned by
+a table captured from the unmodified sources and by a seeded differential test against the old
+arithmetic.
+
+**Recorded residual:** an overflowing total is reported in the aggregation evidence as
+`Double.MAX_VALUE`. `inputWeight` and `eligibleWeight` are therefore a saturating view, not an exact
+sum, and a reader must not treat `Double.MAX_VALUE` there as a measured total.
+
+## A jury can be described before it votes
+
+A verdict records what a jury did; nothing recorded what it was configured to do, so a jury that
+scored with fewer judges than it lists could not be caught by comparing the two.
+
+`Jury.describe()` and `VotingStrategy.describe()` return that structure before any vote, from a new
+`@NullMarked` description package. `SimpleJury`, `CascadedJury`, `MetaJury` and all seven strategies
+describe themselves; a consumer jury or strategy that does not override is described as **opaque** or
+**undeclared**, never as empty. `Judges.describe(Judge)` looks through `NamedJudge` — which now
+exposes `delegate()` — and reports both layers of metadata, so the `DETERMINISTIC` label
+`Juries.fromJudges` puts on a renamed judge no longer hides its real type. Each seat pairs position,
+verdict key, key source and weight.
+
+A judge declares its configuration only by implementing `ConfiguredJudge`, and the portable form keeps
+*undeclared* and *declared-empty* distinct with an explicit flag. `ModelBackedJudge` declares its
+prompt template name, a SHA-256 of the template text, its missing-variable policy and its classifier's
+implementation identity; it deliberately declares no model, because a `JudgeModel` does not state which
+model it will call and any value would be a guess.
+
+Hidden classes record no name, and anonymous or local classes record only their enclosing top-level
+class, so the portable form — validated through the same portable-value algebra `Judgment` uses, and
+versioned by `descriptionVersion` — is byte-identical across JVM runs. No reflection is used, and
+ArchUnit holds it.
+
+**Count a cascade per tier, against `compositeAttempts`, and never also by its top-level aggregate.**
+
 ## New verdict structure
 
 | Surface | Change |
@@ -135,6 +208,25 @@ required fact in transit, and it would accept it silently.
 
 The 0.14 conformance fixtures are byte-identical and are now read only through private historical
 shapes.
+
+## Corrections found by the 0.17 code review
+
+A bounded review of the merged candidate found eight defects that 1,134 passing tests did not. All
+eight are fixed, and these are the parts a consumer sees:
+
+| Surface | Change |
+|---|---|
+| `Judgment.propagatedError` | takes `Map<JudgmentReasonCode, Long>`. Origin counts are carried, merged and emitted in one `long` domain, bounded by the portable integer range; a count above 2³² used to be accepted at construction and silently reported as a smaller number by the next `PROPAGATE` reduction. A total that would leave the range now fails loudly and is contained |
+| `Judgment.portableOriginCounts` | new. The one place the portable form of an origin count is decided, for a custom strategy writing the universal evidence keys itself |
+| ⚠️ `JudgeMetadata` | refuses a blank name, and requires a non-null one. A blank name used to pass, the judge used to run, and seat construction then threw **outside containment** — discarding every other judge's result and collapsing the enclosing cascade tier. `Judges.named` refuses it through the same check. A judge that builds its metadata lazily is contained as unreadable metadata instead |
+| `CompositeAttempt` | a disposition reason must describe the verdict the attempt holds: `CHILD_UNDECIDED` requires an undecided child, `UNDECLARED_NOT_APPLICABLE` requires a `NOT_APPLICABLE` aggregate, and `USED` refuses a child that decided nothing. Stored data carrying a false marker is refused where it is read |
+| `SimpleJuryDescription`, `MetaJuryDescription` | gain `aggregateMayBeNotApplicable` as a component. The capability is stated by the jury rather than re-derived from the strategy description, which published a confident `false` for a jury whose custom strategy declared `EXCLUDE` only through `notApplicablePolicy()`. A description contradicting a strategy that *did* declare its policy is refused |
+| Requirement judges | an incomplete audit is still an `ERROR`, but now keeps its sibling checks, its `criteriaTotal` / `constraintsTotal`, and any valid exclusions. An unanswered criterion is neither a `Check` nor an authorized exclusion |
+| Composite juries | a child jury that returns `null` is a stage failure like one that threw, rather than a `NullPointerException` out of `vote()`. A meta-jury keeps its other members; a non-final cascade tier reaches its final tier |
+| Parent reasoning | where no later tier explains the outcome, a cascade's `no_tier_decided` root and a meta-jury's `stage_failed` root name the stage whose exclusion was refused. A boundary rejection followed by a later selected tier is unchanged: the root reasoning stays that tier's |
+
+The portable wire shapes are unchanged by these corrections, and all five conformance fixtures are
+byte-identical.
 
 ## Migrating
 
