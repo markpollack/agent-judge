@@ -369,16 +369,11 @@ class CascadeRuleTest {
 	@Test
 	@DisplayName("8. a refused exclusion tier holding a real FAIL also stops when its aggregate came from a refusal")
 	void aRefusedPolicyTierHoldingARealFailStops() {
-		// The tier's strategy refuses exclusions, so its aggregate is a machinery error and the
-		// tier is undecided for control flow; the FAIL beneath it is still real.
-		Jury tier = SimpleJury.builder()
-			.judge(new Conditional("conditional", Judgment.notApplicable(EXCLUSION)))
-			.judge(Judges.named(context -> Judgment.fail("a requirement was not met"), "strict"))
-			.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.TREAT_AS_FAIL))
-			.build();
+		// The tier's own strategy refused an exclusion, so its aggregate is a machinery error and
+		// the tier is undecided for control flow. The FAIL beneath it is still real, and one
+		// established violation is enough to reject.
 		Jury refusing = returning(refusedVerdict());
-
-		assertThat(tier.aggregateMayBeNotApplicable()).isFalse();
+		assertThat(refusing.aggregateMayBeNotApplicable()).isFalse();
 
 		Verdict verdict = CascadedJury.builder()
 			.tier("rubric", refusing, TierPolicy.REJECT_ON_ANY_FAIL)
@@ -386,8 +381,23 @@ class CascadeRuleTest {
 			.build()
 			.vote(CONTEXT);
 
-		assertThat(verdict.decision().basis()).isEqualTo(DecisionBasis.INDIVIDUAL_REJECTION);
-		assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.NOT_APPLICABLE_REFUSED);
+		assertThat(verdict.decision())
+			.isEqualTo(new Decision(DecisionKind.TIER, "rubric", DecisionBasis.INDIVIDUAL_REJECTION));
+		assertThat(verdict.aggregated().reasonCode()).as("a CHILD_UNDECIDED rejection keeps the child's own code")
+			.isEqualTo(JudgmentReasonCode.NOT_APPLICABLE_REFUSED);
+		assertThat(verdict.aggregated().status()).as("no FAIL and no score is manufactured")
+			.isNotEqualTo(JudgmentStatus.FAIL);
+		assertThat(verdict.aggregated().score()).isNull();
+		assertThat(verdict.individual()).extracting(Judgment::status)
+			.as("the rejecting tier's individuals are copied, including the FAIL that established it")
+			.containsExactly(JudgmentStatus.NOT_APPLICABLE, JudgmentStatus.FAIL);
+		CompositeAttempt attempt = verdict.compositeAttempts().get(0);
+		assertThat(attempt.dispositionReason()).isEqualTo(DispositionReason.CHILD_UNDECIDED);
+		assertThat(attempt.verdict().aggregated()).as("the child's verdict is unchanged")
+			.isEqualTo(verdict.aggregated());
+		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name)
+			.as("the cascade stopped, so the later tier never ran")
+			.containsExactly("rubric");
 	}
 
 	private static Verdict refusedVerdict() {
@@ -435,21 +445,80 @@ class CascadeRuleTest {
 	@DisplayName("10. a rejecting cascade nested in another cascade")
 	class RejectingCascadeNested {
 
+		/**
+		 * Test 9's cascade: an opaque tier that excludes without declaring it may, over a genuine
+		 * leaf FAIL, so the inner cascade stops on that established rejection with a parent-built
+		 * {@code ERROR stage_failed} root.
+		 * <p>
+		 * {@code innerCapable} changes where the inner cascade's aggregate capability comes from,
+		 * <em>not</em> whether it rejects. A cascade's capability is the union over its tiers, so a
+		 * capable tier configured behind the rejecting one makes the inner cascade capable while
+		 * leaving the D1 stop exactly where it was — which is what makes pinning both
+		 * configurations worth anything. Making the rejecting tier itself capable instead removes
+		 * the rejection: its exclusion is then honoured, no tier has a FAIL, and the cascade walks
+		 * on to a passing final tier. That is the shape this test used to have, and it is why the
+		 * guard stayed green when D1 stopping was disabled.
+		 * </p>
+		 * @param innerCapable whether the inner cascade declares its aggregate may be excluded
+		 * @return the inner cascade
+		 */
 		private Jury rejectingCascade(boolean innerCapable) {
-			Jury tier = innerCapable ? capableExcludingTier() : opaqueExcludingTier(Judgment.pass("a"),
-					Judgment.fail("b"));
 			return CascadedJury.builder()
-				.tier("rubric", tier, TierPolicy.REJECT_ON_ANY_FAIL)
-				.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+				.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")),
+						TierPolicy.REJECT_ON_ANY_FAIL)
+				.tier("semantic", innerCapable ? capableTier() : passingTier("OK"), TierPolicy.FINAL_TIER)
 				.build();
 		}
 
-		/** A capable tier whose exclusion is honoured, so the inner cascade adopts it. */
-		private Jury capableExcludingTier() {
+		/** A tier that declares its aggregate may be excluded, so the cascade holding it is capable. */
+		private Jury capableTier() {
 			return SimpleJury.builder()
-				.judge(new Conditional("conditional", Judgment.notApplicable(EXCLUSION)))
+				.judge(new Conditional("conditional", Judgment.pass("OK")))
 				.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
 				.build();
+		}
+
+		/**
+		 * The §6.5 selected determination: follow named {@code TIER_OUTCOME} edges, and stop at
+		 * {@code OWN}, {@code UNDECIDED}, or a tier reached by {@code INDIVIDUAL_REJECTION}.
+		 * @param root the item's root verdict
+		 * @return the verdict that classifies the item
+		 */
+		private Verdict selectedDetermination(Verdict root) {
+			Verdict current = root;
+			while (current.decision().kind() == DecisionKind.TIER
+					&& current.decision().basis() == DecisionBasis.TIER_OUTCOME) {
+				String named = current.decision().tier();
+				current = current.compositeAttempts()
+					.stream()
+					.filter(attempt -> attempt.relation() == CompositeRelation.CASCADE_TIER
+							&& attempt.name().equals(named))
+					.map(CompositeAttempt::verdict)
+					.findFirst()
+					.orElseThrow();
+			}
+			return current;
+		}
+
+		/** Assert that the inner cascade really did stop on a boundary-rejected D1. */
+		private void assertInnerIsABoundaryRejectedD1(Verdict inner) {
+			assertThat(inner.decision())
+				.as("the inner cascade stopped on the rejection the refused tier had established")
+				.isEqualTo(new Decision(DecisionKind.TIER, "rubric", DecisionBasis.INDIVIDUAL_REJECTION));
+			assertThat(inner.aggregated().status()).as("no FAIL is manufactured").isEqualTo(JudgmentStatus.ERROR);
+			assertThat(inner.aggregated().reasonCode()).as("the root is the parent-built machinery error")
+				.isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+			assertThat(inner.aggregated().score()).as("and no score of zero either").isNull();
+
+			CompositeAttempt refused = inner.compositeAttempts().get(0);
+			assertThat(refused.name()).isEqualTo("rubric");
+			assertThat(refused.disposition()).isEqualTo(AttemptDisposition.STAGE_FAILED);
+			assertThat(refused.dispositionReason()).isEqualTo(DispositionReason.UNDECLARED_NOT_APPLICABLE);
+			assertThat(refused.verdict().aggregated().status()).as("the child's own claim is kept unchanged")
+				.isEqualTo(JudgmentStatus.NOT_APPLICABLE);
+			assertThat(inner.individual()).extracting(Judgment::status)
+				.as("the rejecting tier's individuals are copied, FAIL included")
+				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.FAIL);
 		}
 
 		@ParameterizedTest
@@ -466,13 +535,26 @@ class CascadeRuleTest {
 
 			assertThat(verdict.decision()).isEqualTo(Decision.tier("inner", DecisionBasis.TIER_OUTCOME));
 			assertThat(verdict.compositeAttempts().get(0).disposition()).isEqualTo(AttemptDisposition.USED);
+
+			// What the outer copy marker alone never established: that there was a D1 to adopt.
+			assertInnerIsABoundaryRejectedD1(verdict.compositeAttempts().get(0).verdict());
+
+			Verdict selected = selectedDetermination(verdict);
+			assertThat(selected.decision().basis()).as("the chain ends at the inner rejection")
+				.isEqualTo(DecisionBasis.INDIVIDUAL_REJECTION);
+			assertThat(selected.decision().tier()).isEqualTo("rubric");
+			assertThat(selected.aggregated().status()).as("non-pass: in the denominator, not the numerator")
+				.isNotEqualTo(JudgmentStatus.PASS);
+			assertThat(selected.aggregated().reasonCode()).as("and one machinery failure, counted once")
+				.isEqualTo(JudgmentReasonCode.STAGE_FAILED);
 		}
 
-		@Test
+		@ParameterizedTest
+		@ValueSource(booleans = { true, false })
 		@DisplayName("as a rejecting non-final tier, its determination is adopted rather than refused")
-		void asARejectingNonFinalTier() {
+		void asARejectingNonFinalTier(boolean innerCapable) {
 			Verdict verdict = CascadedJury.builder()
-				.tier("inner", rejectingCascade(false), TierPolicy.REJECT_ON_ANY_FAIL)
+				.tier("inner", rejectingCascade(innerCapable), TierPolicy.REJECT_ON_ANY_FAIL)
 				.tier("outer-final", passingTier("OK"), TierPolicy.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
@@ -481,6 +563,12 @@ class CascadeRuleTest {
 			assertThat(verdict.aggregated().reasonCode()).as("still one machinery failure, counted once")
 				.isEqualTo(JudgmentReasonCode.STAGE_FAILED);
 			assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name).containsExactly("inner");
+
+			assertInnerIsABoundaryRejectedD1(verdict.compositeAttempts().get(0).verdict());
+
+			Verdict selected = selectedDetermination(verdict);
+			assertThat(selected.decision().basis()).isEqualTo(DecisionBasis.INDIVIDUAL_REJECTION);
+			assertThat(selected.aggregated().status()).isNotEqualTo(JudgmentStatus.PASS);
 		}
 
 	}

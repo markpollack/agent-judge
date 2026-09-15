@@ -335,12 +335,19 @@ class ExclusionCapabilityTest {
 		}
 
 		@Test
-		@DisplayName("the description derives the same bound the jury computes, from the portable form alone")
+		@DisplayName("the description states the same bound the jury computes, custom strategies included")
 		void theDescriptionAgreesWithTheJury() {
-			for (Jury jury : List.of(capableJury(),
+			// The custom-strategy cases are the ones that matter. A built-in declares its
+			// not-applicable policy, so a description derived from that declaration can only
+			// agree; a strategy that states its policy through the interface alone is where a
+			// derived description used to publish a confident, wrong false.
+			for (Jury jury : List.of(capableJury(), customCapableJury(),
 					Juries.meta(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE),
 							new NamedJury("rubric", capableJury())),
-					CascadedJury.builder().tier("only", capableJury(), TierPolicy.FINAL_TIER).build())) {
+					Juries.meta(new DelegatingExcluder(), new NamedJury("rubric", customCapableJury())),
+					CascadedJury.builder().tier("only", capableJury(), TierPolicy.FINAL_TIER).build(),
+					CascadedJury.builder().tier("only", customCapableJury(), TierPolicy.FINAL_TIER).build())) {
+				assertThat(jury.aggregateMayBeNotApplicable()).as("every jury here really can exclude").isTrue();
 				assertThat(jury.describe().aggregateMayBeNotApplicable()).isEqualTo(jury.aggregateMayBeNotApplicable());
 				assertThat(jury.describe().toPortable()).containsEntry("aggregateMayBeNotApplicable",
 						jury.aggregateMayBeNotApplicable());
@@ -508,6 +515,41 @@ class ExclusionCapabilityTest {
 			.judge(new Conditional("conditional", excluded()))
 			.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
 			.build();
+	}
+
+	/** The same capable jury, under a custom strategy that declares its policy only through the interface. */
+	private static Jury customCapableJury() {
+		return SimpleJury.builder()
+			.judge(new Conditional("conditional", excluded()))
+			.votingStrategy(new DelegatingExcluder())
+			.build();
+	}
+
+	/**
+	 * A compliant custom strategy: it delegates the reduction to a built-in configured to
+	 * exclude, states that policy through the method composition validation reads, and leaves
+	 * {@code describe()} at its supported default.
+	 */
+	private static final class DelegatingExcluder implements VotingStrategy {
+
+		private final VotingStrategy delegate = new ConsensusStrategy(ErrorPolicy.PROPAGATE,
+				NotApplicablePolicy.EXCLUDE);
+
+		@Override
+		public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
+			return this.delegate.aggregate(judgments, weights);
+		}
+
+		@Override
+		public String getName() {
+			return "delegatingExcluder";
+		}
+
+		@Override
+		public NotApplicablePolicy notApplicablePolicy() {
+			return NotApplicablePolicy.EXCLUDE;
+		}
+
 	}
 
 }
