@@ -93,6 +93,11 @@ produce a rejection indistinguishable from a real one in every stored field.
 
 ## Containment, and one cascade rule
 
+**Why this matters, measured rather than argued.** In one stored evaluation corpus, **20 of 39 runs
+had a jury that errored or abstained — and every one of them is recorded as a subject that did not
+pass.** The instrument failed and the subject was charged for it, silently, in more than half the
+corpus. That is the defect this section removes.
+
 - A strategy that throws, returns null, or returns an aggregate it was not entitled to produce now
   yields an `ERROR aggregation_failed` verdict marked undecided, with every judge's own result
   intact. Previously it discarded the whole jury and, inside a cascade, the enclosing tier.
