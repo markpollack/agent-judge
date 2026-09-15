@@ -288,7 +288,7 @@ class VerdictTest {
 			assertThatThrownBy(() -> Verdict.builder()
 				.aggregated(Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "a judge failed"))
 				.decision(Decision.undecided())
-				.build()).as("a judge's failure is not the instrument reaching no outcome")
+				.build(), "a judge's failure is not the instrument reaching no outcome")
 				.isInstanceOf(IllegalArgumentException.class);
 			assertThatCode(() -> Verdict.builder()
 				.aggregated(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
@@ -503,12 +503,12 @@ class VerdictTest {
 			Verdict tier = excludedTier();
 			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
 
-			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
-				.build()).as("copying the exclusion the cascade just refused would adopt the claim it rejected")
+			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build(),
+					"copying the exclusion the cascade just refused would adopt the claim it rejected")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("parent-authored");
-			assertThatThrownBy(() -> root(BROKEN, tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build())
-				.as("and any other machinery code would name a cause the parent did not observe")
+			assertThatThrownBy(() -> root(BROKEN, tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build(),
+					"and any other machinery code would name a cause the parent did not observe")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("parent-authored");
 			assertThatCode(() -> root(Judgment.error(JudgmentReasonCode.STAGE_FAILED,
@@ -522,18 +522,22 @@ class VerdictTest {
 			Verdict tier = undecidedTier();
 			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
 
-			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
-				.individual(List.of(FAILED))
-				.individualByName(Map.of("second", FAILED))
-				.seats(List.of(new Seat(0, "second", KeySource.DECLARED)))
-				.build()).as("a root that keeps only the failing individual has rewritten the tier's evidence")
+			assertThatThrownBy(
+					() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
+						.individual(List.of(FAILED))
+						.individualByName(Map.of("second", FAILED))
+						.seats(List.of(new Seat(0, "second", KeySource.DECLARED)))
+						.build(),
+					"a root that keeps only the failing individual has rewritten the tier's evidence")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("copies its individuals, map, weights and seats");
 
 			Verdict decided = tier(booleanPass("the tier was satisfied"), Decision.own(), PASSED);
-			assertThatThrownBy(() -> root(decided.aggregated(), decided, used(decided), DecisionBasis.TIER_OUTCOME)
-				.weights(Map.of("0", 2.0))
-				.build()).as("the weights are part of the copy, because they are the join to the seats")
+			assertThatThrownBy(
+					() -> root(decided.aggregated(), decided, used(decided), DecisionBasis.TIER_OUTCOME)
+						.weights(Map.of("0", 2.0))
+						.build(),
+					"the weights are part of the copy, because they are the join to the seats")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("copies its individuals, map, weights and seats");
 		}

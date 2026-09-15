@@ -868,14 +868,13 @@ class NormalizedJudgmentConformanceTest {
 		if (value instanceof Map<?, ?> map) {
 			assertThat(map.keySet()).as("%s keys must all be strings", path).allSatisfy(
 					key -> assertThat(key).isInstanceOf(String.class));
-			assertThatThrownBy(() -> ((Map<String, Object>) map).put("mutated", "x"))
-				.as("%s must be frozen", path)
+			assertThatThrownBy(() -> ((Map<String, Object>) map).put("mutated", "x"), "%s must be frozen", path)
 				.isInstanceOf(UnsupportedOperationException.class);
 			map.forEach((key, nested) -> assertPortableAndFrozen(nested, path + "." + key));
 			return;
 		}
 		if (value instanceof List<?> list) {
-			assertThatThrownBy(() -> ((List<Object>) list).add("mutated")).as("%s must be frozen", path)
+			assertThatThrownBy(() -> ((List<Object>) list).add("mutated"), "%s must be frozen", path)
 				.isInstanceOf(UnsupportedOperationException.class);
 			for (int index = 0; index < list.size(); index++) {
 				assertPortableAndFrozen(list.get(index), path + "[" + index + "]");

@@ -71,8 +71,8 @@ class JudgmentTest {
 		void scoreRejected() {
 			for (double bad : new double[] { -0.1, 1.1, Double.NaN, Double.POSITIVE_INFINITY,
 					Double.NEGATIVE_INFINITY }) {
-				assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, bad, null, null, "x", List.of(), Map.of()))
-					.as("score %s", bad)
+				assertThatThrownBy(() -> new Judgment(JudgmentStatus.PASS, bad, null, null, "x", List.of(), Map.of()),
+						"score %s", bad)
 					.isInstanceOf(IllegalArgumentException.class);
 			}
 		}
@@ -82,7 +82,7 @@ class JudgmentTest {
 		void builderScoreRejected() {
 			for (double bad : new double[] { -0.1, 1.1, Double.NaN, Double.POSITIVE_INFINITY,
 					Double.NEGATIVE_INFINITY }) {
-				assertThatThrownBy(() -> Judgment.builder().pass().score(bad).build()).as("score %s", bad)
+				assertThatThrownBy(() -> Judgment.builder().pass().score(bad).build(), "score %s", bad)
 					.isInstanceOf(IllegalArgumentException.class);
 			}
 		}
@@ -406,8 +406,8 @@ class JudgmentTest {
 			assertThat(MAPPER.writeValueAsString(JudgmentStatus.ABSTAIN)).isEqualTo("\"abstain\"");
 			assertThat(MAPPER.readValue("\"abstain\"", JudgmentStatus.class)).isEqualTo(JudgmentStatus.ABSTAIN);
 
-			assertThatThrownBy(() -> MAPPER.readValue("\"ABSTAIN\"", JudgmentStatus.class))
-				.as("upper case is refused rather than silently accepted")
+			assertThatThrownBy(() -> MAPPER.readValue("\"ABSTAIN\"", JudgmentStatus.class),
+					"upper case is refused rather than silently accepted")
 				.isInstanceOf(Exception.class);
 			assertThatThrownBy(() -> MAPPER.readValue("\"unknown\"", JudgmentStatus.class))
 				.isInstanceOf(Exception.class);

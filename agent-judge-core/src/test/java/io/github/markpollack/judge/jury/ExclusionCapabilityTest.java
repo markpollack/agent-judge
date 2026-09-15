@@ -193,7 +193,7 @@ class ExclusionCapabilityTest {
 			Judgment seat = jury.vote(context()).individual().get(0);
 			assertThat(seat.reasonCode()).as("the jury cannot name the judge, so it does not run it")
 				.isEqualTo(JudgmentReasonCode.JUDGE_METADATA_UNREADABLE);
-			assertThatThrownBy(jury::describe).as("describing it still fails loudly")
+			assertThatThrownBy(jury::describe, "describing it still fails loudly")
 				.isInstanceOf(IllegalArgumentException.class);
 		}
 

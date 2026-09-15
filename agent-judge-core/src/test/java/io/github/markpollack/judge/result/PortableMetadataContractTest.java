@@ -294,12 +294,12 @@ class PortableMetadataContractTest {
 			assertThatThrownBy(() -> withMetadata(singleton("instant", Instant.EPOCH)))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("metadata.instant");
-			assertThatThrownBy(() -> withMetadata(singleton("status", JudgmentStatus.PASS)))
-				.as("an enum is a Java identity, not a portable value; project it to its wire token")
+			assertThatThrownBy(() -> withMetadata(singleton("status", JudgmentStatus.PASS)),
+					"an enum is a Java identity, not a portable value; project it to its wire token")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("metadata.status");
-			assertThatThrownBy(() -> withMetadata(singleton("precise", new BigDecimal("0.1"))))
-				.as("arbitrary-precision types promise exactness that ordinary JSON consumers cannot keep")
+			assertThatThrownBy(() -> withMetadata(singleton("precise", new BigDecimal("0.1"))),
+					"arbitrary-precision types promise exactness that ordinary JSON consumers cannot keep")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("metadata.precise");
 			assertThatThrownBy(() -> withMetadata(singleton("huge", BigInteger.TEN)))

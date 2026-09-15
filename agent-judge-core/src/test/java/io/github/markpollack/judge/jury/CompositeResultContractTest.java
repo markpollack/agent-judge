@@ -115,8 +115,8 @@ class CompositeResultContractTest {
 		for (String invalid : List.of("", " ", " leading", "trailing\u2003", "\u00A0leading", "trailing\u00A0",
 				"e\u0301", "bad\u0001name",
 				"bad\u200Ename", "bad\u2028name", "bad\uD800name", "a".repeat(65))) {
-			assertThatThrownBy(() -> new NamedJury(invalid, returning(leaf("ok"))))
-				.as("invalid configured name %s", printable(invalid))
+			assertThatThrownBy(() -> new NamedJury(invalid, returning(leaf("ok"))), "invalid configured name %s",
+					printable(invalid))
 				.isInstanceOfAny(IllegalArgumentException.class, NullPointerException.class);
 		}
 
