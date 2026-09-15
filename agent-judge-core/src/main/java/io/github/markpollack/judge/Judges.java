@@ -98,8 +98,9 @@ public final class Judges {
 	 * display purposes.
 	 * </p>
 	 * @param judge the judge to wrap
-	 * @param name the judge name
+	 * @param name the judge name; must be non-blank, since a jury stores the judgment under it
 	 * @return named judge with metadata
+	 * @throws IllegalArgumentException if the name is blank
 	 */
 	public static NamedJudge named(Judge judge, String name) {
 		return named(judge, name, null, JudgeType.DETERMINISTIC);
@@ -108,9 +109,10 @@ public final class Judges {
 	/**
 	 * Wrap a judge with name and description.
 	 * @param judge the judge to wrap
-	 * @param name the judge name
+	 * @param name the judge name; must be non-blank, since a jury stores the judgment under it
 	 * @param description the judge description
 	 * @return named judge with metadata
+	 * @throws IllegalArgumentException if the name is blank
 	 */
 	public static NamedJudge named(Judge judge, String name, String description) {
 		return named(judge, name, description, JudgeType.DETERMINISTIC);
@@ -119,10 +121,11 @@ public final class Judges {
 	/**
 	 * Wrap a judge with complete metadata.
 	 * @param judge the judge to wrap
-	 * @param name the judge name
+	 * @param name the judge name; must be non-blank, since a jury stores the judgment under it
 	 * @param description the judge description
 	 * @param type the judge type
 	 * @return named judge with metadata
+	 * @throws IllegalArgumentException if the name is blank
 	 */
 	public static NamedJudge named(Judge judge, String name, String description, JudgeType type) {
 		// Absence, deliberately: a wrapper that manufactured a capability would let any judge

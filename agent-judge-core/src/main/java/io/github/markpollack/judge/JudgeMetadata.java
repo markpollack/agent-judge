@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge;
 
+import java.util.Objects;
+
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -32,7 +34,17 @@ import org.jspecify.annotations.Nullable;
  * of the fact that the judge sometimes excludes.
  * </p>
  *
- * @param name the judge name (e.g., "FileExistsJudge", "CorrectnessJudge")
+ * <h2>The name identifies a seat</h2>
+ * <p>
+ * A jury stores each judgment under the name its judge declared, so the name is an identity
+ * rather than a label, and a blank one is refused here — where the metadata is made, before any
+ * jury is assembled and long before any judge runs. Refusing it later, where a seat is built,
+ * would put the rejection outside the jury's containment: one blank-named seat would discard
+ * every other judge's result and collapse the enclosing cascade tier, which is a jury voting
+ * with fewer judges than it lists.
+ * </p>
+ *
+ * @param name the judge name (e.g., "FileExistsJudge", "CorrectnessJudge"); must be non-blank
  * @param description human-readable description of what this judge evaluates
  * @param type the judge type (deterministic, LLM-powered, hybrid, or agent)
  * @param notApplicableWhen the condition under which this judge may return
@@ -43,15 +55,25 @@ import org.jspecify.annotations.Nullable;
 public record JudgeMetadata(String name, String description, JudgeType type, @Nullable String notApplicableWhen) {
 
 	/**
-	 * Validate the exclusion declaration.
+	 * Validate the name and the exclusion declaration.
+	 * <p>
+	 * A blank name is refused because a jury keys judgments by it: a seat it cannot be built
+	 * from must never be reached with judges' work already spent behind it.
+	 * </p>
 	 * <p>
 	 * A blank declaration is refused rather than read as absence: it would claim a capability
 	 * while saying nothing about when it applies, which is the one thing the declaration is
 	 * for. A judge that never excludes passes {@code null}.
 	 * </p>
-	 * @throws IllegalArgumentException if {@code notApplicableWhen} is present and blank
+	 * @throws IllegalArgumentException if {@code name} is blank, or if {@code notApplicableWhen}
+	 * is present and blank
+	 * @throws NullPointerException if {@code name} is null
 	 */
 	public JudgeMetadata {
+		if (Objects.requireNonNull(name, "name must not be null").isBlank()) {
+			throw new IllegalArgumentException("name must be non-blank: a jury stores each judgment under the name its "
+					+ "judge declared, and a blank name identifies no seat");
+		}
 		if (notApplicableWhen != null && notApplicableWhen.isBlank()) {
 			throw new IllegalArgumentException(
 					"notApplicableWhen must be non-blank when present; use null when the judge never excludes a subject");
