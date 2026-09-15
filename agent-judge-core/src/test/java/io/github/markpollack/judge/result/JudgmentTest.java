@@ -193,6 +193,43 @@ class JudgmentTest {
 				.isInstanceOf(IllegalArgumentException.class);
 		}
 
+		/**
+		 * The three-argument scale has two guards no other input reaches, and neither is
+		 * redundant. A non-finite argument is also caught downstream, but with a diagnostic
+		 * naming the normalized score or the width of the scale rather than the argument the
+		 * caller actually supplied, so only the message separates the guard from its
+		 * downstream. The width guard has no downstream at all: for finite arguments whose
+		 * difference overflows to infinity, the division yields an ordinary finite score and
+		 * nothing later objects. The case above uses NaN on the one-argument overload only,
+		 * which reaches neither guard.
+		 */
+		@Test
+		@DisplayName("raw-range scoring names the argument that was not finite, and refuses a scale that overflows")
+		void rawRangeScaleDiagnostics() {
+			assertThatThrownBy(() -> Judgment.scored(Double.NaN, 0.0, 10.0), "a non-finite value")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessage("value, minimum and maximum must all be finite");
+			assertThatThrownBy(() -> Judgment.scored(5.0, Double.NEGATIVE_INFINITY, 10.0), "a non-finite minimum")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessage("value, minimum and maximum must all be finite");
+			assertThatThrownBy(() -> Judgment.scored(5.0, 0.0, Double.POSITIVE_INFINITY), "a non-finite maximum")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessage("value, minimum and maximum must all be finite");
+
+			assertThatThrownBy(() -> Judgment.scored(0.0, -Double.MAX_VALUE, Double.MAX_VALUE),
+					"finite bounds whose difference overflows to infinity")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessage("maximum - minimum must be finite");
+
+			// The widest scale that does not overflow is still normalized, so the guard refuses
+			// the overflow rather than large magnitudes.
+			assertThat(Judgment.scored(0.0, -Double.MAX_VALUE / 2, Double.MAX_VALUE / 2)
+				.passingAt(0.5)
+				.reasoning("x")
+				.build()
+				.score()).isEqualTo(0.5);
+		}
+
 		@Test
 		@DisplayName("builder requires an explicit outcome selection")
 		void outcomeFirstBuilder() {

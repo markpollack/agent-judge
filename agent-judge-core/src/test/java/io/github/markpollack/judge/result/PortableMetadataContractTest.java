@@ -244,6 +244,16 @@ class PortableMetadataContractTest {
 			assertThatThrownBy(() -> withMetadata(singleton("lonelyLow", "\uDC4D")))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("metadata.lonelyLow");
+			// Both cases above have a unit after the surrogate to inspect. A high surrogate in
+			// the last position has none, and the scan must report that rather than read past
+			// the end of the string, so the expected type carries the claim here.
+			assertThatThrownBy(() -> withMetadata(singleton("trailingHigh", "ok\uD83D")),
+					"a string whose last unit is a high surrogate")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("metadata.trailingHigh")
+				.hasMessageContaining("unpaired surrogate at index 2");
+			// The paired form of the same character is still accepted.
+			assertThatCode(() -> withMetadata(singleton("paired", "ok🚀"))).doesNotThrowAnyException();
 		}
 
 		@Test
