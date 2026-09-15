@@ -273,6 +273,161 @@ class VerdictTest {
 
 	}
 
+	/**
+	 * The ordinary hand-built verdict, in one call.
+	 *
+	 * <p>
+	 * {@link Verdict#of} is shorthand and nothing else, so the claim it has to earn is that it
+	 * produces <em>exactly</em> what the long form produces — not that its parts look plausible.
+	 * Each equivalence case below therefore writes the builder call out in full, by hand, and
+	 * compares the whole record; a shorthand compared against a shorthand would agree with itself
+	 * however wrong it was. The assertions that follow name the individual derivations, because a
+	 * whole-record comparison says the two agree without saying what they agree on.
+	 * </p>
+	 */
+	@Nested
+	@DisplayName("Verdict.of seats declared names in map order")
+	class OrdinaryDeclaredVerdicts {
+
+		@Test
+		@DisplayName("two judgments: the same record the full builder call produces")
+		void twoJudgmentsEqualTheFullBuilderCall() {
+			Judgment style = booleanPass("Judge 1");
+			Judgment coverage = booleanFail("Judge 2");
+			Map<String, Judgment> byName = named("style", style, "coverage", coverage);
+
+			Verdict shorthand = Verdict.of(booleanFail("one judge was not satisfied"), byName);
+			Verdict longhand = Verdict.builder()
+				.aggregated(booleanFail("one judge was not satisfied"))
+				.individual(List.of(style, coverage))
+				.individualByName(byName)
+				.seats(List.of(new Seat(0, "style", KeySource.DECLARED), new Seat(1, "coverage", KeySource.DECLARED)))
+				.decision(Decision.own())
+				.build();
+
+			assertThat(shorthand).isEqualTo(longhand).hasSameHashCodeAs(longhand);
+			assertThat(shorthand.weights()).as("it configures no weights, because nobody configured any").isEmpty();
+			assertThat(shorthand.compositeAttempts()).as("a leaf entered no stage").isEmpty();
+		}
+
+		@Test
+		@DisplayName("three judgments: the same record the full builder call produces")
+		void threeJudgmentsEqualTheFullBuilderCall() {
+			Judgment style = booleanPass("Judge 1");
+			Judgment coverage = booleanFail("Judge 2");
+			Judgment licence = booleanPass("Judge 3");
+			Map<String, Judgment> byName = new LinkedHashMap<>();
+			byName.put("style", style);
+			byName.put("coverage", coverage);
+			byName.put("licence", licence);
+
+			Verdict shorthand = Verdict.of(booleanFail("one judge of three was not satisfied"), byName);
+			Verdict longhand = Verdict.builder()
+				.aggregated(booleanFail("one judge of three was not satisfied"))
+				.individual(List.of(style, coverage, licence))
+				.individualByName(byName)
+				.seats(List.of(new Seat(0, "style", KeySource.DECLARED), new Seat(1, "coverage", KeySource.DECLARED),
+						new Seat(2, "licence", KeySource.DECLARED)))
+				.decision(Decision.own())
+				.build();
+
+			assertThat(shorthand).isEqualTo(longhand).hasSameHashCodeAs(longhand);
+			assertThat(shorthand.decision()).isEqualTo(Decision.own());
+		}
+
+		@Test
+		@DisplayName("every seat is a declared identity, seated from 0 and strictly increasing")
+		void seatsAreDeclaredAndStrictlyIncreasingFromZero() {
+			Map<String, Judgment> byName = new LinkedHashMap<>();
+			byName.put("style", booleanPass("Judge 1"));
+			byName.put("coverage", booleanPass("Judge 2"));
+			byName.put("licence", booleanPass("Judge 3"));
+
+			Verdict verdict = Verdict.of(booleanPass("all three were satisfied"), byName);
+
+			assertThat(verdict.seats()).extracting(Seat::position).containsExactly(0, 1, 2);
+			assertThat(verdict.seats()).extracting(Seat::keySource)
+				.as("the caller supplied names, so the keys are identities rather than positions")
+				.containsOnly(KeySource.DECLARED);
+			assertThat(verdict.seats()).extracting(Seat::verdictKey).containsExactly("style", "coverage", "licence");
+		}
+
+		@Test
+		@DisplayName("the ordered list and the seats both follow the map's encounter order")
+		void encounterOrderDecidesTheSeating() {
+			Judgment zulu = booleanPass("Z");
+			Judgment alpha = booleanFail("A");
+			Judgment mike = booleanPass("M");
+			Map<String, Judgment> byName = new LinkedHashMap<>();
+			byName.put("zulu", zulu);
+			byName.put("alpha", alpha);
+			byName.put("mike", mike);
+
+			Verdict verdict = Verdict.of(booleanFail("the second judge was not satisfied"), byName);
+
+			assertThat(verdict.individual()).as("the order the map was populated in, not an alphabetical one")
+				.containsExactly(zulu, alpha, mike);
+			assertThat(verdict.seats()).containsExactly(new Seat(0, "zulu", KeySource.DECLARED),
+					new Seat(1, "alpha", KeySource.DECLARED), new Seat(2, "mike", KeySource.DECLARED));
+			// The point of the seats is the join, so assert the join itself rather than the two
+			// orders separately: seat i must lead from position i back to the judgment that sat there.
+			for (Seat seat : verdict.seats()) {
+				assertThat(verdict.individualByName().get(seat.verdictKey()))
+					.as("seat %d is keyed '%s'", seat.position(), seat.verdictKey())
+					.isSameAs(verdict.individual().get(seat.position()));
+			}
+		}
+
+		@Test
+		@DisplayName("what it refuses, for the reasons Verdict.single refuses the same things")
+		void refusesWhatItCannotSeat() {
+			Map<String, Judgment> one = Map.of("style", booleanPass("ok"));
+
+			assertThatThrownBy(() -> Verdict.of(null, one)).isInstanceOf(NullPointerException.class)
+				.hasMessageContaining("aggregated judgment");
+			assertThatThrownBy(() -> Verdict.of(booleanPass("agg"), null)).isInstanceOf(NullPointerException.class)
+				.hasMessageContaining("individualByName");
+			assertThatThrownBy(() -> Verdict.of(booleanPass("agg"), Map.of()),
+					"a verdict that reduced nothing is not this shape; it is a builder call with an UNDECIDED decision")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("at least one judgment");
+
+			Map<String, Judgment> blankKey = new LinkedHashMap<>();
+			blankKey.put("style", booleanPass("ok"));
+			blankKey.put("  ", booleanPass("and who said this?"));
+			assertThatThrownBy(() -> Verdict.of(booleanPass("agg"), blankKey),
+					"a blank key is a seat that cannot say who voted")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("non-blank");
+
+			Map<String, Judgment> nullKey = new LinkedHashMap<>();
+			nullKey.put(null, booleanPass("ok"));
+			assertThatThrownBy(() -> Verdict.of(booleanPass("agg"), nullKey))
+				.isInstanceOf(NullPointerException.class);
+
+			Map<String, Judgment> nullJudgment = new LinkedHashMap<>();
+			nullJudgment.put("style", null);
+			assertThatThrownBy(() -> Verdict.of(booleanPass("agg"), nullJudgment))
+				.isInstanceOf(NullPointerException.class)
+				.hasMessageContaining("style");
+		}
+
+		@Test
+		@DisplayName("the caller's map is copied, not captured")
+		void theCallersMapIsCopied() {
+			Map<String, Judgment> byName = new LinkedHashMap<>();
+			byName.put("style", booleanPass("Judge 1"));
+
+			Verdict verdict = Verdict.of(booleanPass("agg"), byName);
+			byName.put("coverage", booleanFail("Judge 2"));
+
+			assertThat(verdict.individualByName()).hasSize(1);
+			assertThat(verdict.individual()).hasSize(1);
+			assertThat(verdict.seats()).hasSize(1);
+		}
+
+	}
+
 	@Nested
 	@DisplayName("Decisions are checked against the verdict that carries them")
 	class Decisions {

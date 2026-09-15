@@ -260,6 +260,83 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 			.build();
 	}
 
+	/**
+	 * Create the complete verdict of a jury whose judges all declared a distinct name.
+	 * <p>
+	 * This is the ordinary hand-built case: one judgment per declared name, seated in the order
+	 * the map hands them over, aggregated by this jury itself. The ordered
+	 * {@link #individual()} list is the map's values in encounter order, seat <em>i</em> keys the
+	 * <em>i</em>-th entry as {@link KeySource#DECLARED}, and the decision is
+	 * {@link Decision#own()}. It produces exactly what the full builder call produces:
+	 * </p>
+	 * <pre>{@code
+	 * Map<String, Judgment> byName = new LinkedHashMap<>();
+	 * byName.put("style", styleResult);
+	 * byName.put("coverage", coverageResult);
+	 *
+	 * Verdict.of(aggregate, byName);
+	 *
+	 * // the same verdict, written out
+	 * Verdict.builder()
+	 *     .aggregated(aggregate)
+	 *     .individual(List.of(styleResult, coverageResult))
+	 *     .individualByName(byName)
+	 *     .seats(List.of(new Seat(0, "style", KeySource.DECLARED),
+	 *                    new Seat(1, "coverage", KeySource.DECLARED)))
+	 *     .decision(Decision.own())
+	 *     .build();
+	 * }</pre>
+	 * <p>
+	 * <b>Pass an ordered map.</b> Both the ordered list and the seats are taken from the same
+	 * encounter order, so whatever order the map iterates in is the order the judgments are
+	 * reported and attributed in. {@link java.util.LinkedHashMap} and
+	 * {@link java.util.SequencedMap} keep the order they were populated in;
+	 * {@link Map#of(Object, Object) Map.of} does not specify one, so use it only when the
+	 * positions genuinely do not matter.
+	 * </p>
+	 * <p>
+	 * <b>What this does not cover.</b> A map key is unique and a map value is one judgment, so
+	 * this factory cannot express two seats sharing one key — which is how a duplicate declared
+	 * name is recorded — and it claims {@code DECLARED} for every key, which a positional key
+	 * such as {@code "Judge#2"} is not. It also seats the entries at 0..n-1 with no gaps, where a
+	 * meta-jury that could not use a member leaves one. Those verdicts are built with
+	 * {@link #builder()} and explicit seats. For a one-judge jury, {@link #single} says so more
+	 * directly.
+	 * </p>
+	 * @param aggregated the jury's own aggregate of the given judgments
+	 * @param individualByName one judgment per declared judge name, in seating order
+	 * @return a complete multi-judgment verdict
+	 * @throws NullPointerException if either argument, a key, or a judgment is null
+	 * @throws IllegalArgumentException if the map is empty or any key is blank
+	 * @since 0.17.0
+	 */
+	public static Verdict of(Judgment aggregated, Map<String, Judgment> individualByName) {
+		Objects.requireNonNull(aggregated, "aggregated judgment must not be null");
+		Objects.requireNonNull(individualByName, "individualByName must not be null");
+		if (individualByName.isEmpty()) {
+			throw new IllegalArgumentException("individualByName must hold at least one judgment; "
+					+ "a verdict that reduced nothing is built with the builder and an UNDECIDED decision");
+		}
+		List<Judgment> individual = new ArrayList<>(individualByName.size());
+		List<Seat> seats = new ArrayList<>(individualByName.size());
+		for (Map.Entry<String, Judgment> entry : individualByName.entrySet()) {
+			String name = Objects.requireNonNull(entry.getKey(), "a judge name must not be null");
+			if (name.isBlank()) {
+				throw new IllegalArgumentException("a judge name must be non-blank");
+			}
+			individual.add(Objects.requireNonNull(entry.getValue(), "the judgment for '" + name
+					+ "' must not be null"));
+			seats.add(new Seat(seats.size(), name, KeySource.DECLARED));
+		}
+		return builder()
+			.aggregated(aggregated)
+			.individual(individual)
+			.individualByName(individualByName)
+			.seats(seats)
+			.decision(Decision.own())
+			.build();
+	}
+
 	/** Builder for {@link Verdict}. */
 	public static class Builder {
 
