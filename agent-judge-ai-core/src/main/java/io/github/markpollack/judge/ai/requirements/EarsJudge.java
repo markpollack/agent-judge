@@ -214,14 +214,14 @@ public final class EarsJudge {
 			Map<String, String> evidence = new LinkedHashMap<>();
 			parse(text, roster.keySet(), outcome, evidence);
 
-			// A criterion the audit skipped is not a criterion that passed.
+			// A criterion the audit skipped is not a criterion that passed. It is an instrument
+			// failure like any protocol breach, so it is collected here and reported through the
+			// same evidence-preserving rollup rather than returned on the spot: the criteria the
+			// audit did establish were still established, and discarding them would make the
+			// instrument's mistake cost more than it should.
 			List<String> unanswered = roster.keySet().stream().filter(id -> !outcome.containsKey(id)).toList();
-			if (!unanswered.isEmpty()) {
-				return Judgment.error("The audit did not answer " + unanswered.size() + " of "
-					+ roster.size() + " criteria, beginning with " + unanswered.get(0));
-			}
 
-			// The guard held. Logged so the passing case is as legible as the failing one:
+			// Logged either way, so the passing case is as legible as the failing one:
 			// "N of N answered" is the evidence that the roster was checked, not assumed.
 			logger.info("{} of {} criteria answered", outcome.size(), roster.size());
 
@@ -235,6 +235,12 @@ public final class EarsJudge {
 				String id = criterion.id();
 				JudgmentStatus status = outcome.get(id);
 				String why = evidence.get(id);
+				if (status == null) {
+					// Unanswered. No Check, because nothing about this criterion was assessed and
+					// a manufactured one would read as a finding about the subject; and no
+					// exclusion, because nobody excluded it. The gap is named in the reasoning.
+					continue;
+				}
 				switch (status) {
 					case PASS -> {
 						passed++;
@@ -270,22 +276,31 @@ public final class EarsJudge {
 				}
 			}
 
-			// PASS means every criterion that applied was affirmatively established.
-			JudgmentStatus verdict = !protocolErrors.isEmpty() ? JudgmentStatus.ERROR
+			// PASS means every criterion that applied was affirmatively established. An
+			// incomplete roster outranks every finding: a conjunction over part of a
+			// specification says nothing about the whole of it.
+			String rosterError = unanswered.isEmpty() ? null
+				: "The audit did not answer " + unanswered.size() + " of " + roster.size()
+					+ " criteria, beginning with " + unanswered.get(0);
+
+			JudgmentStatus verdict = rosterError != null || !protocolErrors.isEmpty() ? JudgmentStatus.ERROR
 				: failed > 0 ? JudgmentStatus.FAIL
 				: !abstained.isEmpty() ? JudgmentStatus.ABSTAIN
 				: excluded.size() == roster.size() ? JudgmentStatus.NOT_APPLICABLE
 				: JudgmentStatus.PASS;
 
-			String reasoning = verdict == JudgmentStatus.ERROR
-				? "The audit broke protocol: " + String.join("; ", protocolErrors)
+			String reasoning = rosterError != null
+				? rosterError + (protocolErrors.isEmpty() ? ""
+					: "; the audit also broke protocol: " + String.join("; ", protocolErrors))
+				: !protocolErrors.isEmpty() ? "The audit broke protocol: " + String.join("; ", protocolErrors)
 				: summarize(passed, failed, abstained, excluded.size(), roster.size());
 
 			// The rollup happens in Java, not in the model, and this line says so: the verdict
 			// and the requirement that bound it. On the ABSTAIN path that identifier is the
 			// fact a jury would otherwise absorb -- see FixedRosterAggregationTests.
 			logger.info("verdict {} - {}", verdict, verdict == JudgmentStatus.PASS ? reasoning
-				: verdict == JudgmentStatus.ERROR ? protocolErrors.get(0)
+				: verdict == JudgmentStatus.ERROR
+					? (rosterError != null ? unanswered.get(0) + " was not answered" : protocolErrors.get(0))
 				: !abstained.isEmpty() && failed == 0 ? abstained.get(0) + " could not be established"
 				: failed > 0 ? failed + " of " + roster.size() + " violated" : reasoning);
 
