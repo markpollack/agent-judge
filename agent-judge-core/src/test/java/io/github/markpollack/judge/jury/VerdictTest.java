@@ -645,9 +645,21 @@ class VerdictTest {
 					AttemptDisposition.STAGE_FAILED, DispositionReason.EXECUTION_FAILED, child, null))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("EXECUTION_FAILED");
+			// Both reasons describe a verdict the stage returned, and the rule is one claim per
+			// reason rather than one claim about the pair. Asserting only CHILD_UNDECIDED would
+			// leave the other reason free to lose its verdict with nothing turning red, so each
+			// is witnessed on its own and named in what it is asserted to report.
 			assertThatThrownBy(() -> new CompositeAttempt("m", CompositeRelation.META_MEMBER, null,
 					AttemptDisposition.STAGE_FAILED, DispositionReason.CHILD_UNDECIDED, null, failure))
 				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("CHILD_UNDECIDED")
+				.hasMessageContaining("must keep it");
+			assertThatThrownBy(() -> new CompositeAttempt("m", CompositeRelation.META_MEMBER, null,
+					AttemptDisposition.STAGE_FAILED, DispositionReason.UNDECLARED_NOT_APPLICABLE, null, failure),
+					"an attempt claiming the child returned an exclusion the parent refused, while keeping no "
+							+ "verdict, is the false marker this rule exists to refuse")
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("UNDECLARED_NOT_APPLICABLE")
 				.hasMessageContaining("must keep it");
 		}
 
