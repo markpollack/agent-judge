@@ -1,0 +1,454 @@
+{
+  "aggregated": {
+    "status": "error",
+    "reasoning": "1 of 2 judgments errored and the error policy is propagate",
+    "checks": [],
+    "metadata": {
+      "aggregation": {
+        "strategy": "consensus",
+        "errorPolicy": "propagate",
+        "inputCount": 2,
+        "eligibleCount": 0,
+        "explicitAbstainCount": 0,
+        "errorCount": 1,
+        "ignoredErrorCount": 0,
+        "errorsTreatedAsAbstainCount": 0,
+        "errorsTreatedAsFailCount": 0
+      }
+    }
+  },
+  "individual": [
+    {
+      "status": "error",
+      "reasoning": "Failed to parse quality response after retry: Unrecognized token 'There': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')\n at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 1]",
+      "checks": [],
+      "metadata": {}
+    },
+    {
+      "status": "pass",
+      "score": 0.6,
+      "reasoning": "gold recall 3/5; placement 3/3 at-or-above expert placement",
+      "checks": [
+        {
+          "name": "G1",
+          "passed": false,
+          "message": "Aggregate boundaries / cross-aggregate object references — NOT FOUND"
+        },
+        {
+          "name": "G2",
+          "passed": true,
+          "message": "Anemic domain model / mutable accumulator — found (Issue 2): \"neither guards a single lifecycle rule. Every field is settable through a public, uncondit…\""
+        },
+        {
+          "name": "placement:G2",
+          "passed": true,
+          "message": "placed at CRITICAL (expected ≥ CRITICAL)"
+        },
+        {
+          "name": "G3",
+          "passed": false,
+          "message": "No domain events / reflection-based listeners — NOT FOUND"
+        },
+        {
+          "name": "G4",
+          "passed": true,
+          "message": "JobRepository interface bloat / repository-per-aggregate-root — found (Issue 3): \"JobRepository is one repository spanning three aggregates, doubling as a read model and as…\""
+        },
+        {
+          "name": "placement:G4",
+          "passed": true,
+          "message": "placed at CRITICAL (expected ≥ WARNING)"
+        },
+        {
+          "name": "G5",
+          "passed": true,
+          "message": "Context object proliferation — found (Issue 8): \"The shared suffix implies five members of one family — a nested hierarchy of scopes, say. …\""
+        },
+        {
+          "name": "placement:G5",
+          "passed": true,
+          "message": "placed at CRITICAL (expected ≥ WARNING)"
+        }
+      ],
+      "metadata": {
+        "register": "spring-batch",
+        "recall": 0.6,
+        "placementAtOrAbove": 3
+      }
+    }
+  ],
+  "individualByName": {
+    "dddQuality": {
+      "status": "error",
+      "reasoning": "Failed to parse quality response after retry: Unrecognized token 'There': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')\n at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 1]",
+      "checks": [],
+      "metadata": {}
+    },
+    "goldRecall": {
+      "status": "pass",
+      "score": 0.6,
+      "reasoning": "gold recall 3/5; placement 3/3 at-or-above expert placement",
+      "checks": [
+        {
+          "name": "G1",
+          "passed": false,
+          "message": "Aggregate boundaries / cross-aggregate object references — NOT FOUND"
+        },
+        {
+          "name": "G2",
+          "passed": true,
+          "message": "Anemic domain model / mutable accumulator — found (Issue 2): \"neither guards a single lifecycle rule. Every field is settable through a public, uncondit…\""
+        },
+        {
+          "name": "placement:G2",
+          "passed": true,
+          "message": "placed at CRITICAL (expected ≥ CRITICAL)"
+        },
+        {
+          "name": "G3",
+          "passed": false,
+          "message": "No domain events / reflection-based listeners — NOT FOUND"
+        },
+        {
+          "name": "G4",
+          "passed": true,
+          "message": "JobRepository interface bloat / repository-per-aggregate-root — found (Issue 3): \"JobRepository is one repository spanning three aggregates, doubling as a read model and as…\""
+        },
+        {
+          "name": "placement:G4",
+          "passed": true,
+          "message": "placed at CRITICAL (expected ≥ WARNING)"
+        },
+        {
+          "name": "G5",
+          "passed": true,
+          "message": "Context object proliferation — found (Issue 8): \"The shared suffix implies five members of one family — a nested hierarchy of scopes, say. …\""
+        },
+        {
+          "name": "placement:G5",
+          "passed": true,
+          "message": "placed at CRITICAL (expected ≥ WARNING)"
+        }
+      ],
+      "metadata": {
+        "register": "spring-batch",
+        "recall": 0.6,
+        "placementAtOrAbove": 3
+      }
+    }
+  },
+  "weights": {
+    "0": 1.0,
+    "1": 1.0
+  },
+  "compositeAttempts": [
+    {
+      "name": "artifacts",
+      "relation": "cascade_tier",
+      "policy": "REJECT_ON_ANY_FAIL",
+      "verdict": {
+        "aggregated": {
+          "status": "pass",
+          "reasoning": "Unanimous consensus: all 1 applicable judge(s) passed",
+          "checks": [],
+          "metadata": {
+            "aggregation": {
+              "strategy": "consensus",
+              "errorPolicy": "propagate",
+              "inputCount": 1,
+              "eligibleCount": 1,
+              "explicitAbstainCount": 0,
+              "errorCount": 0,
+              "ignoredErrorCount": 0,
+              "errorsTreatedAsAbstainCount": 0,
+              "errorsTreatedAsFailCount": 0,
+              "passCount": 1,
+              "failCount": 0
+            }
+          }
+        },
+        "individual": [
+          {
+            "status": "pass",
+            "reasoning": "File exists at ddd-review.md",
+            "checks": [
+              {
+                "name": "file_exists",
+                "passed": true,
+                "message": "File found at ddd-review.md"
+              }
+            ],
+            "metadata": {}
+          }
+        ],
+        "individualByName": {
+          "structure:ddd-review.md": {
+            "status": "pass",
+            "reasoning": "File exists at ddd-review.md",
+            "checks": [
+              {
+                "name": "file_exists",
+                "passed": true,
+                "message": "File found at ddd-review.md"
+              }
+            ],
+            "metadata": {}
+          }
+        },
+        "weights": {
+          "0": 1.0
+        },
+        "compositeAttempts": []
+      }
+    },
+    {
+      "name": "structure",
+      "relation": "cascade_tier",
+      "policy": "REJECT_ON_ANY_FAIL",
+      "verdict": {
+        "aggregated": {
+          "status": "pass",
+          "reasoning": "Unanimous consensus: all 1 applicable judge(s) passed",
+          "checks": [],
+          "metadata": {
+            "aggregation": {
+              "strategy": "consensus",
+              "errorPolicy": "propagate",
+              "inputCount": 1,
+              "eligibleCount": 1,
+              "explicitAbstainCount": 0,
+              "errorCount": 0,
+              "ignoredErrorCount": 0,
+              "errorsTreatedAsAbstainCount": 0,
+              "errorsTreatedAsFailCount": 0,
+              "passCount": 1,
+              "failCount": 0
+            }
+          }
+        },
+        "individual": [
+          {
+            "status": "pass",
+            "reasoning": "Report structure valid",
+            "checks": [
+              {
+                "name": "sections",
+                "passed": true,
+                "message": "All 7 required sections present"
+              },
+              {
+                "name": "findings_present",
+                "passed": true,
+                "message": "34 findings parsed"
+              },
+              {
+                "name": "related_resolve",
+                "passed": true,
+                "message": "All Related references resolve"
+              },
+              {
+                "name": "critical_locations",
+                "passed": true,
+                "message": "All critical findings carry a Location"
+              },
+              {
+                "name": "report_length",
+                "passed": true,
+                "message": "1015 lines"
+              }
+            ],
+            "metadata": {}
+          }
+        ],
+        "individualByName": {
+          "reportStructure": {
+            "status": "pass",
+            "reasoning": "Report structure valid",
+            "checks": [
+              {
+                "name": "sections",
+                "passed": true,
+                "message": "All 7 required sections present"
+              },
+              {
+                "name": "findings_present",
+                "passed": true,
+                "message": "34 findings parsed"
+              },
+              {
+                "name": "related_resolve",
+                "passed": true,
+                "message": "All Related references resolve"
+              },
+              {
+                "name": "critical_locations",
+                "passed": true,
+                "message": "All critical findings carry a Location"
+              },
+              {
+                "name": "report_length",
+                "passed": true,
+                "message": "1015 lines"
+              }
+            ],
+            "metadata": {}
+          }
+        },
+        "weights": {
+          "0": 1.0
+        },
+        "compositeAttempts": []
+      }
+    },
+    {
+      "name": "quality",
+      "relation": "cascade_tier",
+      "policy": "FINAL_TIER",
+      "verdict": {
+        "aggregated": {
+          "status": "error",
+          "reasoning": "1 of 2 judgments errored and the error policy is propagate",
+          "checks": [],
+          "metadata": {
+            "aggregation": {
+              "strategy": "consensus",
+              "errorPolicy": "propagate",
+              "inputCount": 2,
+              "eligibleCount": 0,
+              "explicitAbstainCount": 0,
+              "errorCount": 1,
+              "ignoredErrorCount": 0,
+              "errorsTreatedAsAbstainCount": 0,
+              "errorsTreatedAsFailCount": 0
+            }
+          }
+        },
+        "individual": [
+          {
+            "status": "error",
+            "reasoning": "Failed to parse quality response after retry: Unrecognized token 'There': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')\n at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 1]",
+            "checks": [],
+            "metadata": {}
+          },
+          {
+            "status": "pass",
+            "score": 0.6,
+            "reasoning": "gold recall 3/5; placement 3/3 at-or-above expert placement",
+            "checks": [
+              {
+                "name": "G1",
+                "passed": false,
+                "message": "Aggregate boundaries / cross-aggregate object references — NOT FOUND"
+              },
+              {
+                "name": "G2",
+                "passed": true,
+                "message": "Anemic domain model / mutable accumulator — found (Issue 2): \"neither guards a single lifecycle rule. Every field is settable through a public, uncondit…\""
+              },
+              {
+                "name": "placement:G2",
+                "passed": true,
+                "message": "placed at CRITICAL (expected ≥ CRITICAL)"
+              },
+              {
+                "name": "G3",
+                "passed": false,
+                "message": "No domain events / reflection-based listeners — NOT FOUND"
+              },
+              {
+                "name": "G4",
+                "passed": true,
+                "message": "JobRepository interface bloat / repository-per-aggregate-root — found (Issue 3): \"JobRepository is one repository spanning three aggregates, doubling as a read model and as…\""
+              },
+              {
+                "name": "placement:G4",
+                "passed": true,
+                "message": "placed at CRITICAL (expected ≥ WARNING)"
+              },
+              {
+                "name": "G5",
+                "passed": true,
+                "message": "Context object proliferation — found (Issue 8): \"The shared suffix implies five members of one family — a nested hierarchy of scopes, say. …\""
+              },
+              {
+                "name": "placement:G5",
+                "passed": true,
+                "message": "placed at CRITICAL (expected ≥ WARNING)"
+              }
+            ],
+            "metadata": {
+              "register": "spring-batch",
+              "recall": 0.6,
+              "placementAtOrAbove": 3
+            }
+          }
+        ],
+        "individualByName": {
+          "dddQuality": {
+            "status": "error",
+            "reasoning": "Failed to parse quality response after retry: Unrecognized token 'There': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')\n at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 1]",
+            "checks": [],
+            "metadata": {}
+          },
+          "goldRecall": {
+            "status": "pass",
+            "score": 0.6,
+            "reasoning": "gold recall 3/5; placement 3/3 at-or-above expert placement",
+            "checks": [
+              {
+                "name": "G1",
+                "passed": false,
+                "message": "Aggregate boundaries / cross-aggregate object references — NOT FOUND"
+              },
+              {
+                "name": "G2",
+                "passed": true,
+                "message": "Anemic domain model / mutable accumulator — found (Issue 2): \"neither guards a single lifecycle rule. Every field is settable through a public, uncondit…\""
+              },
+              {
+                "name": "placement:G2",
+                "passed": true,
+                "message": "placed at CRITICAL (expected ≥ CRITICAL)"
+              },
+              {
+                "name": "G3",
+                "passed": false,
+                "message": "No domain events / reflection-based listeners — NOT FOUND"
+              },
+              {
+                "name": "G4",
+                "passed": true,
+                "message": "JobRepository interface bloat / repository-per-aggregate-root — found (Issue 3): \"JobRepository is one repository spanning three aggregates, doubling as a read model and as…\""
+              },
+              {
+                "name": "placement:G4",
+                "passed": true,
+                "message": "placed at CRITICAL (expected ≥ WARNING)"
+              },
+              {
+                "name": "G5",
+                "passed": true,
+                "message": "Context object proliferation — found (Issue 8): \"The shared suffix implies five members of one family — a nested hierarchy of scopes, say. …\""
+              },
+              {
+                "name": "placement:G5",
+                "passed": true,
+                "message": "placed at CRITICAL (expected ≥ WARNING)"
+              }
+            ],
+            "metadata": {
+              "register": "spring-batch",
+              "recall": 0.6,
+              "placementAtOrAbove": 3
+            }
+          }
+        },
+        "weights": {
+          "0": 1.0,
+          "1": 1.0
+        },
+        "compositeAttempts": []
+      }
+    }
+  ]
+}

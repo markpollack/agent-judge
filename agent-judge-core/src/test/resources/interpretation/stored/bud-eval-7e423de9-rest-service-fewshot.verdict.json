@@ -1,0 +1,507 @@
+{
+  "aggregated": {
+    "score": {
+      "value": true
+    },
+    "status": "PASS",
+    "reasoning": "Unanimous consensus: all 1 judges passed",
+    "checks": [],
+    "metadata": {}
+  },
+  "individual": [
+    {
+      "score": {
+        "value": 0.7777777777777778,
+        "min": 0.0,
+        "max": 1.0
+      },
+      "status": "PASS",
+      "reasoning": "Well-structured REST service with proper layering, modern testing practices, and excellent error handling using ProblemDetail.",
+      "checks": [
+        {
+          "name": "error_handling",
+          "passed": true,
+          "message": "error_handling=3/3"
+        },
+        {
+          "name": "test_quality",
+          "passed": true,
+          "message": "test_quality=3/3"
+        },
+        {
+          "name": "layering",
+          "passed": true,
+          "message": "layering=2/3"
+        },
+        {
+          "name": "injection_style",
+          "passed": true,
+          "message": "injection_style=2/3"
+        },
+        {
+          "name": "integration_wiring",
+          "passed": true,
+          "message": "integration_wiring=2/3"
+        },
+        {
+          "name": "config_externalization",
+          "passed": true,
+          "message": "config_externalization=2/3"
+        }
+      ],
+      "metadata": {
+        "violations": [
+          {
+            "criterion": "layering",
+            "file": "GreetingService.java",
+            "issue": "Service layer uses concrete class rather than interface-based design"
+          },
+          {
+            "criterion": "injection_style",
+            "file": "GreetingController.java",
+            "issue": "Constructor parameters use concrete GreetingService class rather than interface types"
+          },
+          {
+            "criterion": "config_externalization",
+            "file": "GreetingService.java",
+            "issue": "Uses @Value for single property rather than @ConfigurationProperties for grouped configuration"
+          },
+          {
+            "criterion": "integration_wiring",
+            "file": "GreetingControllerTests.java",
+            "issue": "No integration tests that verify end-to-end wiring of components"
+          }
+        ],
+        "phase": 1,
+        "normalizedScore": 0.7777777777777778
+      }
+    }
+  ],
+  "individualByName": {
+    "codeQuality": {
+      "score": {
+        "value": 0.7777777777777778,
+        "min": 0.0,
+        "max": 1.0
+      },
+      "status": "PASS",
+      "reasoning": "Well-structured REST service with proper layering, modern testing practices, and excellent error handling using ProblemDetail.",
+      "checks": [
+        {
+          "name": "error_handling",
+          "passed": true,
+          "message": "error_handling=3/3"
+        },
+        {
+          "name": "test_quality",
+          "passed": true,
+          "message": "test_quality=3/3"
+        },
+        {
+          "name": "layering",
+          "passed": true,
+          "message": "layering=2/3"
+        },
+        {
+          "name": "injection_style",
+          "passed": true,
+          "message": "injection_style=2/3"
+        },
+        {
+          "name": "integration_wiring",
+          "passed": true,
+          "message": "integration_wiring=2/3"
+        },
+        {
+          "name": "config_externalization",
+          "passed": true,
+          "message": "config_externalization=2/3"
+        }
+      ],
+      "metadata": {
+        "violations": [
+          {
+            "criterion": "layering",
+            "file": "GreetingService.java",
+            "issue": "Service layer uses concrete class rather than interface-based design"
+          },
+          {
+            "criterion": "injection_style",
+            "file": "GreetingController.java",
+            "issue": "Constructor parameters use concrete GreetingService class rather than interface types"
+          },
+          {
+            "criterion": "config_externalization",
+            "file": "GreetingService.java",
+            "issue": "Uses @Value for single property rather than @ConfigurationProperties for grouped configuration"
+          },
+          {
+            "criterion": "integration_wiring",
+            "file": "GreetingControllerTests.java",
+            "issue": "No integration tests that verify end-to-end wiring of components"
+          }
+        ],
+        "phase": 1,
+        "normalizedScore": 0.7777777777777778
+      }
+    }
+  },
+  "weights": {},
+  "subVerdicts": [
+    {
+      "aggregated": {
+        "score": {
+          "value": true
+        },
+        "status": "PASS",
+        "reasoning": "Unanimous consensus: all 3 judges passed",
+        "checks": [],
+        "metadata": {}
+      },
+      "individual": [
+        {
+          "score": {
+            "value": true
+          },
+          "status": "PASS",
+          "reasoning": "Command succeeded with exit code 0",
+          "checks": [
+            {
+              "name": "command_execution",
+              "passed": true,
+              "message": "Command executed successfully"
+            }
+          ],
+          "metadata": {
+            "expectedExitCode": 0,
+            "command": "./mvnw clean compile",
+            "output": "[INFO] Scanning for projects...\n[INFO] \n[INFO] --------------------< com.example:greeting-service >--------------------\n[INFO] Building greeting-service 0.0.1-SNAPSHOT\n[INFO]   from pom.xml\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- clean:3.5.0:clean (default-clean) @ greeting-service ---\n[INFO] Deleting /tmp/experiment-workspace-15288504574649072277/target\n[INFO] \n[INFO] --- resources:3.3.1:resources (default-resources) @ greeting-service ---\n[INFO] Copying 1 resource from src/main/resources to target/classes\n[INFO] Copying 0 resource from src/main/resources to target/classes\n[INFO] \n[INFO] --- compiler:3.14.1:compile (default-compile) @ greeting-service ---\n[INFO] Recompiling the module because of changed source code.\n[INFO] Compiling 5 source files with javac [debug parameters release 21] to target/classes\n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD SUCCESS\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  0.788 s\n[INFO] Finished at: 2026-06-01T13:51:57-04:00\n[INFO] ------------------------------------------------------------------------\n",
+            "duration": "PT1.403477092S",
+            "exitCode": 0
+          }
+        },
+        {
+          "score": {
+            "value": true
+          },
+          "status": "PASS",
+          "reasoning": "File exists at pom.xml",
+          "checks": [
+            {
+              "name": "file_exists",
+              "passed": true,
+              "message": "File found at pom.xml"
+            }
+          ],
+          "metadata": {}
+        },
+        {
+          "score": {
+            "value": true
+          },
+          "status": "PASS",
+          "reasoning": "File exists at src/main/java",
+          "checks": [
+            {
+              "name": "file_exists",
+              "passed": true,
+              "message": "File found at src/main/java"
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "individualByName": {
+        "structure:pom.xml": {
+          "score": {
+            "value": true
+          },
+          "status": "PASS",
+          "reasoning": "File exists at pom.xml",
+          "checks": [
+            {
+              "name": "file_exists",
+              "passed": true,
+              "message": "File found at pom.xml"
+            }
+          ],
+          "metadata": {}
+        },
+        "structure:src/main/java": {
+          "score": {
+            "value": true
+          },
+          "status": "PASS",
+          "reasoning": "File exists at src/main/java",
+          "checks": [
+            {
+              "name": "file_exists",
+              "passed": true,
+              "message": "File found at src/main/java"
+            }
+          ],
+          "metadata": {}
+        },
+        "compile": {
+          "score": {
+            "value": true
+          },
+          "status": "PASS",
+          "reasoning": "Command succeeded with exit code 0",
+          "checks": [
+            {
+              "name": "command_execution",
+              "passed": true,
+              "message": "Command executed successfully"
+            }
+          ],
+          "metadata": {
+            "expectedExitCode": 0,
+            "command": "./mvnw clean compile",
+            "output": "[INFO] Scanning for projects...\n[INFO] \n[INFO] --------------------< com.example:greeting-service >--------------------\n[INFO] Building greeting-service 0.0.1-SNAPSHOT\n[INFO]   from pom.xml\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- clean:3.5.0:clean (default-clean) @ greeting-service ---\n[INFO] Deleting /tmp/experiment-workspace-15288504574649072277/target\n[INFO] \n[INFO] --- resources:3.3.1:resources (default-resources) @ greeting-service ---\n[INFO] Copying 1 resource from src/main/resources to target/classes\n[INFO] Copying 0 resource from src/main/resources to target/classes\n[INFO] \n[INFO] --- compiler:3.14.1:compile (default-compile) @ greeting-service ---\n[INFO] Recompiling the module because of changed source code.\n[INFO] Compiling 5 source files with javac [debug parameters release 21] to target/classes\n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD SUCCESS\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  0.788 s\n[INFO] Finished at: 2026-06-01T13:51:57-04:00\n[INFO] ------------------------------------------------------------------------\n",
+            "duration": "PT1.403477092S",
+            "exitCode": 0
+          }
+        }
+      },
+      "weights": {
+        "0": 1.0,
+        "1": 1.0,
+        "2": 1.0
+      },
+      "subVerdicts": []
+    },
+    {
+      "aggregated": {
+        "score": {
+          "value": true
+        },
+        "status": "PASS",
+        "reasoning": "Unanimous consensus: all 1 judges passed",
+        "checks": [],
+        "metadata": {}
+      },
+      "individual": [
+        {
+          "score": {
+            "value": true
+          },
+          "status": "PASS",
+          "reasoning": "All POM hygiene checks passed",
+          "checks": [
+            {
+              "name": "parent",
+              "passed": true,
+              "message": "Parent is org.springframework.boot:spring-boot-starter-parent"
+            },
+            {
+              "name": "java_version",
+              "passed": true,
+              "message": "java.version=21"
+            },
+            {
+              "name": "no_duplicates",
+              "passed": true,
+              "message": "No duplicate dependencies"
+            },
+            {
+              "name": "boot_plugin",
+              "passed": true,
+              "message": "spring-boot-maven-plugin present"
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "individualByName": {
+        "bestPractice": {
+          "score": {
+            "value": true
+          },
+          "status": "PASS",
+          "reasoning": "All POM hygiene checks passed",
+          "checks": [
+            {
+              "name": "parent",
+              "passed": true,
+              "message": "Parent is org.springframework.boot:spring-boot-starter-parent"
+            },
+            {
+              "name": "java_version",
+              "passed": true,
+              "message": "java.version=21"
+            },
+            {
+              "name": "no_duplicates",
+              "passed": true,
+              "message": "No duplicate dependencies"
+            },
+            {
+              "name": "boot_plugin",
+              "passed": true,
+              "message": "spring-boot-maven-plugin present"
+            }
+          ],
+          "metadata": {}
+        }
+      },
+      "weights": {
+        "0": 1.0
+      },
+      "subVerdicts": []
+    },
+    {
+      "aggregated": {
+        "score": {
+          "value": true
+        },
+        "status": "PASS",
+        "reasoning": "Unanimous consensus: all 1 judges passed",
+        "checks": [],
+        "metadata": {}
+      },
+      "individual": [
+        {
+          "score": {
+            "value": 0.7777777777777778,
+            "min": 0.0,
+            "max": 1.0
+          },
+          "status": "PASS",
+          "reasoning": "Well-structured REST service with proper layering, modern testing practices, and excellent error handling using ProblemDetail.",
+          "checks": [
+            {
+              "name": "error_handling",
+              "passed": true,
+              "message": "error_handling=3/3"
+            },
+            {
+              "name": "test_quality",
+              "passed": true,
+              "message": "test_quality=3/3"
+            },
+            {
+              "name": "layering",
+              "passed": true,
+              "message": "layering=2/3"
+            },
+            {
+              "name": "injection_style",
+              "passed": true,
+              "message": "injection_style=2/3"
+            },
+            {
+              "name": "integration_wiring",
+              "passed": true,
+              "message": "integration_wiring=2/3"
+            },
+            {
+              "name": "config_externalization",
+              "passed": true,
+              "message": "config_externalization=2/3"
+            }
+          ],
+          "metadata": {
+            "violations": [
+              {
+                "criterion": "layering",
+                "file": "GreetingService.java",
+                "issue": "Service layer uses concrete class rather than interface-based design"
+              },
+              {
+                "criterion": "injection_style",
+                "file": "GreetingController.java",
+                "issue": "Constructor parameters use concrete GreetingService class rather than interface types"
+              },
+              {
+                "criterion": "config_externalization",
+                "file": "GreetingService.java",
+                "issue": "Uses @Value for single property rather than @ConfigurationProperties for grouped configuration"
+              },
+              {
+                "criterion": "integration_wiring",
+                "file": "GreetingControllerTests.java",
+                "issue": "No integration tests that verify end-to-end wiring of components"
+              }
+            ],
+            "phase": 1,
+            "normalizedScore": 0.7777777777777778
+          }
+        }
+      ],
+      "individualByName": {
+        "codeQuality": {
+          "score": {
+            "value": 0.7777777777777778,
+            "min": 0.0,
+            "max": 1.0
+          },
+          "status": "PASS",
+          "reasoning": "Well-structured REST service with proper layering, modern testing practices, and excellent error handling using ProblemDetail.",
+          "checks": [
+            {
+              "name": "error_handling",
+              "passed": true,
+              "message": "error_handling=3/3"
+            },
+            {
+              "name": "test_quality",
+              "passed": true,
+              "message": "test_quality=3/3"
+            },
+            {
+              "name": "layering",
+              "passed": true,
+              "message": "layering=2/3"
+            },
+            {
+              "name": "injection_style",
+              "passed": true,
+              "message": "injection_style=2/3"
+            },
+            {
+              "name": "integration_wiring",
+              "passed": true,
+              "message": "integration_wiring=2/3"
+            },
+            {
+              "name": "config_externalization",
+              "passed": true,
+              "message": "config_externalization=2/3"
+            }
+          ],
+          "metadata": {
+            "violations": [
+              {
+                "criterion": "layering",
+                "file": "GreetingService.java",
+                "issue": "Service layer uses concrete class rather than interface-based design"
+              },
+              {
+                "criterion": "injection_style",
+                "file": "GreetingController.java",
+                "issue": "Constructor parameters use concrete GreetingService class rather than interface types"
+              },
+              {
+                "criterion": "config_externalization",
+                "file": "GreetingService.java",
+                "issue": "Uses @Value for single property rather than @ConfigurationProperties for grouped configuration"
+              },
+              {
+                "criterion": "integration_wiring",
+                "file": "GreetingControllerTests.java",
+                "issue": "No integration tests that verify end-to-end wiring of components"
+              }
+            ],
+            "phase": 1,
+            "normalizedScore": 0.7777777777777778
+          }
+        }
+      },
+      "weights": {
+        "0": 1.0
+      },
+      "subVerdicts": []
+    }
+  ]
+}

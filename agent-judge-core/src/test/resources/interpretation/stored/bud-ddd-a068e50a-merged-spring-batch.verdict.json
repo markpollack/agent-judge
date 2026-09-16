@@ -1,0 +1,253 @@
+{
+  "aggregated": {
+    "status": "fail",
+    "reasoning": "Unanimous consensus: all 1 applicable judge(s) failed",
+    "checks": [],
+    "metadata": {
+      "aggregation": {
+        "strategy": "consensus",
+        "errorPolicy": "propagate",
+        "inputCount": 1,
+        "eligibleCount": 1,
+        "explicitAbstainCount": 0,
+        "errorCount": 0,
+        "ignoredErrorCount": 0,
+        "errorsTreatedAsAbstainCount": 0,
+        "errorsTreatedAsFailCount": 0,
+        "passCount": 0,
+        "failCount": 1
+      }
+    }
+  },
+  "individual": [
+    {
+      "status": "fail",
+      "reasoning": "1 structural violation(s)",
+      "checks": [
+        {
+          "name": "sections",
+          "passed": true,
+          "message": "All 7 required sections present"
+        },
+        {
+          "name": "findings_present",
+          "passed": true,
+          "message": "33 findings parsed"
+        },
+        {
+          "name": "related_resolve",
+          "passed": false,
+          "message": "4 of 38 Related references unresolved: [Suggestion 8, Suggestion 1, Suggestion 10, Suggestion 2]"
+        },
+        {
+          "name": "critical_locations",
+          "passed": true,
+          "message": "9 of 9 critical findings carry a Location"
+        },
+        {
+          "name": "report_length",
+          "passed": true,
+          "message": "628 lines"
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "individualByName": {
+    "reportStructure": {
+      "status": "fail",
+      "reasoning": "1 structural violation(s)",
+      "checks": [
+        {
+          "name": "sections",
+          "passed": true,
+          "message": "All 7 required sections present"
+        },
+        {
+          "name": "findings_present",
+          "passed": true,
+          "message": "33 findings parsed"
+        },
+        {
+          "name": "related_resolve",
+          "passed": false,
+          "message": "4 of 38 Related references unresolved: [Suggestion 8, Suggestion 1, Suggestion 10, Suggestion 2]"
+        },
+        {
+          "name": "critical_locations",
+          "passed": true,
+          "message": "9 of 9 critical findings carry a Location"
+        },
+        {
+          "name": "report_length",
+          "passed": true,
+          "message": "628 lines"
+        }
+      ],
+      "metadata": {}
+    }
+  },
+  "weights": {
+    "0": 1.0
+  },
+  "compositeAttempts": [
+    {
+      "name": "artifacts",
+      "relation": "cascade_tier",
+      "policy": "REJECT_ON_ANY_FAIL",
+      "verdict": {
+        "aggregated": {
+          "status": "pass",
+          "reasoning": "Unanimous consensus: all 1 applicable judge(s) passed",
+          "checks": [],
+          "metadata": {
+            "aggregation": {
+              "strategy": "consensus",
+              "errorPolicy": "propagate",
+              "inputCount": 1,
+              "eligibleCount": 1,
+              "explicitAbstainCount": 0,
+              "errorCount": 0,
+              "ignoredErrorCount": 0,
+              "errorsTreatedAsAbstainCount": 0,
+              "errorsTreatedAsFailCount": 0,
+              "passCount": 1,
+              "failCount": 0
+            }
+          }
+        },
+        "individual": [
+          {
+            "status": "pass",
+            "reasoning": "File exists at ddd-review.md",
+            "checks": [
+              {
+                "name": "file_exists",
+                "passed": true,
+                "message": "File found at ddd-review.md"
+              }
+            ],
+            "metadata": {}
+          }
+        ],
+        "individualByName": {
+          "structure:ddd-review.md": {
+            "status": "pass",
+            "reasoning": "File exists at ddd-review.md",
+            "checks": [
+              {
+                "name": "file_exists",
+                "passed": true,
+                "message": "File found at ddd-review.md"
+              }
+            ],
+            "metadata": {}
+          }
+        },
+        "weights": {
+          "0": 1.0
+        },
+        "compositeAttempts": []
+      }
+    },
+    {
+      "name": "structure",
+      "relation": "cascade_tier",
+      "policy": "REJECT_ON_ANY_FAIL",
+      "verdict": {
+        "aggregated": {
+          "status": "fail",
+          "reasoning": "Unanimous consensus: all 1 applicable judge(s) failed",
+          "checks": [],
+          "metadata": {
+            "aggregation": {
+              "strategy": "consensus",
+              "errorPolicy": "propagate",
+              "inputCount": 1,
+              "eligibleCount": 1,
+              "explicitAbstainCount": 0,
+              "errorCount": 0,
+              "ignoredErrorCount": 0,
+              "errorsTreatedAsAbstainCount": 0,
+              "errorsTreatedAsFailCount": 0,
+              "passCount": 0,
+              "failCount": 1
+            }
+          }
+        },
+        "individual": [
+          {
+            "status": "fail",
+            "reasoning": "1 structural violation(s)",
+            "checks": [
+              {
+                "name": "sections",
+                "passed": true,
+                "message": "All 7 required sections present"
+              },
+              {
+                "name": "findings_present",
+                "passed": true,
+                "message": "33 findings parsed"
+              },
+              {
+                "name": "related_resolve",
+                "passed": false,
+                "message": "4 of 38 Related references unresolved: [Suggestion 8, Suggestion 1, Suggestion 10, Suggestion 2]"
+              },
+              {
+                "name": "critical_locations",
+                "passed": true,
+                "message": "9 of 9 critical findings carry a Location"
+              },
+              {
+                "name": "report_length",
+                "passed": true,
+                "message": "628 lines"
+              }
+            ],
+            "metadata": {}
+          }
+        ],
+        "individualByName": {
+          "reportStructure": {
+            "status": "fail",
+            "reasoning": "1 structural violation(s)",
+            "checks": [
+              {
+                "name": "sections",
+                "passed": true,
+                "message": "All 7 required sections present"
+              },
+              {
+                "name": "findings_present",
+                "passed": true,
+                "message": "33 findings parsed"
+              },
+              {
+                "name": "related_resolve",
+                "passed": false,
+                "message": "4 of 38 Related references unresolved: [Suggestion 8, Suggestion 1, Suggestion 10, Suggestion 2]"
+              },
+              {
+                "name": "critical_locations",
+                "passed": true,
+                "message": "9 of 9 critical findings carry a Location"
+              },
+              {
+                "name": "report_length",
+                "passed": true,
+                "message": "628 lines"
+              }
+            ],
+            "metadata": {}
+          }
+        },
+        "weights": {
+          "0": 1.0
+        },
+        "compositeAttempts": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,325 @@
+{
+  "experimentId" : "example-0-17-cascade",
+  "experimentName" : "design-example",
+  "datasetVersion" : null,
+  "datasetDirty" : false,
+  "datasetSemanticVersion" : "1.0.0",
+  "knowledgeManifest" : null,
+  "timestamp" : "2026-09-16T09:00:00Z",
+  "items" : [ {
+    "itemId" : "DDD-001",
+    "itemSlug" : "merged:spring-batch",
+    "success" : true,
+    "passed" : false,
+    "costUsd" : 2.83,
+    "totalTokens" : 360779,
+    "durationMs" : 742000,
+    "scores" : { },
+    "metrics" : { },
+    "executionDetail" : null,
+    "verdict" : {
+      "aggregated" : {
+        "status" : "abstain",
+        "reasoning" : "No consensus: 1 passed, 1 failed among 2 applicable judge(s)",
+        "checks" : [ ],
+        "metadata" : {
+          "aggregation" : {
+            "strategy" : "consensus",
+            "errorPolicy" : "propagate",
+            "notApplicablePolicy" : "refuse",
+            "inputCount" : 2,
+            "eligibleCount" : 2,
+            "explicitAbstainCount" : 0,
+            "notApplicableCount" : 0,
+            "errorCount" : 0,
+            "ignoredErrorCount" : 0,
+            "errorsTreatedAsAbstainCount" : 0,
+            "errorsTreatedAsFailCount" : 0,
+            "notApplicableTreatedAsFailCount" : 0,
+            "errorCodeCounts" : { },
+            "passCount" : 1,
+            "failCount" : 1
+          }
+        }
+      },
+      "individual" : [ {
+        "status" : "pass",
+        "reasoning" : "report present",
+        "checks" : [ ],
+        "metadata" : { }
+      }, {
+        "status" : "fail",
+        "reasoning" : "report has no bounded contexts",
+        "checks" : [ ],
+        "metadata" : { }
+      } ],
+      "individualByName" : {
+        "structure:ddd-review.md" : {
+          "status" : "pass",
+          "reasoning" : "report present",
+          "checks" : [ ],
+          "metadata" : { }
+        },
+        "reportStructure" : {
+          "status" : "fail",
+          "reasoning" : "report has no bounded contexts",
+          "checks" : [ ],
+          "metadata" : { }
+        }
+      },
+      "weights" : {
+        "0" : 1.0,
+        "1" : 1.0
+      },
+      "seats" : [ {
+        "position" : 0,
+        "verdictKey" : "structure:ddd-review.md",
+        "keySource" : "DECLARED"
+      }, {
+        "position" : 1,
+        "verdictKey" : "reportStructure",
+        "keySource" : "DECLARED"
+      } ],
+      "decision" : {
+        "kind" : "tier",
+        "tier" : "structure",
+        "basis" : "tier_outcome"
+      },
+      "compositeAttempts" : [ {
+        "name" : "structure",
+        "relation" : "cascade_tier",
+        "policy" : "REJECT_ON_ANY_FAIL",
+        "disposition" : "used",
+        "verdict" : {
+          "aggregated" : {
+            "status" : "abstain",
+            "reasoning" : "No consensus: 1 passed, 1 failed among 2 applicable judge(s)",
+            "checks" : [ ],
+            "metadata" : {
+              "aggregation" : {
+                "strategy" : "consensus",
+                "errorPolicy" : "propagate",
+                "notApplicablePolicy" : "refuse",
+                "inputCount" : 2,
+                "eligibleCount" : 2,
+                "explicitAbstainCount" : 0,
+                "notApplicableCount" : 0,
+                "errorCount" : 0,
+                "ignoredErrorCount" : 0,
+                "errorsTreatedAsAbstainCount" : 0,
+                "errorsTreatedAsFailCount" : 0,
+                "notApplicableTreatedAsFailCount" : 0,
+                "errorCodeCounts" : { },
+                "passCount" : 1,
+                "failCount" : 1
+              }
+            }
+          },
+          "individual" : [ {
+            "status" : "pass",
+            "reasoning" : "report present",
+            "checks" : [ ],
+            "metadata" : { }
+          }, {
+            "status" : "fail",
+            "reasoning" : "report has no bounded contexts",
+            "checks" : [ ],
+            "metadata" : { }
+          } ],
+          "individualByName" : {
+            "structure:ddd-review.md" : {
+              "status" : "pass",
+              "reasoning" : "report present",
+              "checks" : [ ],
+              "metadata" : { }
+            },
+            "reportStructure" : {
+              "status" : "fail",
+              "reasoning" : "report has no bounded contexts",
+              "checks" : [ ],
+              "metadata" : { }
+            }
+          },
+          "weights" : {
+            "0" : 1.0,
+            "1" : 1.0
+          },
+          "seats" : [ {
+            "position" : 0,
+            "verdictKey" : "structure:ddd-review.md",
+            "keySource" : "DECLARED"
+          }, {
+            "position" : 1,
+            "verdictKey" : "reportStructure",
+            "keySource" : "DECLARED"
+          } ],
+          "decision" : {
+            "kind" : "own"
+          },
+          "compositeAttempts" : [ ]
+        }
+      } ],
+      "instrumentHash" : "6066a1f6b795f33510c4076f9f727a6f6273db2410ed9e885effbe307670530d"
+    },
+    "metadata" : { },
+    "workspacePath" : null
+  } ],
+  "metadata" : { },
+  "aggregateScores" : { },
+  "counts" : {
+    "passes" : 0,
+    "nonPasses" : 1,
+    "excluded" : 0,
+    "instrumentFailures" : 0,
+    "notJudged" : 0,
+    "unattestable" : 0
+  },
+  "totalCostUsd" : 2.83,
+  "totalTokens" : 360779,
+  "totalDurationMs" : 742000,
+  "codeVersion" : null,
+  "codeDirty" : false,
+  "conditions" : {
+    "values" : { },
+    "undeclaredBy" : [ ]
+  },
+  "instrument" : {
+    "descriptionVersion" : 2,
+    "specHash" : "6066a1f6b795f33510c4076f9f727a6f6273db2410ed9e885effbe307670530d",
+    "description" : {
+      "descriptionVersion" : 2,
+      "kind" : "CASCADED",
+      "aggregateMayBeNotApplicable" : false,
+      "tiers" : [ {
+        "name" : "structure",
+        "policy" : "REJECT_ON_ANY_FAIL",
+        "jury" : {
+          "kind" : "SIMPLE",
+          "aggregateMayBeNotApplicable" : false,
+          "strategy" : {
+            "name" : "consensus",
+            "implementation" : {
+              "form" : "NAMED",
+              "className" : "io.github.markpollack.judge.jury.ConsensusStrategy"
+            },
+            "parameters" : {
+              "declared" : true,
+              "values" : {
+                "errorPolicy" : "propagate",
+                "notApplicablePolicy" : "refuse"
+              }
+            }
+          },
+          "seats" : [ {
+            "position" : 0,
+            "verdictKey" : "structure:ddd-review.md",
+            "keySource" : "DECLARED",
+            "weight" : 1.0,
+            "judge" : {
+              "metadata" : {
+                "declared" : true,
+                "values" : {
+                  "name" : "structure:ddd-review.md",
+                  "type" : "DETERMINISTIC"
+                }
+              },
+              "delegateMetadata" : {
+                "declared" : false
+              },
+              "notApplicableWhen" : {
+                "declared" : false
+              },
+              "implementation" : {
+                "form" : "HIDDEN"
+              },
+              "configuration" : {
+                "declared" : false
+              }
+            }
+          }, {
+            "position" : 1,
+            "verdictKey" : "reportStructure",
+            "keySource" : "DECLARED",
+            "weight" : 1.0,
+            "judge" : {
+              "metadata" : {
+                "declared" : true,
+                "values" : {
+                  "name" : "reportStructure",
+                  "type" : "DETERMINISTIC"
+                }
+              },
+              "delegateMetadata" : {
+                "declared" : false
+              },
+              "notApplicableWhen" : {
+                "declared" : false
+              },
+              "implementation" : {
+                "form" : "HIDDEN"
+              },
+              "configuration" : {
+                "declared" : false
+              }
+            }
+          } ]
+        }
+      }, {
+        "name" : "quality",
+        "policy" : "FINAL_TIER",
+        "jury" : {
+          "kind" : "SIMPLE",
+          "aggregateMayBeNotApplicable" : false,
+          "strategy" : {
+            "name" : "consensus",
+            "implementation" : {
+              "form" : "NAMED",
+              "className" : "io.github.markpollack.judge.jury.ConsensusStrategy"
+            },
+            "parameters" : {
+              "declared" : true,
+              "values" : {
+                "errorPolicy" : "propagate",
+                "notApplicablePolicy" : "refuse"
+              }
+            }
+          },
+          "seats" : [ {
+            "position" : 0,
+            "verdictKey" : "expertRecall",
+            "keySource" : "DECLARED",
+            "weight" : 1.0,
+            "judge" : {
+              "metadata" : {
+                "declared" : true,
+                "values" : {
+                  "name" : "expertRecall",
+                  "type" : "DETERMINISTIC"
+                }
+              },
+              "delegateMetadata" : {
+                "declared" : false
+              },
+              "notApplicableWhen" : {
+                "declared" : false
+              },
+              "implementation" : {
+                "form" : "HIDDEN"
+              },
+              "configuration" : {
+                "declared" : false
+              }
+            }
+          } ]
+        }
+      } ]
+    },
+    "describeFailure" : null,
+    "libraries" : {
+      "agent-judge-core" : "0.17.0-SNAPSHOT"
+    },
+    "artifacts" : {
+      "agent-judge-core" : "sha256:46a236c753ec8f565f30f83333c9263542db6a0029ba41a20f20315c74816219"
+    }
+  }
+}

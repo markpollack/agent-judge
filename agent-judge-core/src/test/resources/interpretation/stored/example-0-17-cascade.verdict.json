@@ -1,0 +1,158 @@
+{
+  "aggregated": {
+    "status": "abstain",
+    "reasoning": "No consensus: 1 passed, 1 failed among 2 applicable judge(s)",
+    "checks": [],
+    "metadata": {
+      "aggregation": {
+        "strategy": "consensus",
+        "errorPolicy": "propagate",
+        "notApplicablePolicy": "refuse",
+        "inputCount": 2,
+        "eligibleCount": 2,
+        "explicitAbstainCount": 0,
+        "notApplicableCount": 0,
+        "errorCount": 0,
+        "ignoredErrorCount": 0,
+        "errorsTreatedAsAbstainCount": 0,
+        "errorsTreatedAsFailCount": 0,
+        "notApplicableTreatedAsFailCount": 0,
+        "errorCodeCounts": {},
+        "passCount": 1,
+        "failCount": 1
+      }
+    }
+  },
+  "individual": [
+    {
+      "status": "pass",
+      "reasoning": "report present",
+      "checks": [],
+      "metadata": {}
+    },
+    {
+      "status": "fail",
+      "reasoning": "report has no bounded contexts",
+      "checks": [],
+      "metadata": {}
+    }
+  ],
+  "individualByName": {
+    "structure:ddd-review.md": {
+      "status": "pass",
+      "reasoning": "report present",
+      "checks": [],
+      "metadata": {}
+    },
+    "reportStructure": {
+      "status": "fail",
+      "reasoning": "report has no bounded contexts",
+      "checks": [],
+      "metadata": {}
+    }
+  },
+  "weights": {
+    "0": 1.0,
+    "1": 1.0
+  },
+  "seats": [
+    {
+      "position": 0,
+      "verdictKey": "structure:ddd-review.md",
+      "keySource": "DECLARED"
+    },
+    {
+      "position": 1,
+      "verdictKey": "reportStructure",
+      "keySource": "DECLARED"
+    }
+  ],
+  "decision": {
+    "kind": "tier",
+    "tier": "structure",
+    "basis": "tier_outcome"
+  },
+  "compositeAttempts": [
+    {
+      "name": "structure",
+      "relation": "cascade_tier",
+      "policy": "REJECT_ON_ANY_FAIL",
+      "disposition": "used",
+      "verdict": {
+        "aggregated": {
+          "status": "abstain",
+          "reasoning": "No consensus: 1 passed, 1 failed among 2 applicable judge(s)",
+          "checks": [],
+          "metadata": {
+            "aggregation": {
+              "strategy": "consensus",
+              "errorPolicy": "propagate",
+              "notApplicablePolicy": "refuse",
+              "inputCount": 2,
+              "eligibleCount": 2,
+              "explicitAbstainCount": 0,
+              "notApplicableCount": 0,
+              "errorCount": 0,
+              "ignoredErrorCount": 0,
+              "errorsTreatedAsAbstainCount": 0,
+              "errorsTreatedAsFailCount": 0,
+              "notApplicableTreatedAsFailCount": 0,
+              "errorCodeCounts": {},
+              "passCount": 1,
+              "failCount": 1
+            }
+          }
+        },
+        "individual": [
+          {
+            "status": "pass",
+            "reasoning": "report present",
+            "checks": [],
+            "metadata": {}
+          },
+          {
+            "status": "fail",
+            "reasoning": "report has no bounded contexts",
+            "checks": [],
+            "metadata": {}
+          }
+        ],
+        "individualByName": {
+          "structure:ddd-review.md": {
+            "status": "pass",
+            "reasoning": "report present",
+            "checks": [],
+            "metadata": {}
+          },
+          "reportStructure": {
+            "status": "fail",
+            "reasoning": "report has no bounded contexts",
+            "checks": [],
+            "metadata": {}
+          }
+        },
+        "weights": {
+          "0": 1.0,
+          "1": 1.0
+        },
+        "seats": [
+          {
+            "position": 0,
+            "verdictKey": "structure:ddd-review.md",
+            "keySource": "DECLARED"
+          },
+          {
+            "position": 1,
+            "verdictKey": "reportStructure",
+            "keySource": "DECLARED"
+          }
+        ],
+        "decision": {
+          "kind": "own"
+        },
+        "compositeAttempts": []
+      }
+    }
+  ],
+  "instrumentHash": "6066a1f6b795f33510c4076f9f727a6f6273db2410ed9e885effbe307670530d"
+}
