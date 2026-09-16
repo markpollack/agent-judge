@@ -214,6 +214,48 @@ required fact in transit, and it would accept it silently.
 The 0.14 conformance fixtures are byte-identical and are now read only through private historical
 shapes.
 
+## The interpretation of a verdict
+
+A stored verdict says what happened; it did not say what that *means*, and every consumer walked
+`compositeAttempts`, compared disposition strings and decided for itself which status was a
+rejection. One measured consequence is the 20-of-39 corpus above: juries that errored or abstained,
+counted as subjects that failed. The rules for reading a verdict belong to the library that wrote
+it, so this release adds them as one shape and two entry points, in the new
+`io.github.markpollack.judge.jury.interpretation` package.
+
+```java
+Interpretation live   = Verdicts.interpret(verdict);    // a live verdict
+Interpretation stored = Verdicts.interpret(storedMap);  // any stored verdict, any age
+String text           = Summaries.of(stored);           // deterministic, from the fields alone
+```
+
+`Interpretation` is the same shape whether the verdict was written by 0.17 or by 0.13; what differs
+between a complete record and an incomplete one is only its `defects`:
+
+| Field | What it says |
+|---|---|
+| `reading` | what the verdict says about the subject: `ACCEPTED`, `REJECTED`, `UNDECIDED`, `NOT_APPLICABLE`, `NOT_ASSESSED`. A decision that stopped on an individual rejection reads `REJECTED` whatever the aggregate says; an `error` aggregate reads `NOT_ASSESSED` **before** an `abstain` reads `UNDECIDED`. Null only when the root records no readable status, which the defects say |
+| `readingSupport` | whether the recorded facts back that reading: `SUPPORTED`; `CONTRADICTED`, with one `INCONSISTENT` defect per contradiction; or `UNDETERMINED`, when the facts needed are absent — each an `ABSENT` defect — or the strategy's rule is not closed-form. The evidence check reads the root's **own** aggregation block, never one found elsewhere in the tree |
+| `decidedBy` | which stage decided, read from the recorded decision chain — **never inferred** from the root equalling a sub-verdict, from attempt order, or from reasoning text. `null` when the root decided itself or the record does not say |
+| `root`, `stages` | the verdict's own aggregate and judges, then every attempt a composite jury entered, recursively, each with its own full `path`, its attempt facts, its own reasoning and `evidence`, and every judge with its recorded reasoning, checks, score and reason code. A stage that entered and never produced a verdict has a null `status` and its `failure` code; **an absent status is never read as a failure** |
+| `defects` | what the record is missing (`ABSENT`), cannot say (`UNPARSEABLE`), carries in a token this version does not define (`UNKNOWN_VOCABULARY`), or contradicts itself on (`INCONSISTENT`) — each with a path and a field. Empty for every verdict a built-in jury produces |
+| `summary` | prose generated from the fields above and nothing else: every name, status, reason code, reading and support value it mentions is in the fields, and every one in the fields is mentioned |
+| `schemaVersion`, `sourceVersion` | `1`; and `0` for an unstamped verdict, `1` for the seven-component form 0.17 writes |
+
+The three stored shapes in the fleet all read. The 0.13 `subVerdicts` form: upper-case statuses are
+read as their 0.17 tokens; a `{value, min, max}` score is normalised on its own recorded scale with
+that scale reported beside it as `scoreScale`; a `{value: boolean}` score object is `UNPARSEABLE`
+and ignored. The 0.14–0.16 `compositeAttempts` form: no decision, seats or dispositions, each an
+`ABSENT` defect, while its evidence block binds leniently into `Evidence` — the nullable view of the
+keys `AggregationEvidence` writes — with the counts it lacks null, so a block that agrees with its
+status is `SUPPORTED` even though `decidedBy` is null. And the complete 0.17 form, on which the live
+and stored paths agree byte for byte. An unknown token is carried as recorded with a defect rather
+than refused, and a map of the wrong shape degrades into a list of missing facts rather than an
+exception.
+
+What this deliberately does not say: whether any reading counts against the subject, enters a
+denominator, or affects a rate. That policy belongs to the consumer that owns the denominator.
+
 ## Corrections found by the 0.17 code review
 
 A bounded review of the merged candidate found eight defects that 1,134 passing tests did not. All

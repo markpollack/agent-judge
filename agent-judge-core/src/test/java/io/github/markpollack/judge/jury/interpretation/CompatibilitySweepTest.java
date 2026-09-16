@@ -86,9 +86,24 @@ class CompatibilitySweepTest {
 
 		final List<String> flatRootExamples = new ArrayList<>();
 
-		int contradictedExamples;
-
 		final List<String> contradicted = new ArrayList<>();
+
+		/** Items whose verdict is an object that carries {@code aggregated}: the verdicts proper. */
+		int rootsWithAggregated;
+
+		final List<String> rootsWithoutAggregated = new ArrayList<>();
+
+		/** Verdict nodes reached outside any item, such as a bare verdict fixture file. */
+		int nodesOutsideItems;
+
+		/** Files under an {@code experiments/runs} directory that hold at least one verdict proper. */
+		int runsFilesWithVerdicts;
+
+		/** Files under an {@code experiments/runs} directory, whatever they hold. */
+		int runsFiles;
+
+		/** Items under a result file's {@code items} array whose verdict is null. */
+		int itemsWithNullVerdict;
 
 	}
 
@@ -152,14 +167,22 @@ class CompatibilitySweepTest {
 		String project = root.relativize(file).getName(0).toString();
 		int[] counts = tally.perProject.computeIfAbsent(project, key -> new int[4]);
 		counts[0]++;
+		boolean underRuns = file.toString().contains("/experiments/runs/");
+		if (underRuns) {
+			tally.runsFiles++;
+		}
 		if (tree.isObject() && tree.has("items") && tree.get("items").isArray()) {
 			tally.resultFiles++;
 			counts[1]++;
 		}
 		int before = tally.rootVerdicts;
+		int beforeProper = tally.rootsWithAggregated;
 		visit(tree, file, tally, counts, "$");
 		if (tally.rootVerdicts > before) {
 			tally.filesWithVerdicts++;
+		}
+		if (underRuns && tally.rootsWithAggregated > beforeProper) {
+			tally.runsFilesWithVerdicts++;
 		}
 	}
 
@@ -170,9 +193,18 @@ class CompatibilitySweepTest {
 				tally.items++;
 				counts[2]++;
 				JsonNode verdict = node.get("verdict");
+				if (verdict.isNull()) {
+					tally.itemsWithNullVerdict++;
+				}
 				if (verdict.isObject()) {
 					tally.rootVerdicts++;
 					counts[3]++;
+					if (verdict.has("aggregated")) {
+						tally.rootsWithAggregated++;
+					}
+					else if (tally.rootsWithoutAggregated.size() < 5) {
+						tally.rootsWithoutAggregated.add(file + " :: " + where + " :: keys " + keysOf(verdict));
+					}
 					countNodes(verdict, tally);
 					interpret(verdict, node, file, tally);
 				}
@@ -185,7 +217,9 @@ class CompatibilitySweepTest {
 			}
 			if (node.has("aggregated")) {
 				// A verdict node reached without an item around it: count its tree once and stop.
+				int before = tally.verdictNodes;
 				countNodes(node, tally);
+				tally.nodesOutsideItems += tally.verdictNodes - before;
 				return;
 			}
 			node.fields().forEachRemaining(entry -> visit(entry.getValue(), file, tally, counts,
@@ -230,7 +264,7 @@ class CompatibilitySweepTest {
 		bump(tally.rootShapes, shape);
 		String itemName = item.has("itemSlug") ? item.get("itemSlug").asText()
 				: item.has("itemId") ? item.get("itemId").asText() : "<unnamed item>";
-		if (shape.equals("flat") && tally.flatRootExamples.size() < 5) {
+		if (shape.equals("flat") && verdict.has("aggregated") && tally.flatRootExamples.size() < 5) {
 			tally.flatRootExamples.add(file + " :: " + itemName);
 		}
 		Map<String, Object> stored = MAPPER.convertValue(verdict, Fixtures.MAP);
@@ -268,6 +302,12 @@ class CompatibilitySweepTest {
 		counts.merge(key, 1, Integer::sum);
 	}
 
+	private static List<String> keysOf(JsonNode node) {
+		List<String> keys = new ArrayList<>();
+		node.fieldNames().forEachRemaining(keys::add);
+		return keys;
+	}
+
 	private static String report(String roots, Tally tally) {
 		StringBuilder out = new StringBuilder();
 		out.append("# AJ-26 compatibility sweep\n\n");
@@ -280,7 +320,12 @@ class CompatibilitySweepTest {
 		row(out, "files holding at least one verdict object", tally.filesWithVerdicts);
 		row(out, "items (objects with a `verdict` member, outside any verdict tree)", tally.items);
 		row(out, "items whose verdict is an object (root verdicts interpreted)", tally.rootVerdicts);
+		row(out, "of those, verdicts proper (the object carries `aggregated`)", tally.rootsWithAggregated);
+		row(out, "items whose verdict is null", tally.itemsWithNullVerdict);
 		row(out, "verdict nodes (objects with `aggregated`, roots included)", tally.verdictNodes);
+		row(out, "of those, reached outside any item (bare verdict files)", tally.nodesOutsideItems);
+		row(out, "files under an experiments/runs directory", tally.runsFiles);
+		row(out, "of those, holding at least one verdict proper", tally.runsFilesWithVerdicts);
 		row(out, "interpret(Map) exceptions", tally.exceptions.size());
 		out.append("\n## Root verdicts by shape\n\n");
 		table(out, tally.rootShapes);
@@ -309,8 +354,16 @@ class CompatibilitySweepTest {
 			.append(" | ")
 			.append(counts[3])
 			.append(" |\n"));
-		out.append("\n## Flat roots, first five\n\n");
+		out.append("\n## Flat roots that are verdicts proper, first five\n\n");
+		if (tally.flatRootExamples.isEmpty()) {
+			out.append("none\n");
+		}
 		tally.flatRootExamples.forEach(example -> out.append("- ").append(example).append('\n'));
+		out.append("\n## Objects with a `verdict` member that carries no `aggregated`, first five\n\n");
+		if (tally.rootsWithoutAggregated.isEmpty()) {
+			out.append("none\n");
+		}
+		tally.rootsWithoutAggregated.forEach(example -> out.append("- ").append(example).append('\n'));
 		out.append("\n## Contradicted readings, first twenty\n\n");
 		if (tally.contradicted.isEmpty()) {
 			out.append("none\n");
