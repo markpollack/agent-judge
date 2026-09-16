@@ -1,0 +1,158 @@
+{
+  "aggregated": {
+    "score": {
+      "value": false
+    },
+    "status": "FAIL",
+    "reasoning": "No consensus: 1 passed, 1 failed (consensus required)",
+    "checks": [],
+    "metadata": {}
+  },
+  "individual": [
+    {
+      "score": {
+        "value": false
+      },
+      "status": "FAIL",
+      "reasoning": "File not found at ddd-review.md",
+      "checks": [
+        {
+          "name": "file_exists",
+          "passed": false,
+          "message": "File not found at ddd-review.md"
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "score": {
+        "value": true
+      },
+      "status": "PASS",
+      "reasoning": "File exists at ddd-action-brief.md",
+      "checks": [
+        {
+          "name": "file_exists",
+          "passed": true,
+          "message": "File found at ddd-action-brief.md"
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "individualByName": {
+    "structure:ddd-action-brief.md": {
+      "score": {
+        "value": true
+      },
+      "status": "PASS",
+      "reasoning": "File exists at ddd-action-brief.md",
+      "checks": [
+        {
+          "name": "file_exists",
+          "passed": true,
+          "message": "File found at ddd-action-brief.md"
+        }
+      ],
+      "metadata": {}
+    },
+    "structure:ddd-review.md": {
+      "score": {
+        "value": false
+      },
+      "status": "FAIL",
+      "reasoning": "File not found at ddd-review.md",
+      "checks": [
+        {
+          "name": "file_exists",
+          "passed": false,
+          "message": "File not found at ddd-review.md"
+        }
+      ],
+      "metadata": {}
+    }
+  },
+  "weights": {},
+  "subVerdicts": [
+    {
+      "aggregated": {
+        "score": {
+          "value": false
+        },
+        "status": "FAIL",
+        "reasoning": "No consensus: 1 passed, 1 failed (consensus required)",
+        "checks": [],
+        "metadata": {}
+      },
+      "individual": [
+        {
+          "score": {
+            "value": false
+          },
+          "status": "FAIL",
+          "reasoning": "File not found at ddd-review.md",
+          "checks": [
+            {
+              "name": "file_exists",
+              "passed": false,
+              "message": "File not found at ddd-review.md"
+            }
+          ],
+          "metadata": {}
+        },
+        {
+          "score": {
+            "value": true
+          },
+          "status": "PASS",
+          "reasoning": "File exists at ddd-action-brief.md",
+          "checks": [
+            {
+              "name": "file_exists",
+              "passed": true,
+              "message": "File found at ddd-action-brief.md"
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "individualByName": {
+        "structure:ddd-action-brief.md": {
+          "score": {
+            "value": true
+          },
+          "status": "PASS",
+          "reasoning": "File exists at ddd-action-brief.md",
+          "checks": [
+            {
+              "name": "file_exists",
+              "passed": true,
+              "message": "File found at ddd-action-brief.md"
+            }
+          ],
+          "metadata": {}
+        },
+        "structure:ddd-review.md": {
+          "score": {
+            "value": false
+          },
+          "status": "FAIL",
+          "reasoning": "File not found at ddd-review.md",
+          "checks": [
+            {
+              "name": "file_exists",
+              "passed": false,
+              "message": "File not found at ddd-review.md"
+            }
+          ],
+          "metadata": {}
+        }
+      },
+      "weights": {
+        "1": 1.0,
+        "0": 1.0
+      },
+      "subVerdicts": []
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "aggregated": {
+    "status": "error",
+    "reasoning": "The final cascade tier failed to execute.",
+    "checks": [],
+    "metadata": {}
+  },
+  "individual": [],
+  "individualByName": {},
+  "weights": {},
+  "compositeAttempts": [
+    {
+      "name": "review-produced",
+      "relation": "cascade_tier",
+      "policy": "REJECT_ON_ANY_FAIL",
+      "verdict": {
+        "aggregated": {
+          "status": "pass",
+          "reasoning": "Unanimous consensus: all 1 applicable judge(s) passed",
+          "checks": [],
+          "metadata": {
+            "aggregation": {
+              "strategy": "consensus",
+              "errorPolicy": "propagate",
+              "inputCount": 1,
+              "eligibleCount": 1,
+              "explicitAbstainCount": 0,
+              "errorCount": 0,
+              "ignoredErrorCount": 0,
+              "errorsTreatedAsAbstainCount": 0,
+              "errorsTreatedAsFailCount": 0,
+              "passCount": 1,
+              "failCount": 0
+            }
+          }
+        },
+        "individual": [
+          {
+            "status": "pass",
+            "score": 1.0,
+            "reasoning": "Review parsed, carries a verdict, is substantive, and cites only packet files (1 findings, 0 touchpoints)",
+            "checks": [
+              {
+                "name": "review-parsed",
+                "passed": true,
+                "message": ""
+              },
+              {
+                "name": "verdict-present",
+                "passed": true,
+                "message": ""
+              },
+              {
+                "name": "substantive",
+                "passed": true,
+                "message": ""
+              },
+              {
+                "name": "paths-exist",
+                "passed": true,
+                "message": ""
+              }
+            ],
+            "metadata": {
+              "parsed": true,
+              "findingCount": 1,
+              "touchpointCount": 0,
+              "phantomPathCount": 0
+            }
+          }
+        ],
+        "individualByName": {
+          "review-well-formed": {
+            "status": "pass",
+            "score": 1.0,
+            "reasoning": "Review parsed, carries a verdict, is substantive, and cites only packet files (1 findings, 0 touchpoints)",
+            "checks": [
+              {
+                "name": "review-parsed",
+                "passed": true,
+                "message": ""
+              },
+              {
+                "name": "verdict-present",
+                "passed": true,
+                "message": ""
+              },
+              {
+                "name": "substantive",
+                "passed": true,
+                "message": ""
+              },
+              {
+                "name": "paths-exist",
+                "passed": true,
+                "message": ""
+              }
+            ],
+            "metadata": {
+              "parsed": true,
+              "findingCount": 1,
+              "touchpointCount": 0,
+              "phantomPathCount": 0
+            }
+          }
+        },
+        "weights": {
+          "0": 1.0
+        },
+        "compositeAttempts": []
+      }
+    },
+    {
+      "name": "review-quality",
+      "relation": "cascade_tier",
+      "policy": "FINAL_TIER",
+      "failureCode": "jury_execution_failed"
+    }
+  ]
+}
