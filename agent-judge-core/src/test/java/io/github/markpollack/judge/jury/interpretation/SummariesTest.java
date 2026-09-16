@@ -45,7 +45,8 @@ class SummariesTest {
 
 	private static final Pattern QUOTED = Pattern.compile("'([^']*)'");
 
-	private static final Pattern BRACKETED = Pattern.compile("\\[([a-z_]+)]");
+	/** A reason code is rendered as {@code [code]} after whitespace; a defect path's own brackets follow a name. */
+	private static final Pattern BRACKETED = Pattern.compile("(?<=\\s)\\[([a-z_]+)]");
 
 	static Stream<org.junit.jupiter.params.provider.Arguments> interpretations() {
 		List<org.junit.jupiter.params.provider.Arguments> all = new ArrayList<>();

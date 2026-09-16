@@ -27,10 +27,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("The score rule")
 class ScoreRuleTest {
 
+	/** A one-judge verdict whose three copies of the judgment all carry the given score. */
+	@SuppressWarnings("unchecked")
 	private static Map<String, Object> singleWithScore(Object score) {
 		Map<String, Object> stored = mutableCopy(asMap(Verdict.single("grader", Judgment.pass("graded"))));
-		for (Map<String, Object> judgment : new java.util.ArrayList<>(java.util.List.<Map<String, Object>>of(
-				at(stored, "aggregated"), at(stored, "individualByName", "grader")))) {
+		for (Map<String, Object> judgment : java.util.List.<Map<String, Object>>of(at(stored, "aggregated"),
+				(Map<String, Object>) Fixtures.listAt(stored, "individual").get(0),
+				at(stored, "individualByName", "grader"))) {
 			if (score == null) {
 				judgment.remove("score");
 			}
@@ -39,6 +42,11 @@ class ScoreRuleTest {
 			}
 		}
 		return stored;
+	}
+
+	/** Only the score defects: a hand-built single verdict carries no evidence block, which is its own defect. */
+	private static java.util.List<Defect> scoreDefects(Interpretation interpretation) {
+		return interpretation.defects().stream().filter(defect -> defect.field().equals("score")).toList();
 	}
 
 	private static Map<String, Object> bounded(Object value, double min, double max) {
@@ -60,7 +68,7 @@ class ScoreRuleTest {
 
 		assertThat(grader(interpretation).score()).isEqualTo(0.75);
 		assertThat(grader(interpretation).scoreScale()).isEqualTo(new ScoreScale(0.0, 10.0));
-		assertThat(interpretation.defects()).isEmpty();
+		assertThat(scoreDefects(interpretation)).isEmpty();
 	}
 
 	@Test
@@ -70,7 +78,7 @@ class ScoreRuleTest {
 
 		assertThat(grader(interpretation).score()).isEqualTo(0.75);
 		assertThat(grader(interpretation).scoreScale()).isEqualTo(new ScoreScale(0.0, 1.0));
-		assertThat(interpretation.defects()).isEmpty();
+		assertThat(scoreDefects(interpretation)).isEmpty();
 	}
 
 	@Test
@@ -80,7 +88,7 @@ class ScoreRuleTest {
 
 		assertThat(grader(interpretation).score()).isEqualTo(0.75);
 		assertThat(grader(interpretation).scoreScale()).isNull();
-		assertThat(interpretation.defects()).isEmpty();
+		assertThat(scoreDefects(interpretation)).isEmpty();
 	}
 
 	@Test
@@ -118,12 +126,12 @@ class ScoreRuleTest {
 	@DisplayName("an absent or null score is null with no defect")
 	void anAbsentScore() {
 		assertThat(grader(Verdicts.interpret(singleWithScore(null))).score()).isNull();
-		assertThat(Verdicts.interpret(singleWithScore(null)).defects()).isEmpty();
+		assertThat(scoreDefects(Verdicts.interpret(singleWithScore(null)))).isEmpty();
 
 		Map<String, Object> explicitNull = singleWithScore(null);
 		at(explicitNull, "individualByName", "grader").put("score", null);
 		assertThat(grader(Verdicts.interpret(explicitNull)).score()).isNull();
-		assertThat(Verdicts.interpret(explicitNull).defects()).isEmpty();
+		assertThat(scoreDefects(Verdicts.interpret(explicitNull))).isEmpty();
 	}
 
 }
