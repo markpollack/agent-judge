@@ -29,8 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code score} and {@code label} have always been <em>semantically</em> optional, but a
  * consumer reading the Java declaration — by eye, by reflection, or by a schema deriver —
  * could not tell them apart from the required members. This class pins the declaration so
- * reflection, schema derivation, and serialization cannot disagree about which members may
- * be absent.
+ * reflection, schema derivation, and serialization cannot disagree about which members
+ * may be absent.
  * </p>
  *
  * <p>
@@ -46,9 +46,10 @@ class JudgmentNullnessContractTest {
 
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 
-	private static final List<String> OPTIONAL_MEMBERS = List.of("score", "label");
+	private static final List<String> OPTIONAL_MEMBERS = List.of("assessment", "certainty", "distribution",
+			"reasonCode", "provenance", "policyApplication");
 
-	private static final List<String> REQUIRED_MEMBERS = List.of("status", "reasoning", "checks", "metadata");
+	private static final List<String> REQUIRED_MEMBERS = List.of("producerStatus", "reasoning", "checks", "metadata");
 
 	@Nested
 	@DisplayName("Declaration")
@@ -67,7 +68,8 @@ class JudgmentNullnessContractTest {
 		void noOtherCorePackageIsNullMarked() {
 			assertThat(List.of(io.github.markpollack.judge.Judge.class, io.github.markpollack.judge.jury.Verdict.class,
 					io.github.markpollack.judge.context.JudgmentContext.class,
-					io.github.markpollack.judge.config.JudgeSpec.class, io.github.markpollack.judge.fs.FileContentJudge.class))
+					io.github.markpollack.judge.config.JudgeSpec.class,
+					io.github.markpollack.judge.fs.FileContentJudge.class))
 				.allSatisfy(type -> assertThat(type.getPackage().getAnnotation(NullMarked.class))
 					.as("%s must not be null-marked by this step", type.getPackageName())
 					.isNull());
@@ -77,10 +79,10 @@ class JudgmentNullnessContractTest {
 		@DisplayName("score and label are @Nullable on every declaration surface")
 		void optionalMembersAreDeclaredNullable() {
 			for (String member : OPTIONAL_MEMBERS) {
-				assertThat(nullnessSurfaces(member)).allSatisfy(
-						(surface, annotated) -> assertThat(annotated.getAnnotation(Nullable.class))
-							.as("Judgment.%s must be @Nullable on its %s", member, surface)
-							.isNotNull());
+				assertThat(nullnessSurfaces(member))
+					.allSatisfy((surface, annotated) -> assertThat(annotated.getAnnotation(Nullable.class))
+						.as("Judgment.%s must be @Nullable on its %s", member, surface)
+						.isNotNull());
 			}
 		}
 
@@ -88,10 +90,10 @@ class JudgmentNullnessContractTest {
 		@DisplayName("status and the other required members carry no @Nullable")
 		void requiredMembersAreNotDeclaredNullable() {
 			for (String member : REQUIRED_MEMBERS) {
-				assertThat(nullnessSurfaces(member)).allSatisfy(
-						(surface, annotated) -> assertThat(annotated.getAnnotation(Nullable.class))
-							.as("Judgment.%s must stay non-null on its %s", member, surface)
-							.isNull());
+				assertThat(nullnessSurfaces(member))
+					.allSatisfy((surface, annotated) -> assertThat(annotated.getAnnotation(Nullable.class))
+						.as("Judgment.%s must stay non-null on its %s", member, surface)
+						.isNull());
 			}
 		}
 
@@ -168,10 +170,11 @@ class JudgmentNullnessContractTest {
 	}
 
 	/**
-	 * The four places a consumer can read the nullness of one record component: the record
-	 * component itself, its accessor return type, its canonical-constructor parameter type,
-	 * and its backing field type. A JSpecify type-use annotation must reach all four, or a
-	 * downstream reader would see a different contract depending on where it looked.
+	 * The four places a consumer can read the nullness of one record component: the
+	 * record component itself, its accessor return type, its canonical-constructor
+	 * parameter type, and its backing field type. A JSpecify type-use annotation must
+	 * reach all four, or a downstream reader would see a different contract depending on
+	 * where it looked.
 	 */
 	private static Map<String, AnnotatedType> nullnessSurfaces(String member) {
 		RecordComponent component = recordComponent(member);

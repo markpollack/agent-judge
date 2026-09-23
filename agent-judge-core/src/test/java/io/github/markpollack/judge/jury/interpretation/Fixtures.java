@@ -68,7 +68,9 @@ final class Fixtures {
 	private Fixtures() {
 	}
 
-	/** A stored verdict object copied from the archive, as parsed JSON in encounter order. */
+	/**
+	 * A stored verdict object copied from the archive, as parsed JSON in encounter order.
+	 */
 	static Map<String, Object> stored(String name) {
 		return readMap("/interpretation/stored/" + name + ".verdict.json");
 	}
@@ -89,19 +91,27 @@ final class Fixtures {
 
 	static Verdict golden(String resource) {
 		try {
-			return MAPPER.treeToValue(readTree(resource), Verdict.class);
+			return MAPPER.treeToValue(
+					io.github.markpollack.judge.conformance.ModernFixtureExpectations.statusOnly(readTree(resource)),
+					Verdict.class);
 		}
 		catch (Exception ex) {
 			throw new AssertionError("could not read " + resource + " as a Verdict", ex);
 		}
 	}
 
-	/** The stored projection of a live verdict: the same map a reader parses from the wire. */
+	/**
+	 * The stored projection of a live verdict: the same map a reader parses from the
+	 * wire.
+	 */
 	static Map<String, Object> asMap(Verdict verdict) {
 		return MAPPER.convertValue(verdict, MAP);
 	}
 
-	/** A deep, mutable copy so a test can damage a fixture without touching the shared one. */
+	/**
+	 * A deep, mutable copy so a test can damage a fixture without touching the shared
+	 * one.
+	 */
 	@SuppressWarnings("unchecked")
 	static Map<String, Object> mutableCopy(Map<String, Object> map) {
 		return (Map<String, Object>) copy(map);
@@ -213,7 +223,9 @@ final class Fixtures {
 		return builder.build();
 	}
 
-	/** An opaque tier that excludes over real individuals while declaring no capability. */
+	/**
+	 * An opaque tier that excludes over real individuals while declaring no capability.
+	 */
 	static Jury opaqueExcludingTier(Judgment... individuals) {
 		Map<String, Judgment> byName = new LinkedHashMap<>();
 		for (int index = 0; index < individuals.length; index++) {

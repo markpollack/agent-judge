@@ -84,6 +84,11 @@ final class Interpreter {
 	// ==================== The whole ====================
 
 	private Interpretation run(Map<String, Object> verdict) {
+		verdict = LegacyInterpretationBridge.project(verdict, path -> {
+			this.undeterminable = true;
+			unknown(path, "modernResult", "Modern judgment semantics require the version-2 interpreter; "
+					+ "this temporary v1 view does not establish support for them.");
+		});
 		int sourceVersion = verdict.get("decision") != null && verdict.get("seats") != null ? 1 : 0;
 
 		Node rootNode = readVerdict(verdict, "verdict", true);

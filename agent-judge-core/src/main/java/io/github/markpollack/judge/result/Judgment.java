@@ -20,126 +20,30 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Result of a judgment: an outcome, optionally a normalized quantitative assessment, and
- * optionally a classification label.
+ * Immutable producer assessment and optional application policy. Operational status and
+ * reasons are derived; assessment, native support and provider declarations remain raw.
+ * Legacy score/label methods are derived compatibility views, never stored duplicates.
+ * Metadata is recursively copied and restricted to portable JSON values.
  *
- * <p>
- * These are three independent facts, not one polymorphic value:
- * </p>
- * <ul>
- * <li>{@code status} — the outcome. Always present.</li>
- * <li>{@code score} — a quantitative assessment already normalized to {@code [0.0, 1.0]}.
- * Absent when the judge made no measurement.</li>
- * <li>{@code label} — the exact classification the judge assigned. Absent when the judge
- * classified nothing.</li>
- * </ul>
- *
- * <p>
- * A Boolean judgment records only its {@code status}: {@link JudgmentStatus#PASS} already
- * carries that fact, and storing {@code 1.0} alongside it would duplicate one fact in two
- * places that could then disagree. Use {@link #effectiveScore()} where a numeric view of a
- * Boolean outcome is wanted.
- * </p>
- *
- * <h2>Invariants</h2>
- * <p>
- * Every rule below is enforced in the compact constructor, so it holds for <em>any</em>
- * construction path including the canonical constructor. The outcome-specific builder stages
- * make incomplete or contradictory construction unavailable in ordinary autocomplete; the
- * constructor independently enforces every cross-field combination.
- * </p>
- * <table border="1">
- * <caption>Which facts each status may carry</caption>
- * <tr><th>Status</th><th>score</th><th>label</th><th>reasoning</th><th>reasonCode</th></tr>
- * <tr><td>PASS</td><td>allowed</td><td>allowed</td><td>may be blank</td><td>forbidden</td></tr>
- * <tr><td>FAIL</td><td>allowed</td><td>allowed</td><td>may be blank; required when coded</td>
- * <td>optional, subject family</td></tr>
- * <tr><td>ABSTAIN</td><td>forbidden</td><td>allowed</td><td>required</td><td>forbidden</td></tr>
- * <tr><td>NOT_APPLICABLE</td><td>forbidden</td><td>allowed</td><td>required</td><td>forbidden</td></tr>
- * <tr><td>ERROR</td><td>forbidden</td><td>forbidden</td><td>required</td>
- * <td>required, instrument family</td></tr>
- * </table>
- * <p>
- * An abstaining or excluded classifier can complete successfully and produce a meaningful
- * category — which of several reasons it could not decide, or which characteristic of the
- * subject put the criterion out of scope — while still casting no vote, so a label is
- * legitimate there. {@code ERROR} means the judge never completed, so a label would either
- * impersonate a completed classification or become an undeclared error-code channel; the
- * machine-readable classification of an error is {@link #reasonCode()}, which is a closed
- * vocabulary rather than free text.
- * </p>
- *
- * <h2>Errors</h2>
- * <p>
- * A {@code Judgment} is a result value, not an exception transport. It carries no
- * {@link Throwable}: machines classify on {@link #reasonCode()}, humans read
- * {@code reasoning}, and the original exception is logged where it was caught. Because
- * {@code reasoning} is the only carrier of what did not happen, it must be non-blank for
- * {@code ERROR}, {@code ABSTAIN} and {@code NOT_APPLICABLE}, and wherever a
- * {@code reasonCode} is present.
- * </p>
- * <p>
- * One countable code plus mandatory free text: the code is what a reader counts, the
- * reasoning is what a human reads, and neither substitutes for the other. An instrument code
- * is required on every {@code ERROR}, because an instrument failure nobody can count is a
- * failure nobody fixes; a subject code is optional on a {@code FAIL}, because most rejections
- * are explained in prose and inventing a category for them would manufacture a taxonomy
- * nobody asked for.
- * </p>
- *
- * <h2>Serialization and portability</h2>
- * <p>
- * Every {@code Judgment} is portable. Absent optionals are omitted rather than emitted as
- * {@code null}, and {@code metadata} accepts only strings, booleans, interoperable
- * integers, finite numbers, arrays, and string-keyed objects, recursively. Anything else —
- * a live exception, a {@link Duration}, an SDK response, an enum constant, an
- * arbitrary-precision number — is refused by the constructor, naming the exact path of the
- * offending value. Accepted containers are copied and recursively frozen, so a caller that
- * keeps mutating its own map, list, or array cannot alter a judgment that was already
- * built.
- * </p>
- * <p>
- * This is a property of the value, not of caller restraint: a consumer never discovers at
- * serialization time that an in-process judgment held a Java object. Diagnostics that
- * genuinely need live objects belong in {@code JudgmentContext} or another non-result
- * surface. Result timing is the worked example — {@value #ELAPSED_MILLIS_KEY} carries an
- * integer and {@link #elapsed()} derives the {@code Duration} view.
- * </p>
- *
- * <p>
- * <strong>Design Inspiration:</strong> Combines patterns from multiple frameworks:
- * deepeval's rich metadata (score_breakdown, reason, success), ragas's explainability
- * emphasis, and the "judges" framework's Judgment structure. The checks list allows
- * judges to report multiple sub-assertions (inspired by AssertJ's SoftAssertions
- * pattern), providing transparency into evaluation logic.
- * </p>
- *
- * <h2>Declared optionality</h2>
- * <p>
- * This package is {@code @NullMarked}, so every component below is non-null unless it is
- * declared {@link Nullable}. {@code score}, {@code label} and {@code reasonCode} are the only
- * optional members, and they are optional in the Java declaration exactly as they are on the
- * wire: a consumer reading the record by eye, by reflection, or through a schema deriver sees
- * the same contract that {@link JsonInclude} produces. The build enforces these declarations
- * with NullAway rather than leaving them as prose.
- * </p>
- *
- * @param status the judgment status (PASS, FAIL, ABSTAIN, NOT_APPLICABLE, ERROR); never null
- * @param score normalized assessment in [0.0, 1.0], or null when no measurement was made
- * @param label the classification assigned, or null when nothing was classified
- * @param reasonCode the countable cause: required and instrument-family on ERROR, optional and
- * subject-family on FAIL, forbidden elsewhere; null when a FAIL is an uncoded rejection
- * @param reasoning human-readable explanation of the judgment; never null
- * @param checks individual check results
- * @param metadata additional judgment information (extensibility, timing, evidence);
- * recursively portable and recursively immutable, in encounter order
- * @author Mark Pollack
- * @since 0.1.0
+ * @param producerStatus disposition before application policy
+ * @param assessment optional product assessment
+ * @param certainty optional metric-specific support
+ * @param distribution optional native distribution
+ * @param reasonCode producer cause, subject-family only on FAIL and instrument-family on
+ * ERROR
+ * @param reasoning producer explanation; required for ABSTAIN, NOT_APPLICABLE and ERROR
+ * @param checks bounded child judgments with unique IDs
+ * @param provenance optional evaluation identity and retained artifact references
+ * @param policyApplication optional immutable application policy result
+ * @param metadata recursively immutable portable metadata
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonPropertyOrder({ "status", "score", "label", "reasonCode", "reasoning", "checks", "metadata" })
-public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable String label,
-		@Nullable JudgmentReasonCode reasonCode, String reasoning, List<Check> checks, Map<String, Object> metadata) {
+@JsonPropertyOrder({ "producerStatus", "assessment", "certainty", "distribution", "reasonCode", "reasoning", "checks",
+		"provenance", "policyApplication", "metadata" })
+public record Judgment(JudgmentStatus producerStatus, @Nullable Assessment assessment, @Nullable Certainty certainty,
+		@Nullable Distribution distribution, @Nullable JudgmentReasonCode reasonCode, String reasoning,
+		List<Check> checks, @Nullable EvaluationProvenance provenance, @Nullable PolicyApplication policyApplication,
+		Map<String, Object> metadata) {
 
 	/**
 	 * Metadata key reserved for aggregation evidence written by voting strategies.
@@ -153,8 +57,8 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	public static final String AGGREGATION_KEY = "aggregation";
 
 	/**
-	 * Metadata key carrying elapsed result timing, as a non-negative interoperable integer
-	 * count of milliseconds.
+	 * Metadata key carrying elapsed result timing, as a non-negative interoperable
+	 * integer count of milliseconds.
 	 * <p>
 	 * The unit is part of the key so the number is never ambiguous, and absence is the
 	 * omission of the key rather than a sentinel. {@link #elapsed()} derives a Java
@@ -167,19 +71,21 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 
 	/**
 	 * Aggregation-evidence key carrying the terminal reason codes an
-	 * {@link JudgmentReasonCode#ERRORS_PROPAGATED} aggregate propagated, as a non-empty map of
-	 * wire name to positive count.
+	 * {@link JudgmentReasonCode#ERRORS_PROPAGATED} aggregate propagated, as a non-empty
+	 * map of wire name to positive count.
 	 * <p>
 	 * The key is declared here because the invariant is enforced here: a judgment whose
-	 * {@code reasonCode} is {@code errors_propagated} must carry a structurally valid block
-	 * under it, inside the reserved {@value #AGGREGATION_KEY} block. Strategies write it through
-	 * the jury package's evidence contract, which re-exports this same constant.
+	 * {@code reasonCode} is {@code errors_propagated} must carry a structurally valid
+	 * block under it, inside the reserved {@value #AGGREGATION_KEY} block. Strategies
+	 * write it through the jury package's evidence contract, which re-exports this same
+	 * constant.
 	 * </p>
 	 * <p>
-	 * <strong>The count domain is {@code long}</strong>, bounded by the portable integer range
-	 * the metadata algebra already enforces. Counts are carried, merged and emitted in that one
-	 * domain: a narrower accumulator anywhere would not reject a large count, it would
-	 * <em>change</em> it, and a corrupted count is indistinguishable from a correct one.
+	 * <strong>The count domain is {@code long}</strong>, bounded by the portable integer
+	 * range the metadata algebra already enforces. Counts are carried, merged and emitted
+	 * in that one domain: a narrower accumulator anywhere would not reject a large count,
+	 * it would <em>change</em> it, and a corrupted count is indistinguishable from a
+	 * correct one.
 	 * </p>
 	 *
 	 * @since 0.17.0
@@ -188,59 +94,164 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 
 	/** Validate, copy, and recursively freeze every judgment component. */
 	public Judgment {
-		Objects.requireNonNull(status, "status must not be null");
+		Objects.requireNonNull(producerStatus, "producer status must not be null");
 		Objects.requireNonNull(reasoning, "reasoning must not be null");
-		Objects.requireNonNull(checks, "checks must not be null");
-		Objects.requireNonNull(metadata, "metadata must not be null");
-
-		checks = List.copyOf(checks);
-		metadata = PortableValues.normalizeMetadata(metadata);
-
-		if (score != null) {
-			if (!Double.isFinite(score)) {
-				throw new IllegalArgumentException("score must be finite, but was " + score);
+		checks = List.copyOf(Objects.requireNonNull(checks, "checks must not be null"));
+		metadata = PortableValues.normalizeMetadata(Objects.requireNonNull(metadata, "metadata must not be null"));
+		if (checks.stream().map(Check::id).distinct().count() != checks.size()) {
+			throw new IllegalArgumentException("check IDs must be unique");
+		}
+		if (producerStatus == JudgmentStatus.ERROR || producerStatus == JudgmentStatus.NOT_APPLICABLE) {
+			if (assessment != null || certainty != null || distribution != null) {
+				throw new IllegalArgumentException(producerStatus + " must not carry assessment or support");
 			}
-			if (score < 0.0 || score > 1.0) {
-				throw new IllegalArgumentException("score must be between 0.0 and 1.0, but was " + score);
-			}
-			if (status == JudgmentStatus.ABSTAIN || status == JudgmentStatus.NOT_APPLICABLE
-					|| status == JudgmentStatus.ERROR) {
-				throw new IllegalArgumentException(
-						status + " represents no completed measurement, so it must not carry a score");
+			if (policyApplication != null) {
+				throw new IllegalArgumentException(producerStatus + " bypasses policy application");
 			}
 		}
-
-		if (label != null) {
-			if (label.isBlank()) {
-				throw new IllegalArgumentException("label must be non-blank when present");
-			}
-			if (status == JudgmentStatus.ERROR) {
-				throw new IllegalArgumentException("ERROR means the judge did not complete, so it must not carry a label");
-			}
+		if (certainty != null && (assessment == null || !assessment.has(certainty.target()))) {
+			throw new IllegalArgumentException("certainty target must name a present assessment component");
 		}
-
-		if (reasoning.isBlank() && requiresReasoning(status)) {
-			throw new IllegalArgumentException(status + " requires non-blank reasoning explaining "
-					+ (status == JudgmentStatus.NOT_APPLICABLE ? "what the subject lacks that the criterion is about"
-							: "why the judge could not evaluate"));
+		if (distribution != null) {
+			requireDistribution(assessment, distribution);
 		}
-
-		requireReasonCodeFamily(status, reasonCode);
+		if (reasoning.isBlank() && requiresReasoning(producerStatus)) {
+			throw new IllegalArgumentException(producerStatus + " requires non-blank reasoning");
+		}
+		requireReasonCodeFamily(producerStatus, reasonCode);
 		if (reasonCode != null && reasoning.isBlank()) {
-			throw new IllegalArgumentException(
-					"a reasonCode is one countable cause plus free text, so " + reasonCode.wireName()
-							+ " requires non-blank reasoning");
+			throw new IllegalArgumentException("reasonCode requires non-blank reasoning");
 		}
 		if (reasonCode == JudgmentReasonCode.ERRORS_PROPAGATED) {
 			requireOrigin(metadata);
 		}
 	}
 
+	private static void requireDistribution(@Nullable Assessment assessment, Distribution distribution) {
+		if (assessment == null || !assessment.has(distribution.target())) {
+			throw new IllegalArgumentException("distribution target must name a present assessment component");
+		}
+		List<String> expected = switch (distribution.target()) {
+			case PROPOSITION -> List.of("false", "true");
+			case CATEGORY -> Objects.requireNonNull(assessment.category()).alternatives();
+			case NUMERIC -> {
+				NumericAssessment numeric = Objects.requireNonNull(assessment.numeric());
+				if (numeric.kind() != NumericKind.ORDINAL_EXPECTATION) {
+					throw new IllegalArgumentException("numeric distribution requires declared ordinal levels");
+				}
+				yield numeric.levels();
+			}
+		};
+		List<String> actual = distribution.masses().stream().map(ProbabilityMass::alternative).toList();
+		if (actual.size() != expected.size() || !actual.containsAll(expected)) {
+			throw new IllegalArgumentException("distribution keys must exactly match the target domain");
+		}
+	}
+
+	/**
+	 * Compatibility constructor mapping declared normalized scores and categories into
+	 * assessment.
+	 * @param status producer disposition
+	 * @param score normalized quality score, or null
+	 * @param label declared selected category, or null
+	 * @param reasonCode producer reason code
+	 * @param reasoning producer explanation
+	 * @param checks child checks
+	 * @param metadata portable metadata
+	 */
+	public Judgment(JudgmentStatus status, @Nullable Double score, @Nullable String label,
+			@Nullable JudgmentReasonCode reasonCode, String reasoning, List<Check> checks,
+			Map<String, Object> metadata) {
+		this(status, legacyAssessment(score, label), null, null, reasonCode, reasoning, checks, null, null, metadata);
+	}
+
+	private static @Nullable Assessment legacyAssessment(@Nullable Double score, @Nullable String label) {
+		if (score == null && label == null) {
+			return null;
+		}
+		if (score != null) {
+			requireNormalized("score", score);
+		}
+		if (label != null) {
+			ValueRequirements.text(label, "label");
+		}
+		return new Assessment(null,
+				score == null ? null
+						: new NumericAssessment(score, NumericKind.MEASUREMENT, "normalized-quality:v1", 0, 1,
+								List.of(), QualityDirection.INCREASING),
+				label == null ? null : new Category(label, List.of(label)));
+	}
+
+	/**
+	 * Returns operational disposition derived from producer status and policy application.
+	 * @return operational disposition derived from producer status and policy application
+	 */
+	public JudgmentStatus status() {
+		if (policyApplication instanceof PolicyFailure) {
+			return JudgmentStatus.ERROR;
+		}
+		if (policyApplication instanceof AppliedPolicy applied && applied.action() != AcceptanceAction.USE_ASSESSMENT) {
+			return JudgmentStatus.ABSTAIN;
+		}
+		return producerStatus;
+	}
+
+	/**
+	 * Returns operational instrument/subject cause, never a retained subject code on policy ERROR.
+	 * @return operational instrument/subject cause, never a retained subject code on
+	 * policy ERROR
+	 */
+	public @Nullable JudgmentReasonCode operationalReasonCode() {
+		if (policyApplication instanceof PolicyFailure failure) {
+			return failure.reasonCode();
+		}
+		if (policyApplication instanceof AppliedPolicy applied && applied.action() != AcceptanceAction.USE_ASSESSMENT) {
+			return null;
+		}
+		return reasonCode;
+	}
+
+	/**
+	 * Returns policy explanation on policy failure/withholding, otherwise producer reasoning.
+	 * @return policy explanation on policy failure/withholding, otherwise producer
+	 * reasoning
+	 */
+	public String operationalReasoning() {
+		if (policyApplication instanceof PolicyFailure failure) {
+			return failure.reason();
+		}
+		if (policyApplication instanceof AppliedPolicy applied && applied.action() != AcceptanceAction.USE_ASSESSMENT) {
+			return applied.reason();
+		}
+		return reasoning;
+	}
+
+	/**
+	 * Returns derived normalized numeric quality, absent without an explicit quality direction.
+	 * @return derived normalized numeric quality, absent without an explicit quality
+	 * direction
+	 */
+	public @Nullable Double score() {
+		if (assessment == null || assessment.numeric() == null) {
+			return null;
+		}
+		OptionalDouble score = assessment.numeric().qualityScore();
+		return score.isPresent() ? score.getAsDouble() : null;
+	}
+
+	/**
+	 * Returns selected category, absent when there is none.
+	 * @return selected category, absent when there is none
+	 */
+	public @Nullable String label() {
+		return assessment == null || assessment.category() == null ? null : assessment.category().selected();
+	}
+
 	/**
 	 * Whether a status is meaningless without an explanation.
 	 * <p>
-	 * Each of these three records that something did <em>not</em> happen, and the only carrier
-	 * of what that was is the prose.
+	 * Each of these three records that something did <em>not</em> happen, and the only
+	 * carrier of what that was is the prose.
 	 * </p>
 	 * @param status the judgment status
 	 * @return true when reasoning must be non-blank
@@ -262,8 +273,8 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 						"ERROR requires a reasonCode: an instrument failure nobody can count is a failure nobody fixes");
 			}
 			if (reasonCode.family() != JudgmentReasonCode.Family.INSTRUMENT) {
-				throw new IllegalArgumentException("ERROR requires an instrument reasonCode, but " + reasonCode.wireName()
-						+ " describes the subject");
+				throw new IllegalArgumentException("ERROR requires an instrument reasonCode, but "
+						+ reasonCode.wireName() + " describes the subject");
 			}
 			return;
 		}
@@ -272,8 +283,8 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		}
 		if (status == JudgmentStatus.FAIL) {
 			if (reasonCode.family() != JudgmentReasonCode.Family.SUBJECT) {
-				throw new IllegalArgumentException("FAIL may only carry a subject reasonCode, but " + reasonCode.wireName()
-						+ " says the instrument failed; report that as an ERROR instead");
+				throw new IllegalArgumentException("FAIL may only carry a subject reasonCode, but "
+						+ reasonCode.wireName() + " says the instrument failed; report that as an ERROR instead");
 			}
 			return;
 		}
@@ -284,12 +295,13 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	/**
 	 * Enforce the origin a propagating aggregate owes.
 	 * <p>
-	 * Validation reads the already-frozen metadata, so what is checked is exactly what the
-	 * judgment will hold — including the portable integer range, which
-	 * {@link PortableValues} has already applied to every count. This is therefore the single
-	 * place the count domain is decided: a positive integral value within that range, read as a
-	 * {@code long}. It validates structure, not authenticity: it proves the aggregate names
-	 * terminal causes with positive counts, not that those causes really occurred.
+	 * Validation reads the already-frozen metadata, so what is checked is exactly what
+	 * the judgment will hold — including the portable integer range, which
+	 * {@link PortableValues} has already applied to every count. This is therefore the
+	 * single place the count domain is decided: a positive integral value within that
+	 * range, read as a {@code long}. It validates structure, not authenticity: it proves
+	 * the aggregate names terminal causes with positive counts, not that those causes
+	 * really occurred.
 	 * </p>
 	 * @param metadata the frozen metadata
 	 */
@@ -312,13 +324,15 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 			}
 			Object count = entry.getValue();
 			// Any integral box the portable algebra admits, read in the one count domain.
-			// Reading it as an int here instead would make the accepted domain wider than the
-			// checked one, which is how a count survives validation and is then corrupted.
+			// Reading it as an int here instead would make the accepted domain wider than
+			// the
+			// checked one, which is how a count survives validation and is then
+			// corrupted.
 			boolean positiveInteger = (count instanceof Byte || count instanceof Short || count instanceof Integer
 					|| count instanceof Long) && ((Number) count).longValue() > 0L;
 			if (!positiveInteger) {
-				throw new IllegalArgumentException("'" + ERROR_CODE_COUNTS_KEY + "' counts must be positive integers, but "
-						+ code.wireName() + " was given " + count);
+				throw new IllegalArgumentException("'" + ERROR_CODE_COUNTS_KEY
+						+ "' counts must be positive integers, but " + code.wireName() + " was given " + count);
 			}
 		}
 	}
@@ -328,60 +342,51 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	 * @return true if status is PASS
 	 */
 	public boolean pass() {
-		return status == JudgmentStatus.PASS;
+		return status() == JudgmentStatus.PASS;
 	}
 
 	/**
 	 * Check whether the judge failed to complete its evaluation.
 	 * <p>
 	 * Distinct from {@link #pass()} being false: a {@code FAIL} means the judge completed
-	 * and rejected the subject, whereas an {@code ERROR} means it never reached a finding.
-	 * The explanation is in {@link #reasoning()}; the original exception, if any, was
-	 * logged where it was caught.
+	 * and rejected the subject, whereas an {@code ERROR} means it never reached a
+	 * finding. The explanation is in {@link #reasoning()}; the original exception, if
+	 * any, was logged where it was caught.
 	 * </p>
 	 * @return true if status is ERROR
 	 */
 	public boolean hasError() {
-		return status == JudgmentStatus.ERROR;
+		return status() == JudgmentStatus.ERROR;
 	}
 
 	/**
 	 * Check whether the criterion did not apply to this subject.
 	 * <p>
-	 * Distinct from {@link #pass()} being false and from {@link #hasError()}: the instrument
-	 * worked and the question was simply the wrong one to ask here. A reader excludes this
-	 * judgment from its denominator and counts it separately, rather than scoring it.
+	 * Distinct from {@link #pass()} being false and from {@link #hasError()}: the
+	 * instrument worked and the question was simply the wrong one to ask here. A reader
+	 * excludes this judgment from its denominator and counts it separately, rather than
+	 * scoring it.
 	 * </p>
 	 * @return true if status is NOT_APPLICABLE
 	 * @since 0.17.0
 	 */
 	public boolean notApplicable() {
-		return status == JudgmentStatus.NOT_APPLICABLE;
+		return status() == JudgmentStatus.NOT_APPLICABLE;
 	}
 
 	/**
-	 * The numeric view of this judgment, for strategies that deliberately treat a Boolean
-	 * outcome as a number.
-	 * <p>
-	 * This is a derived view, never stored state:
-	 * </p>
-	 * <ul>
-	 * <li>an explicit {@code score} if the judge measured one;</li>
-	 * <li>otherwise {@code 1.0} for {@code PASS} and {@code 0.0} for {@code FAIL};</li>
-	 * <li>otherwise empty — {@code ABSTAIN} and {@code ERROR} made no assessment, and zero
-	 * is a real assessment rather than the absence of one.</li>
-	 * </ul>
-	 * @return the normalized numeric contribution, or empty when there is none
+	 * Derived voting view, present only for operational PASS and FAIL. An explicitly
+	 * directed numeric assessment supplies normalized quality; otherwise status supplies
+	 * PASS=1 or FAIL=0. Withheld assessment remains raw but contributes no vote. This
+	 * view never reads certainty or distribution.
+	 * @return normalized voting contribution, or empty for every inconclusive outcome
 	 */
 	public OptionalDouble effectiveScore() {
-		if (score != null) {
-			return OptionalDouble.of(score);
+		if (status() != JudgmentStatus.PASS && status() != JudgmentStatus.FAIL) {
+			return OptionalDouble.empty();
 		}
-		return switch (status) {
-			case PASS -> OptionalDouble.of(1.0);
-			case FAIL -> OptionalDouble.of(0.0);
-			case ABSTAIN, NOT_APPLICABLE, ERROR -> OptionalDouble.empty();
-		};
+		Double score = score();
+		return OptionalDouble.of(score == null ? (status() == JudgmentStatus.PASS ? 1 : 0) : score);
 	}
 
 	/**
@@ -421,14 +426,14 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	/**
 	 * Create an abstaining judgment with reasoning.
 	 * <p>
-	 * Used when the criterion applies and this is the right instrument, but the judge could
-	 * not decide. It carries no score: abstention means no assessment was made, which is not
-	 * the same fact as an assessment of zero.
+	 * Used when the criterion applies and this is the right instrument, but the judge
+	 * could not decide. It may retain a raw assessment, which is distinct from the same
+	 * fact as an assessment of zero.
 	 * </p>
 	 * <p>
 	 * A criterion that does not apply to this subject at all is
-	 * {@link #notApplicable(String)}, which is excluded from a denominator rather than left
-	 * undecided within it.
+	 * {@link #notApplicable(String)}, which is excluded from a denominator rather than
+	 * left undecided within it.
 	 * </p>
 	 * @param reasoning why the judge could not decide; must be non-blank
 	 * @return abstaining judgment
@@ -440,16 +445,17 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	/**
 	 * Create a judgment that the criterion does not apply to this subject.
 	 * <p>
-	 * Only where the subject by definition lacks what the criterion is about. Evidence that is
-	 * merely missing is {@link #abstain(String)}. The reasoning is required and is what makes
-	 * the exclusion auditable: it must say what the subject lacks.
+	 * Only where the subject by definition lacks what the criterion is about. Evidence
+	 * that is merely missing is {@link #abstain(String)}. The reasoning is required and
+	 * is what makes the exclusion auditable: it must say what the subject lacks.
 	 * </p>
 	 * <p>
-	 * A jury honours this only from a seat that declared in advance that it can exclude; an
-	 * undeclared exclusion is contained as an error, so a judge cannot dodge a criterion after
-	 * seeing it.
+	 * A jury honours this only from a seat that declared in advance that it can exclude;
+	 * an undeclared exclusion is contained as an error, so a judge cannot dodge a
+	 * criterion after seeing it.
 	 * </p>
-	 * @param reasoning what the subject lacks that the criterion is about; must be non-blank
+	 * @param reasoning what the subject lacks that the criterion is about; must be
+	 * non-blank
 	 * @return a not-applicable judgment
 	 * @since 0.17.0
 	 */
@@ -478,8 +484,8 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	/**
 	 * Create an error judgment with an explicit countable cause.
 	 * @param reasonCode the instrument code naming the cause; not
-	 * {@link JudgmentReasonCode#ERRORS_PROPAGATED}, which requires an origin and is built by
-	 * {@link #propagatedError}
+	 * {@link JudgmentReasonCode#ERRORS_PROPAGATED}, which requires an origin and is built
+	 * by {@link #propagatedError}
 	 * @param reasoning why no finding was reached; must be non-blank
 	 * @return error judgment
 	 * @since 0.17.0
@@ -489,31 +495,32 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	}
 
 	/**
-	 * Create the {@link JudgmentReasonCode#ERRORS_PROPAGATED} aggregate for a set of errored
-	 * inputs, atomically with the origin that makes it countable.
+	 * Create the {@link JudgmentReasonCode#ERRORS_PROPAGATED} aggregate for a set of
+	 * errored inputs, atomically with the origin that makes it countable.
 	 * <p>
-	 * A propagating aggregate is not itself a cause; it stands for the causes it propagated.
-	 * Those live in its aggregation evidence under {@value #ERROR_CODE_COUNTS_KEY}, and the
-	 * constructor refuses the code without them, so there is no moment at which a propagated
-	 * error exists with nothing to attribute it to.
+	 * A propagating aggregate is not itself a cause; it stands for the causes it
+	 * propagated. Those live in its aggregation evidence under
+	 * {@value #ERROR_CODE_COUNTS_KEY}, and the constructor refuses the code without them,
+	 * so there is no moment at which a propagated error exists with nothing to attribute
+	 * it to.
 	 * </p>
 	 * <p>
-	 * The map is flattened: a propagated input contributes the origins <em>it</em> propagated,
-	 * never {@code errors_propagated} itself. Counts may therefore exceed the number of errored
-	 * inputs.
+	 * The map is flattened: a propagated input contributes the origins <em>it</em>
+	 * propagated, never {@code errors_propagated} itself. Counts may therefore exceed the
+	 * number of errored inputs.
 	 * </p>
 	 * <p>
-	 * Counts are {@code long} because that is the domain the wire and the constructor already
-	 * accept: a portable integer reaches 9,007,199,254,740,991. A narrower parameter here would
-	 * silently narrow every count that passes through a reduction, which is corruption rather
-	 * than rejection.
+	 * Counts are {@code long} because that is the domain the wire and the constructor
+	 * already accept: a portable integer reaches 9,007,199,254,740,991. A narrower
+	 * parameter here would silently narrow every count that passes through a reduction,
+	 * which is corruption rather than rejection.
 	 * </p>
-	 * @param origin terminal codes to positive counts within the portable integer range; must be
-	 * non-empty and must not contain {@link JudgmentReasonCode#ERRORS_PROPAGATED}
+	 * @param origin terminal codes to positive counts within the portable integer range;
+	 * must be non-empty and must not contain {@link JudgmentReasonCode#ERRORS_PROPAGATED}
 	 * @param reasoning why the aggregate is an error; must be non-blank
 	 * @return the propagating error judgment, carrying its origin
-	 * @throws IllegalArgumentException if the origin is empty, holds a non-terminal key, or
-	 * holds a count that is not a positive portable integer
+	 * @throws IllegalArgumentException if the origin is empty, holds a non-terminal key,
+	 * or holds a count that is not a positive portable integer
 	 * @since 0.17.0
 	 */
 	public static Judgment propagatedError(Map<JudgmentReasonCode, Long> origin, String reasoning) {
@@ -521,25 +528,25 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		evidence.put(ERROR_CODE_COUNTS_KEY, portableOriginCounts(origin));
 		Map<String, Object> metadata = new LinkedHashMap<>();
 		metadata.put(AGGREGATION_KEY, evidence);
-		return new Judgment(JudgmentStatus.ERROR, null, null, JudgmentReasonCode.ERRORS_PROPAGATED, reasoning, List.of(),
-				metadata);
+		return new Judgment(JudgmentStatus.ERROR, null, null, JudgmentReasonCode.ERRORS_PROPAGATED, reasoning,
+				List.of(), metadata);
 	}
 
 	/**
 	 * Project origin counts into the portable block that lives under
 	 * {@value #ERROR_CODE_COUNTS_KEY}.
 	 * <p>
-	 * This is the one place the portable form of a count is decided, so the block a jury writes
-	 * as evidence and the block a propagating aggregate carries as its invariant cannot drift
-	 * apart. A custom strategy writing the universal evidence keys itself uses it for the same
-	 * reason.
+	 * This is the one place the portable form of a count is decided, so the block a jury
+	 * writes as evidence and the block a propagating aggregate carries as its invariant
+	 * cannot drift apart. A custom strategy writing the universal evidence keys itself
+	 * uses it for the same reason.
 	 * </p>
 	 * <p>
-	 * Each count is boxed as the narrowest integer type that holds it <em>exactly</em> — which
-	 * is the type a JSON reader produces for the same number, so a judgment in memory and the
-	 * same judgment read back from the wire are equal. The value is never changed; only its box
-	 * is chosen. The domain is {@code long} throughout, because a count is a portable integer and
-	 * those reach far beyond {@code int}.
+	 * Each count is boxed as the narrowest integer type that holds it <em>exactly</em> —
+	 * which is the type a JSON reader produces for the same number, so a judgment in
+	 * memory and the same judgment read back from the wire are equal. The value is never
+	 * changed; only its box is chosen. The domain is {@code long} throughout, because a
+	 * count is a portable integer and those reach far beyond {@code int}.
 	 * </p>
 	 * @param origin terminal codes to positive counts within the portable integer range
 	 * @return wire name to count, in encounter order
@@ -584,14 +591,15 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	 */
 	public static ScoredJudgment scored(double normalizedScore) {
 		requireNormalized("score", normalizedScore);
-		return new ScoredStage(normalizedScore);
+		return new ScoredStage(new NumericAssessment(normalizedScore, NumericKind.MEASUREMENT, "normalized-quality:v1",
+				0, 1, List.of(), QualityDirection.INCREASING));
 	}
 
 	/**
 	 * Begin a quantitative judgment from a raw value on a declared finite scale.
 	 * <p>
-	 * The raw value is normalized once here and is not retained as a second competing score.
-	 * The caller must still state the normalized acceptance threshold through
+	 * The raw value and bounds are retained; normalization is only a derived quality
+	 * view. The caller must still state the normalized acceptance threshold through
 	 * {@link ScoredJudgment#passingAt(double)}.
 	 * </p>
 	 * @param value the raw value, within [minimum, maximum]
@@ -609,13 +617,8 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		if (value < minimum || value > maximum) {
 			throw new IllegalArgumentException("value must be between minimum and maximum, but was " + value);
 		}
-		double range = maximum - minimum;
-		if (!Double.isFinite(range)) {
-			throw new IllegalArgumentException("maximum - minimum must be finite");
-		}
-		double normalizedScore = (value - minimum) / range;
-		requireNormalized("normalized score", normalizedScore);
-		return new ScoredStage(normalizedScore);
+		return new ScoredStage(new NumericAssessment(value, NumericKind.MEASUREMENT, "declared-quality-range:v1",
+				minimum, maximum, List.of(), QualityDirection.INCREASING));
 	}
 
 	private static void requireNormalized(String name, double value) {
@@ -630,8 +633,8 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	 * Begin a judgment by selecting its required outcome.
 	 * <p>
 	 * The selected outcome narrows the methods offered by the next stage. In particular,
-	 * ABSTAIN cannot carry a score, ERROR can carry neither a score nor a label, and both
-	 * require reasoning before {@code build()} is available.
+	 * ERROR cannot carry assessment, and ABSTAIN and ERROR require reasoning before
+	 * {@code build()} is available.
 	 * </p>
 	 * @return the outcome-selection stage
 	 */
@@ -642,16 +645,19 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	/**
 	 * Copy this judgment into a builder for immutable enrichment.
 	 * <p>
-	 * All six value components are preserved. Subsequent metadata calls accumulate entries
+	 * All value components are preserved. Subsequent metadata calls accumulate entries
 	 * and replace only matching keys.
 	 * </p>
 	 * @return a builder initialized from this judgment
 	 */
 	public EnrichmentBuilder toBuilder() {
 		Builder builder = new Builder();
-		builder.status = this.status;
-		builder.score = this.score;
-		builder.label = this.label;
+		builder.status = this.producerStatus;
+		builder.assessment = this.assessment;
+		builder.certainty = this.certainty;
+		builder.distribution = this.distribution;
+		builder.provenance = this.provenance;
+		builder.policyApplication = this.policyApplication;
 		builder.reasonCode = this.reasonCode;
 		builder.reasoning = this.reasoning;
 		builder.checks = new ArrayList<>(this.checks);
@@ -692,8 +698,8 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		/**
 		 * Select an error outcome, coded {@link JudgmentReasonCode#JUDGE_REPORTED}.
 		 * <p>
-		 * The default is the judge's own report of its failure. Infrastructure that knows a more
-		 * specific shape states it through {@link #error(JudgmentReasonCode)}.
+		 * The default is the judge's own report of its failure. Infrastructure that knows
+		 * a more specific shape states it through {@link #error(JudgmentReasonCode)}.
 		 * </p>
 		 * @return a stage requiring ERROR reasoning
 		 */
@@ -722,12 +728,16 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 
 	}
 
-	private record ScoredStage(double normalizedScore) implements ScoredJudgment {
+	private record ScoredStage(NumericAssessment numeric) implements ScoredJudgment {
 
 		@Override
 		public FindingBuilder passingAt(double normalizedThreshold) {
 			requireNormalized("threshold", normalizedThreshold);
-			return verdict(this.normalizedScore >= normalizedThreshold).score(this.normalizedScore);
+			Builder builder = new Builder();
+			builder.status = numeric.qualityScore().orElseThrow() >= normalizedThreshold ? JudgmentStatus.PASS
+					: JudgmentStatus.FAIL;
+			builder.assessment = new Assessment(null, numeric, null);
+			return builder;
 		}
 
 	}
@@ -799,8 +809,8 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		/**
 		 * Record the countable subject cause of a rejection.
 		 * <p>
-		 * Legal on {@code FAIL} only, and optional there: a {@code FAIL} with no code is an
-		 * uncoded rejection, explained by its reasoning alone.
+		 * Legal on {@code FAIL} only, and optional there: a {@code FAIL} with no code is
+		 * an uncoded rejection, explained by its reasoning alone.
 		 * </p>
 		 * @param reasonCode a {@link JudgmentReasonCode.Family#SUBJECT} code
 		 * @return this builder
@@ -892,9 +902,8 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 	/**
 	 * Builder for a reasoned NOT_APPLICABLE outcome.
 	 * <p>
-	 * A label is legitimate here: the judge completed and may have classified <em>why</em> the
-	 * criterion does not apply. A score is not: an excluded criterion was never assessed, and
-	 * zero is a real assessment rather than the absence of one.
+	 * Assessment is forbidden: the criterion was not evaluated. The legacy label method
+	 * remains only for source compatibility and rejects construction when used.
 	 * </p>
 	 *
 	 * @since 0.17.0
@@ -909,7 +918,8 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		NotApplicableBuilder reasoning(String reasoning);
 
 		/**
-		 * Set a completed classification of why the criterion does not apply.
+		 * Legacy source bridge. Supplying a label is rejected at construction because
+		 * NOT_APPLICABLE forbids assessment; retain the exclusion in reasoning.
 		 * @param label completed classification
 		 * @return this builder
 		 */
@@ -987,9 +997,15 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		/** Null until an outcome stage is selected; {@link #build()} requires it. */
 		private @Nullable JudgmentStatus status;
 
-		private @Nullable Double score;
+		private @Nullable Assessment assessment;
 
-		private @Nullable String label;
+		private @Nullable Certainty certainty;
+
+		private @Nullable Distribution distribution;
+
+		private @Nullable EvaluationProvenance provenance;
+
+		private @Nullable PolicyApplication policyApplication;
 
 		private @Nullable JudgmentReasonCode reasonCode;
 
@@ -1072,7 +1088,11 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 			if (score < 0.0 || score > 1.0) {
 				throw new IllegalArgumentException("score must be between 0.0 and 1.0, but was " + score);
 			}
-			this.score = score;
+			Assessment previous = this.assessment;
+			this.assessment = new Assessment(previous == null ? null : previous.proposition(),
+					new NumericAssessment(score, NumericKind.MEASUREMENT, "normalized-quality:v1", 0, 1, List.of(),
+							QualityDirection.INCREASING),
+					previous == null ? null : previous.category());
 			return this;
 		}
 
@@ -1086,7 +1106,9 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 			if (label.isBlank()) {
 				throw new IllegalArgumentException("label must be non-blank when present");
 			}
-			this.label = label;
+			Assessment previous = this.assessment;
+			this.assessment = new Assessment(previous == null ? null : previous.proposition(),
+					previous == null ? null : previous.numeric(), new Category(label, List.of(label)));
 			return this;
 		}
 
@@ -1127,9 +1149,8 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		}
 
 		/**
-		 * Add several metadata entries.
-		 * Existing entries are retained; values in this map replace entries with the same
-		 * key.
+		 * Add several metadata entries. Existing entries are retained; values in this map
+		 * replace entries with the same key.
 		 * @param metadata the entries; must not contain the reserved
 		 * {@value Judgment#AGGREGATION_KEY} key
 		 * @return this builder
@@ -1150,12 +1171,15 @@ public record Judgment(JudgmentStatus status, @Nullable Double score, @Nullable 
 		}
 
 		public Judgment build() {
-			// The staged interfaces make build() unreachable before an outcome is selected,
-			// but that invariant is invisible to a nullness checker reading this class. State
-			// it where the value is used rather than trusting the stage types; the message
+			// The staged interfaces make build() unreachable before an outcome is
+			// selected,
+			// but that invariant is invisible to a nullness checker reading this class.
+			// State
+			// it where the value is used rather than trusting the stage types; the
+			// message
 			// matches the one the compact constructor would otherwise raise.
-			return new Judgment(Objects.requireNonNull(status, "status must not be null"), score, label, reasonCode,
-					reasoning, checks, metadata);
+			return new Judgment(Objects.requireNonNull(status, "status must not be null"), assessment, certainty,
+					distribution, reasonCode, reasoning, checks, provenance, policyApplication, metadata);
 		}
 
 	}

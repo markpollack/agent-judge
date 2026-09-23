@@ -9,18 +9,18 @@
  * {@link io.github.markpollack.judge.result.JudgmentReasonCode} and
  * {@link io.github.markpollack.judge.result.Check}.
  *
- * <h2>Three ways of not passing, told apart</h2>
+ * <h2>Four ways of not passing, told apart</h2>
  *
  * <p>A result that cannot distinguish them cannot produce an honest rate, because each belongs in
  * a different place in the arithmetic:
  *
  * <ul>
  *   <li>{@code FAIL} — the question was asked and answered no. Counted, against the subject.</li>
- *   <li>{@code ABSTAIN} — the question applied and has no answer yet. Counted; no vote cast.</li>
+ *   <li>{@code ABSTAIN} — the criterion applies but no usable conclusion is available. Raw assessment may remain; no vote cast.</li>
  *   <li>{@code NOT_APPLICABLE} — the question should not have been asked here. <em>Excluded</em>
  *       from the denominator, and counted separately so a reader can say how much of a rubric
  *       applied.</li>
- *   <li>{@code ERROR} — the instrument never reached a finding. Excluded from the subject
+ *   <li>{@code ERROR} — the producer or application policy failed. Raw producer facts may remain after policy failure. Excluded from the subject
  *       denominator and counted as an instrument failure.</li>
  * </ul>
  *
@@ -30,8 +30,9 @@
  *
  * <h2>One countable code plus mandatory free text</h2>
  *
- * <p>Every {@code ERROR} carries a {@code JudgmentReasonCode} from the instrument family, because
- * an instrument failure nobody can count is a failure nobody fixes. A {@code FAIL} may carry one
+ * <p>Every operational {@code ERROR} exposes an instrument-family cause through
+ * {@link io.github.markpollack.judge.result.Judgment#operationalReasonCode()}, because
+ * an instrument failure nobody can count is a failure nobody fixes. A producer {@code FAIL} may carry one
  * from the subject family, and usually does not: most rejections are explained in prose, and
  * forcing a category would manufacture a taxonomy nobody asked for. The code is what a reader
  * counts; the reasoning is what a human reads; neither substitutes for the other, and a code is
@@ -45,7 +46,7 @@
  * <p>This package is {@link org.jspecify.annotations.NullMarked}: every reference type in a
  * declaration here is non-null unless it is explicitly annotated
  * {@link org.jspecify.annotations.Nullable}. That makes the optionality of
- * {@code Judgment.score} and {@code Judgment.label} visible to readers, reflection, and
+ * assessment, native support, provenance and policy application visible to readers, reflection, and
  * schema derivers rather than only to prose.
  *
  * <p>Values here are results, so they are portable: {@code Judgment} metadata accepts only
@@ -58,7 +59,8 @@
  * <p>JSpecify supplies vocabulary, not enforcement. Main sources in this package are checked
  * by NullAway at {@code ERROR} during {@code default-compile}, in JSpecify mode with
  * {@code OnlyNullMarked=true}; see {@code agent-judge-core/pom.xml}. Adoption is per package:
- * this package and {@code io.github.markpollack.judge.description} have opted in, and
+ * this package, {@code io.github.markpollack.judge.description}, and
+ * {@code io.github.markpollack.judge.jury.interpretation} have opted in, and
  * extending {@code @NullMarked} to another package is separate work with its own diagnostic
  * triage.
  */

@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * </p>
  *
  * <p>
- * The central distinction this enum draws is between three ways of not passing:
+ * The central distinction this enum draws is between four ways of not passing:
  * </p>
  * <table border="1">
  * <caption>Not passing, told apart</caption>
@@ -61,7 +61,8 @@ public enum JudgmentStatus {
 	FAIL("fail"),
 
 	/**
-	 * The criterion applies and this is the right instrument, but the judge could not decide.
+	 * The criterion applies, but no usable conclusion is available under this evaluation.
+	 * A producer assessment may remain even when the producer or application policy abstains.
 	 * <p>
 	 * Missing evidence, an ambiguous artifact, a model that would not commit: the question was
 	 * the right one to ask and it has no answer yet. A judge that reached no decision casts no
@@ -93,7 +94,8 @@ public enum JudgmentStatus {
 	NOT_APPLICABLE("not_applicable"),
 
 	/**
-	 * Judge encountered an error during evaluation.
+	 * The producer or application policy encountered an instrument error.
+	 * A policy failure retains the original producer assessment.
 	 */
 	ERROR("error");
 

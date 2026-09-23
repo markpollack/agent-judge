@@ -60,7 +60,8 @@ class VotingStrategyCharacterizationTest {
 			case PASS -> Judgment.builder().pass().label(label).reasoning("classified " + label).build();
 			case FAIL -> Judgment.builder().fail().label(label).reasoning("classified " + label).build();
 			case ABSTAIN -> Judgment.builder().abstain().reasoning("classified " + label).label(label).build();
-			case NOT_APPLICABLE -> Judgment.builder().notApplicable().reasoning("classified " + label).label(label).build();
+			case NOT_APPLICABLE ->
+				Judgment.builder().notApplicable().reasoning("classified " + label).label(label).build();
 			case ERROR -> throw new IllegalArgumentException("ERROR cannot carry a classification label");
 		};
 	}
@@ -128,14 +129,14 @@ class VotingStrategyCharacterizationTest {
 		}
 
 		@Test
-		@DisplayName("CHANGED: score and status can no longer contradict (was constructible)")
+		@DisplayName("ABSTAIN retains a measurement without voting; ERROR forbids one")
 		void contradictionRefused() {
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ABSTAIN, 0.4, null, null, "x", List.of(), Map.of()))
+			assertThat(new Judgment(JudgmentStatus.ABSTAIN, 0.4, null, null, "x", List.of(), Map.of()).effectiveScore())
+				.isEmpty();
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, 0.0, null, JudgmentReasonCode.JUDGE_REPORTED,
+					"x", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("no completed measurement");
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, 0.0, null, JudgmentReasonCode.JUDGE_REPORTED, "x", List.of(), Map.of()))
-				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("no completed measurement");
+				.hasMessageContaining("must not carry assessment");
 		}
 
 	}
@@ -258,10 +259,9 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: even count averages the two middle values")
 		void evenCount() {
-			Judgment result = strategy.aggregate(
-					List.of(numeric(0.2, JudgmentStatus.FAIL), numeric(0.4, JudgmentStatus.FAIL),
-							numeric(0.6, JudgmentStatus.PASS), numeric(0.8, JudgmentStatus.PASS)),
-					Map.of());
+			Judgment result = strategy
+				.aggregate(List.of(numeric(0.2, JudgmentStatus.FAIL), numeric(0.4, JudgmentStatus.FAIL),
+						numeric(0.6, JudgmentStatus.PASS), numeric(0.8, JudgmentStatus.PASS)), Map.of());
 
 			assertThat(result.score()).isCloseTo(0.5, within());
 		}
@@ -272,7 +272,8 @@ class VotingStrategyCharacterizationTest {
 			Judgment result = strategy.aggregate(List.of(numeric(0.9, JudgmentStatus.PASS),
 					numeric(0.8, JudgmentStatus.PASS), Judgment.abstain("n/a")), Map.of());
 
-			// Was 0.8, with the abstention sorted in as a zero; now the median of {0.8, 0.9}.
+			// Was 0.8, with the abstention sorted in as a zero; now the median of {0.8,
+			// 0.9}.
 			assertThat(result.score()).isCloseTo(0.85, within());
 		}
 
@@ -317,10 +318,11 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: empty weights still mean equal weighting; evidence now preserves attribution")
 		void emptyWeightsComputeInStrategy() {
-			Judgment result = strategy.aggregate(
-					List.of(numeric(1.0, JudgmentStatus.PASS), numeric(0.0, JudgmentStatus.FAIL)), Map.of());
+			Judgment result = strategy
+				.aggregate(List.of(numeric(1.0, JudgmentStatus.PASS), numeric(0.0, JudgmentStatus.FAIL)), Map.of());
 
-			// The value is unchanged; the attribution is not. Delegating would have stamped
+			// The value is unchanged; the attribution is not. Delegating would have
+			// stamped
 			// "average" onto a verdict the caller produced with WeightedAverageStrategy.
 			assertThat(result.score()).isCloseTo(0.5, within());
 			assertThat(evidence(result)).containsEntry(AggregationEvidence.STRATEGY, "weightedAverage");
@@ -377,7 +379,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: positive input weight but zero eligible weight yields ABSTAIN, not NaN")
 		void zeroEligibleWeightYieldsAbstain() {
-			// The only positively weighted judge abstains, leaving a zero-weight survivor.
+			// The only positively weighted judge abstains, leaving a zero-weight
+			// survivor.
 			Judgment result = strategy.aggregate(List.of(Judgment.abstain("n/a"), numeric(1.0, JudgmentStatus.PASS)),
 					Map.of("0", 1.0, "1", 0.0));
 
@@ -432,7 +435,8 @@ class VotingStrategyCharacterizationTest {
 			Judgment result = strategy
 				.aggregate(List.of(statusOnly(JudgmentStatus.PASS), statusOnly(JudgmentStatus.PASS)), Map.of());
 
-			// Was FAIL: two PASS judgments with no score fell through toBoolean() to false.
+			// Was FAIL: two PASS judgments with no score fell through toBoolean() to
+			// false.
 			assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		}
 
@@ -451,7 +455,8 @@ class VotingStrategyCharacterizationTest {
 		void failPlusAbstainFails() {
 			Judgment result = strategy.aggregate(List.of(booleanJudgment(false), Judgment.abstain("n/a")), Map.of());
 
-			// Was FAIL too, but reported "Unanimous consensus" over a manufactured fail vote.
+			// Was FAIL too, but reported "Unanimous consensus" over a manufactured fail
+			// vote.
 			assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 			assertThat(result.reasoning()).contains("1 applicable judge");
 		}
@@ -541,8 +546,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: Majority reads status and ignores numeric score magnitude")
 		void numericScoresDoNotOverrideStatus() {
-			Judgment result = strategy.aggregate(
-					List.of(numeric(0.9, JudgmentStatus.FAIL), numeric(0.95, JudgmentStatus.FAIL)), Map.of());
+			Judgment result = strategy
+				.aggregate(List.of(numeric(0.9, JudgmentStatus.FAIL), numeric(0.95, JudgmentStatus.FAIL)), Map.of());
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		}
@@ -550,7 +555,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: the default error policy is PROPAGATE (was an implicit TREAT_AS_FAIL)")
 		void defaultErrorPolicyPropagates() {
-			// The pre-migration BASELINE case: the default was demonstrably TREAT_AS_FAIL,
+			// The pre-migration BASELINE case: the default was demonstrably
+			// TREAT_AS_FAIL,
 			// but nothing recorded that as a choice. Both shapes below returned FAIL.
 			assertThat(strategy.aggregate(List.of(Judgment.error("boom"), Judgment.error("boom")), Map.of()).status())
 				.isEqualTo(JudgmentStatus.ERROR);
@@ -628,9 +634,8 @@ class VotingStrategyCharacterizationTest {
 			// weight included — rather than zeroing its contribution while still dividing
 			// by its weight. Consuming the weight would drag the mean toward zero, which
 			// is the silent negative vote the migration exists to remove.
-			Judgment result = new WeightedAverageStrategy(ErrorPolicy.IGNORE)
-				.aggregate(List.of(numeric(0.8, JudgmentStatus.PASS), Judgment.error("boom")),
-						Map.of("0", 1.0, "1", 3.0));
+			Judgment result = new WeightedAverageStrategy(ErrorPolicy.IGNORE).aggregate(
+					List.of(numeric(0.8, JudgmentStatus.PASS), Judgment.error("boom")), Map.of("0", 1.0, "1", 3.0));
 
 			assertThat(result.score()).isCloseTo(0.8, within());
 			assertThat(evidence(result)).containsEntry(AggregationEvidence.INPUT_WEIGHT, 4.0)
@@ -687,7 +692,8 @@ class VotingStrategyCharacterizationTest {
 			assertThat(evidence(new ConsensusStrategy().aggregate(judgments, Map.of())))
 				.containsKeys(AggregationEvidence.PASS_COUNT, AggregationEvidence.FAIL_COUNT);
 
-			// Numeric strategies count no votes; emitting zeros would read as real counts.
+			// Numeric strategies count no votes; emitting zeros would read as real
+			// counts.
 			assertThat(evidence(new AverageVotingStrategy().aggregate(judgments, Map.of())))
 				.doesNotContainKeys(AggregationEvidence.PASS_COUNT, AggregationEvidence.FAIL_COUNT);
 			assertThat(evidence(new MedianVotingStrategy().aggregate(judgments, Map.of())))

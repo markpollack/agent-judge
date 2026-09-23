@@ -59,22 +59,23 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * The cross-cutting 0.14 contract, proved once on one artifact.
  *
  * <p>
- * M2 (declared optionality), M3 (recursively portable, recursively frozen result values and
- * the {@code elapsedMillis} timing convention) and M5 (mixed applicable votes aggregate to
- * {@code ABSTAIN}) each have their own focused corpus. Passing separately is weaker than it
- * looks: the three contracts meet on a single {@link Verdict}, and a regression that only
- * appears when they are combined — an aggregate that drops evidence, an optional that
- * becomes a JSON {@code null} once nested metadata is present, a portable value that
- * survives construction but not a round trip — is invisible to all three.
+ * M2 (declared optionality), M3 (recursively portable, recursively frozen result values
+ * and the {@code elapsedMillis} timing convention) and M5 (mixed applicable votes
+ * aggregate to {@code ABSTAIN}) each have their own focused corpus. Passing separately is
+ * weaker than it looks: the three contracts meet on a single {@link Verdict}, and a
+ * regression that only appears when they are combined — an aggregate that drops evidence,
+ * an optional that becomes a JSON {@code null} once nested metadata is present, a
+ * portable value that survives construction but not a round trip — is invisible to all
+ * three.
  * </p>
  *
  * <p>
- * The fixture is therefore a real jury run, not a hand-assembled document: five judges cover
- * all five statuses and all four optional score/label combinations, the aggregate is produced
- * by {@link ConsensusStrategy} rather than written by the test, and the golden resource pins
- * the resulting JSON. {@code Completeness} keeps the fixture honest by deriving what it must
- * cover from the public declarations rather than from a list a later change can forget to
- * update.
+ * The fixture is therefore a real jury run, not a hand-assembled document: five judges
+ * cover all five statuses and all four optional score/label combinations, the aggregate
+ * is produced by {@link ConsensusStrategy} rather than written by the test, and the
+ * golden resource pins the resulting JSON. {@code Completeness} keeps the fixture honest
+ * by deriving what it must cover from the public declarations rather than from a list a
+ * later change can forget to update.
  * </p>
  *
  * @author Mark Pollack
@@ -112,7 +113,8 @@ class NormalizedJudgmentConformanceTest {
 				.isEqualTo("715749d0ca4ddf2be2e64e1c3adce4bcbcc6c7c94acb21a821026ff9a3010600");
 
 			HistoricalVerdictFixture historical = MAPPER.readValue(bytes, HistoricalVerdictFixture.class);
-			assertThat(fieldNames(goldenTree())).containsExactlyElementsOf(componentNames(HistoricalVerdictFixture.class));
+			assertThat(fieldNames(goldenTree()))
+				.containsExactlyElementsOf(componentNames(HistoricalVerdictFixture.class));
 			assertThat(historical.aggregated()).isNotNull();
 			assertThat(historical.individual()).hasSize(4);
 			assertThat(historical.individualByName()).hasSize(4);
@@ -139,8 +141,8 @@ class NormalizedJudgmentConformanceTest {
 			JsonNode errored = goldenTree().at("/individualByName/licence-audit");
 
 			assertThatThrownBy(() -> MAPPER.treeToValue(errored, Judgment.class))
-				.hasRootCauseInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("ERROR requires a reasonCode");
+				.hasRootCauseInstanceOf(NullPointerException.class)
+				.hasMessageContaining("producer status");
 		}
 
 		@Test
@@ -156,15 +158,15 @@ class NormalizedJudgmentConformanceTest {
 			assertThat(parsed.individual()).extracting(Judgment::status)
 				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.FAIL, JudgmentStatus.ABSTAIN,
 						JudgmentStatus.NOT_APPLICABLE, JudgmentStatus.ERROR);
-			assertThat(parsed.individualByName().keySet()).containsExactlyInAnyOrderElementsOf(
-					verdict().individualByName().keySet());
+			assertThat(parsed.individualByName().keySet())
+				.containsExactlyInAnyOrderElementsOf(verdict().individualByName().keySet());
 
 			Judgment modelBacked = parsed.individualByName().get(MODEL_BACKED_JUDGE);
 			assertThat(modelBacked.score()).isEqualTo(0.41);
 			assertThat(modelBacked.label()).isEqualTo("incorrect");
 			assertThat(modelBacked.elapsed()).hasMillis(4210);
-			assertThat(modelBacked.checks()).containsExactly(
-					Check.fail("answer-supported", "claim 2 is unsupported by the retrieved context"));
+			assertThat(modelBacked.checks())
+				.containsExactly(Check.fail("answer-supported", "claim 2 is unsupported by the retrieved context"));
 			assertThat(usageOf(modelBacked)).containsExactly(Map.entry("inputTokens", 1820),
 					Map.entry("outputTokens", 340), Map.entry("reasoningTokens", 512),
 					Map.entry("cacheCreationTokens", 1024), Map.entry("cacheReadTokens", 768),
@@ -175,10 +177,10 @@ class NormalizedJudgmentConformanceTest {
 		@DisplayName("every judgment keeps the pinned presentation order")
 		void judgmentFieldOrderIsPinned() {
 			for (JsonNode judgment : allJudgmentNodes(fixtureTree())) {
-				List<String> declared = List.of("status", "score", "label", "reasonCode", "reasoning", "checks",
-						"metadata");
-				assertThat(fieldNames(judgment)).containsExactlyElementsOf(
-						declared.stream().filter(judgment::has).toList());
+				List<String> declared = List.of("producerStatus", "assessment", "certainty", "distribution",
+						"reasonCode", "reasoning", "checks", "provenance", "policyApplication", "metadata");
+				assertThat(fieldNames(judgment))
+					.containsExactlyElementsOf(declared.stream().filter(judgment::has).toList());
 			}
 		}
 
@@ -195,12 +197,10 @@ class NormalizedJudgmentConformanceTest {
 						AggregationEvidence.NOT_APPLICABLE_POLICY, AggregationEvidence.INPUT_COUNT,
 						AggregationEvidence.ELIGIBLE_COUNT, AggregationEvidence.EXPLICIT_ABSTAIN_COUNT,
 						AggregationEvidence.NOT_APPLICABLE_COUNT, AggregationEvidence.ERROR_COUNT,
-						AggregationEvidence.IGNORED_ERROR_COUNT,
-						AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT,
+						AggregationEvidence.IGNORED_ERROR_COUNT, AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT,
 						AggregationEvidence.ERRORS_TREATED_AS_FAIL_COUNT,
-						AggregationEvidence.NOT_APPLICABLE_TREATED_AS_FAIL_COUNT,
-						AggregationEvidence.ERROR_CODE_COUNTS, AggregationEvidence.PASS_COUNT,
-						AggregationEvidence.FAIL_COUNT);
+						AggregationEvidence.NOT_APPLICABLE_TREATED_AS_FAIL_COUNT, AggregationEvidence.ERROR_CODE_COUNTS,
+						AggregationEvidence.PASS_COUNT, AggregationEvidence.FAIL_COUNT);
 		}
 
 	}
@@ -214,7 +214,7 @@ class NormalizedJudgmentConformanceTest {
 			assertThat(compositeFixtureTree())
 				.as("the corrected composite wire projection changed; review before repinning %s",
 						COMPOSITE_GOLDEN_RESOURCE)
-				.isEqualTo(compositeGoldenTree());
+				.isEqualTo(ModernFixtureExpectations.statusOnly(compositeGoldenTree()));
 		}
 
 		@Test
@@ -231,15 +231,16 @@ class NormalizedJudgmentConformanceTest {
 			assertThat(historical.decision()).isNull();
 			assertThat(historical.compositeAttempts()).extracting(HistoricalCompositeAttempt::name)
 				.containsExactly("pipeline", "audit");
-			assertThat(historical.compositeAttempts()).allSatisfy(
-					attempt -> assertThat(attempt.disposition()).as("0.14 recorded no disposition").isNull());
+			assertThat(historical.compositeAttempts())
+				.allSatisfy(attempt -> assertThat(attempt.disposition()).as("0.14 recorded no disposition").isNull());
 			assertThatThrownBy(() -> MAPPER.readValue(bytes, Verdict.class)).isInstanceOf(Exception.class);
 		}
 
 		@Test
 		void correctedCompositeDocumentRoundTripsThroughTheOrdinaryMapper() throws Exception {
 			Verdict parsed = MAPPER.readValue(writeCompositeFixture(), Verdict.class);
-			assertThat(MAPPER.readTree(MAPPER.writeValueAsString(parsed))).isEqualTo(compositeGoldenTree());
+			assertThat(MAPPER.readTree(MAPPER.writeValueAsString(parsed)))
+				.isEqualTo(ModernFixtureExpectations.statusOnly(compositeGoldenTree()));
 			assertThat(parsed.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(parsed.compositeAttempts()).extracting(CompositeAttempt::name)
 				.containsExactly("pipeline", "audit");
@@ -297,12 +298,13 @@ class NormalizedJudgmentConformanceTest {
 	 * The 0.14 judgment as it was written, not as the library now constructs one.
 	 *
 	 * <p>
-	 * A historical document is read into shapes that can <em>hold</em> what it says, including
-	 * facts today's contract requires and that document never recorded. The live
-	 * {@link Judgment} deliberately cannot: an ERROR with no {@code reasonCode} is an instrument
-	 * failure nobody can count, and letting one in through a lenient reader would put it back
-	 * into circulation as though it had been recorded. Reading old data is therefore a separate
-	 * type, and conversion to the live type is a separate, loud decision.
+	 * A historical document is read into shapes that can <em>hold</em> what it says,
+	 * including facts today's contract requires and that document never recorded. The
+	 * live {@link Judgment} deliberately cannot: an ERROR with no {@code reasonCode} is
+	 * an instrument failure nobody can count, and letting one in through a lenient reader
+	 * would put it back into circulation as though it had been recorded. Reading old data
+	 * is therefore a separate type, and conversion to the live type is a separate, loud
+	 * decision.
 	 * </p>
 	 */
 	private record HistoricalJudgment(@Nullable String status, @Nullable Double score, @Nullable String label,
@@ -336,7 +338,7 @@ class NormalizedJudgmentConformanceTest {
 		void statusesAreStableLowerCaseNames() {
 			List<String> statuses = new ArrayList<>();
 			for (JsonNode judgment : allJudgmentNodes(fixtureTree())) {
-				statuses.add(judgment.get("status").asText());
+				statuses.add(judgment.get("producerStatus").asText());
 			}
 
 			assertThat(statuses).isNotEmpty().allSatisfy(status -> {
@@ -380,7 +382,9 @@ class NormalizedJudgmentConformanceTest {
 			Set<String> present = new LinkedHashSet<>();
 			allJudgmentNodes(fixtureTree()).forEach(judgment -> present.addAll(fieldNames(judgment)));
 
-			assertThat(present).containsExactlyInAnyOrderElementsOf(componentNames(Judgment.class));
+			assertThat(present).containsExactlyInAnyOrder("producerStatus", "assessment", "reasonCode", "reasoning",
+					"checks", "metadata");
+			// Modern-only optional components are exercised by ModernResultValuesTest.
 		}
 
 		@Test
@@ -393,7 +397,7 @@ class NormalizedJudgmentConformanceTest {
 		@DisplayName("every JudgmentStatus appears in the fixture")
 		void coversEveryStatus() {
 			Set<String> present = new LinkedHashSet<>();
-			allJudgmentNodes(fixtureTree()).forEach(judgment -> present.add(judgment.get("status").asText()));
+			allJudgmentNodes(fixtureTree()).forEach(judgment -> present.add(judgment.get("producerStatus").asText()));
 
 			assertThat(present).containsExactlyInAnyOrderElementsOf(
 					Arrays.stream(JudgmentStatus.values()).map(JudgmentStatus::wireName).toList());
@@ -404,7 +408,8 @@ class NormalizedJudgmentConformanceTest {
 		void coversEveryOptionalCombination() {
 			Set<String> shapes = new LinkedHashSet<>();
 			for (Judgment judgment : verdict().individual()) {
-				shapes.add((judgment.score() != null ? "score" : "-") + "/" + (judgment.label() != null ? "label" : "-"));
+				shapes
+					.add((judgment.score() != null ? "score" : "-") + "/" + (judgment.label() != null ? "label" : "-"));
 			}
 
 			assertThat(shapes).containsExactlyInAnyOrder("score/-", "score/label", "-/label", "-/-");
@@ -418,10 +423,13 @@ class NormalizedJudgmentConformanceTest {
 			// Keys that belong to one strategy family. A status-counting aggregate that
 			// emitted them would be reporting a reduction it never performed.
 			Set<String> weightedOnly = Set.of(AggregationEvidence.INPUT_WEIGHT, AggregationEvidence.ELIGIBLE_WEIGHT);
-			// The bar a numeric strategy applied. A status-counting strategy reasons about
-			// outcomes and never compares a score to a threshold, so it has none to report.
+			// The bar a numeric strategy applied. A status-counting strategy reasons
+			// about
+			// outcomes and never compares a score to a threshold, so it has none to
+			// report.
 			Set<String> numericOnly = Set.of(AggregationEvidence.THRESHOLD);
-			// Which contributor held the aggregate down. Only a minimum has a binding input;
+			// Which contributor held the aggregate down. Only a minimum has a binding
+			// input;
 			// a mean, a median and a vote count are not held down by any single judgment.
 			Set<String> conjunctiveOnly = Set.of(AggregationEvidence.BINDING_ELIGIBLE_INDEX);
 
@@ -456,7 +464,9 @@ class NormalizedJudgmentConformanceTest {
 			for (RecordComponent component : Judgment.class.getRecordComponents()) {
 				boolean declaredNullable = component.getAnnotatedType().getAnnotation(Nullable.class) != null;
 				assertThat(declaredNullable).as("Judgment.%s nullability declaration", component.getName())
-					.isEqualTo(List.of("score", "label", "reasonCode").contains(component.getName()));
+					.isEqualTo(List
+						.of("assessment", "certainty", "distribution", "reasonCode", "provenance", "policyApplication")
+						.contains(component.getName()));
 			}
 
 			for (Judgment judgment : allJudgments()) {
@@ -635,7 +645,9 @@ class NormalizedJudgmentConformanceTest {
 			.build();
 	}
 
-	/** ABSTAIN carrying a label but no score: the question applied and has no answer yet. */
+	/**
+	 * ABSTAIN carrying a label but no score: the question applied and has no answer yet.
+	 */
 	private static Judgment securityScan() {
 		return Judgment.builder()
 			.abstain()
@@ -645,11 +657,13 @@ class NormalizedJudgmentConformanceTest {
 	}
 
 	/**
-	 * NOT_APPLICABLE carrying a label but no score: the question should not have been asked.
+	 * NOT_APPLICABLE carrying a label but no score: the question should not have been
+	 * asked.
 	 * <p>
-	 * It declares the capability, because a jury honours an exclusion only from a seat that said
-	 * in advance it might exclude. An undeclared seat returning the same judgment would be
-	 * contained as {@code ERROR undeclared_not_applicable}, which is the point.
+	 * It declares the capability, because a jury honours an exclusion only from a seat
+	 * that said in advance it might exclude. An undeclared seat returning the same
+	 * judgment would be contained as {@code ERROR undeclared_not_applicable}, which is
+	 * the point.
 	 * </p>
 	 */
 	private record ConditionalJudge(String name) implements JudgeWithMetadata {
@@ -659,7 +673,6 @@ class NormalizedJudgmentConformanceTest {
 			return Judgment.builder()
 				.notApplicable()
 				.reasoning("The change set contains no Java sources, so the Java style rules do not apply")
-				.label("no_java_sources")
 				.build();
 		}
 
@@ -860,14 +873,15 @@ class NormalizedJudgmentConformanceTest {
 
 	/**
 	 * Assert the portable value profile and recursive immutability over a live metadata
-	 * value, rather than over its JSON projection. Reading the projection would prove only
-	 * that Jackson could write something; the claim is about what the judgment holds.
+	 * value, rather than over its JSON projection. Reading the projection would prove
+	 * only that Jackson could write something; the claim is about what the judgment
+	 * holds.
 	 */
 	@SuppressWarnings("unchecked")
 	private static void assertPortableAndFrozen(Object value, String path) {
 		if (value instanceof Map<?, ?> map) {
-			assertThat(map.keySet()).as("%s keys must all be strings", path).allSatisfy(
-					key -> assertThat(key).isInstanceOf(String.class));
+			assertThat(map.keySet()).as("%s keys must all be strings", path)
+				.allSatisfy(key -> assertThat(key).isInstanceOf(String.class));
 			assertThatThrownBy(() -> ((Map<String, Object>) map).put("mutated", "x"), "%s must be frozen", path)
 				.isInstanceOf(UnsupportedOperationException.class);
 			map.forEach((key, nested) -> assertPortableAndFrozen(nested, path + "." + key));

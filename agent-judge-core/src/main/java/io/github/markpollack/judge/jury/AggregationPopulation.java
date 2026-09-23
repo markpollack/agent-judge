@@ -234,7 +234,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @return true when the error came from machinery
 	 */
 	static boolean hasMachineryOrigin(Judgment judgment) {
-		JudgmentReasonCode code = judgment.reasonCode();
+		JudgmentReasonCode code = judgment.operationalReasonCode();
 		if (code == null) {
 			return true;
 		}
@@ -273,7 +273,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @param totals the running total, keyed by terminal code
 	 */
 	private static void flattenOrigin(Judgment judgment, Map<JudgmentReasonCode, Long> totals) {
-		JudgmentReasonCode code = judgment.reasonCode();
+		JudgmentReasonCode code = judgment.operationalReasonCode();
 		if (code == null) {
 			return;
 		}

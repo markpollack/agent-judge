@@ -124,7 +124,7 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 			Map<String, Judgment> individualByName, Map<String, Double> weights, List<Seat> seats, Decision decision,
 			List<CompositeAttempt> attempts) {
 		if (decision.kind() == DecisionKind.UNDECIDED) {
-			JudgmentReasonCode code = aggregated.reasonCode();
+			JudgmentReasonCode code = aggregated.operationalReasonCode();
 			if (aggregated.status() != JudgmentStatus.ERROR
 					|| code == null || code.originFamily() != JudgmentReasonCode.OriginFamily.MACHINERY) {
 				throw new IllegalArgumentException("an UNDECIDED verdict reports that the instrument reached no "
@@ -199,9 +199,9 @@ public record Verdict(Judgment aggregated, List<Judgment> individual, Map<String
 		// UNDECLARED_NOT_APPLICABLE: the child's aggregate is an exclusion the cascade refused,
 		// so the root cannot be a copy of it. The parent authors a machinery error instead, and
 		// the child's verdict stays unchanged on its attempt.
-		if (aggregated.reasonCode() != JudgmentReasonCode.STAGE_FAILED) {
+		if (aggregated.operationalReasonCode() != JudgmentReasonCode.STAGE_FAILED) {
 			throw new IllegalArgumentException("a rejection on a boundary-refused exclusion builds a parent-authored "
-					+ "ERROR stage_failed root, but tier '" + name + "' produced " + aggregated.reasonCode());
+					+ "ERROR stage_failed root, but tier '" + name + "' produced " + aggregated.operationalReasonCode());
 		}
 	}
 

@@ -112,8 +112,8 @@ final class AggregationBoundary {
 			return "returned a NOT_APPLICABLE aggregate, but this jury never declared that its aggregate "
 					+ "may be excluded";
 		}
-		if (aggregate.status() == JudgmentStatus.ERROR && !ALLOWED_ERROR_CODES.contains(aggregate.reasonCode())) {
-			return "returned an ERROR coded " + aggregate.reasonCode()
+		if (aggregate.status() == JudgmentStatus.ERROR && !ALLOWED_ERROR_CODES.contains(aggregate.operationalReasonCode())) {
+			return "returned an ERROR coded " + aggregate.operationalReasonCode()
 					+ ", which names a cause outside the reduction it performed";
 		}
 		return null;
@@ -146,7 +146,7 @@ final class AggregationBoundary {
 	 * @return the decision
 	 */
 	static Decision decisionFor(Judgment aggregated) {
-		JudgmentReasonCode code = aggregated.reasonCode();
+		JudgmentReasonCode code = aggregated.operationalReasonCode();
 		boolean undecided = aggregated.status() == JudgmentStatus.ERROR && code != null
 				&& code.originFamily() == JudgmentReasonCode.OriginFamily.MACHINERY;
 		return undecided ? Decision.undecided() : Decision.own();

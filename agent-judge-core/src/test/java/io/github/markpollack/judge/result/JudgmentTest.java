@@ -62,8 +62,7 @@ class JudgmentTest {
 			assertThat(Judgment.pass("ok").score()).isNull();
 			assertThat(Judgment.builder().fail().score(0.0).reasoning("x").build().score()).isZero();
 			assertThat(Judgment.builder().pass().score(1.0).reasoning("x").build().score()).isOne();
-			assertThat(Judgment.builder().pass().score(0.42).reasoning("x").build().score())
-				.isEqualTo(0.42);
+			assertThat(Judgment.builder().pass().score(0.42).reasoning("x").build().score()).isEqualTo(0.42);
 		}
 
 		@Test
@@ -88,14 +87,14 @@ class JudgmentTest {
 		}
 
 		@Test
-		@DisplayName("ABSTAIN and ERROR must not carry a score")
+		@DisplayName("ABSTAIN may retain a score; producer ERROR cannot")
 		void noScoreForNonMeasurements() {
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ABSTAIN, 0.5, null, null, "x", List.of(), Map.of()))
+			assertThat(new Judgment(JudgmentStatus.ABSTAIN, 0.5, null, null, "x", List.of(), Map.of()).score())
+				.isEqualTo(0.5);
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, 0.0, null, JudgmentReasonCode.JUDGE_REPORTED,
+					"x", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("no completed measurement");
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, 0.0, null, JudgmentReasonCode.JUDGE_REPORTED, "x", List.of(), Map.of()))
-				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("no completed measurement");
+				.hasMessageContaining("must not carry assessment");
 		}
 
 		@Test
@@ -112,12 +111,13 @@ class JudgmentTest {
 		@Test
 		@DisplayName("ABSTAIN may carry a label; ERROR may not")
 		void labelAllowedOnAbstainOnly() {
-			assertThatCode(() -> new Judgment(JudgmentStatus.ABSTAIN, null, "not_applicable", null, "x", List.of(), Map.of()))
+			assertThatCode(
+					() -> new Judgment(JudgmentStatus.ABSTAIN, null, "not_applicable", null, "x", List.of(), Map.of()))
 				.doesNotThrowAnyException();
-			assertThatThrownBy(
-					() -> new Judgment(JudgmentStatus.ERROR, null, "not_applicable", JudgmentReasonCode.JUDGE_REPORTED, "x", List.of(), Map.of()))
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, null, "not_applicable",
+					JudgmentReasonCode.JUDGE_REPORTED, "x", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("must not carry a label");
+				.hasMessageContaining("must not carry assessment");
 		}
 
 		@Test
@@ -126,7 +126,8 @@ class JudgmentTest {
 			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ABSTAIN, null, null, null, "  ", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("non-blank reasoning");
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, null, null, JudgmentReasonCode.JUDGE_REPORTED, "", List.of(), Map.of()))
+			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, null, null, JudgmentReasonCode.JUDGE_REPORTED,
+					"", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("non-blank reasoning");
 			assertThatCode(() -> new Judgment(JudgmentStatus.PASS, null, null, null, "", List.of(), Map.of()))
@@ -176,35 +177,19 @@ class JudgmentTest {
 		@Test
 		@DisplayName("raw-range scoring normalizes once and rejects invalid scales")
 		void rawRangeScoring() {
-			Judgment judgment = Judgment.scored(82.0, 0.0, 100.0)
-				.passingAt(0.80)
-				.reasoning("quality")
-				.build();
+			Judgment judgment = Judgment.scored(82.0, 0.0, 100.0).passingAt(0.80).reasoning("quality").build();
 
 			assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 			assertThat(judgment.score()).isEqualTo(0.82);
-			assertThatThrownBy(() -> Judgment.scored(1.0, 1.0, 1.0))
-				.isInstanceOf(IllegalArgumentException.class);
-			assertThatThrownBy(() -> Judgment.scored(11.0, 0.0, 10.0))
-				.isInstanceOf(IllegalArgumentException.class);
-			assertThatThrownBy(() -> Judgment.scored(Double.NaN))
-				.isInstanceOf(IllegalArgumentException.class);
+			assertThatThrownBy(() -> Judgment.scored(1.0, 1.0, 1.0)).isInstanceOf(IllegalArgumentException.class);
+			assertThatThrownBy(() -> Judgment.scored(11.0, 0.0, 10.0)).isInstanceOf(IllegalArgumentException.class);
+			assertThatThrownBy(() -> Judgment.scored(Double.NaN)).isInstanceOf(IllegalArgumentException.class);
 			assertThatThrownBy(() -> Judgment.scored(0.5).passingAt(Double.NaN))
 				.isInstanceOf(IllegalArgumentException.class);
 		}
 
-		/**
-		 * The three-argument scale has two guards no other input reaches, and neither is
-		 * redundant. A non-finite argument is also caught downstream, but with a diagnostic
-		 * naming the normalized score or the width of the scale rather than the argument the
-		 * caller actually supplied, so only the message separates the guard from its
-		 * downstream. The width guard has no downstream at all: for finite arguments whose
-		 * difference overflows to infinity, the division yields an ordinary finite score and
-		 * nothing later objects. The case above uses NaN on the one-argument overload only,
-		 * which reaches neither guard.
-		 */
 		@Test
-		@DisplayName("raw-range scoring names the argument that was not finite, and refuses a scale that overflows")
+		@DisplayName("raw-range scoring rejects nonfinite inputs and handles overflowing differences")
 		void rawRangeScaleDiagnostics() {
 			assertThatThrownBy(() -> Judgment.scored(Double.NaN, 0.0, 10.0), "a non-finite value")
 				.isInstanceOf(IllegalArgumentException.class)
@@ -216,13 +201,11 @@ class JudgmentTest {
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessage("value, minimum and maximum must all be finite");
 
-			assertThatThrownBy(() -> Judgment.scored(0.0, -Double.MAX_VALUE, Double.MAX_VALUE),
-					"finite bounds whose difference overflows to infinity")
-				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessage("maximum - minimum must be finite");
+			Judgment wide = Judgment.scored(0.0, -Double.MAX_VALUE, Double.MAX_VALUE).passingAt(0.5).build();
+			assertThat(wide.score()).isEqualTo(0.5);
+			assertThat(wide.assessment().numeric().lower()).isEqualTo(-Double.MAX_VALUE);
+			assertThat(wide.certainty()).isNull();
 
-			// The widest scale that does not overflow is still normalized, so the guard refuses
-			// the overflow rather than large magnitudes.
 			assertThat(Judgment.scored(0.0, -Double.MAX_VALUE / 2, Double.MAX_VALUE / 2)
 				.passingAt(0.5)
 				.reasoning("x")
@@ -241,7 +224,8 @@ class JudgmentTest {
 		@Test
 		@DisplayName("one builder composes scored and classified judgments")
 		void conventionalBuilder() {
-			Judgment judgment = Judgment.builder().pass()
+			Judgment judgment = Judgment.builder()
+				.pass()
 				.label("excellent")
 				.score(1.0)
 				.reasoning("all criteria satisfied")
@@ -282,8 +266,7 @@ class JudgmentTest {
 			assertThat(Judgment.fail("x").effectiveScore()).hasValue(0.0);
 			assertThat(Judgment.abstain("x").effectiveScore()).isEmpty();
 			assertThat(Judgment.error("x").effectiveScore()).isEmpty();
-			assertThat(Judgment.builder().fail().score(0.3).reasoning("x").build().effectiveScore())
-				.hasValue(0.3);
+			assertThat(Judgment.builder().fail().score(0.3).reasoning("x").build().effectiveScore()).hasValue(0.3);
 		}
 
 		@Test
@@ -298,7 +281,8 @@ class JudgmentTest {
 		@Test
 		@DisplayName("checks and metadata accumulate")
 		void checksAndMetadata() {
-			Judgment judgment = Judgment.builder().pass()
+			Judgment judgment = Judgment.builder()
+				.pass()
 				.reasoning("x")
 				.check(Check.pass("a"))
 				.checks(List.of(Check.pass("b"), Check.fail("c", "bad")))
@@ -313,7 +297,8 @@ class JudgmentTest {
 		@Test
 		@DisplayName("toBuilder preserves every component and supports enrichment")
 		void copyAndEnrich() {
-			Judgment original = Judgment.builder().pass()
+			Judgment original = Judgment.builder()
+				.pass()
 				.label("relevant")
 				.score(0.8)
 				.reasoning("matched")
@@ -336,7 +321,8 @@ class JudgmentTest {
 		void elapsed() {
 			assertThat(Judgment.pass("x").elapsed()).isNull();
 
-			Judgment timed = Judgment.builder().pass()
+			Judgment timed = Judgment.builder()
+				.pass()
 				.reasoning("x")
 				.metadata(Judgment.ELAPSED_MILLIS_KEY, 100)
 				.build();
@@ -356,8 +342,7 @@ class JudgmentTest {
 			assertThatThrownBy(() -> Judgment.builder().pass().metadata(Judgment.AGGREGATION_KEY, "mine"))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("reserved");
-			assertThatThrownBy(() -> Judgment.builder().pass()
-				.metadata(Map.of(Judgment.AGGREGATION_KEY, "mine")))
+			assertThatThrownBy(() -> Judgment.builder().pass().metadata(Map.of(Judgment.AGGREGATION_KEY, "mine")))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("reserved");
 		}
@@ -374,10 +359,7 @@ class JudgmentTest {
 		@Test
 		@DisplayName("an unrelated caller key is unaffected")
 		void unrelatedKeysFine() {
-			Judgment judgment = Judgment.builder().pass()
-				.reasoning("x")
-				.metadata("aggregations", "mine")
-				.build();
+			Judgment judgment = Judgment.builder().pass().reasoning("x").metadata("aggregations", "mine").build();
 
 			assertThat(judgment.metadata()).containsEntry("aggregations", "mine");
 		}
@@ -391,32 +373,36 @@ class JudgmentTest {
 		@Test
 		@DisplayName("boolean verdict omits absent optionals")
 		void booleanWire() throws Exception {
-			assertThat(MAPPER.writeValueAsString(Judgment.pass("All checks passed")))
-				.isEqualTo("{\"status\":\"pass\",\"reasoning\":\"All checks passed\",\"checks\":[],\"metadata\":{}}");
+			assertThat(MAPPER.writeValueAsString(Judgment.pass("All checks passed"))).isEqualTo(
+					"{\"producerStatus\":\"pass\",\"reasoning\":\"All checks passed\",\"checks\":[],\"metadata\":{}}");
 		}
 
 		@Test
 		@DisplayName("quantitative verdict includes score")
 		void scoredWire() throws Exception {
-			Judgment judgment = Judgment.builder().pass()
+			Judgment judgment = Judgment.builder()
+				.pass()
 				.score(0.82)
 				.reasoning("Quality exceeded the acceptance threshold")
 				.build();
 
-			assertThat(MAPPER.writeValueAsString(judgment)).isEqualTo("{\"status\":\"pass\",\"score\":0.82,"
-					+ "\"reasoning\":\"Quality exceeded the acceptance threshold\",\"checks\":[],\"metadata\":{}}");
+			assertThat(MAPPER.writeValueAsString(judgment)).isEqualTo(
+					"{\"producerStatus\":\"pass\",\"assessment\":{\"numeric\":{\"value\":0.82,\"kind\":\"MEASUREMENT\",\"scaleId\":\"normalized-quality:v1\",\"lower\":0.0,\"upper\":1.0,\"levels\":[],\"qualityDirection\":\"INCREASING\"}},"
+							+ "\"reasoning\":\"Quality exceeded the acceptance threshold\",\"checks\":[],\"metadata\":{}}");
 		}
 
 		@Test
 		@DisplayName("categorical verdict includes label")
 		void classifiedWire() throws Exception {
-			Judgment judgment = Judgment.builder().pass()
+			Judgment judgment = Judgment.builder()
+				.pass()
 				.label("relevant")
 				.reasoning("The document directly supports the claim")
 				.build();
 
-			assertThat(MAPPER.writeValueAsString(judgment)).isEqualTo("{\"status\":\"pass\",\"label\":\"relevant\","
-					+ "\"reasoning\":\"The document directly supports the claim\",\"checks\":[],\"metadata\":{}}");
+			assertThat(MAPPER.writeValueAsString(judgment)).isEqualTo(
+					"{\"producerStatus\":\"pass\",\"assessment\":{\"category\":{\"selected\":\"relevant\",\"alternatives\":[\"relevant\"]}},"
+							+ "\"reasoning\":\"The document directly supports the claim\",\"checks\":[],\"metadata\":{}}");
 		}
 
 		@Test
@@ -424,7 +410,7 @@ class JudgmentTest {
 		void errorWire() throws Exception {
 			String json = MAPPER.writeValueAsString(Judgment.error("Judge invocation timed out"));
 
-			assertThat(json).isEqualTo("{\"status\":\"error\",\"reasonCode\":\"judge_reported\","
+			assertThat(json).isEqualTo("{\"producerStatus\":\"error\",\"reasonCode\":\"judge_reported\","
 					+ "\"reasoning\":\"Judge invocation timed out\",\"checks\":[],\"metadata\":{}}");
 			assertThat(json).doesNotContain("stackTrace").doesNotContain("cause").doesNotContain("Exception");
 		}
@@ -453,7 +439,8 @@ class JudgmentTest {
 		@Test
 		@DisplayName("round-trips through deserialization")
 		void roundTrip() throws Exception {
-			Judgment original = Judgment.builder().fail()
+			Judgment original = Judgment.builder()
+				.fail()
 				.score(0.42)
 				.reasoning("below bar")
 				.check(Check.fail("c", "bad"))
@@ -470,10 +457,8 @@ class JudgmentTest {
 			// so it is refused where it is supplied rather than where it is written; no
 			// judgment holding one exists to serialize. Vectors live in
 			// PortableMetadataContractTest.
-			assertThatThrownBy(() -> Judgment.builder().pass()
-				.reasoning("x")
-				.metadata("elapsed", Duration.ofMillis(100))
-				.build())
+			assertThatThrownBy(
+					() -> Judgment.builder().pass().reasoning("x").metadata("elapsed", Duration.ofMillis(100)).build())
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("metadata.elapsed")
 				.hasMessageContaining("java.time.Duration");

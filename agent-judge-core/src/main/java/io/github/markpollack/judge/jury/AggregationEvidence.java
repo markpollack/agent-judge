@@ -192,8 +192,9 @@ public final class AggregationEvidence {
 		}
 		Map<String, Object> metadata = new LinkedHashMap<>(judgment.metadata());
 		metadata.put(Judgment.AGGREGATION_KEY, block);
-		return new Judgment(judgment.status(), judgment.score(), judgment.label(), judgment.reasonCode(),
-				judgment.reasoning(), judgment.checks(), metadata);
+		return new Judgment(judgment.producerStatus(), judgment.assessment(), judgment.certainty(), judgment.distribution(),
+				judgment.reasonCode(), judgment.reasoning(), judgment.checks(), judgment.provenance(),
+				judgment.policyApplication(), metadata);
 	}
 
 	/**

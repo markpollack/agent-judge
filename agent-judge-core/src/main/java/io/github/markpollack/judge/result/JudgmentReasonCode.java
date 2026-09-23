@@ -13,10 +13,12 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The countable cause of a judgment, alongside its mandatory free text.
+ * The countable cause of a producer or policy result, alongside its mandatory free text.
  *
  * <p>
- * One code plus {@link Judgment#reasoning()}. The code is what a reader counts; the reasoning
+ * Producer code plus {@link Judgment#reasoning()}; policy failures have their own code and reason.
+ * Operational readers use {@link Judgment#operationalReasonCode()} and
+ * {@link Judgment#operationalReasoning()} so retained producer causes cannot misclassify a policy failure. The code is what a reader counts; the reasoning
  * is what a human reads. Neither replaces the other, and a category is never guessed: every
  * constant below corresponds to an observed failure shape, a source, a policy or decision
  * outcome, or a library mechanism. New constants are added only when observed reason clusters
@@ -67,6 +69,9 @@ import org.jspecify.annotations.Nullable;
  * @see Judgment#reasonCode()
  */
 public enum JudgmentReasonCode {
+
+	/** Application acceptance-policy machinery failed. */
+	POLICY_FAILED("policy_failed", Family.INSTRUMENT, OriginFamily.MACHINERY),
 
 	/**
 	 * A configured judge threw, or returned no judgment at all.

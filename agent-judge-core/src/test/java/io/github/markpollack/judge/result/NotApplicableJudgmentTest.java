@@ -23,9 +23,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <p>
  * The two differ in what a denominator does with them, which is the only difference that
- * matters to a rate. An abstention was a fair question with no answer; an exclusion says the
- * question should not have been asked. Collapsing them is how a rubric reports a pass rate over
- * criteria half of which never applied.
+ * matters to a rate. An abstention was a fair question with no answer; an exclusion says
+ * the question should not have been asked. Collapsing them is how a rubric reports a pass
+ * rate over criteria half of which never applied.
  * </p>
  */
 @DisplayName("NOT_APPLICABLE")
@@ -52,15 +52,14 @@ class NotApplicableJudgmentTest {
 				.hasMessageContaining("Unknown judgment status");
 			assertThatThrownBy(() -> JudgmentStatus.fromWire("notApplicable"))
 				.isInstanceOf(IllegalArgumentException.class);
-			assertThatThrownBy(() -> JudgmentStatus.fromWire("skipped"))
-				.isInstanceOf(IllegalArgumentException.class);
+			assertThatThrownBy(() -> JudgmentStatus.fromWire("skipped")).isInstanceOf(IllegalArgumentException.class);
 		}
 
 		@Test
 		@DisplayName("the five statuses are exactly the vocabulary, in a stable order")
 		void theVocabulary() {
-			assertThat(Arrays.stream(JudgmentStatus.values()).map(JudgmentStatus::wireName))
-				.containsExactly("pass", "fail", "abstain", "not_applicable", "error");
+			assertThat(Arrays.stream(JudgmentStatus.values()).map(JudgmentStatus::wireName)).containsExactly("pass",
+					"fail", "abstain", "not_applicable", "error");
 		}
 
 	}
@@ -75,7 +74,7 @@ class NotApplicableJudgmentTest {
 			assertThatThrownBy(() -> new Judgment(JudgmentStatus.NOT_APPLICABLE, 0.0, null, null,
 					"the repository contains no Java", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("must not carry a score");
+				.hasMessageContaining("must not carry assessment");
 			assertThatThrownBy(() -> new Judgment(JudgmentStatus.NOT_APPLICABLE, 1.0, null, null,
 					"the repository contains no Java", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class);
@@ -84,8 +83,8 @@ class NotApplicableJudgmentTest {
 		@Test
 		@DisplayName("reasoning is required: an exclusion nobody explained cannot be audited")
 		void reasoningIsRequired() {
-			assertThatThrownBy(() -> new Judgment(JudgmentStatus.NOT_APPLICABLE, null, null, null, "   ", List.of(),
-					Map.of()))
+			assertThatThrownBy(
+					() -> new Judgment(JudgmentStatus.NOT_APPLICABLE, null, null, null, "   ", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("NOT_APPLICABLE requires non-blank reasoning");
 			assertThatThrownBy(() -> Judgment.builder().notApplicable().reasoning(""))
@@ -93,15 +92,11 @@ class NotApplicableJudgmentTest {
 		}
 
 		@Test
-		@DisplayName("a label is allowed: the judge completed and may have classified why")
-		void labelIsAllowed() {
-			Judgment excluded = Judgment.builder()
-				.notApplicable()
-				.reasoning("the repository contains no Java source")
-				.label("no_java_files")
-				.build();
-
-			assertThat(excluded.label()).isEqualTo("no_java_files");
+		@DisplayName("a label is forbidden because an excluded criterion has no assessment")
+		void labelIsForbidden() {
+			assertThatThrownBy(
+					() -> Judgment.builder().notApplicable().reasoning("no Java").label("no_java_files").build())
+				.isInstanceOf(IllegalArgumentException.class);
 		}
 
 		@Test
@@ -133,8 +128,7 @@ class NotApplicableJudgmentTest {
 			assertThat(excluded.pass()).isFalse();
 			assertThat(excluded.hasError()).isFalse();
 			assertThat(excluded.notApplicable()).isTrue();
-			assertThat(Judgment.abstain("could not decide").notApplicable())
-				.as("an abstention is not an exclusion")
+			assertThat(Judgment.abstain("could not decide").notApplicable()).as("an abstention is not an exclusion")
 				.isFalse();
 		}
 
@@ -153,11 +147,10 @@ class NotApplicableJudgmentTest {
 		Judgment excluded = Judgment.builder()
 			.notApplicable()
 			.reasoning("the repository contains no Java source")
-			.label("no_java_files")
 			.build();
 
 		String json = MAPPER.writeValueAsString(excluded);
-		assertThat(json).contains("\"status\":\"not_applicable\"").doesNotContain("abstain");
+		assertThat(json).contains("\"producerStatus\":\"not_applicable\"").doesNotContain("abstain");
 		assertThat(MAPPER.readValue(json, Judgment.class)).isEqualTo(excluded);
 	}
 

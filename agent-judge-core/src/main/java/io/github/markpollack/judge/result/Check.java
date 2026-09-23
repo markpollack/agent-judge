@@ -8,28 +8,54 @@ package io.github.markpollack.judge.result;
 import java.util.Objects;
 
 /**
- * Individual check within a judgment.
+ * A named child judgment, limited to one level of checks.
  *
- * <p>
- * Checks represent sub-assertions within a judgment. For example, a test judge might have
- * checks for "tests compiled", "tests ran", "no failures", "no errors".
- * </p>
- *
- * @param name the check name
- * @param passed whether this check passed
- * @param message optional message (error message if failed, confirmation if passed)
- * @author Mark Pollack
- * @since 0.1.0
+ * @param id unique ID within its parent roster
+ * @param judgment complete child result, whose checks must be empty
  */
-public record Check(String name, boolean passed, String message) {
-
-	/** Validate a check's required name and message. */
+public record Check(String id, Judgment judgment) {
+	/** Validate and freeze this value. */
 	public Check {
-		Objects.requireNonNull(name, "name must not be null");
-		Objects.requireNonNull(message, "message must not be null");
-		if (name.isBlank()) {
-			throw new IllegalArgumentException("name must be non-blank");
+		ValueRequirements.text(id, "name/id");
+		Objects.requireNonNull(judgment, "judgment");
+		if (!judgment.checks().isEmpty()) {
+			throw new IllegalArgumentException("nested checks are forbidden");
 		}
+	}
+
+	/**
+	 * Compatibility constructor for declared Boolean checks.
+	 * @param name check ID
+	 * @param passed declared Boolean result
+	 * @param message explanation
+	 */
+	public Check(String name, boolean passed, String message) {
+		this(name, Judgment.verdict(passed).reasoning(Objects.requireNonNull(message, "message")).build());
+	}
+
+	/**
+	 * Returns check ID (compatibility view).
+	 * @return check ID (compatibility view)
+	 */
+	public String name() {
+		return id;
+	}
+
+	/**
+	 * Returns whether the child operationally passed; false includes inconclusive outcomes.
+	 * @return whether the child operationally passed; false includes inconclusive
+	 * outcomes
+	 */
+	public boolean passed() {
+		return judgment.pass();
+	}
+
+	/**
+	 * Returns child operational explanation (compatibility view).
+	 * @return child operational explanation (compatibility view)
+	 */
+	public String message() {
+		return judgment.operationalReasoning();
 	}
 
 	/**

@@ -47,17 +47,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * New construction is strict, and reading old data is a separate decision.
  *
  * <p>
- * The two must not be the same code path. A reader that is lenient enough to load a 0.14 document
- * is lenient enough to accept a 0.17 result that lost a required fact somewhere in transit, and it
- * will accept it silently — which is the one outcome worth engineering against, because the value
- * that comes back looks exactly like a value that was recorded. So the live types refuse anything
- * incomplete, loudly and by name, and a historical document is read into shapes that can
- * <em>hold</em> absence without pretending it is a value.
+ * The two must not be the same code path. A reader that is lenient enough to load a 0.14
+ * document is lenient enough to accept a 0.17 result that lost a required fact somewhere
+ * in transit, and it will accept it silently — which is the one outcome worth engineering
+ * against, because the value that comes back looks exactly like a value that was
+ * recorded. So the live types refuse anything incomplete, loudly and by name, and a
+ * historical document is read into shapes that can <em>hold</em> absence without
+ * pretending it is a value.
  * </p>
  *
  * <p>
- * The goldens below pin what a 0.17 result looks like on the wire. They exist so that a change to
- * the format is a decision somebody makes rather than a diff somebody notices later.
+ * The goldens below pin what a 0.17 result looks like on the wire. They exist so that a
+ * change to the format is a decision somebody makes rather than a diff somebody notices
+ * later.
  * </p>
  */
 @DisplayName("The historical boundary")
@@ -85,7 +87,6 @@ class HistoricalBoundaryTest {
 				Judgment.builder()
 					.notApplicable()
 					.reasoning("The change set contains no Java sources, so the Java style rules do not apply")
-					.label("no_java_sources")
 					.build(),
 				Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "Judge 'flaky' threw java.lang.IllegalStateException"),
 				Judgment.propagatedError(
@@ -94,9 +95,9 @@ class HistoricalBoundaryTest {
 	}
 
 	/**
-	 * A cascade that stopped on a rejection a boundary-refused tier had already established: the
-	 * seven-component verdict, the dispositions, and the parent-authored stage-failed root, all in
-	 * one document.
+	 * A cascade that stopped on a rejection a boundary-refused tier had already
+	 * established: the seven-component verdict, the dispositions, and the parent-authored
+	 * stage-failed root, all in one document.
 	 */
 	static Verdict boundaryRejection() {
 		Judgment failing = Judgment.fail("a requirement was not met");
@@ -119,7 +120,7 @@ class HistoricalBoundaryTest {
 		void theVocabularyIsPinned() throws Exception {
 			assertThat(MAPPER.readTree(writeVocabulary()))
 				.as("the result vocabulary changed; review before repinning %s", VOCABULARY_GOLDEN)
-				.isEqualTo(goldenTree(VOCABULARY_GOLDEN));
+				.isEqualTo(ModernFixtureExpectations.statusOnly(goldenTree(VOCABULARY_GOLDEN)));
 		}
 
 		@Test
@@ -133,8 +134,8 @@ class HistoricalBoundaryTest {
 				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.FAIL, JudgmentStatus.FAIL,
 						JudgmentStatus.NOT_APPLICABLE, JudgmentStatus.ERROR, JudgmentStatus.ERROR);
 			assertThat(parsed).extracting(Judgment::reasonCode)
-				.containsExactly(null, null, JudgmentReasonCode.SUBJECT_EMPTY, null,
-						JudgmentReasonCode.JUDGE_FAILED, JudgmentReasonCode.ERRORS_PROPAGATED);
+				.containsExactly(null, null, JudgmentReasonCode.SUBJECT_EMPTY, null, JudgmentReasonCode.JUDGE_FAILED,
+						JudgmentReasonCode.ERRORS_PROPAGATED);
 		}
 
 		@Test
@@ -154,7 +155,7 @@ class HistoricalBoundaryTest {
 		void theBoundaryRejectionIsPinned() throws Exception {
 			assertThat(MAPPER.readTree(writeBoundaryRejection()))
 				.as("the boundary-rejection projection changed; review before repinning %s", BOUNDARY_GOLDEN)
-				.isEqualTo(goldenTree(BOUNDARY_GOLDEN));
+				.isEqualTo(ModernFixtureExpectations.statusOnly(goldenTree(BOUNDARY_GOLDEN)));
 		}
 
 		@Test
@@ -202,7 +203,7 @@ class HistoricalBoundaryTest {
 		@DisplayName("a judgment with no status cannot be read as one")
 		void aMissingStatusIsRefused() {
 			assertThatThrownBy(
-					() -> MAPPER.readValue(withoutJudgmentField(vocabulary().get(0), "status"), Judgment.class))
+					() -> MAPPER.readValue(withoutJudgmentField(vocabulary().get(0), "producerStatus"), Judgment.class))
 				.hasRootCauseInstanceOf(NullPointerException.class)
 				.hasMessageContaining("status");
 		}
@@ -219,8 +220,10 @@ class HistoricalBoundaryTest {
 		@Test
 		@DisplayName("a propagated error whose origin is missing or unreadable cannot be read as one")
 		void anInvalidOriginIsRefusedAtTheBoundary() {
-			// This is the shape the origin rule calls machinery: a wrapper that names no cause.
-			// It can only come from stored data, and it stops here — which is why no live wrapper
+			// This is the shape the origin rule calls machinery: a wrapper that names no
+			// cause.
+			// It can only come from stored data, and it stops here — which is why no live
+			// wrapper
 			// ever needs fabricating to test the rule.
 			String noOrigin = writeJudgment(vocabulary().get(5)).replaceAll("\"errorCodeCounts\":\\{[^}]*\\}",
 					"\"errorCodeCounts\":{}");
