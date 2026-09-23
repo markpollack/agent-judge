@@ -1,0 +1,21 @@
+PetClinic source and specification fixtures
+
+The files under src/test/resources/semantic-conformance/petclinic/source are
+unmodified copies of selected files from Anton Arhipov's Spring PetClinic
+spec-driven-development experiment, as vendored by the Agent Judge Tutorial.
+Spring PetClinic is a Spring community sample.
+
+Original repository: https://github.com/antonarhipov/spring-petclinic-fork
+Original revision attributed by the Tutorial: fc9df4af46171bf7b6146d0477cc68d70e8532ad
+Immediate source: https://github.com/markpollack/agent-judge-tutorial
+Immediate source revision: 27756e9f1d4248bb0229c182f23d403a8bc5d2ec
+
+The upstream Apache License 2.0 LICENSE.txt and README.md are preserved verbatim
+under petclinic/source. There is no separately tracked NOTICE file in this pinned
+vendored subject. Existing source bytes and any headers are preserved; these files
+are not relicensed under the enclosing project's license. The input JSON files
+contain excerpts of those same Apache-licensed files with explicit source selectors.
+
+The uc6-ac8-boundary.patch was authored in the Agent Judge Tutorial and is copied
+verbatim from that repository, separately from the upstream PetClinic source.
+Its Apache License 2.0 license is preserved verbatim at petclinic/mutation/LICENSE.

@@ -1,0 +1,24 @@
+{
+  "model": "jev-1.13.0",
+  "answers": {
+    "q": {
+      "type": "score",
+      "score": 1.7,
+      "confidence": 0.8,
+      "legend": {
+        "0": "No required clauses met",
+        "1": "Some required clauses met",
+        "2": "All required clauses met"
+      },
+      "probabilities": {
+        "0": 0.1,
+        "1": 0.1,
+        "2": 1.1
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 120,
+    "output_tokens": 12
+  }
+}

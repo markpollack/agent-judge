@@ -1,0 +1,18 @@
+{
+  "model": "jev-1.13.0",
+  "answers": {
+    "q": {
+      "type": "choice",
+      "choice": "violated",
+      "probabilities": {
+        "satisfied": 0.05,
+        "violated": 0.9,
+        "insufficient_evidence": 0.05
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 120,
+    "output_tokens": 12
+  }
+}

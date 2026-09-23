@@ -1,0 +1,274 @@
+{
+  "formatVersion": 1,
+  "tutorial": {
+    "repository": "https://github.com/markpollack/agent-judge-tutorial",
+    "commit": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec",
+    "subjectPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/",
+    "upstreamRepository": "https://github.com/antonarhipov/spring-petclinic-fork",
+    "upstreamCommit": "fc9df4af46171bf7b6146d0477cc68d70e8532ad",
+    "upstreamIdentityBasis": "Tutorial vendored import attribution; no remote identity verification performed."
+  },
+  "extraction": "Source files are exact git show COMMIT:sourceGitPath bytes. Input content is inclusive firstLine..lastLine split on LF, retaining line terminators, decoded as UTF-8. JSON files use UTF-8; file hashes refer to retained serialized bytes, not reconstructed JSON.",
+  "artifacts": [
+    {
+      "path": "petclinic/source/src/main/java/org/springframework/samples/petclinic/scheduling/service/StaffFallbackService.java",
+      "bytes": 21025,
+      "sha256": "943c1cd088994083f3cd4b2df9e0f97836f0d70b3783d4af3510050a7a9a07dd",
+      "sourceGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/src/main/java/org/springframework/samples/petclinic/scheduling/service/StaffFallbackService.java"
+    },
+    {
+      "path": "petclinic/source/src/main/java/org/springframework/samples/petclinic/scheduling/service/LockCoordinator.java",
+      "bytes": 5309,
+      "sha256": "911fe16a9f76e6711b0d5d370b011e75433e5bf1cb2adac5c91a4c1d70b1f57b",
+      "sourceGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/src/main/java/org/springframework/samples/petclinic/scheduling/service/LockCoordinator.java"
+    },
+    {
+      "path": "petclinic/source/src/main/java/org/springframework/samples/petclinic/scheduling/service/LifecycleProcessor.java",
+      "bytes": 13827,
+      "sha256": "d2f641ad9cef2e926353025ceb0868b425605eb34344885485991d69fcd43b52",
+      "sourceGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/src/main/java/org/springframework/samples/petclinic/scheduling/service/LifecycleProcessor.java"
+    },
+    {
+      "path": "petclinic/source/src/main/java/org/springframework/samples/petclinic/scheduling/service/AppointmentService.java",
+      "bytes": 24938,
+      "sha256": "3e935ccbc7fdd03745f65d384375bec921c20daa678ea45a7541bf6b7ef4b904",
+      "sourceGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/src/main/java/org/springframework/samples/petclinic/scheduling/service/AppointmentService.java"
+    },
+    {
+      "path": "petclinic/source/spec/smart-appointment-scheduling/rules.md",
+      "bytes": 13305,
+      "sha256": "280d14c05099c72eca120989f7899e6cb3fa8255f95c73bd1c3acec165df708a",
+      "sourceGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/spec/smart-appointment-scheduling/rules.md"
+    },
+    {
+      "path": "petclinic/source/spec/smart-appointment-scheduling/manage-appointment-lifecycle/criteria.md",
+      "bytes": 12141,
+      "sha256": "69268831a36819792a8ffda4dfeb9a4734fb0f5dfb631142e0b6fd0ccdbfb2a1",
+      "sourceGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/spec/smart-appointment-scheduling/manage-appointment-lifecycle/criteria.md"
+    },
+    {
+      "path": "petclinic/source/LICENSE.txt",
+      "bytes": 11360,
+      "sha256": "56dfc19e0dc836e30177332f73e8e6fbc297941acf3d906eec6eaaa46c2c452a",
+      "sourceGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/LICENSE.txt"
+    },
+    {
+      "path": "petclinic/source/README.md",
+      "bytes": 10534,
+      "sha256": "6d837738cd3960131fdbc2adf2e1916deffe83fb92390f533710f1c3938b1ea2",
+      "sourceGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/README.md"
+    },
+    {
+      "path": "petclinic/mutation/LICENSE",
+      "bytes": 11360,
+      "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe",
+      "sourceGitPath": "LICENSE"
+    },
+    {
+      "path": "petclinic/mutation/uc6-ac8-boundary.patch",
+      "bytes": 1191,
+      "sha256": "130f0cefcdb0747616978995fcdbc059a45726d2dab8eb22f42260f9b1ec6570",
+      "sourceGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/uc6-ac8-boundary.patch"
+    },
+    {
+      "path": "petclinic/inputs/rule-4.json",
+      "bytes": 11473,
+      "sha256": "031bad79f3558f6170afa53089721e80249c550384f681403597a6da1d198671"
+    },
+    {
+      "path": "petclinic/inputs/uc6-ac8.json",
+      "bytes": 3318,
+      "sha256": "0ae2b11bb1dcaccead4074ee520976511abcf59171493d5418e6a1f33103307c"
+    },
+    {
+      "path": "petclinic/expectations.json",
+      "bytes": 1307,
+      "sha256": "5d13e1c9596bec1af31c365721f822961f07773e92866ea3ab10c8a412de0a37"
+    },
+    {
+      "path": "digests/empty.bin",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "digests/ascii.bin",
+      "bytes": 3,
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    },
+    {
+      "path": "digests/utf8-nfc.bin",
+      "bytes": 15,
+      "sha256": "433d82270b4c9d9b9d3abe92da6d14779f6406c857aad68d90de00e6e9d112b9"
+    },
+    {
+      "path": "digests/utf8-nfd.bin",
+      "bytes": 16,
+      "sha256": "274db31bd4f4390888cc3919323b82b888425e92b3a7968fac2e3620e74ec60c"
+    },
+    {
+      "path": "digests/lf.bin",
+      "bytes": 13,
+      "sha256": "dbea9325179efe46ea2add94f7b6b745ca983fabb208dc6d34aa064623d7ee23"
+    },
+    {
+      "path": "digests/crlf.bin",
+      "bytes": 15,
+      "sha256": "f8e0f1568dd9254c3262d199d5dcfc9ff6d4855e18ec53a7176f9eab948ed93e"
+    },
+    {
+      "path": "digests/json-compact.bin",
+      "bytes": 13,
+      "sha256": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777"
+    },
+    {
+      "path": "digests/json-reordered.bin",
+      "bytes": 13,
+      "sha256": "3fb75453225c732a76b7899ea2096dda1455189c89817239732182f73fe5a09f"
+    },
+    {
+      "path": "digests/json-spaced.bin",
+      "bytes": 18,
+      "sha256": "dff00ea25fe8c50e7aa5c8990614ad8f4ede53b61b821eb029993ada4a58aca3"
+    },
+    {
+      "path": "digests/vectors.json",
+      "bytes": 2084,
+      "sha256": "900cdcd0c097dc8848183d9c8aa578c9fd6eb265dcfc9a4293cc22401585f68b"
+    },
+    {
+      "path": "jev/requests/noul.json",
+      "bytes": 475,
+      "sha256": "7c4af36e10af2a8a0c83677ef072dce344e04bb9c4c12743970ca59b9ef57ba4"
+    },
+    {
+      "path": "jev/responses/noul-valid.json",
+      "bytes": 173,
+      "sha256": "f3704cb59d32a2e8f39240e587016a1e4cb84c1f84009b3f8656ab5ac97f8d03"
+    },
+    {
+      "path": "jev/requests/choice.json",
+      "bytes": 530,
+      "sha256": "19bd126233ac313ad9610ac56b941559a585ee532920410d790842f4d38511be"
+    },
+    {
+      "path": "jev/responses/choice-valid.json",
+      "bytes": 332,
+      "sha256": "ee70e0aa32d3c857208685f10f970731c0fe5f0bc8777e22d0d4be6e07d896b4"
+    },
+    {
+      "path": "jev/requests/score.json",
+      "bytes": 448,
+      "sha256": "bfc43f9590d1b2fa64621c754d2109407363c8e5d85ef7847022e86d420aaa08"
+    },
+    {
+      "path": "jev/responses/score-valid.json",
+      "bytes": 435,
+      "sha256": "6a7a66218cf6e1fa5aced46c90474fb9b1f92bf6f233906a66129a00ad9a2428"
+    },
+    {
+      "path": "jev/responses/missing-model.json",
+      "bytes": 148,
+      "sha256": "3c46d2115f68eb7f2060938c8fcebbdedef4713abbd06fd7838d1c677738b672"
+    },
+    {
+      "path": "jev/responses/missing-usage.json",
+      "bytes": 106,
+      "sha256": "df216f4e7361b1b15adf56e39fa9685d6061d06ad894d888fa2678fe38f59f88"
+    },
+    {
+      "path": "jev/responses/missing-answer.json",
+      "bytes": 112,
+      "sha256": "165c8a6fd6bd416a0b15afb760ceb73a7a12dfdd52cbe0cc20cb07bda996b2c7"
+    },
+    {
+      "path": "jev/responses/wrong-answer-type.json",
+      "bytes": 175,
+      "sha256": "e7767993c88921f2d035f8ee5ef2adeacce08f381d657a48e9351009afaa023a"
+    },
+    {
+      "path": "jev/responses/noul-out-of-range.json",
+      "bytes": 172,
+      "sha256": "0a7ad276e742bc7fb843812260d140c9d6cee81905c83901fdd0990e3d9a9d10"
+    },
+    {
+      "path": "jev/responses/choice-missing-confidence.json",
+      "bytes": 307,
+      "sha256": "7f4ef4538bdb2ee0a24ea4baf321ef5ac18633adbc28c884ec1e56a40e5d713a"
+    },
+    {
+      "path": "jev/responses/score-missing-confidence.json",
+      "bytes": 410,
+      "sha256": "cbadc44e8b6dc629e74271f8b0b903a726f9f49291343037a18945929ece8930"
+    },
+    {
+      "path": "jev/responses/score-missing-legend.json",
+      "bytes": 286,
+      "sha256": "b745e16e9d45386137cc6896bf910dbf77cca50a283995681b83c46a5bdeb2a4"
+    },
+    {
+      "path": "jev/responses/score-changed-legend.json",
+      "bytes": 427,
+      "sha256": "4f0336a88b6a2a5b32bc19d1d5e74df2712aeee9fefb85d240256ba947cb7721"
+    },
+    {
+      "path": "jev/responses/score-reversed-legend.json",
+      "bytes": 435,
+      "sha256": "f602499333a28a71d2d4c3dd22f7906b94cd8ba843ef40242cbbfb1fadf7b2f9"
+    },
+    {
+      "path": "jev/responses/choice-incomplete-distribution.json",
+      "bytes": 293,
+      "sha256": "08502c1346bd2c154eaf1143035c68f68c04602e61c0c64c2c8ef56dd76ba6bd"
+    },
+    {
+      "path": "jev/responses/choice-negative-mass.json",
+      "bytes": 333,
+      "sha256": "29498acb809e8077020b691ac74f130d28fa1b99ee977022affe48cd7601769c"
+    },
+    {
+      "path": "jev/responses/choice-sum-not-one.json",
+      "bytes": 332,
+      "sha256": "66b95f4705ce9d64c907a4588a5143351d0bb5a568e2b95bf90e911eb5be84ab"
+    },
+    {
+      "path": "jev/responses/choice-not-maximum.json",
+      "bytes": 333,
+      "sha256": "131ce9b9653fc3188a8d13071a77465567e8b91a4766b8f1cd661685f584e940"
+    },
+    {
+      "path": "jev/responses/choice-unknown-selection.json",
+      "bytes": 331,
+      "sha256": "dfac9a58bdb8a8cc3c9b0cd0de46bf7b9e4d4517f7f2d187ac10adbd3b600c1b"
+    },
+    {
+      "path": "jev/responses/score-incomplete-distribution.json",
+      "bytes": 417,
+      "sha256": "b7cf8fb16984de172712e1b449d9fe6c21551b89523a6572803670ff758a4906"
+    },
+    {
+      "path": "jev/responses/score-out-of-range-mass.json",
+      "bytes": 435,
+      "sha256": "234ab70c873bb9099122fc687bbbb6d22725123e237bb6c40d8e24ff9e25644f"
+    },
+    {
+      "path": "jev/responses/score-incoherent-mean.json",
+      "bytes": 435,
+      "sha256": "c10257459da3c2b2fafab6fc67d65560409d2e83f934d88ad0fcb3675c33cdc3"
+    },
+    {
+      "path": "jev/responses/usage-negative.json",
+      "bytes": 172,
+      "sha256": "e1f20c6f0b7395e9ad9984fe1b3cb5a7fb73cfb5169fce9d2713bff40a865f97"
+    },
+    {
+      "path": "jev/responses/confidence-out-of-range.json",
+      "bytes": 332,
+      "sha256": "2d1f09af1a7e8fd6b8073228740f9bd1b23bc92fb371f28a7a0c616caa9c6c1a"
+    },
+    {
+      "path": "jev/cases.json",
+      "bytes": 8853,
+      "sha256": "4d4a70f3ef24de7096b288a911dbc805fb11dc85c2cee751360f03d8c058a080"
+    }
+  ]
+}

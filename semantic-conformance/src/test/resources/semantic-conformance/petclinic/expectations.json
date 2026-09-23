@@ -1,0 +1,28 @@
+{
+  "cases": [
+    {
+      "id": "rule-4",
+      "state": "petclinic/inputs/rule-4.json",
+      "expected": "FAIL",
+      "basis": "SOURCE_REVIEW",
+      "review": "createStaffOffer acquires SchedulingRequest at line 248 before Owner acquisition through lockResources at line 258. The helper takes Owner before SchedulingRequest using PESSIMISTIC_WRITE; its ordered sequence cannot undo the earlier caller lock. This rejects the lock-order clause; no fresh deadlock execution is asserted.",
+      "executionEvidence": null
+    },
+    {
+      "id": "uc6-ac8",
+      "state": "petclinic/inputs/uc6-ac8.json",
+      "expected": "PASS",
+      "basis": "SOURCE_REVIEW",
+      "review": "For the BOOKED equality boundary, !now.isBefore(start) is true and throws before the first appointment state mutation. This is a source review of UC6-AC8 only, not an execution record or whole-service conformance claim.",
+      "executionEvidence": null
+    }
+  ],
+  "mutation": {
+    "patch": "petclinic/mutation/uc6-ac8-boundary.patch",
+    "requirement": "uc6-ac8",
+    "expected": "FAIL",
+    "basis": "SOURCE_REVIEW",
+    "review": "The patch changes the equality guard to now.isAfter(start), which is false at equality. No boundary execution or semantic mutation kill is asserted.",
+    "executionEvidence": null
+  }
+}

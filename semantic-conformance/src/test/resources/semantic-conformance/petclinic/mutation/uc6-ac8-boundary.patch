@@ -1,0 +1,25 @@
+Seeded defect for the negative control in module 06.
+
+UC6-AC8 says an owner cancelling at the exact start instant must be rejected.
+The generated code got that right with `!now.isBefore(start)`, which is true at
+the boundary. This patch replaces it with `now.isAfter(start)`, which is false
+at the boundary, so cancellation at the start instant now succeeds.
+
+AC9 (cancellation strictly after the start) is unaffected, and so is the test
+suite: testCancelAppointmentByOwnerFailsIfPastStartTime sets the start to
+NOW - 10 minutes, ten minutes away from the boundary this defect lives on.
+All 290 tests stay green. The specification is not met and nothing goes red.
+
+That is the whole reason this module exists.
+
+--- a/src/main/java/org/springframework/samples/petclinic/scheduling/service/AppointmentService.java
++++ b/src/main/java/org/springframework/samples/petclinic/scheduling/service/AppointmentService.java
+@@ -151,7 +151,7 @@
+ 		}
+ 
+ 		Instant now = timeService.now();
+-		if (!now.isBefore(appointment.getStartTime())) {
++		if (now.isAfter(appointment.getStartTime())) {
+ 			throw new IllegalStateException("Cannot cancel an appointment at or after its scheduled start time");
+ 		}
+ 

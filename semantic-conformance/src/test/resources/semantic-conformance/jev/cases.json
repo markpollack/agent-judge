@@ -1,0 +1,288 @@
+{
+  "origin": "Constructed offline wire fixtures, not provider observations or result DTOs.",
+  "sources": [
+    {
+      "url": "https://github.com/typesafe-ai/typesafe-sdk-python/blob/0ffd094c72ed9445223060b24ffd7a56aa781fb4/src/typesafe_sdk/_schemas/models.py",
+      "sha256": "ef4df0873cf8934b29adb4fddd894b694d9469a53bd6b35f22bdc508d26df707"
+    }
+  ],
+  "cases": [
+    {
+      "id": "noul-valid",
+      "request": "jev/requests/noul.json",
+      "response": "jev/responses/noul-valid.json",
+      "expected": "VALID_NATIVE",
+      "defect": null
+    },
+    {
+      "id": "choice-valid",
+      "request": "jev/requests/choice.json",
+      "response": "jev/responses/choice-valid.json",
+      "expected": "VALID_NATIVE",
+      "defect": null
+    },
+    {
+      "id": "score-valid",
+      "request": "jev/requests/score.json",
+      "response": "jev/responses/score-valid.json",
+      "expected": "VALID_NATIVE",
+      "defect": null
+    },
+    {
+      "id": "missing-model",
+      "request": "jev/requests/noul.json",
+      "response": "jev/responses/missing-model.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "missing-model",
+      "base": "jev/responses/noul-valid.json",
+      "mutation": {
+        "pointer": "/model",
+        "op": "remove"
+      }
+    },
+    {
+      "id": "missing-usage",
+      "request": "jev/requests/noul.json",
+      "response": "jev/responses/missing-usage.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "missing-usage",
+      "base": "jev/responses/noul-valid.json",
+      "mutation": {
+        "pointer": "/usage",
+        "op": "remove"
+      }
+    },
+    {
+      "id": "missing-answer",
+      "request": "jev/requests/noul.json",
+      "response": "jev/responses/missing-answer.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "missing-answer",
+      "base": "jev/responses/noul-valid.json",
+      "mutation": {
+        "pointer": "/answers/q",
+        "op": "remove"
+      }
+    },
+    {
+      "id": "wrong-answer-type",
+      "request": "jev/requests/noul.json",
+      "response": "jev/responses/wrong-answer-type.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "wrong-answer-type",
+      "base": "jev/responses/noul-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/type",
+        "op": "replace",
+        "value": "choice"
+      }
+    },
+    {
+      "id": "noul-out-of-range",
+      "request": "jev/requests/noul.json",
+      "response": "jev/responses/noul-out-of-range.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "noul-out-of-range",
+      "base": "jev/responses/noul-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/noul",
+        "op": "replace",
+        "value": 1.1
+      }
+    },
+    {
+      "id": "choice-missing-confidence",
+      "request": "jev/requests/choice.json",
+      "response": "jev/responses/choice-missing-confidence.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "choice-missing-confidence",
+      "base": "jev/responses/choice-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/confidence",
+        "op": "remove"
+      }
+    },
+    {
+      "id": "score-missing-confidence",
+      "request": "jev/requests/score.json",
+      "response": "jev/responses/score-missing-confidence.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "score-missing-confidence",
+      "base": "jev/responses/score-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/confidence",
+        "op": "remove"
+      }
+    },
+    {
+      "id": "score-missing-legend",
+      "request": "jev/requests/score.json",
+      "response": "jev/responses/score-missing-legend.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "score-missing-legend",
+      "base": "jev/responses/score-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/legend",
+        "op": "remove"
+      }
+    },
+    {
+      "id": "score-changed-legend",
+      "request": "jev/requests/score.json",
+      "response": "jev/responses/score-changed-legend.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "score-changed-legend",
+      "base": "jev/responses/score-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/legend/1",
+        "op": "replace",
+        "value": "Unrelated meaning"
+      }
+    },
+    {
+      "id": "score-reversed-legend",
+      "request": "jev/requests/score.json",
+      "response": "jev/responses/score-reversed-legend.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "score-reversed-legend",
+      "base": "jev/responses/score-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/legend",
+        "op": "replace",
+        "value": {
+          "0": "All required clauses met",
+          "1": "Some required clauses met",
+          "2": "No required clauses met"
+        }
+      }
+    },
+    {
+      "id": "choice-incomplete-distribution",
+      "request": "jev/requests/choice.json",
+      "response": "jev/responses/choice-incomplete-distribution.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "choice-incomplete-distribution",
+      "base": "jev/responses/choice-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/probabilities/insufficient_evidence",
+        "op": "remove"
+      }
+    },
+    {
+      "id": "choice-negative-mass",
+      "request": "jev/requests/choice.json",
+      "response": "jev/responses/choice-negative-mass.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "choice-negative-mass",
+      "base": "jev/responses/choice-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/probabilities/satisfied",
+        "op": "replace",
+        "value": -0.05
+      }
+    },
+    {
+      "id": "choice-sum-not-one",
+      "request": "jev/requests/choice.json",
+      "response": "jev/responses/choice-sum-not-one.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "choice-sum-not-one",
+      "base": "jev/responses/choice-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/probabilities/violated",
+        "op": "replace",
+        "value": 0.5
+      }
+    },
+    {
+      "id": "choice-not-maximum",
+      "request": "jev/requests/choice.json",
+      "response": "jev/responses/choice-not-maximum.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "choice-not-maximum",
+      "base": "jev/responses/choice-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/choice",
+        "op": "replace",
+        "value": "satisfied"
+      }
+    },
+    {
+      "id": "choice-unknown-selection",
+      "request": "jev/requests/choice.json",
+      "response": "jev/responses/choice-unknown-selection.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "choice-unknown-selection",
+      "base": "jev/responses/choice-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/choice",
+        "op": "replace",
+        "value": "unknown"
+      }
+    },
+    {
+      "id": "score-incomplete-distribution",
+      "request": "jev/requests/score.json",
+      "response": "jev/responses/score-incomplete-distribution.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "score-incomplete-distribution",
+      "base": "jev/responses/score-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/probabilities/2",
+        "op": "remove"
+      }
+    },
+    {
+      "id": "score-out-of-range-mass",
+      "request": "jev/requests/score.json",
+      "response": "jev/responses/score-out-of-range-mass.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "score-out-of-range-mass",
+      "base": "jev/responses/score-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/probabilities/2",
+        "op": "replace",
+        "value": 1.1
+      }
+    },
+    {
+      "id": "score-incoherent-mean",
+      "request": "jev/requests/score.json",
+      "response": "jev/responses/score-incoherent-mean.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "score-incoherent-mean",
+      "base": "jev/responses/score-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/score",
+        "op": "replace",
+        "value": 1.0
+      }
+    },
+    {
+      "id": "usage-negative",
+      "request": "jev/requests/noul.json",
+      "response": "jev/responses/usage-negative.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "usage-negative",
+      "base": "jev/responses/noul-valid.json",
+      "mutation": {
+        "pointer": "/usage/input_tokens",
+        "op": "replace",
+        "value": -1
+      }
+    },
+    {
+      "id": "confidence-out-of-range",
+      "request": "jev/requests/choice.json",
+      "response": "jev/responses/confidence-out-of-range.json",
+      "expected": "INVALID_NATIVE",
+      "defect": "confidence-out-of-range",
+      "base": "jev/responses/choice-valid.json",
+      "mutation": {
+        "pointer": "/answers/q/confidence",
+        "op": "replace",
+        "value": 1.1
+      }
+    }
+  ]
+}

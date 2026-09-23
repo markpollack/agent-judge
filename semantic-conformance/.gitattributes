@@ -1,0 +1,2 @@
+# Preserve exact provenance bytes, including CRLF and Unicode digest vectors.
+src/test/resources/** -text

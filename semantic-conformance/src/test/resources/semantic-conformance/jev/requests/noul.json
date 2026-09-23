@@ -1,0 +1,17 @@
+{
+  "model": "jev-1.13.0",
+  "state": {
+    "requirement": "All three required clauses shall be met.",
+    "evidence": "Synthetic transport fixture; no real assessment was made."
+  },
+  "questions": {
+    "q": {
+      "type": "noul",
+      "instructions": "Does the complete supplied evidence establish satisfaction of the requirement?",
+      "criteria": {
+        "true": "The requirement is satisfied.",
+        "false": "The requirement is violated."
+      }
+    }
+  }
+}
