@@ -24,7 +24,11 @@ import io.github.markpollack.judge.description.MetaJuryDescription;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentReasonCode;
 
-/** Package-private named jury-of-juries implementation used by {@link Juries}. */
+/**
+ * Named jury-of-juries implementation used by {@link Juries}. Exactly one declared usable
+ * member retains its complete aggregate without invoking the meta-strategy. Failed members
+ * remain stage failures; one survivor among multiple declared members is not identity.
+ */
 class MetaJury implements Jury {
 
 	private static final Logger logger = LoggerFactory.getLogger(MetaJury.class);
@@ -37,13 +41,13 @@ class MetaJury implements Jury {
 	private final VotingStrategy metaStrategy;
 
 	/**
-	 * A member whose aggregate may be excluded exists, and the strategy is configured to honour
-	 * an exclusion.
+	 * A capable member exists and either one-member identity applies or the strategy
+	 * excludes N/A. REFUSE remains a construction error for capable members.
 	 * @return true when this jury's aggregate may be NOT_APPLICABLE
 	 */
 	@Override
 	public boolean aggregateMayBeNotApplicable() {
-		return metaStrategy.notApplicablePolicy() == NotApplicablePolicy.EXCLUDE
+		return (members.size() == 1 || metaStrategy.notApplicablePolicy() == NotApplicablePolicy.EXCLUDE)
 				&& members.stream().anyMatch(member -> member.jury().aggregateMayBeNotApplicable());
 	}
 
@@ -179,13 +183,14 @@ class MetaJury implements Jury {
 				.build();
 		}
 
-		Judgment aggregate = aggregateWithinBoundary(successful);
+		boolean identity = members.size() == 1;
+		Judgment aggregate = identity ? successful.get(0) : aggregateWithinBoundary(successful);
 		return Verdict.builder()
 			.aggregated(aggregate)
 			.individual(successful)
 			.individualByName(successfulByName)
 			.seats(seats)
-			.decision(AggregationBoundary.decisionFor(aggregate))
+			.decision(identity ? Decision.own() : AggregationBoundary.decisionFor(aggregate))
 			.compositeAttempts(attempts)
 			.build();
 	}

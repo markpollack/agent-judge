@@ -136,7 +136,7 @@ class RejectedExclusionExplanationTest {
 				.vote(CONTEXT);
 
 			assertThat(verdict.decision().tier()).isEqualTo("semantic");
-			assertThat(verdict.aggregated().reasoning()).isEqualTo("All 1 applicable requirement(s) passed");
+			assertThat(verdict.aggregated().reasoning()).isEqualTo("every requirement was met");
 			assertThat(verdict.compositeAttempts().get(0).dispositionReason())
 				.as("the disposition is still countable")
 				.isEqualTo(DispositionReason.UNDECLARED_NOT_APPLICABLE);

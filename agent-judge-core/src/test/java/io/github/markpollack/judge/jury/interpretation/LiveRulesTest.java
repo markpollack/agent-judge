@@ -206,7 +206,7 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("A7: an own root reports decidedBy null with no defect")
 	void anOwnRootNamesNoStage() {
-		Interpretation interpretation = Verdicts.interpret(passingTier("ok", "OK").vote(CONTEXT));
+		Interpretation interpretation = Verdicts.interpret(twoSeatPassingReduction().vote(CONTEXT));
 
 		assertThat(interpretation.decidedBy()).isNull();
 		assertThat(interpretation.defects()).isEmpty();
@@ -217,7 +217,7 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("an outcome adopted through two tiers is decided by the last edge, with basis tier_outcome")
 	void anAdoptedOutcomeIsDecidedByTheLastEdge() {
-		Jury inner = CascadedJury.builder().tier("leaf", passingTier("ok", "OK"), TierPolicy.FINAL_TIER).build();
+		Jury inner = CascadedJury.builder().tier("leaf", twoSeatPassingReduction(), TierPolicy.FINAL_TIER).build();
 		Verdict verdict = CascadedJury.builder().tier("outer-tier", inner, TierPolicy.FINAL_TIER).build().vote(CONTEXT);
 
 		Interpretation interpretation = Verdicts.interpret(verdict);
@@ -254,6 +254,14 @@ class LiveRulesTest {
 		assertThat(MAPPER.writeValueAsString(live)).isEqualTo(MAPPER.writeValueAsString(fromMap));
 		assertThat(live.sourceVersion()).isEqualTo(1);
 		assertThat(live.defects()).isEmpty();
+	}
+
+	/** These legacy-reader tests exercise an explicit reduction, not modern identity. */
+	private static Jury twoSeatPassingReduction() {
+		return io.github.markpollack.judge.jury.SimpleJury.builder()
+			.judge(io.github.markpollack.judge.Judges.named(context -> Judgment.pass("first"), "first"))
+			.judge(io.github.markpollack.judge.Judges.named(context -> Judgment.pass("second"), "second"))
+			.votingStrategy(new io.github.markpollack.judge.jury.ConsensusStrategy()).build();
 	}
 
 }

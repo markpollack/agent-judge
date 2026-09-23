@@ -67,6 +67,11 @@ import org.slf4j.LoggerFactory;
  * </p>
  * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
+ * <p>One declared seat with a valid returned result is identity composition: the complete
+ * Judgment is retained, with an OWN decision and no strategy invocation or added aggregation
+ * evidence. Configuration and exclusion guards still apply. Failed invocations remain
+ * contained inputs to the configured error reduction; they are not identity results.
+ *
  * @author Mark Pollack
  * @since 0.1.0
  */
@@ -197,17 +202,17 @@ public class SimpleJury implements Jury {
 	}
 
 	/**
-	 * A capable seat exists and the strategy is configured to honour an exclusion.
+	 * A capable seat exists and either identity applies or the strategy excludes N/A.
 	 * <p>
-	 * Both halves are needed, and the conjunction is what makes this bound conservative: a
-	 * capable seat under a refusing strategy produces an error, never an excluded aggregate.
+	 * One declared seat preserves N/A even with TREAT_AS_FAIL configured. A refusing
+	 * strategy still rejects a capable seat at construction; multi-seat bounds are unchanged.
 	 * </p>
 	 * @return true when this jury's aggregate may be NOT_APPLICABLE
 	 * @since 0.17.0
 	 */
 	@Override
 	public boolean aggregateMayBeNotApplicable() {
-		return votingStrategy.notApplicablePolicy() == NotApplicablePolicy.EXCLUDE
+		return (judges.size() == 1 || votingStrategy.notApplicablePolicy() == NotApplicablePolicy.EXCLUDE)
 				&& declaredCapabilities.stream().anyMatch(declared -> declared != null);
 	}
 
@@ -300,17 +305,25 @@ public class SimpleJury implements Jury {
 
 	@Override
 	public Verdict vote(JudgmentContext context) {
+		return voteForComposition(context).verdict();
+	}
+
+	/** Per-call validity is orchestration state, never fabricated result metadata. */
+	record CompositionVote(Verdict verdict, boolean identity) {
+	}
+
+	CompositionVote voteForComposition(JudgmentContext context) {
 		// Read every seat's key once, on the caller's thread and before any judge runs, so a
 		// judge whose metadata cannot be read becomes an ERROR seat instead of an exception.
 		List<SeatKey> keys = IntStream.range(0, judges.size())
 			.mapToObj(index -> SeatKey.of(judges.get(index), index))
 			.toList();
 
-		List<Judgment> individualJudgments;
+		List<Invocation> invocations;
 
 		if (parallel) {
 			// Parallel execution using CompletableFuture
-			List<CompletableFuture<Judgment>> futures = IntStream.range(0, judges.size())
+			List<CompletableFuture<Invocation>> futures = IntStream.range(0, judges.size())
 				.mapToObj(index -> CompletableFuture.supplyAsync(() -> invokeJudge(index, keys.get(index), context),
 						executor))
 				.toList();
@@ -319,14 +332,17 @@ public class SimpleJury implements Jury {
 			CompletableFuture<Void> allOf = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
 
 			// Collect results
-			individualJudgments = allOf.thenApply(v -> futures.stream().map(CompletableFuture::join).toList()).join();
+			invocations = allOf.thenApply(v -> futures.stream().map(CompletableFuture::join).toList()).join();
 		}
 		else {
 			// Sequential execution
-			individualJudgments = IntStream.range(0, judges.size())
+			invocations = IntStream.range(0, judges.size())
 				.mapToObj(index -> invokeJudge(index, keys.get(index), context))
 				.toList();
 		}
+
+		List<Judgment> individualJudgments = invocations.stream().map(Invocation::judgment).toList();
+		boolean identity = judges.size() == 1 && invocations.get(0).returned();
 
 		// Build identity map (preserves order via LinkedHashMap) and the seats that join it to
 		// the ordered list.
@@ -337,17 +353,21 @@ public class SimpleJury implements Jury {
 			seats.add(new Seat(i, keys.get(i).verdictKey(), keySourceAt(i, keys.get(i))));
 		}
 
-		Judgment aggregated = aggregateWithinBoundary(individualJudgments);
+		Judgment aggregated = identity ? individualJudgments.get(0) : aggregateWithinBoundary(individualJudgments);
 
-		return Verdict.builder()
+		Verdict verdict = Verdict.builder()
 			.aggregated(aggregated)
 			.individual(individualJudgments)
 			.individualByName(judgmentByName)
 			.weights(weights)
 			.seats(seats)
-			.decision(AggregationBoundary.decisionFor(aggregated))
+			.decision(identity ? Decision.own() : AggregationBoundary.decisionFor(aggregated))
 			.compositeAttempts(List.of())
 			.build();
+		return new CompositionVote(verdict, identity);
+	}
+
+	private record Invocation(Judgment judgment, boolean returned) {
 	}
 
 	private KeySource keySourceAt(int position, SeatKey key) {
@@ -380,30 +400,32 @@ public class SimpleJury implements Jury {
 	 * @param index the judge's position in the configured list
 	 * @param key the seat's key, read before any judge ran
 	 * @param context the judgment context
-	 * @return the judge's judgment, or an ERROR judgment naming the judge and the cause
+	 * @return the result and whether it was returned validly rather than contained
 	 */
-	private Judgment invokeJudge(int index, SeatKey key, JudgmentContext context) {
+	private Invocation invokeJudge(int index, SeatKey key, JudgmentContext context) {
 		if (key.metadataFailure() != null) {
 			String reasoning = key.unreadableMetadata();
 			logger.warn("{}; recording an ERROR for the error policy to resolve", reasoning, key.cause());
-			return Judgment.error(JudgmentReasonCode.JUDGE_METADATA_UNREADABLE, reasoning);
+			return new Invocation(Judgment.error(JudgmentReasonCode.JUDGE_METADATA_UNREADABLE, reasoning), false);
 		}
 		Judge judge = judges.get(index);
 		String name = key.verdictKey();
 		try {
-			Judgment judgment = guardExclusion(index, name, judge.judge(context));
+			Judgment raw = judge.judge(context);
+			Judgment judgment = guardExclusion(index, name, raw);
 			if (judgment == null) {
 				logger.warn("Judge '{}' returned no judgment; recording an ERROR for the error policy to resolve",
 						name);
-				return Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "Judge '" + name + "' returned no judgment");
+				return new Invocation(Judgment.error(JudgmentReasonCode.JUDGE_FAILED,
+						"Judge '" + name + "' returned no judgment"), false);
 			}
-			return judgment;
+			return new Invocation(judgment, judgment == raw);
 		}
 		catch (Exception ex) {
 			logger.warn("Judge '{}' threw {}; recording an ERROR for the error policy to resolve", name,
 					ex.getClass().getName(), ex);
-			return Judgment.error(JudgmentReasonCode.JUDGE_FAILED,
-					"Judge '" + name + "' threw " + ex.getClass().getName() + describeCause(ex));
+			return new Invocation(Judgment.error(JudgmentReasonCode.JUDGE_FAILED,
+					"Judge '" + name + "' threw " + ex.getClass().getName() + describeCause(ex)), false);
 		}
 	}
 

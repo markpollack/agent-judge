@@ -18,8 +18,9 @@ import io.github.markpollack.judge.jury.NotApplicablePolicy;
  * seats in order.
  *
  * <p>
- * {@code seats().size()} is the number of judgments the jury submits to its strategy, which
- * the aggregation evidence reports as {@code inputCount}.
+ * {@code seats().size()} is the declared cardinality. One valid returned seat is carried
+ * unchanged without a strategy call or new aggregation evidence; otherwise the reduction
+ * evidence reports its input count.
  * </p>
  *
  * <h2>Portable form</h2>
@@ -33,7 +34,8 @@ import io.github.markpollack.judge.jury.NotApplicablePolicy;
  *
  * <h2>Why the capability is carried rather than derived</h2>
  * <p>
- * The bound is "a capable seat exists <em>and</em> the strategy honours an exclusion", and the
+ * One declared capable seat retains N/A by identity. For multiple seats, the bound is
+ * "a capable seat exists <em>and</em> the strategy honours an exclusion", and the
  * second half is only derivable from a description when the strategy declared its
  * not-applicable policy. A custom strategy may legitimately override
  * {@link io.github.markpollack.judge.jury.VotingStrategy#notApplicablePolicy()} and leave
@@ -77,7 +79,8 @@ public record SimpleJuryDescription(StrategyDescription strategy, List<SeatDescr
 		}
 		NotApplicablePolicy declared = strategy.notApplicablePolicy();
 		if (declared != null) {
-			boolean derived = declared == NotApplicablePolicy.EXCLUDE
+			boolean derived = (declared == NotApplicablePolicy.EXCLUDE
+					|| (seats.size() == 1 && declared == NotApplicablePolicy.TREAT_AS_FAIL))
 					&& seats.stream().anyMatch(seat -> seat.judge().notApplicableWhen() != null);
 			if (derived != aggregateMayBeNotApplicable) {
 				throw new IllegalArgumentException("strategy '" + strategy.name() + "' declares notApplicablePolicy "

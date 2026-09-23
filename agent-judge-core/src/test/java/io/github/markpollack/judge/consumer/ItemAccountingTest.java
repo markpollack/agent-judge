@@ -112,7 +112,7 @@ class ItemAccountingTest {
 	@Test
 	@DisplayName("a direct instrument failure: undecided, so it is excluded from the subject denominator")
 	void aDirectInstrumentFailure() {
-		Verdict root = brokenReduction(Judgment.pass("a")).vote(CONTEXT);
+		Verdict root = brokenReduction(Judgment.pass("a"), Judgment.pass("b")).vote(CONTEXT);
 
 		Verdict selected = selectedDetermination(root);
 
@@ -191,7 +191,7 @@ class ItemAccountingTest {
 	@DisplayName("only named copy edges are followed: a later completed determination is not searched for")
 	void onlyNamedEdgesAreFollowed() {
 		Verdict root = CascadedJury.builder()
-			.tier("first", brokenReduction(Judgment.fail("a requirement was not met")),
+			.tier("first", brokenReduction(Judgment.fail("a requirement was not met"), Judgment.pass("other")),
 					TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("second", SimpleJury.of(Judgment.pass("OK")), TierPolicy.FINAL_TIER)
 			.build()

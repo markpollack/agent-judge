@@ -356,6 +356,7 @@ class ContainmentTest {
 		/** A member that fails its stage in the way the matrix asks for. */
 		private Jury memberFailing(DispositionReason reason, JudgmentReasonCode machineryCode) {
 			return switch (reason) {
+				case INVALID_TIER_RESULT -> throw new IllegalArgumentException("Only assessment cascade tiers use this reason");
 				case EXECUTION_FAILED -> throwing(new IllegalStateException("boom"));
 				case CHILD_UNDECIDED -> returning(Verdict.builder()
 					.aggregated(Judgment.error(machineryCode, "the stage reached no outcome"))
@@ -402,7 +403,8 @@ class ContainmentTest {
 		java.util.List<org.junit.jupiter.params.provider.Arguments> arguments = new java.util.ArrayList<>();
 		for (ErrorPolicy errorPolicy : ErrorPolicy.values()) {
 			for (JudgmentReasonCode code : machinery) {
-				for (DispositionReason reason : DispositionReason.values()) {
+				for (DispositionReason reason : List.of(DispositionReason.EXECUTION_FAILED,
+						DispositionReason.CHILD_UNDECIDED, DispositionReason.UNDECLARED_NOT_APPLICABLE)) {
 					arguments.add(org.junit.jupiter.params.provider.Arguments.of(errorPolicy, code, reason));
 				}
 			}

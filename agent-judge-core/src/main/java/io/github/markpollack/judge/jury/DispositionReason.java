@@ -30,6 +30,9 @@ public enum DispositionReason {
 	 */
 	EXECUTION_FAILED("execution_failed"),
 
+	/** The assessment tier violated its single-seat identity or policy contract. */
+	INVALID_TIER_RESULT("invalid_tier_result"),
+
 	/**
 	 * The stage returned a verdict whose decision is {@link DecisionKind#UNDECIDED}: it ran, and
 	 * determined nothing. The actual verdict is kept on the attempt.

@@ -163,9 +163,9 @@ class DescribedCapabilityTest {
 
 			assertThat(excluding.describe().aggregateMayBeNotApplicable()).isTrue();
 			assertThat(failing.describe().aggregateMayBeNotApplicable())
-				.as("an exclusion treated as a failure never reaches the aggregate")
-				.isFalse();
-			assertThat(failing.aggregateMayBeNotApplicable()).isFalse();
+				.as("one declared seat retains its exclusion by identity")
+				.isTrue();
+			assertThat(failing.aggregateMayBeNotApplicable()).isTrue();
 		}
 
 		@Test

@@ -18,6 +18,8 @@ import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.description.CascadedJuryDescription;
 import io.github.markpollack.judge.description.JuryDescription;
 import io.github.markpollack.judge.description.TierDescription;
+import io.github.markpollack.judge.result.AcceptanceAction;
+import io.github.markpollack.judge.result.AppliedPolicy;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentReasonCode;
 import io.github.markpollack.judge.result.JudgmentStatus;
@@ -41,6 +43,8 @@ public class CascadedJury implements Jury {
 
 	private final List<TierConfig> tiers;
 
+	private final boolean assessmentCascade;
+
 	private CascadedJury(List<TierConfig> tiers) {
 		Set<String> names = new HashSet<>();
 		for (TierConfig tier : tiers) {
@@ -49,6 +53,7 @@ public class CascadedJury implements Jury {
 			}
 		}
 		this.tiers = List.copyOf(tiers);
+		this.assessmentCascade = tiers.stream().anyMatch(tier -> tier.policy() == TierPolicy.STOP_ON_USABLE_ASSESSMENT);
 	}
 
 	@Override
@@ -112,7 +117,12 @@ public class CascadedJury implements Jury {
 	 * The single rule, applied to each tier in order.
 	 *
 	 * <p>
-	 * There are only three things a tier can do. It can throw; it can return a verdict the
+	 * Legacy policies retain the failed-stage behavior described below. Assessment routing
+	 * instead requires a valid one-seat SimpleJury identity and stops on any invocation or
+	 * contract failure; its final tier has the same bound. Only an explicit ESCALATE action
+	 * continues it, and final escalation remains a retained ABSTAIN.
+	 *
+	 * <p>There are only three things a tier can do. It can throw; it can return a verdict the
 	 * cascade cannot use; or it can return one the cascade can. The interesting case is the
 	 * middle one, and the rule there is deliberately asymmetric: a tier that did not finish may
 	 * still have established a genuine rejection on the way, and one established violation is
@@ -127,9 +137,22 @@ public class CascadedJury implements Jury {
 	private Verdict execute(JudgmentContext context) {
 		List<CompositeAttempt> attempts = new ArrayList<>();
 		for (TierConfig tier : tiers) {
+			boolean bounded = tier.policy() == TierPolicy.STOP_ON_USABLE_ASSESSMENT
+					|| (assessmentCascade && tier.policy() == TierPolicy.FINAL_TIER);
+			boolean[] identity = { false };
 			Verdict tierVerdict;
 			try {
-				tierVerdict = CompositeExecutionScope.invokeChild(tier.name(), () -> tier.jury().vote(context));
+				tierVerdict = CompositeExecutionScope.invokeChild(tier.name(), () -> {
+					if (!bounded) {
+						return tier.jury().vote(context);
+					}
+					if (!(tier.jury() instanceof SimpleJury simple) || simple.getJudges().size() != 1) {
+						throw new IllegalStateException("Assessment tier requires one declared SimpleJury seat");
+					}
+					SimpleJury.CompositionVote result = simple.voteForComposition(context);
+					identity[0] = result.identity();
+					return result.verdict();
+				});
 			}
 			catch (CompositeLimitExceededException ex) {
 				throw ex;
@@ -139,10 +162,23 @@ public class CascadedJury implements Jury {
 						tier.name(), ex.getClass().getName(), ex);
 				attempts.add(CompositeAttempt.executionFailed(tier.name(), CompositeRelation.CASCADE_TIER,
 						tier.policy(), EXECUTION_FAILURE));
+				if (bounded) {
+					return assessmentTierFailed(tier, attempts,
+							"The assessment tier failed to execute or had invalid configuration.");
+				}
 				if (tier.policy() == TierPolicy.FINAL_TIER) {
 					return noTierDecided(attempts, "The final cascade tier failed to execute.");
 				}
 				continue;
+			}
+
+			if (bounded) {
+				String defect = assessmentTierDefect(tier, tierVerdict, identity[0]);
+				if (defect != null) {
+					attempts.add(CompositeAttempt.stageFailed(tier.name(), CompositeRelation.CASCADE_TIER,
+							tier.policy(), DispositionReason.INVALID_TIER_RESULT, tierVerdict));
+					return assessmentTierFailed(tier, attempts, defect);
+				}
 			}
 
 			DispositionReason reason = NotApplicableGuard.stageFailure(tier.jury(), tierVerdict);
@@ -173,10 +209,42 @@ public class CascadedJury implements Jury {
 		return noTierDecided(attempts, "No cascade tier produced a determination.");
 	}
 
+	private static String assessmentTierDefect(TierConfig tier, Verdict verdict, boolean identity) {
+		if (!identity || verdict.decision().kind() != DecisionKind.OWN
+				|| !verdict.compositeAttempts().isEmpty() || verdict.individual().size() != 1
+				|| verdict.seats().size() != 1 || verdict.seats().get(0).position() != 0) {
+			return "The assessment tier did not return a valid one-seat OWN identity result.";
+		}
+		Judgment seat = verdict.individual().get(0);
+		if (!seat.equals(verdict.aggregated())
+				|| !seat.equals(verdict.individualByName().get(verdict.seats().get(0).verdictKey()))) {
+			return "The assessment tier aggregate or named result differs from its sole seat.";
+		}
+		if (NotApplicableGuard.stageFailure(tier.jury(), verdict) != null) {
+			return "The assessment tier returned an unusable or undeclared exclusion.";
+		}
+		if (seat.status() == JudgmentStatus.ERROR || seat.status() == JudgmentStatus.NOT_APPLICABLE) {
+			return null;
+		}
+		return seat.policyApplication() instanceof AppliedPolicy ? null
+				: "The assessment tier's seat has no applied acceptance policy.";
+	}
+
+	private Verdict assessmentTierFailed(TierConfig tier, List<CompositeAttempt> attempts, String explanation) {
+		return Verdict.builder()
+			.aggregated(Judgment.error(JudgmentReasonCode.STAGE_FAILED, "Tier '" + tier.name() + "': " + explanation))
+			.decision(Decision.undecided())
+			.compositeAttempts(attempts)
+			.build();
+	}
+
 	private boolean shouldStop(TierConfig tier, Verdict verdict) {
 		return switch (tier.policy()) {
 			case REJECT_ON_ANY_FAIL -> hasAnyFail(verdict);
 			case ACCEPT_ON_ALL_PASS -> allPassed(verdict);
+			case STOP_ON_USABLE_ASSESSMENT -> !(verdict.individual().get(0).status() == JudgmentStatus.ABSTAIN
+					&& verdict.individual().get(0).policyApplication() instanceof AppliedPolicy applied
+					&& applied.action() == AcceptanceAction.ESCALATE);
 			case FINAL_TIER -> true;
 		};
 	}

@@ -29,7 +29,7 @@ import org.jspecify.annotations.Nullable;
  * <caption>The three kinds</caption>
  * <tr><th>Kind</th><th>tier</th><th>basis</th><th>What it means</th></tr>
  * <tr><td>{@link DecisionKind#OWN}</td><td>absent</td><td>absent</td>
- * <td>this jury reduced, or a policy decided</td></tr>
+ * <td>this jury reduced, retained one valid result by identity, or a policy decided</td></tr>
  * <tr><td>{@link DecisionKind#TIER}</td><td>required</td><td>required</td>
  * <td>the named direct tier determined it</td></tr>
  * <tr><td>{@link DecisionKind#UNDECIDED}</td><td>absent</td><td>absent</td>
@@ -71,7 +71,7 @@ public record Decision(DecisionKind kind, @Nullable String tier, @Nullable Decis
 		}
 	}
 
-	/** The jury reduced, or one of its policies decided. */
+	/** The jury reduced, retained a valid identity result, or one of its policies decided. */
 	private static final Decision OWN = new Decision(DecisionKind.OWN, null, null);
 
 	/** Nothing determined an outcome. */

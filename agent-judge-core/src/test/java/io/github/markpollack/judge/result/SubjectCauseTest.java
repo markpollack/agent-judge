@@ -102,7 +102,8 @@ class SubjectCauseTest {
 		assertThat(verdict.decision()).isEqualTo(Decision.tier("gate", DecisionBasis.TIER_OUTCOME));
 		assertThat(verdict.individual()).singleElement()
 			.satisfies(leaf -> assertThat(leaf.reasonCode()).isEqualTo(JudgmentReasonCode.SUBJECT_EMPTY));
-		assertThat(verdict.aggregated().reasonCode()).as("the reduction observed no cause of its own").isNull();
+		assertThat(verdict.aggregated()).as("one-seat identity keeps the complete cause-bearing leaf")
+			.isEqualTo(verdict.individual().get(0));
 		assertThat(verdict.compositeAttempts().get(0).verdict().individual()).as("the same leaf, copied not counted")
 			.isEqualTo(verdict.individual());
 	}

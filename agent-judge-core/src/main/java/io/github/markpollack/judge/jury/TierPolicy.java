@@ -31,8 +31,16 @@ public enum TierPolicy {
 	ACCEPT_ON_ALL_PASS("ACCEPT_ON_ALL_PASS"),
 
 	/**
+	 * Stop on a policy-applied usable assessment or terminal outcome. Continue only
+	 * when the sole valid seat explicitly requests ESCALATE. Requires a one-seat
+	 * SimpleJury, and the same bound on this cascade's final tier.
+	 */
+	STOP_ON_USABLE_ASSESSMENT("STOP_ON_USABLE_ASSESSMENT"),
+
+	/**
 	 * Always produce a verdict — no escalation possible. Must be the last tier in the
-	 * cascade. Use for LLM semantic evaluation (Tier 3).
+	 * cascade. When STOP_ON_USABLE_ASSESSMENT is present, the final tier also requires a
+	 * one-seat SimpleJury and policy-applied result; final ESCALATE remains ABSTAIN.
 	 */
 	FINAL_TIER("FINAL_TIER");
 

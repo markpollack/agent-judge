@@ -16,7 +16,11 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * </p>
  *
  * <p>
- * The four policies differ in whether the errored judgment stays in the population being
+ * These are reduction policies. A valid result returned by one declared jury seat is
+ * retained by identity without error reduction; contained invocation failures still use
+ * the configured reduction.
+ *
+ * <p>The four policies differ in whether the errored judgment stays in the population being
  * reduced:
  * </p>
  * <table border="1">

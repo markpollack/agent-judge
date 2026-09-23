@@ -306,7 +306,7 @@ class CascadeRuleTest {
 
 			assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
 			assertThat(verdict.aggregated().reasoning()).as("the root reasoning is the later tier's, not a note about the refusal")
-				.contains("Unanimous consensus")
+				.isEqualTo("OK")
 				.doesNotContain("NOT_APPLICABLE");
 			CompositeAttempt refused = verdict.compositeAttempts().get(0);
 			assertThat(refused.disposition()).isEqualTo(AttemptDisposition.STAGE_FAILED);
@@ -365,6 +365,7 @@ class CascadeRuleTest {
 		void anInnerPropagatedOutcomeIsAdopted() {
 			Jury erroring = SimpleJury.builder()
 				.judge(Judges.named(context -> Judgment.error("the index was unreachable"), "flaky"))
+			.judge(Judges.named(context -> Judgment.pass("another seat"), "other"))
 				.votingStrategy(new ConsensusStrategy())
 				.build();
 			Jury inner = CascadedJury.builder().tier("leaf", erroring, TierPolicy.FINAL_TIER).build();
@@ -698,11 +699,13 @@ class CascadeRuleTest {
 		// member completed a reduction, so its FAIL is real.
 		Jury errorDerived = SimpleJury.builder()
 			.judge(Judges.named(context -> Judgment.error("the index was unreachable"), "flaky"))
+			.judge(Judges.named(context -> Judgment.pass("another seat"), "other"))
 			.votingStrategy(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_FAIL, NotApplicablePolicy.EXCLUDE))
 			.build();
 		// A member whose exclusion policy turned an exclusion into a failing contribution.
 		Jury exclusionDerived = SimpleJury.builder()
 			.judge(new Conditional("conditional", Judgment.notApplicable(EXCLUSION)))
+			.judge(Judges.named(context -> Judgment.pass("another seat"), "other"))
 			.votingStrategy(new AllMustPassStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.TREAT_AS_FAIL))
 			.build();
 

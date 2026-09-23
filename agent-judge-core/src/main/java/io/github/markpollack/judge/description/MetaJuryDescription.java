@@ -32,7 +32,8 @@ import io.github.markpollack.judge.jury.NotApplicablePolicy;
  *
  * <h2>Why the capability is carried rather than derived</h2>
  * <p>
- * Exactly as in {@link SimpleJuryDescription}: the strategy's not-applicable policy is only
+ * One declared usable member retains its complete aggregate, including N/A. For reductions,
+ * exactly as in {@link SimpleJuryDescription}, the strategy's not-applicable policy is only
  * derivable from a description that declared it, and reading its absence as {@code REFUSE}
  * publishes a confident {@code false} for a meta-jury that can in fact return an exclusion. The
  * jury states what it is, and a declared policy is cross-checked against it.
@@ -59,7 +60,8 @@ public record MetaJuryDescription(StrategyDescription strategy, List<MemberDescr
 		members = List.copyOf(Objects.requireNonNull(members, "members must not be null"));
 		NotApplicablePolicy declared = strategy.notApplicablePolicy();
 		if (declared != null) {
-			boolean derived = declared == NotApplicablePolicy.EXCLUDE
+			boolean derived = (declared == NotApplicablePolicy.EXCLUDE
+					|| (members.size() == 1 && declared == NotApplicablePolicy.TREAT_AS_FAIL))
 					&& members.stream().anyMatch(member -> member.jury().aggregateMayBeNotApplicable());
 			if (derived != aggregateMayBeNotApplicable) {
 				throw new IllegalArgumentException("strategy '" + strategy.name() + "' declares notApplicablePolicy "

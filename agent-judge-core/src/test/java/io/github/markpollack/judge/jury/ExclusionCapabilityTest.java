@@ -306,8 +306,8 @@ class ExclusionCapabilityTest {
 				.judge(new Conditional("conditional", excluded()))
 				.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.TREAT_AS_FAIL))
 				.build()
-				.aggregateMayBeNotApplicable()).as("an exclusion treated as a failure never reaches the aggregate")
-				.isFalse();
+				.aggregateMayBeNotApplicable()).as("one declared seat retains its exclusion by identity")
+				.isTrue();
 			assertThat(SimpleJury.builder()
 				.judge(new Unconditional("plain", Judgment.pass("ok")))
 				.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))

@@ -73,7 +73,8 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 					+ "rather than a verdict");
 		}
 		if ((dispositionReason == DispositionReason.CHILD_UNDECIDED
-				|| dispositionReason == DispositionReason.UNDECLARED_NOT_APPLICABLE) && verdict == null) {
+				|| dispositionReason == DispositionReason.UNDECLARED_NOT_APPLICABLE
+				|| dispositionReason == DispositionReason.INVALID_TIER_RESULT) && verdict == null) {
 			throw new IllegalArgumentException(dispositionReason
 					+ " describes a verdict the stage returned, so the attempt must keep it");
 		}

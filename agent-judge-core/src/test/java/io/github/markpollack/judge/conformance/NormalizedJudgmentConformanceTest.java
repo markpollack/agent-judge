@@ -210,11 +210,11 @@ class NormalizedJudgmentConformanceTest {
 	class CompositeGolden {
 
 		@Test
-		void realCompositeExecutionMatchesTheGoldenDocument() {
+		void realCompositeExecutionPreservesHistoricalStructureWithModernIdentity() {
 			assertThat(compositeFixtureTree())
-				.as("the corrected composite wire projection changed; review before repinning %s",
+				.as("only the declared one-seat identity projections differ from frozen %s",
 						COMPOSITE_GOLDEN_RESOURCE)
-				.isEqualTo(ModernFixtureExpectations.statusOnly(compositeGoldenTree()));
+				.isEqualTo(modernCompositeIdentityExpectation());
 		}
 
 		@Test
@@ -240,7 +240,7 @@ class NormalizedJudgmentConformanceTest {
 		void correctedCompositeDocumentRoundTripsThroughTheOrdinaryMapper() throws Exception {
 			Verdict parsed = MAPPER.readValue(writeCompositeFixture(), Verdict.class);
 			assertThat(MAPPER.readTree(MAPPER.writeValueAsString(parsed)))
-				.isEqualTo(ModernFixtureExpectations.statusOnly(compositeGoldenTree()));
+				.isEqualTo(modernCompositeIdentityExpectation());
 			assertThat(parsed.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(parsed.compositeAttempts()).extracting(CompositeAttempt::name)
 				.containsExactly("pipeline", "audit");
@@ -725,6 +725,19 @@ class NormalizedJudgmentConformanceTest {
 		catch (Exception ex) {
 			throw new AssertionError("could not parse the composite conformance fixture", ex);
 		}
+	}
+
+	/** Explicit live identity expectation; the immutable 0.17 bytes remain historical. */
+	private static JsonNode modernCompositeIdentityExpectation() {
+		JsonNode expected = ModernFixtureExpectations.statusOnly(compositeGoldenTree());
+		JsonNode pipeline = expected.at("/compositeAttempts/0/verdict");
+		JsonNode leaf = pipeline.at("/compositeAttempts/1/verdict");
+		JsonNode sole = leaf.at("/individual/0");
+		((com.fasterxml.jackson.databind.node.ObjectNode) leaf).set("aggregated", sole);
+		((com.fasterxml.jackson.databind.node.ObjectNode) pipeline).set("aggregated", sole);
+		((com.fasterxml.jackson.databind.node.ArrayNode) expected.get("individual")).set(0, sole);
+		((com.fasterxml.jackson.databind.node.ObjectNode) expected.get("individualByName")).set("pipeline", sole);
+		return expected;
 	}
 
 	private static JsonNode compositeGoldenTree() {

@@ -665,7 +665,11 @@ final class Interpreter {
 	private static Set<String> policyTokens() {
 		Set<String> tokens = new java.util.LinkedHashSet<>();
 		for (TierPolicy policy : TierPolicy.values()) {
-			tokens.add(policy.wireName());
+			// The v1 reader cannot certify the new identity/policy routing protocol.
+			// Its full coherence checks belong to the versioned modern reader.
+			if (policy != TierPolicy.STOP_ON_USABLE_ASSESSMENT) {
+				tokens.add(policy.wireName());
+			}
 		}
 		return tokens;
 	}
