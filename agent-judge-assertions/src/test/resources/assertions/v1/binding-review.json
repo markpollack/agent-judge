@@ -1,0 +1,24 @@
+{
+  "id": "conference-assertion-binding-review:v1",
+  "author": "assertion-fixture-author",
+  "reviewer": "independent-binding-reviewer",
+  "approved": true,
+  "bindingsSha256": "bb18c2746924755c23a65d474da26eb9240adc105557aa154bb886e2ce4dcfa2",
+  "configurationSha256": "da6ca48de15d03e1507549ebc5d00e99db6c0d5e521c1d374dcbbff42cb16794",
+  "policySha256": "2734174c8e9752a5dae6886922a483a47fe7d69dca0ebafa123d4566fd20929b",
+  "subjectRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec",
+  "artifactReferencesVerified": 9,
+  "requirementTextDigestsVerified": 2,
+  "review": [
+    "The exact canonical short requirement is an alias for the retained RULE-4 global lock-order sentence, under the exact selected source-path scope. It does not replace or certify every RULE-4 conjunct.",
+    "The source exhibits a direct controller entry into createStaffOffer, lockRequest before lockResources, and actual PESSIMISTIC_WRITE acquisition semantics. The scoped no-preheld-lock condition supports this ordering counterexample; it is not fresh runtime or deadlock evidence.",
+    "The AC8 goal is the exact retained source requirement text. The selected cancellation method rejects equality before its state mutation under the declared ordinarily completing collaborator assumptions; no fresh equality-boundary execution is claimed.",
+    "Provider instructions make both conditional scopes explicit and admit insufficient evidence. The original bundle bytes remain unchanged. Bindings, sufficiency reviews, expected labels and prior model reasoning are excluded from provider inputs.",
+    "The three-label Choice projection preserves satisfied, violated and insufficient determinations. The explicit demonstration policy uses the assessment and retains abstention; it does not introduce a confidence threshold or certify a production operating policy."
+  ],
+  "limits": [
+    "This is source/alias/configuration review, not approval to transmit evidence or spend money.",
+    "The selected primitive is provisional for the programming-model slice; comparative preference belongs to the later experiment.",
+    "No live model behavior, local calibration, arbitrary requirement sufficiency, whole-system compliance or mutation kill is established."
+  ]
+}

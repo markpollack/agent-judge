@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "subjectRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec",
+  "evidenceManifest": {
+    "path": "evidence-compilation/v1/manifest.json",
+    "bytes": 13622,
+    "sha256": "ed95b6145d507ce74102a3c8b5413621804c0dec36b029d4714105ae0bd0507f"
+  },
+  "sufficiencyReviews": {
+    "path": "evidence-compilation/v1/reviews.json",
+    "bytes": 10551,
+    "sha256": "366af930fb4c00395a83f77b5acfe2fdae497e8b9d74ede2e3a7cc5d4a2954d7"
+  },
+  "bindings": [
+    {
+      "id": "RULE-4-lock-order",
+      "revision": "1",
+      "text": "Repository locks are acquired in the required order",
+      "textSha256": "6f12c9a0cec462af68cafbb1ed6672c0877fccb748b37b56c888435be2964b8e",
+      "sourceRequirement": {
+        "path": "evidence-compilation/v1/requirements/rule-4.txt",
+        "bytes": 797,
+        "sha256": "88d3251b9a88e379840e6a9187c5c22cfdf640197c9ba699980368104114e93b"
+      },
+      "selectedClause": {
+        "path": "evidence-compilation/v1/requirements/required-lock-order.txt",
+        "bytes": 190,
+        "sha256": "1a3825cc6111adaf0053788333e019776b79fd8fbba44c2d3f18c2709688f6ff"
+      },
+      "recipe": {
+        "path": "evidence-compilation/v1/recipes/rule-4-path-v2.json",
+        "bytes": 3978,
+        "sha256": "4837c7498c6ce8cbafea18d2b3e9376aec842dab788fd995b7621d137565887a"
+      },
+      "recipeId": "rule-4-path-v2",
+      "recipeVersion": "1",
+      "bundle": {
+        "path": "evidence-compilation/v1/inputs/bundle-01.json",
+        "bytes": 20425,
+        "sha256": "437d8b577c34eafc6de0cb46a7514e5e37855ae23ee8669144f3c482c5f9862e"
+      },
+      "reviewKey": "rule-4-path-v2",
+      "scope": "Source-level lock ordering for a valid, successfully claimed request entering StaffQueueController.createOffer without pre-held database locks, under ordinary Spring @Transactional and JPA pessimistic-lock semantics. Analyze the supplied path; no execution trace or whole-application transaction configuration is provided.",
+      "aliasMeaning": "The exact short text aliases only the requiredLockOrder clause in the selected bundle, under its scope. Other RULE-4 clauses, a fresh deadlock and arbitrary transaction configurations are outside this assertion.",
+      "sufficiency": "Conditional source sufficiency for this exact alias and selected clause; source review is not model observation."
+    },
+    {
+      "id": "UC6-AC8",
+      "revision": "1",
+      "text": "### UC6-AC8: Reject owner cancellation at start\n\n**Covers:** UC6-B6\n\nIf an owner attempts to cancel a `BOOKED` appointment at its start instant, then the system shall reject cancellation and shall preserve the appointment state.\n",
+      "textSha256": "f502c09e1c05f488c2af410c768b1b0e0f6e90e2eee03497a50faa6f34e7a87d",
+      "sourceRequirement": {
+        "path": "evidence-compilation/v1/requirements/uc6-ac8.txt",
+        "bytes": 229,
+        "sha256": "f502c09e1c05f488c2af410c768b1b0e0f6e90e2eee03497a50faa6f34e7a87d"
+      },
+      "recipe": {
+        "path": "evidence-compilation/v1/recipes/uc6-ac8-baseline-v1.json",
+        "bytes": 2359,
+        "sha256": "21d927dc3d122f33901e8e45aaec63a6e57ba71b071b94b394c06458403a4f3f"
+      },
+      "recipeId": "uc6-ac8-cancel-source",
+      "recipeVersion": "1",
+      "bundle": {
+        "path": "semantic-conformance/petclinic/inputs/uc6-ac8.json",
+        "bytes": 3318,
+        "sha256": "0ae2b11bb1dcaccead4074ee520976511abcf59171493d5418e6a1f33103307c"
+      },
+      "reviewKey": "uc6-ac8-baseline-v1",
+      "scope": "Source-level owner cancellation of an owned BOOKED appointment when timeService.now() equals its start instant, with ordinary Java time/comparison semantics and unchanged collaborators completing normally. Analyze the supplied baseline subject; no execution trace is provided.",
+      "sufficiency": "Conditional source sufficiency at equality boundary under normally completing collaborators; no execution observation."
+    }
+  ],
+  "providerInputExclusions": [
+    "This binding manifest and sufficiency reviews",
+    "Expected labels and historical model answers/reasoning",
+    "All unselected repository bytes, runtime configuration and agent output"
+  ],
+  "status": "Source binding candidate; independent review recorded separately"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "source-conformance-demonstration",
+  "revision": "1",
+  "action": "USE_ASSESSMENT",
+  "reason": "Illustrative source-conformance policy uses the native selected assessment; insufficient evidence remains ABSTAIN.",
+  "threshold": null,
+  "claim": "No empirical operating threshold or universal confidence meaning. ERROR and NOT_APPLICABLE bypass policy."
+}
