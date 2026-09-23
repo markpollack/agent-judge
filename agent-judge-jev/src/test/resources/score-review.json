@@ -1,0 +1,33 @@
+{
+  "id": "clause-rubric-order-review:v1",
+  "configurationDigest": "0ab51c18e62d58b6961750619ae51a21fa3f57bd96086505dba045e162f54d7f",
+  "author": "fixture-author",
+  "reviewer": "independent-rubric-reviewer",
+  "approved": true,
+  "scope": "Synthetic complete finite clause checklist; no real subject or provider inference result.",
+  "dimension": "Ordered extent of satisfaction of the declared required clauses.",
+  "orderingReview": [
+    {
+      "criterion": "No required clauses met",
+      "rank": 0,
+      "meaning": "None of the declared clauses is satisfied."
+    },
+    {
+      "criterion": "Some required clauses met",
+      "rank": 1,
+      "meaning": "A nonempty proper subset of the declared clauses is satisfied; some excludes all."
+    },
+    {
+      "criterion": "All required clauses met",
+      "rank": 2,
+      "meaning": "Every declared required clause is satisfied."
+    }
+  ],
+  "directionReview": "The ordinal indices and quality ranks strictly increase from none through partial to full satisfaction.",
+  "projectionReview": "Quality 0 maps to FAIL; quality 1 maps to PASS; intermediate expectations map to ABSTAIN. Missing provider answers are instrument ERROR. These are explicit conservative fixture boundaries, not empirically selected thresholds.",
+  "limits": [
+    "The provider score is an expected ordinal index, not a count of satisfied clauses, degree measured on equal semantic intervals, probability of satisfaction or certainty.",
+    "The review establishes rubric ordering and declared projection coherence only. It does not certify evidence sufficiency for an arbitrary new requirement.",
+    "No live model behavior, local calibration, comparative primitive preference or real-system compliance is established."
+  ]
+}
