@@ -12,8 +12,8 @@ decoding UTF-8. Tests reproduce each excerpt from the complete retained source f
 The serialized input files themselves are hashed as exact bytes; parsing and reserializing
 JSON is not a substitute for hashing the retained artifact.
 
-Only `petclinic/inputs/rule-4.json` and `petclinic/inputs/uc6-ac8.json` are inference
-states. Each contains requirement and source excerpts only. Expected labels and source
+Within the original `semantic-conformance` resource namespace, only
+`petclinic/inputs/rule-4.json` and `petclinic/inputs/uc6-ac8.json` are inference states. Each contains requirement and source excerpts only. Expected labels and source
 review rationale live separately in `petclinic/expectations.json`; the existing mutation
 patch is under `petclinic/mutation/`. Do not send the whole fixture directory as state.
 No historical evaluator responses, private sessions, or model reasoning are included.
@@ -41,5 +41,10 @@ transformations, not an adapter implementation or future result representation.
 Unicode normalization, line-ending conversion, JSON key order and whitespace are all
 observable: no canonicalization is implied. `.gitattributes` disables text conversion
 for these resources. These vectors are retained inputs for independent implementations.
+
+The additive sibling `evidence-compilation/v1` namespace supplies versioned recipes,
+source sufficiency reviews, and bounded controls. It reuses the original positive input
+without changing any original resource bytes. Its own manifest enumerates its eligible
+input bundles; see [evidence compilation](EVIDENCE-COMPILATION.md).
 
 See [NOTICE](NOTICE) for attribution and the preserved upstream license.

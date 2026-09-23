@@ -19,3 +19,14 @@ contain excerpts of those same Apache-licensed files with explicit source select
 The uc6-ac8-boundary.patch was authored in the Agent Judge Tutorial and is copied
 verbatim from that repository, separately from the upstream PetClinic source.
 Its Apache License 2.0 license is preserved verbatim at petclinic/mutation/LICENSE.
+
+Evidence-compilation source fixtures
+
+The sibling src/test/resources/evidence-compilation/v1/sources/StaffQueueController.java
+is another unmodified copy from the same pinned Tutorial/PetClinic source.
+Its derived/AppointmentService.java is MODIFIED from the retained upstream source:
+only the Tutorial uc6-ac8-boundary.patch hunk is applied, as recorded in the new
+manifest. This is a source derivation, not an execution artifact. These files and
+their excerpts retain Apache License 2.0 licensing under the preserved subject
+LICENSE.txt identified above. The original source/readme/license files are reused
+without alteration. EVIDENCE-COMPILATION.md records the exact attribution and links.

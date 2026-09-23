@@ -1,0 +1,312 @@
+{
+  "formatVersion": 1,
+  "id": "petclinic-evidence-compilation",
+  "version": "1",
+  "sourceRepository": "https://github.com/markpollack/agent-judge-tutorial",
+  "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec",
+  "sources": [
+    {
+      "id": "rules",
+      "path": "semantic-conformance/petclinic/source/spec/smart-appointment-scheduling/rules.md",
+      "bytes": 13305,
+      "sha256": "280d14c05099c72eca120989f7899e6cb3fa8255f95c73bd1c3acec165df708a",
+      "tutorialGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/spec/smart-appointment-scheduling/rules.md",
+      "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec"
+    },
+    {
+      "id": "criteria",
+      "path": "semantic-conformance/petclinic/source/spec/smart-appointment-scheduling/manage-appointment-lifecycle/criteria.md",
+      "bytes": 12141,
+      "sha256": "69268831a36819792a8ffda4dfeb9a4734fb0f5dfb631142e0b6fd0ccdbfb2a1",
+      "tutorialGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/spec/smart-appointment-scheduling/manage-appointment-lifecycle/criteria.md",
+      "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec"
+    },
+    {
+      "id": "staff",
+      "path": "semantic-conformance/petclinic/source/src/main/java/org/springframework/samples/petclinic/scheduling/service/StaffFallbackService.java",
+      "bytes": 21025,
+      "sha256": "943c1cd088994083f3cd4b2df9e0f97836f0d70b3783d4af3510050a7a9a07dd",
+      "tutorialGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/src/main/java/org/springframework/samples/petclinic/scheduling/service/StaffFallbackService.java",
+      "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec"
+    },
+    {
+      "id": "locks",
+      "path": "semantic-conformance/petclinic/source/src/main/java/org/springframework/samples/petclinic/scheduling/service/LockCoordinator.java",
+      "bytes": 5309,
+      "sha256": "911fe16a9f76e6711b0d5d370b011e75433e5bf1cb2adac5c91a4c1d70b1f57b",
+      "tutorialGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/src/main/java/org/springframework/samples/petclinic/scheduling/service/LockCoordinator.java",
+      "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec"
+    },
+    {
+      "id": "lifecycle",
+      "path": "semantic-conformance/petclinic/source/src/main/java/org/springframework/samples/petclinic/scheduling/service/LifecycleProcessor.java",
+      "bytes": 13827,
+      "sha256": "d2f641ad9cef2e926353025ceb0868b425605eb34344885485991d69fcd43b52",
+      "tutorialGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/src/main/java/org/springframework/samples/petclinic/scheduling/service/LifecycleProcessor.java",
+      "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec"
+    },
+    {
+      "id": "appointments",
+      "path": "semantic-conformance/petclinic/source/src/main/java/org/springframework/samples/petclinic/scheduling/service/AppointmentService.java",
+      "bytes": 24938,
+      "sha256": "3e935ccbc7fdd03745f65d384375bec921c20daa678ea45a7541bf6b7ef4b904",
+      "tutorialGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/src/main/java/org/springframework/samples/petclinic/scheduling/service/AppointmentService.java",
+      "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec"
+    },
+    {
+      "id": "entry",
+      "path": "evidence-compilation/v1/sources/StaffQueueController.java",
+      "bytes": 8915,
+      "sha256": "e70c2f73c038741aa563391021561cbcaab06f4b6c5d65f1d6f0c327b07e9ea5",
+      "tutorialGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/src/main/java/org/springframework/samples/petclinic/scheduling/controller/StaffQueueController.java",
+      "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec"
+    },
+    {
+      "id": "patch",
+      "path": "semantic-conformance/petclinic/mutation/uc6-ac8-boundary.patch",
+      "bytes": 1191,
+      "sha256": "130f0cefcdb0747616978995fcdbc059a45726d2dab8eb22f42260f9b1ec6570",
+      "tutorialGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/uc6-ac8-boundary.patch",
+      "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec"
+    },
+    {
+      "id": "subject-license",
+      "path": "semantic-conformance/petclinic/source/LICENSE.txt",
+      "bytes": 11360,
+      "sha256": "56dfc19e0dc836e30177332f73e8e6fbc297941acf3d906eec6eaaa46c2c452a",
+      "tutorialGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/LICENSE.txt",
+      "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec"
+    },
+    {
+      "id": "subject-readme",
+      "path": "semantic-conformance/petclinic/source/README.md",
+      "bytes": 10534,
+      "sha256": "6d837738cd3960131fdbc2adf2e1916deffe83fb92390f533710f1c3938b1ea2",
+      "tutorialGitPath": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/README.md",
+      "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec"
+    },
+    {
+      "id": "patch-license",
+      "path": "semantic-conformance/petclinic/mutation/LICENSE",
+      "bytes": 11360,
+      "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe",
+      "tutorialGitPath": "LICENSE",
+      "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec"
+    },
+    {
+      "id": "appointments-after",
+      "path": "evidence-compilation/v1/derived/AppointmentService.java",
+      "bytes": 24936,
+      "sha256": "8b48f1d248c5408396cc280b2f1c19ef42ae723fa6ce6195bf0e8873f6c69d85"
+    }
+  ],
+  "sourceDerivations": [
+    {
+      "id": "ac8-single-hunk-application",
+      "producer": "fixture-ac8-single-hunk-application",
+      "version": "1",
+      "inputs": [
+        "appointments",
+        "patch"
+      ],
+      "output": "appointments-after",
+      "operation": "Select unified diff from its first --- a/ header; require one @@ -151,7 +151,7 @@ hunk; verify all seven old context/removal lines exactly against source lines 151..157; replace by seven context/addition lines. Preserve every other byte. No source execution.",
+      "derivedFacts": [],
+      "execution": null
+    }
+  ],
+  "retainedOriginalManifest": {
+    "path": "semantic-conformance/manifest.json",
+    "bytes": 11154,
+    "sha256": "ce98b3876366d20bd683007e31274b36d75b334f21ed37623f6a44cb8706bb9c"
+  },
+  "retainedPositiveControl": {
+    "path": "semantic-conformance/petclinic/inputs/uc6-ac8.json",
+    "bytes": 3318,
+    "sha256": "0ae2b11bb1dcaccead4074ee520976511abcf59171493d5418e6a1f33103307c"
+  },
+  "artifacts": [
+    {
+      "path": "evidence-compilation/v1/sources/StaffQueueController.java",
+      "bytes": 8915,
+      "sha256": "e70c2f73c038741aa563391021561cbcaab06f4b6c5d65f1d6f0c327b07e9ea5"
+    },
+    {
+      "path": "evidence-compilation/v1/derived/AppointmentService.java",
+      "bytes": 24936,
+      "sha256": "8b48f1d248c5408396cc280b2f1c19ef42ae723fa6ce6195bf0e8873f6c69d85"
+    },
+    {
+      "path": "evidence-compilation/v1/requirements/rule-4.txt",
+      "bytes": 797,
+      "sha256": "88d3251b9a88e379840e6a9187c5c22cfdf640197c9ba699980368104114e93b"
+    },
+    {
+      "path": "evidence-compilation/v1/requirements/uc6-ac8.txt",
+      "bytes": 229,
+      "sha256": "f502c09e1c05f488c2af410c768b1b0e0f6e90e2eee03497a50faa6f34e7a87d"
+    },
+    {
+      "path": "evidence-compilation/v1/requirements/required-lock-order.txt",
+      "bytes": 190,
+      "sha256": "1a3825cc6111adaf0053788333e019776b79fd8fbba44c2d3f18c2709688f6ff"
+    },
+    {
+      "path": "evidence-compilation/v1/changes/uc6-ac8.diff",
+      "bytes": 480,
+      "sha256": "a8aaf3b2ef73edadac7db84115622d46dbddc224c7df52da240f800bcd759f4d"
+    },
+    {
+      "path": "evidence-compilation/v1/inputs/bundle-01.json",
+      "bytes": 20425,
+      "sha256": "437d8b577c34eafc6de0cb46a7514e5e37855ae23ee8669144f3c482c5f9862e"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/rule-4-path-v2.json",
+      "bytes": 3978,
+      "sha256": "4837c7498c6ce8cbafea18d2b3e9376aec842dab788fd995b7621d137565887a"
+    },
+    {
+      "path": "evidence-compilation/v1/inputs/bundle-02.json",
+      "bytes": 4501,
+      "sha256": "0559a82b65eedb2d02c2e92bf8e0811582f3e835fcf9c03be3eac2d1bd9bf80a"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/rule-4-source-only-v1.json",
+      "bytes": 2924,
+      "sha256": "091aa1194464dee88fc9b6733065fce93c118f91ba4eb23962a8d4f6141effcf"
+    },
+    {
+      "path": "evidence-compilation/v1/inputs/bundle-03.json",
+      "bytes": 16118,
+      "sha256": "e4e705480ae16e066517f7eae0b8c745b9a43fdd7d7d25f7fb284797a7a0d65d"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/rule-4-no-helper-v1.json",
+      "bytes": 3852,
+      "sha256": "091ac9fe6c5045c530e37c7febb17b8016b14dd9f239e9b4fc08313f25b54d83"
+    },
+    {
+      "path": "evidence-compilation/v1/inputs/bundle-04.json",
+      "bytes": 3316,
+      "sha256": "f11ce4d8da6c6b1546278805b136b4eebabd657de4dcee1a6a92c023759865d1"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/uc6-ac8-change-v1.json",
+      "bytes": 3423,
+      "sha256": "5f379e9fb1e74148fab56ba6210dfd5c6d94b036f870be106e9138720ee4d6e9"
+    },
+    {
+      "path": "evidence-compilation/v1/inputs/bundle-05.json",
+      "bytes": 1001,
+      "sha256": "6aeeb9b46b61d1edd1b839081a1d38b32eae4c5afa2fc33c52798b2051adfa6b"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/uc6-ac8-diff-only-v1.json",
+      "bytes": 3391,
+      "sha256": "80200ac4e20a710a4a3fd5da7124bd6448bb84bc67fce2bec1ec3b66291b870b"
+    },
+    {
+      "path": "evidence-compilation/v1/inputs/bundle-06.json",
+      "bytes": 3300,
+      "sha256": "b905ddfdac853a6a390740ae7c3791c625d753386482f520d2ef54eb4c6485b0"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/uc6-ac8-no-time-guard-v1.json",
+      "bytes": 3617,
+      "sha256": "f435da2933f061255307222346087c6c1268f979d008abe73a895f5de010db3a"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/uc6-ac8-baseline-v1.json",
+      "bytes": 2359,
+      "sha256": "21d927dc3d122f33901e8e45aaec63a6e57ba71b071b94b394c06458403a4f3f"
+    },
+    {
+      "path": "evidence-compilation/v1/reviews.json",
+      "bytes": 10551,
+      "sha256": "366af930fb4c00395a83f77b5acfe2fdae497e8b9d74ede2e3a7cc5d4a2954d7"
+    }
+  ],
+  "recipes": [
+    {
+      "path": "evidence-compilation/v1/recipes/rule-4-path-v2.json",
+      "bytes": 3978,
+      "sha256": "4837c7498c6ce8cbafea18d2b3e9376aec842dab788fd995b7621d137565887a"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/rule-4-source-only-v1.json",
+      "bytes": 2924,
+      "sha256": "091aa1194464dee88fc9b6733065fce93c118f91ba4eb23962a8d4f6141effcf"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/rule-4-no-helper-v1.json",
+      "bytes": 3852,
+      "sha256": "091ac9fe6c5045c530e37c7febb17b8016b14dd9f239e9b4fc08313f25b54d83"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/uc6-ac8-change-v1.json",
+      "bytes": 3423,
+      "sha256": "5f379e9fb1e74148fab56ba6210dfd5c6d94b036f870be106e9138720ee4d6e9"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/uc6-ac8-diff-only-v1.json",
+      "bytes": 3391,
+      "sha256": "80200ac4e20a710a4a3fd5da7124bd6448bb84bc67fce2bec1ec3b66291b870b"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/uc6-ac8-no-time-guard-v1.json",
+      "bytes": 3617,
+      "sha256": "f435da2933f061255307222346087c6c1268f979d008abe73a895f5de010db3a"
+    },
+    {
+      "path": "evidence-compilation/v1/recipes/uc6-ac8-baseline-v1.json",
+      "bytes": 2359,
+      "sha256": "21d927dc3d122f33901e8e45aaec63a6e57ba71b071b94b394c06458403a4f3f"
+    }
+  ],
+  "inputs": [
+    {
+      "path": "evidence-compilation/v1/inputs/bundle-01.json",
+      "bytes": 20425,
+      "sha256": "437d8b577c34eafc6de0cb46a7514e5e37855ae23ee8669144f3c482c5f9862e"
+    },
+    {
+      "path": "evidence-compilation/v1/inputs/bundle-02.json",
+      "bytes": 4501,
+      "sha256": "0559a82b65eedb2d02c2e92bf8e0811582f3e835fcf9c03be3eac2d1bd9bf80a"
+    },
+    {
+      "path": "evidence-compilation/v1/inputs/bundle-03.json",
+      "bytes": 16118,
+      "sha256": "e4e705480ae16e066517f7eae0b8c745b9a43fdd7d7d25f7fb284797a7a0d65d"
+    },
+    {
+      "path": "evidence-compilation/v1/inputs/bundle-04.json",
+      "bytes": 3316,
+      "sha256": "f11ce4d8da6c6b1546278805b136b4eebabd657de4dcee1a6a92c023759865d1"
+    },
+    {
+      "path": "evidence-compilation/v1/inputs/bundle-05.json",
+      "bytes": 1001,
+      "sha256": "6aeeb9b46b61d1edd1b839081a1d38b32eae4c5afa2fc33c52798b2051adfa6b"
+    },
+    {
+      "path": "evidence-compilation/v1/inputs/bundle-06.json",
+      "bytes": 3300,
+      "sha256": "b905ddfdac853a6a390740ae7c3791c625d753386482f520d2ef54eb4c6485b0"
+    },
+    {
+      "path": "semantic-conformance/petclinic/inputs/uc6-ac8.json",
+      "bytes": 3318,
+      "sha256": "0ae2b11bb1dcaccead4074ee520976511abcf59171493d5418e6a1f33103307c"
+    }
+  ],
+  "assembly": "UTF-8 JSON with explicit requirement/scope, selected source excerpts and optional exact requirement lock-order sentence/diff. For reconstruction compare parsed JSON to selections; hash original retained serialized bytes without canonicalization.",
+  "excludedFromInference": [
+    "recipes",
+    "reviews",
+    "manifest",
+    "whole sources",
+    "patch introductory prose"
+  ]
+}

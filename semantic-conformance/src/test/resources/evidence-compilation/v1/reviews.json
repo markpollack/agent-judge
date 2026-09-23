@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "reviewScope": "Conditional source sufficiency and expected truth; no inference or execution observations.",
+  "reviews": [
+    {
+      "recipe": "rule-4-path-v2",
+      "recipeRef": {
+        "path": "evidence-compilation/v1/recipes/rule-4-path-v2.json",
+        "bytes": 3978,
+        "sha256": "4837c7498c6ce8cbafea18d2b3e9376aec842dab788fd995b7621d137565887a"
+      },
+      "bundle": {
+        "path": "evidence-compilation/v1/inputs/bundle-01.json",
+        "bytes": 20425,
+        "sha256": "437d8b577c34eafc6de0cb46a7514e5e37855ae23ee8669144f3c482c5f9862e"
+      },
+      "variant": "REVIEWED_SUFFICIENT",
+      "sufficiency": "SUFFICIENT_FOR_SCOPED_SOURCE_CLAIM",
+      "reviewBasis": "MANUAL_SOURCE_REVIEW",
+      "reviewedSubjectTruth": "FAIL",
+      "expectedEvidenceDisposition": "DETERMINABLE",
+      "rationale": "Under the explicitly scoped no-preheld-lock entry, the controller calls the service directly. The service transaction first acquires the request through lockRequest, then lockResources acquires Owner before Request using real PESSIMISTIC_WRITE semantics. verifyClaimant performs only claim lookup and identity checking. The independent lifecycle path is supporting context, not an executed deadlock. This one path rejects the lock-order clause; it does not adjudicate all conjuncts or prove every transaction configuration.",
+      "removedContext": [],
+      "limits": [
+        "Conditional source claim only; no fresh subject execution, deadlock proof or mutation kill.",
+        "Source-review expectation is not a model observation.",
+        "A missing-context inference prevented by preflight is not model-recognized insufficiency."
+      ],
+      "binaryCompleteEvidenceEligible": true
+    },
+    {
+      "recipe": "rule-4-source-only-v1",
+      "recipeRef": {
+        "path": "evidence-compilation/v1/recipes/rule-4-source-only-v1.json",
+        "bytes": 2924,
+        "sha256": "091aa1194464dee88fc9b6733065fce93c118f91ba4eb23962a8d4f6141effcf"
+      },
+      "bundle": {
+        "path": "evidence-compilation/v1/inputs/bundle-02.json",
+        "bytes": 4501,
+        "sha256": "0559a82b65eedb2d02c2e92bf8e0811582f3e835fcf9c03be3eac2d1bd9bf80a"
+      },
+      "variant": "SOURCE_ONLY_CONTROL_NOT_HISTORICAL_DIFF",
+      "sufficiency": "INSUFFICIENT",
+      "reviewBasis": "MANUAL_SOURCE_REVIEW",
+      "reviewedSubjectTruth": "FAIL",
+      "expectedEvidenceDisposition": "INSUFFICIENT_EVIDENCE",
+      "rationale": "The service source names lockRequest and lockResources but omits their locking semantics and the entry path. Names alone cannot establish the effective database lock order. No original PR diff exists in the retained evidence.",
+      "removedContext": [
+        "Controller entry/declaration, service declaration/constructor, verifyClaimant, locking helper, and lifecycle caller."
+      ],
+      "limits": [
+        "Conditional source claim only; no fresh subject execution, deadlock proof or mutation kill.",
+        "Source-review expectation is not a model observation.",
+        "A missing-context inference prevented by preflight is not model-recognized insufficiency."
+      ],
+      "binaryCompleteEvidenceEligible": false
+    },
+    {
+      "recipe": "rule-4-no-helper-v1",
+      "recipeRef": {
+        "path": "evidence-compilation/v1/recipes/rule-4-no-helper-v1.json",
+        "bytes": 3852,
+        "sha256": "091ac9fe6c5045c530e37c7febb17b8016b14dd9f239e9b4fc08313f25b54d83"
+      },
+      "bundle": {
+        "path": "evidence-compilation/v1/inputs/bundle-03.json",
+        "bytes": 16118,
+        "sha256": "e4e705480ae16e066517f7eae0b8c745b9a43fdd7d7d25f7fb284797a7a0d65d"
+      },
+      "variant": "KNOWN_INSUFFICIENT",
+      "sufficiency": "INSUFFICIENT",
+      "reviewBasis": "MANUAL_SOURCE_REVIEW",
+      "reviewedSubjectTruth": "FAIL",
+      "expectedEvidenceDisposition": "INSUFFICIENT_EVIDENCE",
+      "rationale": "The entry and caller order remain, but all actual helper acquisition bodies and ID ordering are removed. Equivalent method names could implement different locking strategies. The retained lifecycle call does not restore the missing semantics.",
+      "removedContext": [
+        "LockCoordinator lines 1..134, including lockResources, lockRequest and sortIds."
+      ],
+      "limits": [
+        "Conditional source claim only; no fresh subject execution, deadlock proof or mutation kill.",
+        "Source-review expectation is not a model observation.",
+        "A missing-context inference prevented by preflight is not model-recognized insufficiency."
+      ],
+      "binaryCompleteEvidenceEligible": false
+    },
+    {
+      "recipe": "uc6-ac8-change-v1",
+      "recipeRef": {
+        "path": "evidence-compilation/v1/recipes/uc6-ac8-change-v1.json",
+        "bytes": 3423,
+        "sha256": "5f379e9fb1e74148fab56ba6210dfd5c6d94b036f870be106e9138720ee4d6e9"
+      },
+      "bundle": {
+        "path": "evidence-compilation/v1/inputs/bundle-04.json",
+        "bytes": 3316,
+        "sha256": "f11ce4d8da6c6b1546278805b136b4eebabd657de4dcee1a6a92c023759865d1"
+      },
+      "variant": "REVIEWED_SUFFICIENT",
+      "sufficiency": "SUFFICIENT_FOR_SCOPED_SOURCE_CLAIM",
+      "reviewBasis": "MANUAL_SOURCE_REVIEW",
+      "reviewedSubjectTruth": "FAIL",
+      "expectedEvidenceDisposition": "DETERMINABLE",
+      "rationale": "The same post-change method retains the BOOKED status handling, time comparison, state mutation and return. At equality isAfter is false; with the explicitly assumed normally completing collaborators the method can set CANCELLED and return. The external authentic diff provenance and exact hunk derivation link this subject to its baseline; no execution is asserted.",
+      "removedContext": [],
+      "limits": [
+        "Conditional source claim only; no fresh subject execution, deadlock proof or mutation kill.",
+        "Source-review expectation is not a model observation.",
+        "A missing-context inference prevented by preflight is not model-recognized insufficiency."
+      ],
+      "binaryCompleteEvidenceEligible": true
+    },
+    {
+      "recipe": "uc6-ac8-diff-only-v1",
+      "recipeRef": {
+        "path": "evidence-compilation/v1/recipes/uc6-ac8-diff-only-v1.json",
+        "bytes": 3391,
+        "sha256": "80200ac4e20a710a4a3fd5da7124bd6448bb84bc67fce2bec1ec3b66291b870b"
+      },
+      "bundle": {
+        "path": "evidence-compilation/v1/inputs/bundle-05.json",
+        "bytes": 1001,
+        "sha256": "6aeeb9b46b61d1edd1b839081a1d38b32eae4c5afa2fc33c52798b2051adfa6b"
+      },
+      "variant": "AUTHENTIC_DIFF_ONLY",
+      "sufficiency": "INSUFFICIENT",
+      "reviewBasis": "MANUAL_SOURCE_REVIEW",
+      "reviewedSubjectTruth": "FAIL",
+      "expectedEvidenceDisposition": "INSUFFICIENT_EVIDENCE",
+      "rationale": "The authentic hunk shows the changed temporal guard but omits the enclosing method, BOOKED handling and following state changes/return. It identifies a suspicious guard without independently establishing the full cancellation outcome or preservation behavior of the post-change subject.",
+      "removedContext": [
+        "AppointmentService post-change method lines 128..180 except context already present in the hunk."
+      ],
+      "limits": [
+        "Conditional source claim only; no fresh subject execution, deadlock proof or mutation kill.",
+        "Source-review expectation is not a model observation.",
+        "A missing-context inference prevented by preflight is not model-recognized insufficiency."
+      ],
+      "binaryCompleteEvidenceEligible": false
+    },
+    {
+      "recipe": "uc6-ac8-no-time-guard-v1",
+      "recipeRef": {
+        "path": "evidence-compilation/v1/recipes/uc6-ac8-no-time-guard-v1.json",
+        "bytes": 3617,
+        "sha256": "f435da2933f061255307222346087c6c1268f979d008abe73a895f5de010db3a"
+      },
+      "bundle": {
+        "path": "evidence-compilation/v1/inputs/bundle-06.json",
+        "bytes": 3300,
+        "sha256": "b905ddfdac853a6a390740ae7c3791c625d753386482f520d2ef54eb4c6485b0"
+      },
+      "variant": "KNOWN_INSUFFICIENT",
+      "sufficiency": "INSUFFICIENT",
+      "reviewBasis": "MANUAL_SOURCE_REVIEW",
+      "reviewedSubjectTruth": "FAIL",
+      "expectedEvidenceDisposition": "INSUFFICIENT_EVIDENCE",
+      "rationale": "The temporal guard (153..156) and diff that could reveal it are absent. The explicit line-range gap leaves open whether cancellation is rejected before the shown mutation; the snippets are not spliced into a false complete method. This is missing evidence about the same mutant, not another source mutation.",
+      "removedContext": [
+        "AppointmentService post-change lines 153..156, plus the complete diff (which also reveals the guard)."
+      ],
+      "limits": [
+        "Conditional source claim only; no fresh subject execution, deadlock proof or mutation kill.",
+        "Source-review expectation is not a model observation.",
+        "A missing-context inference prevented by preflight is not model-recognized insufficiency."
+      ],
+      "binaryCompleteEvidenceEligible": false
+    },
+    {
+      "recipe": "uc6-ac8-baseline-v1",
+      "recipeRef": {
+        "path": "evidence-compilation/v1/recipes/uc6-ac8-baseline-v1.json",
+        "bytes": 2359,
+        "sha256": "21d927dc3d122f33901e8e45aaec63a6e57ba71b071b94b394c06458403a4f3f"
+      },
+      "bundle": {
+        "path": "semantic-conformance/petclinic/inputs/uc6-ac8.json",
+        "bytes": 3318,
+        "sha256": "0ae2b11bb1dcaccead4074ee520976511abcf59171493d5418e6a1f33103307c"
+      },
+      "variant": "RETAINED_POSITIVE_CONTROL",
+      "sufficiency": "SUFFICIENT_FOR_SCOPED_SOURCE_CLAIM",
+      "reviewBasis": "MANUAL_SOURCE_REVIEW",
+      "reviewedSubjectTruth": "PASS",
+      "expectedEvidenceDisposition": "DETERMINABLE",
+      "rationale": "The unchanged original baseline bundle retains the whole cancellation method. At equality !isBefore is true and rejects before appointment state mutation. This is the source-level equality-boundary claim, not a fresh execution. The extraction recipe/version is identical to the sufficient mutant; only the subject source bytes and derivation provenance differ.",
+      "removedContext": [],
+      "limits": [
+        "Conditional source claim only; no fresh subject execution, deadlock proof or mutation kill.",
+        "Source-review expectation is not a model observation.",
+        "A missing-context inference prevented by preflight is not model-recognized insufficiency."
+      ],
+      "binaryCompleteEvidenceEligible": true
+    }
+  ]
+}

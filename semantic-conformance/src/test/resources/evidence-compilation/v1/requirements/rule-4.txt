@@ -1,0 +1,4 @@
+### RULE-4
+**Covers:** UC3-AC9–UC3-AC11, UC3-AC47–UC3-AC66, UC4-AC31–UC4-AC48, UC5-AC6–UC5-AC11, UC5-AC20–UC5-AC48, UC6-AC4–UC6-AC10, UC6-AC13–UC6-AC27, UC6-AC32–UC6-AC52
+**MUST** protect reservation-changing transactions with JPA pessimistic write locks and live revalidation. When several resource types are involved, locks MUST be acquired in this global order, with identifiers ascending within a type: Owner, Pet, Vet, SchedulingRequest, Appointment, Reservation. External AI or solver work MUST NOT run while a database transaction or pessimistic lock is open.
+**Reason:** Stable row locking is portable across H2, MySQL, and PostgreSQL and serializes races on existing resource rows without relying on vendor-specific interval constraints or serializable-isolation retries.

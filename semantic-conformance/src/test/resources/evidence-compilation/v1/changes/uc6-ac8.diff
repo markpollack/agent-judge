@@ -1,0 +1,11 @@
+--- a/src/main/java/org/springframework/samples/petclinic/scheduling/service/AppointmentService.java
++++ b/src/main/java/org/springframework/samples/petclinic/scheduling/service/AppointmentService.java
+@@ -151,7 +151,7 @@
+ 		}
+ 
+ 		Instant now = timeService.now();
+-		if (!now.isBefore(appointment.getStartTime())) {
++		if (now.isAfter(appointment.getStartTime())) {
+ 			throw new IllegalStateException("Cannot cancel an appointment at or after its scheduled start time");
+ 		}
+ 

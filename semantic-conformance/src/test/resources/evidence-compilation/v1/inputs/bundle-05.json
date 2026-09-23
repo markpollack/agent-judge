@@ -1,0 +1,13 @@
+{
+  "requirement": {
+    "path": "spec/smart-appointment-scheduling/manage-appointment-lifecycle/criteria.md",
+    "firstLine": 47,
+    "lastLine": 51,
+    "content": "### UC6-AC8: Reject owner cancellation at start\n\n**Covers:** UC6-B6\n\nIf an owner attempts to cancel a `BOOKED` appointment at its start instant, then the system shall reject cancellation and shall preserve the appointment state.\n"
+  },
+  "change": {
+    "format": "unified-diff",
+    "content": "--- a/src/main/java/org/springframework/samples/petclinic/scheduling/service/AppointmentService.java\n+++ b/src/main/java/org/springframework/samples/petclinic/scheduling/service/AppointmentService.java\n@@ -151,7 +151,7 @@\n \t\t}\n \n \t\tInstant now = timeService.now();\n-\t\tif (!now.isBefore(appointment.getStartTime())) {\n+\t\tif (now.isAfter(appointment.getStartTime())) {\n \t\t\tthrow new IllegalStateException(\"Cannot cancel an appointment at or after its scheduled start time\");\n \t\t}\n \n"
+  },
+  "evidence": []
+}

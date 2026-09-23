@@ -1,0 +1,5 @@
+### UC6-AC8: Reject owner cancellation at start
+
+**Covers:** UC6-B6
+
+If an owner attempts to cancel a `BOOKED` appointment at its start instant, then the system shall reject cancellation and shall preserve the appointment state.

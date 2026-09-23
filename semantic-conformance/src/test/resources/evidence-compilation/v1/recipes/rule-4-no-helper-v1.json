@@ -1,0 +1,118 @@
+{
+  "id": "rule-4-no-helper-v1",
+  "version": "1",
+  "extractionRecipe": {
+    "id": "rule-4-no-helper-v1",
+    "version": "1",
+    "stateShape": "requirement-scope-source"
+  },
+  "requirement": {
+    "id": "RULE-4",
+    "revision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec",
+    "artifact": {
+      "path": "evidence-compilation/v1/requirements/rule-4.txt",
+      "bytes": 797,
+      "sha256": "88d3251b9a88e379840e6a9187c5c22cfdf640197c9ba699980368104114e93b"
+    },
+    "selection": {
+      "source": "rules",
+      "firstLine": 38,
+      "lastLine": 41,
+      "sha256": "88d3251b9a88e379840e6a9187c5c22cfdf640197c9ba699980368104114e93b",
+      "bytes": 797
+    }
+  },
+  "scope": "Source-level lock ordering for a valid, successfully claimed request entering StaffQueueController.createOffer without pre-held database locks, under ordinary Spring @Transactional and JPA pessimistic-lock semantics. Analyze the supplied path; no execution trace or whole-application transaction configuration is provided.",
+  "subject": {
+    "tutorialRevision": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec",
+    "identity": "petclinic-at-27756e9f1d4248bb0229c182f23d403a8bc5d2ec",
+    "sourceRefs": [
+      "entry",
+      "staff",
+      "locks",
+      "lifecycle"
+    ],
+    "changeArtifact": null,
+    "historicalChangeAvailability": "ORIGINAL_PR_DIFF_NOT_AVAILABLE"
+  },
+  "requiredLockOrder": {
+    "artifact": {
+      "path": "evidence-compilation/v1/requirements/required-lock-order.txt",
+      "bytes": 190,
+      "sha256": "1a3825cc6111adaf0053788333e019776b79fd8fbba44c2d3f18c2709688f6ff"
+    },
+    "selection": {
+      "source": "rules",
+      "byteStart": 5053,
+      "byteEndExclusive": 5243,
+      "sha256": "1a3825cc6111adaf0053788333e019776b79fd8fbba44c2d3f18c2709688f6ff",
+      "bytes": 190
+    }
+  },
+  "changeSelection": null,
+  "context": [
+    {
+      "source": "entry",
+      "firstLine": 1,
+      "lastLine": 50,
+      "sha256": "8dbddf3afd9be0b81dab4b7fa64c128ed8b31bec4e067eb89ca149cb61ef7aa3",
+      "bytes": 2395
+    },
+    {
+      "source": "entry",
+      "firstLine": 135,
+      "lastLine": 148,
+      "sha256": "fd7730bccc2c4cea7990cc26d716cca1c3259dc0234c01752a793918f9170360",
+      "bytes": 725
+    },
+    {
+      "source": "staff",
+      "firstLine": 1,
+      "lastLine": 79,
+      "sha256": "ba1cde324bd70f2364e6a989d67cb30e59a1a7ca23fa2ae662473123fd337f8d",
+      "bytes": 3833
+    },
+    {
+      "source": "staff",
+      "firstLine": 246,
+      "lastLine": 309,
+      "sha256": "3c49786801c6686fb4529293fd0a5fd9d3b5a7c2d34075967e44e65be68eb9f3",
+      "bytes": 2664
+    },
+    {
+      "source": "staff",
+      "firstLine": 489,
+      "lastLine": 498,
+      "sha256": "122b7a13fbfc45fc3c1708037f76059a29d51f68a2327de795d1ac3a18649a9e",
+      "bytes": 448
+    },
+    {
+      "source": "lifecycle",
+      "firstLine": 149,
+      "lastLine": 209,
+      "sha256": "5aa1b093726f56c6dfc903c2a6eaea9690fe827ac1e53a8ce7f4b048356d8a93",
+      "bytes": 2725
+    }
+  ],
+  "bounds": {
+    "maxUtf8BundleBytes": 24576,
+    "actualUtf8BundleBytes": 16118,
+    "expansion": "NONE",
+    "truncation": "FORBIDDEN",
+    "contextSelection": "Only the listed inclusive line/byte selections; gaps remain explicit."
+  },
+  "exclusions": [
+    "Historical model answers and reasoning; expected truth and these review records.",
+    "Unselected repository sources and runtime configuration; no hidden retrieval.",
+    "Historical private sessions, execution claims and unrelated changes.",
+    "LockCoordinator acquisition semantics."
+  ],
+  "derivedFacts": [],
+  "sourceDerivation": null,
+  "bundle": {
+    "path": "evidence-compilation/v1/inputs/bundle-03.json",
+    "bytes": 16118,
+    "sha256": "e4e705480ae16e066517f7eae0b8c745b9a43fdd7d7d25f7fb284797a7a0d65d"
+  },
+  "sufficiencyRecord": "evidence-compilation/v1/reviews.json#rule-4-no-helper-v1"
+}

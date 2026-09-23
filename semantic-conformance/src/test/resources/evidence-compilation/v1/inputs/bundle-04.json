@@ -1,0 +1,16 @@
+{
+  "requirement": {
+    "path": "spec/smart-appointment-scheduling/manage-appointment-lifecycle/criteria.md",
+    "firstLine": 47,
+    "lastLine": 51,
+    "content": "### UC6-AC8: Reject owner cancellation at start\n\n**Covers:** UC6-B6\n\nIf an owner attempts to cancel a `BOOKED` appointment at its start instant, then the system shall reject cancellation and shall preserve the appointment state.\n"
+  },
+  "evidence": [
+    {
+      "path": "src/main/java/org/springframework/samples/petclinic/scheduling/service/AppointmentService.java",
+      "firstLine": 128,
+      "lastLine": 180,
+      "content": "\t@Transactional\n\tpublic AppointmentDto cancelAppointmentByOwner(Integer appointmentId, Integer ownerId, String reason,\n\t\t\tString actorUsername) {\n\t\tAppointment initial = appointmentRepository.findByIdAndOwnerId(appointmentId, ownerId)\n\t\t\t.orElseThrow(() -> new ResourceNotFoundException(\"Appointment not found\"));\n\n\t\tInteger petId = initial.getPet().getId();\n\t\tInteger vetId = initial.getVet().getId();\n\t\tInteger reqId = initial.getRequest() != null ? initial.getRequest().getId() : null;\n\n\t\tlockCoordinator.lockResources(List.of(ownerId), List.of(petId), List.of(vetId),\n\t\t\t\t(reqId != null ? List.of(reqId) : null), List.of(appointmentId), null);\n\n\t\tAppointment appointment = appointmentRepository.findById(appointmentId)\n\t\t\t.orElseThrow(() -> new ResourceNotFoundException(\"Appointment not found\"));\n\n\t\tif (appointment.getStatus() == AppointmentStatus.CANCELLED) {\n\t\t\treturn AppointmentDto.from(appointment);\n\t\t}\n\n\t\tif (appointment.getStatus() == AppointmentStatus.COMPLETED\n\t\t\t\t|| appointment.getStatus() == AppointmentStatus.NO_SHOW) {\n\t\t\tthrow new IllegalStateException(\"Cannot cancel a completed or no-show appointment\");\n\t\t}\n\n\t\tInstant now = timeService.now();\n\t\tif (now.isAfter(appointment.getStartTime())) {\n\t\t\tthrow new IllegalStateException(\"Cannot cancel an appointment at or after its scheduled start time\");\n\t\t}\n\n\t\tappointment.setStatus(AppointmentStatus.CANCELLED);\n\t\tString actualReason = (reason != null && !reason.trim().isEmpty()) ? reason.trim() : \"Cancelled by owner\";\n\t\tappointment.setCancellationReason(actualReason);\n\t\tAppointment saved = appointmentRepository.save(appointment);\n\n\t\tSchedulingRequest req = saved.getRequest();\n\t\tif (req != null && req.getRetentionDeadline() == null) {\n\t\t\tClinicSettings settings = clinicSettingsService.getSettings();\n\t\t\treq.setRetentionDeadline(now.plus(Duration.ofDays(settings.getSensitiveDataRetentionDays())));\n\t\t\tschedulingRequestRepository.save(req);\n\t\t}\n\n\t\tcalendarConflictService.resolveConflictsForAppointment(appointmentId, ConflictStatus.CANCELLED, actorUsername);\n\n\t\tauditService.recordEvent(AuditEventType.APPOINTMENT_CANCELLED, actorUsername != null ? actorUsername : \"owner\",\n\t\t\t\t\"OWNER\", \"APPOINTMENT\", String.valueOf(saved.getId()), \"CANCELLED\",\n\t\t\t\tMap.of(\"reason\", actualReason, \"cancelledBy\", \"owner\"));\n\n\t\tnotificationService.createNotification(ownerId, \"notification.appointmentCancelled.title\",\n\t\t\t\t\"notification.appointmentCancelled.message\", \"/scheduling/appointments/\" + saved.getId());\n\n\t\treturn AppointmentDto.from(saved);\n\t}\n"
+    }
+  ]
+}

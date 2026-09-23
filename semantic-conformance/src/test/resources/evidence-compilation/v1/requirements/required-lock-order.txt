@@ -1,0 +1,1 @@
+When several resource types are involved, locks MUST be acquired in this global order, with identifiers ascending within a type: Owner, Pet, Vet, SchedulingRequest, Appointment, Reservation.
