@@ -146,7 +146,7 @@ public class CommandJudge extends DeterministicJudge {
 			logger.error("Command execution failed: {}", command, ex);
 			return Judgment.builder().error()
 				.reasoning("Command execution failed: " + ex.getMessage())
-				.check(Check.fail("command_execution", "Execution error: " + ex.getMessage()))
+				.check(new Check("command_execution", Judgment.error("Execution error: " + ex.getMessage())))
 				.build();
 		}
 	}

@@ -87,6 +87,7 @@ public class ClassVersionJudge extends DeterministicJudge {
 
 		List<Check> checks = new ArrayList<>();
 		List<String> mismatches = new ArrayList<>();
+		List<String> readErrors = new ArrayList<>();
 
 		for (Path classFile : classFiles) {
 			String relativeName = classesDir.relativize(classFile).toString();
@@ -103,9 +104,17 @@ public class ClassVersionJudge extends DeterministicJudge {
 				}
 			}
 			catch (IOException ex) {
-				checks.add(Check.fail(relativeName, "Failed to read: " + ex.getMessage()));
-				mismatches.add(relativeName + " (read error: " + ex.getMessage() + ")");
+				checks.add(new Check(relativeName, Judgment.error("Failed to read: " + ex.getMessage())));
+				readErrors.add(relativeName + " (read error: " + ex.getMessage() + ")");
 			}
+		}
+
+		if (!readErrors.isEmpty()) {
+			return Judgment.builder().error()
+				.reasoning(String.format("Could not determine the version of %d of %d .class files: %s; %d known mismatches",
+						readErrors.size(), classFiles.size(), String.join(", ", readErrors), mismatches.size()))
+				.checks(checks)
+				.build();
 		}
 
 		boolean pass = mismatches.isEmpty();

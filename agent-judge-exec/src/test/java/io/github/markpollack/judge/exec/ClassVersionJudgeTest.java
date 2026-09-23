@@ -107,6 +107,28 @@ class ClassVersionJudgeTest {
 		assertThat(judgment.reasoning()).contains("No targetClassVersion");
 	}
 
+	@Test
+	void unreadableVersionOutranksKnownMismatchAndKeepsEveryFile() throws IOException {
+		Path classes = workspace.resolve("target/classes");
+		writeClassFile(classes.resolve("Good.class"), 61);
+		writeClassFile(classes.resolve("Mismatch.class"), 52);
+		Files.write(classes.resolve("Truncated.class"), new byte[] { (byte) 0xca, (byte) 0xfe });
+		Files.write(classes.resolve("Invalid.class"), new byte[] { 0, 0, 0, 0, 0, 0, 0, 61 });
+
+		Judgment judgment = judge.judge(contextWithVersion(61));
+
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(judgment.assessment()).isNull();
+		assertThat(judgment.reasoning()).contains("2 of 4", "Truncated.class", "Invalid.class");
+		assertThat(judgment.checks()).hasSize(4);
+		Map<String, JudgmentStatus> statuses = judgment.checks().stream()
+			.collect(java.util.stream.Collectors.toMap(check -> check.id(), check -> check.judgment().status()));
+		assertThat(statuses).containsExactlyInAnyOrderEntriesOf(Map.of("Good.class", JudgmentStatus.PASS,
+				"Mismatch.class", JudgmentStatus.FAIL, "Truncated.class", JudgmentStatus.ERROR,
+				"Invalid.class", JudgmentStatus.ERROR));
+		assertThat(judgment.checks()).allSatisfy(check -> assertThat(check.judgment().checks()).isEmpty());
+	}
+
 	// ==================== Helpers ====================
 
 	private JudgmentContext contextWithVersion(int version) {

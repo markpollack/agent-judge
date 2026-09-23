@@ -1,5 +1,6 @@
 package io.github.markpollack.judge.ai;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,28 +10,38 @@ import java.util.OptionalDouble;
 
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.model.Usage;
+import io.github.markpollack.judge.result.Assessment;
+import io.github.markpollack.judge.result.Category;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.result.NumericAssessment;
+import io.github.markpollack.judge.result.NumericKind;
+import io.github.markpollack.judge.result.QualityDirection;
 
 /**
  * Label-based classification using exact normalized matching (trim + lowercase).
  *
- * <p>Maps a model response's text to a {@link JudgmentStatus} via declared label mappings.
- * Uses exact matching after normalization — substring matching is intentionally avoided
+ * <p>
+ * Maps a model response's text to a {@link JudgmentStatus} via declared label mappings.
+ * A recognized result retains the complete ordered category domain. Uses exact matching
+ * after normalization — substring matching is intentionally avoided
  * because "irrelevant" contains "relevant".
  *
- * <p>When no label matches, returns {@link JudgmentStatus#ABSTAIN} with the raw judge
- * output preserved in metadata. No label is recorded in that case: there is no valid
+ * <p>
+ * When no label matches, returns {@link JudgmentStatus#ABSTAIN} with the raw judge output
+ * preserved in metadata. No label is recorded in that case: there is no valid
  * classification to assert.
  *
  * <h2>Numeric meaning of a label</h2>
- * <p>A label is not implicitly a score. {@code relevant}, {@code poor}, or {@code excellent}
- * has numeric meaning only under a declared policy, and this classifier is where that policy
- * belongs — it already owns the vocabulary. Declare a score alongside a label and it is
- * recorded on the judgment; otherwise the judgment carries a label and no score, and
- * downstream aggregation needs no category mapping at all.
+ * <p>
+ * A label is not implicitly a score. {@code relevant}, {@code poor}, or {@code excellent}
+ * has numeric meaning only under a declared policy, and this classifier is where that
+ * policy belongs — it already owns the vocabulary. Declare a score alongside a label and
+ * it is recorded on the judgment; otherwise the judgment carries a label and no score,
+ * and downstream aggregation needs no category mapping at all.
  *
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.10.0
@@ -43,7 +54,7 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 	private final Map<String, Double> scores;
 
 	private LabelJudgmentClassifier(Map<String, JudgmentStatus> mapping, Map<String, Double> scores) {
-		this.mapping = Map.copyOf(mapping);
+		this.mapping = Collections.unmodifiableMap(new LinkedHashMap<>(mapping));
 		this.scores = Map.copyOf(scores);
 	}
 
@@ -54,52 +65,44 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 	 * @return a new classifier
 	 */
 	public static LabelJudgmentClassifier passFail(String passLabel, String failLabel) {
-		return new LabelJudgmentClassifier(
-				Map.of(normalizeLabel(passLabel), JudgmentStatus.PASS, normalizeLabel(failLabel), JudgmentStatus.FAIL),
-				Map.of());
+		String pass = normalizeLabel(passLabel);
+		String fail = normalizeLabel(failLabel);
+		if (pass.equals(fail)) {
+			throw new IllegalArgumentException("pass and fail labels must differ");
+		}
+		return builder().pass(pass).fail(fail).build();
 	}
 
 	@Override
 	public Judgment classify(JudgeModelResponse response) {
 		String raw = response.text();
 		String normalized = normalize(raw);
+		Map<String, Object> metadata = new LinkedHashMap<>();
+		metadata.put("rawJudgeOutput", raw);
+		addResponseMetadata(metadata, response);
 
 		JudgmentStatus status = mapping.get(normalized);
 		if (status == null) {
-			// Nothing matched, so there is no classification to assert: no label, no score.
-			Judgment.EnrichmentBuilder builder = Judgment.builder().abstain()
+			// Nothing matched, so there is no classification to assert: no label, no
+			// score.
+			Judgment.EnrichmentBuilder builder = Judgment.builder()
+				.abstain()
 				.reasoning("Judge output did not match any label: " + raw)
-				.metadata("rawJudgeOutput", raw);
-			addResponseMetadata(builder, response);
+				.metadata(metadata);
 			return builder.build();
 		}
 
 		Double declaredScore = scores.get(normalized);
-		Judgment.EnrichmentBuilder builder = switch (status) {
-			case PASS -> finding(Judgment.builder().pass(), normalized, raw, declaredScore);
-			case FAIL -> finding(Judgment.builder().fail(), normalized, raw, declaredScore);
-			case ABSTAIN -> Judgment.builder()
-				.abstain()
-				.reasoning(raw)
-				.label(normalized)
-				.metadata("rawJudgeOutput", raw);
-			case NOT_APPLICABLE, ERROR ->
-				throw new IllegalStateException("A recognized classification label cannot map to " + status);
-		};
-
-		addResponseMetadata(builder, response);
-		return builder.build();
+		Assessment assessment = new Assessment(null,
+				declaredScore == null ? null : new NumericAssessment(declaredScore, NumericKind.MEASUREMENT,
+						"normalized-quality:v1", 0, 1, List.of(), QualityDirection.INCREASING),
+				new Category(normalized, categories()));
+		return new Judgment(status, assessment, null, null, null, raw, List.of(), null, null, metadata);
 	}
 
-	private static Judgment.FindingBuilder finding(Judgment.FindingBuilder builder, String label, String raw,
-			Double score) {
-		builder.label(label).reasoning(raw).metadata("rawJudgeOutput", raw);
-		return score == null ? builder : builder.score(score);
-	}
-
-	private static void addResponseMetadata(Judgment.EnrichmentBuilder builder, JudgeModelResponse response) {
+	private static void addResponseMetadata(Map<String, Object> metadata, JudgeModelResponse response) {
 		if (response.model() != null) {
-			builder.metadata("model", response.model());
+			metadata.put("model", response.model());
 		}
 		Usage usage = response.usage();
 		if (usage == null) {
@@ -107,10 +110,11 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 		}
 		// A Usage record is a Java identity rather than a portable value, so the result
 		// carries its projection. Usage owns the keys and the order; a classifier that
-		// re-listed the components here is the place a new category gets silently dropped.
+		// re-listed the components here is the place a new category gets silently
+		// dropped.
 		Map<String, Object> portableUsage = usage.toPortableMap();
 		if (!portableUsage.isEmpty()) {
-			builder.metadata("usage", portableUsage);
+			metadata.put("usage", portableUsage);
 		}
 	}
 

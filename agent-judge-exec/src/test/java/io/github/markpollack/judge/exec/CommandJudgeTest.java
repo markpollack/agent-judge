@@ -52,7 +52,7 @@ class CommandJudgeTest {
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.checks()).hasSize(1);
-		assertThat(judgment.checks().get(0).passed()).isFalse();
+		assertThat(judgment.checks().get(0).judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 	}
 
 	@Test
@@ -67,7 +67,8 @@ class CommandJudgeTest {
 		assertThat(judgment.reasoning()).contains("sandbox unavailable");
 		assertThat(judgment.checks()).singleElement().satisfies(check -> {
 			assertThat(check.name()).isEqualTo("command_execution");
-			assertThat(check.passed()).isFalse();
+			assertThat(check.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(check.judgment().assessment()).isNull();
 		});
 	}
 

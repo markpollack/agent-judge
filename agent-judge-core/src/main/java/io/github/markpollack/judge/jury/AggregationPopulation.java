@@ -161,7 +161,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 					if (notApplicablePolicy == NotApplicablePolicy.TREAT_AS_FAIL) {
 						// The contribution fails; the original judgment is untouched and still
 						// carries no score.
-						eligible.add(Judgment.fail("Not applicable treated as failure: " + judgment.reasoning()));
+						eligible.add(Judgment.fail("Not applicable treated as failure: " + judgment.operationalReasoning()));
 						eligibleIndices.add(index);
 						notApplicableTreatedAsFailCount++;
 					}
@@ -171,7 +171,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 						case TREAT_AS_FAIL -> {
 							// Step 2 already exited if any error was machinery-origin, so every
 							// error reaching here is a judge's own and the policy governs it.
-							eligible.add(Judgment.fail("Error treated as failure: " + judgment.reasoning()));
+							eligible.add(Judgment.fail("Error treated as failure: " + judgment.operationalReasoning()));
 							eligibleIndices.add(index);
 							errorsTreatedAsFailCount++;
 						}

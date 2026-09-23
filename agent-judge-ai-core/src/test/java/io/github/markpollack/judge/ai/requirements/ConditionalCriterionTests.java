@@ -66,15 +66,15 @@ class ConditionalCriterionTests {
 		}
 
 		@Test
-		@DisplayName("an excluded criterion is not a check: it was never assessed")
-		void exclusionsAreNotChecks() {
+		@DisplayName("an excluded criterion retains its own not-applicable check")
+		void exclusionsRetainChecks() {
 			Judgment judgment = ears("""
 				    UC1-AC1: PASS - Foo.java:10 does it
 				    UC1-AC2: NOT_APPLICABLE - the change set contains no Java sources
 				    UC1-AC3: PASS - Baz.java:30 does it
 				    """);
 
-			assertThat(judgment.checks()).extracting(Check::name).containsExactly("UC1-AC1", "UC1-AC3");
+			assertThat(judgment.checks()).extracting(Check::name).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
 		}
 
 		@Test
@@ -164,7 +164,7 @@ class ConditionalCriterionTests {
 				    UC1-AC3: FAIL - Baz.java:30 does the opposite
 				    """);
 
-			assertThat(judgment.checks()).extracting(Check::name).containsExactly("UC1-AC2", "UC1-AC3");
+			assertThat(judgment.checks()).extracting(Check::name).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
 			assertThat(judgment.metadata()).containsEntry("criteriaTotal", 3).containsEntry("established", 1L);
 		}
 

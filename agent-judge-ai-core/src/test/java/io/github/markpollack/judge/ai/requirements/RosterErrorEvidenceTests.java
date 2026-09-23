@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * say how much of the specification had actually been audited.
  *
  * <p>The one thing the retained evidence must never do is launder the gap. A criterion nobody
- * answered was not assessed, so it produces no check; and it was certainly not excluded, so it is
+ * answered was not assessed, so its check records ERROR; and it was certainly not excluded, so it is
  * never counted as an authorized exclusion. Those two are what separate "we audited two of three"
  * from "one criterion did not apply".
  */
@@ -59,7 +59,9 @@ class RosterErrorEvidenceTests {
 			assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(judgment.reasonCode()).isEqualTo(JudgmentReasonCode.JUDGE_REPORTED);
 			assertThat(judgment.reasoning()).contains("UC1-AC2");
-			assertThat(judgment.checks()).extracting(Check::name).containsExactly("UC1-AC1", "UC1-AC3");
+			assertThat(judgment.checks()).extracting(Check::name).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
+			assertThat(judgment.checks()).extracting(check -> check.judgment().status())
+				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.ERROR, JudgmentStatus.FAIL);
 			assertThat(judgment.metadata()).containsEntry("criteriaTotal", 3).containsEntry("established", 1L);
 		}
 
@@ -78,13 +80,15 @@ class RosterErrorEvidenceTests {
 		}
 
 		@Test
-		@DisplayName("a criterion nobody answered is neither a check nor an authorized exclusion")
+		@DisplayName("a criterion nobody answered retains an error check without an authorized exclusion")
 		void anUnansweredCriterionIsNotLaundered() {
 			Judgment judgment = ears("""
 					UC1-AC1: PASS - Foo.java:10 does it
 					""");
 
-			assertThat(judgment.checks()).extracting(Check::name).containsExactly("UC1-AC1");
+			assertThat(judgment.checks()).extracting(Check::name).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
+			assertThat(judgment.checks()).extracting(check -> check.judgment().status())
+				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.ERROR, JudgmentStatus.ERROR);
 			assertThat(judgment.metadata()).containsEntry("notApplicableCount", 0);
 			assertThat(excluded(judgment)).isEmpty();
 		}
@@ -119,7 +123,9 @@ class RosterErrorEvidenceTests {
 			assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(judgment.reasonCode()).isEqualTo(JudgmentReasonCode.JUDGE_REPORTED);
 			assertThat(judgment.reasoning()).contains("RULE-2");
-			assertThat(judgment.checks()).extracting(Check::name).containsExactly("RULE-1", "RULE-3");
+			assertThat(judgment.checks()).extracting(Check::name).containsExactly("RULE-1", "RULE-2", "RULE-3");
+			assertThat(judgment.checks()).extracting(check -> check.judgment().status())
+				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.ERROR, JudgmentStatus.FAIL);
 			assertThat(judgment.metadata()).containsEntry("constraintsTotal", 3).containsEntry("established", 1L);
 		}
 
@@ -138,13 +144,15 @@ class RosterErrorEvidenceTests {
 		}
 
 		@Test
-		@DisplayName("a constraint nobody answered is neither a check nor an authorized exclusion")
+		@DisplayName("a constraint nobody answered retains an error check without an authorized exclusion")
 		void anUnansweredConstraintIsNotLaundered() {
 			Judgment judgment = rfc("""
 					RULE-1: PASS - Tx.java:10 does it
 					""");
 
-			assertThat(judgment.checks()).extracting(Check::name).containsExactly("RULE-1");
+			assertThat(judgment.checks()).extracting(Check::name).containsExactly("RULE-1", "RULE-2", "RULE-3");
+			assertThat(judgment.checks()).extracting(check -> check.judgment().status())
+				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.ERROR, JudgmentStatus.ERROR);
 			assertThat(judgment.metadata()).containsEntry("notApplicableCount", 0);
 			assertThat(excluded(judgment)).isEmpty();
 		}

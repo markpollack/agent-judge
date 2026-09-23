@@ -152,7 +152,8 @@ class EarsJudgeTests {
 			    UC1-AC3: PASS - Baz.java:30 does it
 			    """);
 
-		assertThat(judgment.status()).as("the first answer stands").isEqualTo(JudgmentStatus.PASS);
+		assertThat(judgment.status()).as("ambiguous repeated answers are instrument failures")
+			.isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.checks()).hasSize(3);
 	}
 

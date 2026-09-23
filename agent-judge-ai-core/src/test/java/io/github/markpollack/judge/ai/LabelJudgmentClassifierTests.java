@@ -7,6 +7,7 @@ import io.github.markpollack.judge.result.JudgmentStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,8 +62,8 @@ class LabelJudgmentClassifierTests {
 	}
 
 	/**
-	 * A label is not implicitly a number. It acquires one only where the classifier that owns
-	 * the vocabulary declares it, which is the contrast this pair pins.
+	 * A label is not implicitly a number. It acquires one only where the classifier that
+	 * owns the vocabulary declares it, which is the contrast this pair pins.
 	 */
 	@Test
 	void declaredNumericMeaningIsRecordedAlongsideTheLabel() {
@@ -90,16 +91,17 @@ class LabelJudgmentClassifierTests {
 		Judgment judgment = classifier.classify(resp);
 
 		assertThat(judgment.metadata()).containsEntry("model", "gpt-4o");
-		// The Usage record is a Java identity; the result carries its portable projection.
+		// The Usage record is a Java identity; the result carries its portable
+		// projection.
 		// An unreported category is omitted rather than carried as a null.
 		assertThat(judgment.metadata()).containsEntry("usage",
 				Map.of("inputTokens", 10L, "outputTokens", 5L, "reportedTotalTokens", 15L));
 	}
 
 	/**
-	 * Every category the model reported reaches the result. The classifier does not decide
-	 * which quantities are interesting, so a source that reports reasoning and cache
-	 * activity is not flattened back down to a prompt/completion pair.
+	 * Every category the model reported reaches the result. The classifier does not
+	 * decide which quantities are interesting, so a source that reports reasoning and
+	 * cache activity is not flattened back down to a prompt/completion pair.
 	 */
 	@Test
 	void usageProjectionCarriesEveryReportedCategory() {
@@ -140,11 +142,7 @@ class LabelJudgmentClassifierTests {
 
 	@Test
 	void builderCustomMappings() {
-		var classifier = LabelJudgmentClassifier.builder()
-			.pass("correct")
-			.fail("incorrect")
-			.abstain("unsure")
-			.build();
+		var classifier = LabelJudgmentClassifier.builder().pass("correct").fail("incorrect").abstain("unsure").build();
 
 		assertThat(classifier.classify(response("correct")).status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(classifier.classify(response("incorrect")).status()).isEqualTo(JudgmentStatus.FAIL);
@@ -153,8 +151,7 @@ class LabelJudgmentClassifierTests {
 
 	@Test
 	void builderRequiresAtLeastOneMapping() {
-		assertThatThrownBy(() -> LabelJudgmentClassifier.builder().build())
-			.isInstanceOf(IllegalStateException.class);
+		assertThatThrownBy(() -> LabelJudgmentClassifier.builder().build()).isInstanceOf(IllegalStateException.class);
 	}
 
 	@Test
@@ -168,15 +165,15 @@ class LabelJudgmentClassifierTests {
 	}
 
 	/**
-	 * A declared score is a normalized score like any other, and the label rule above says
-	 * nothing about it: every score the other cases supply is valid, so the range check had no
-	 * input of its own. The label is valid in each case here so that only the score can be what
-	 * is refused, and the message must name the label whose declaration was wrong.
+	 * A declared score is a normalized score like any other, and the label rule above
+	 * says nothing about it: every score the other cases supply is valid, so the range
+	 * check had no input of its own. The label is valid in each case here so that only
+	 * the score can be what is refused, and the message must name the label whose
+	 * declaration was wrong.
 	 */
 	@Test
 	void builderRejectsDeclaredScoresOutsideTheNormalizedRange() {
-		for (double bad : new double[] { -0.1, 1.1, Double.NaN, Double.POSITIVE_INFINITY,
-				Double.NEGATIVE_INFINITY }) {
+		for (double bad : new double[] { -0.1, 1.1, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY }) {
 			assertThatThrownBy(() -> LabelJudgmentClassifier.builder().pass("excellent", bad), "pass score %s", bad)
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessage("Score for label 'excellent' must be finite and between 0.0 and 1.0, but was " + bad);
@@ -209,6 +206,21 @@ class LabelJudgmentClassifierTests {
 
 	private JudgeModelResponse response(String text) {
 		return new JudgeModelResponse(text, null, null, null);
+	}
+
+	@Test
+	void selectedCategoryRetainsTheCompleteConfiguredDomainInOrder() {
+		var classifier = LabelJudgmentClassifier.builder()
+			.pass("excellent", 0.9)
+			.fail("poor", 0.1)
+			.abstain("unclear")
+			.build();
+		for (String selected : List.of("excellent", "poor", "unclear")) {
+			Judgment result = classifier.classify(response(selected));
+			assertThat(result.assessment().category().alternatives()).containsExactly("excellent", "poor", "unclear");
+			assertThat(result.assessment().category().selected()).isEqualTo(selected);
+			assertThat(result.certainty()).isNull();
+		}
 	}
 
 }

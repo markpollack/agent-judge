@@ -427,7 +427,7 @@ public class SimpleJury implements Jury {
 			return judgment;
 		}
 		String reasoning = "Judge '" + name + "' returned NOT_APPLICABLE without declaring that it may exclude a "
-				+ "subject, so the exclusion is not honoured: " + judgment.reasoning();
+				+ "subject, so the exclusion is not honoured: " + judgment.operationalReasoning();
 		logger.warn("{}; recording an ERROR for the error policy to resolve", reasoning);
 		return Judgment.error(JudgmentReasonCode.UNDECLARED_NOT_APPLICABLE, reasoning);
 	}

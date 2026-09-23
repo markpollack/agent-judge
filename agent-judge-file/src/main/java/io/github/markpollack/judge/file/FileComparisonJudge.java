@@ -68,7 +68,7 @@ public class FileComparisonJudge extends DeterministicJudge {
 
 					checks.addAll(fileJudgment.checks());
 					if (!fileJudgment.pass()) {
-						failures.add(filePath + ": " + fileJudgment.reasoning());
+						failures.add(filePath + ": " + fileJudgment.operationalReasoning());
 					}
 				}
 			}
