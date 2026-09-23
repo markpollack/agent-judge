@@ -174,6 +174,7 @@ class MetaJury implements Jury {
 					"One or more jury members did not produce a usable determination, so this jury reduced nothing."
 							+ NotApplicableGuard.refusedExclusionNote(attempts, "Member"));
 			return Verdict.builder()
+			.declaredCardinality(members.size())
 				.aggregated(aggregate)
 				.individual(successful)
 				.individualByName(successfulByName)
@@ -186,6 +187,7 @@ class MetaJury implements Jury {
 		boolean identity = members.size() == 1;
 		Judgment aggregate = identity ? successful.get(0) : aggregateWithinBoundary(successful);
 		return Verdict.builder()
+			.declaredCardinality(members.size())
 			.aggregated(aggregate)
 			.individual(successful)
 			.individualByName(successfulByName)

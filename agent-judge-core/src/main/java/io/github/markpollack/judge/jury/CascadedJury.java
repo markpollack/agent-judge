@@ -276,6 +276,7 @@ public class CascadedJury implements Jury {
 			.individualByName(stoppingVerdict.individualByName())
 			.weights(stoppingVerdict.weights())
 			.seats(stoppingVerdict.seats())
+			.declaredCardinality(stoppingVerdict.declaredCardinality())
 			.decision(Decision.tier(name, DecisionBasis.TIER_OUTCOME))
 			.compositeAttempts(attempts)
 			.build();
@@ -308,6 +309,7 @@ public class CascadedJury implements Jury {
 			.individualByName(tierVerdict.individualByName())
 			.weights(tierVerdict.weights())
 			.seats(tierVerdict.seats())
+			.declaredCardinality(tierVerdict.declaredCardinality())
 			.decision(Decision.tier(tier.name(), DecisionBasis.INDIVIDUAL_REJECTION))
 			.compositeAttempts(attempts)
 			.build();

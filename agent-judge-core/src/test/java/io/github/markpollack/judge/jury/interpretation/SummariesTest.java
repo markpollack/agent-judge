@@ -54,7 +54,7 @@ class SummariesTest {
 			all.add(org.junit.jupiter.params.provider.Arguments.of(name, Verdicts.interpret(stored(name))));
 		}
 		for (String resource : List.of(COMPOSITE_GOLDEN, BOUNDARY_GOLDEN)) {
-			all.add(org.junit.jupiter.params.provider.Arguments.of(resource, Verdicts.interpret(golden(resource))));
+			all.add(org.junit.jupiter.params.provider.Arguments.of(resource, Verdicts.interpret(Fixtures.readMap(resource))));
 		}
 		Verdict d1 = LiveFixturesForSummaries.childUndecidedRejection();
 		all.add(org.junit.jupiter.params.provider.Arguments.of("child-undecided D1", Verdicts.interpret(d1)));

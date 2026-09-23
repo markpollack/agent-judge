@@ -53,7 +53,9 @@ public final class Summaries {
 		sentences.add(decidedBySentence(interpretation));
 		sentences.add(readingSentence(interpretation.reading()));
 		sentences.add(supportSentence(interpretation.readingSupport()));
-		sentences.add(interpretation.sourceVersion() == 1
+		sentences.add(interpretation.sourceVersion() == 2 ? "Source: explicit version-2 semantic results (sourceVersion 2)."
+				: interpretation.sourceVersion() < 0 || interpretation.sourceVersion() > 2 ? "Source: unsupported version " + interpretation.sourceVersion() + "."
+				: interpretation.sourceVersion() == 1
 				? "Source: the seven-component form 0.17 writes (sourceVersion 1)."
 				: "Source: an unstamped record written before 0.17 (sourceVersion 0).");
 		sentences.add(defectsSentence(interpretation.defects()));
@@ -131,14 +133,14 @@ public final class Summaries {
 			}
 			return subject + " records no readable status" + judgesClause(stage) + ".";
 		}
-		return subject + " " + outcome(stage.status(), stage.reasonCode(), stage.reasoning()) + judgesClause(stage) + ".";
+		return subject + " " + outcome(stage.status(), stage.reasonCode(), stage.reasoning()) + semantic(stage.judgment()) + judgesClause(stage) + ".";
 	}
 
 	private static String rootSentence(Stage root) {
 		if (root.status() == null) {
 			return "The root records no readable status" + judgesClause(root) + ".";
 		}
-		return "The root " + outcome(root.status(), root.reasonCode(), root.reasoning()) + judgesClause(root) + ".";
+		return "The root " + outcome(root.status(), root.reasonCode(), root.reasoning()) + semantic(root.judgment()) + judgesClause(root) + ".";
 	}
 
 	private static String outcome(String status, @Nullable String reasonCode, @Nullable String reasoning) {
@@ -154,9 +156,27 @@ public final class Summaries {
 		for (JudgeSeat judge : stage.judges()) {
 			String said = judge.status() == null ? "records no readable status"
 					: outcome(judge.status(), judge.reasonCode(), judge.reasoning());
-			clauses.add(quote(judge.name()) + " " + said);
+			clauses.add(quote(judge.name()) + " " + said + semantic(judge.judgment()));
 		}
 		return "; its judges: " + String.join("; ", clauses);
+	}
+
+	private static String semantic(@Nullable JudgmentView view) {
+		if (view == null || view.producerStatus() == null) return "";
+		List<String> facts = new ArrayList<>();
+		if (view.producerStatus() != null) facts.add("producer=" + view.producerStatus());
+		if (view.assessment() != null) facts.add("assessment=" + view.assessment());
+		if (view.certainty() != null) facts.add("certainty=" + view.certainty());
+		if (view.distribution() != null) facts.add("distribution=" + view.distribution());
+		if (view.provenance() != null) facts.add("provenance=" + view.provenance());
+		if (view.policyApplication() != null) facts.add("policy=" + view.policyApplication());
+		if (view.producerReasonCode() != null) facts.add("rawCause=" + view.producerReasonCode());
+		if (view.producerReasoning() != null && !view.producerReasoning().equals(view.reasoning())) facts.add("rawReason=" + view.producerReasoning());
+		if (view.legacyLabel() != null) facts.add("legacyLabel=" + view.legacyLabel());
+		for (Check check : view.checks()) facts.add("check '" + check.name() + "' " +
+			(check.judgment() == null ? "legacyPassed=" + check.legacyPassed() + "; finer status unrecorded"
+				: check.judgment().status() + semantic(check.judgment())));
+		return facts.isEmpty() ? "" : " {" + String.join("; ", facts) + "}";
 	}
 
 	/** The fixed phrase for a status token; the agreement test holds its own copy as the oracle. */
@@ -223,12 +243,12 @@ public final class Summaries {
 			.anyMatch(defect -> (defect.path().equals("verdict") && defect.field().equals("decision"))
 					|| defect.path().equals("verdict.decision"));
 		return unreadable ? "Which stage decided is not recorded and has not been inferred."
-				: "The root's own reduction decided; no stage is named.";
+				: "The root's own decision applies; no stage is named.";
 	}
 
 	private static String readingSentence(@Nullable VerdictReading reading) {
 		if (reading == null) {
-			return "Reading: none; the root records no readable status.";
+			return "Reading: none; the record does not support a usable subject determination.";
 		}
 		String gloss = switch (reading) {
 			case ACCEPTED -> "the subject was judged and accepted";

@@ -14,20 +14,18 @@ import org.jspecify.annotations.Nullable;
 /**
  * The interpretation of one verdict.
  *
- * <p>The same shape whether the verdict was written by 0.17 or by 0.13. What differs between a
- * complete record and an incomplete one is only {@link #defects()}. A consumer reads fields; it
- * never re-derives.
+ * <p>Version 2 retains complete modern semantic views and explicitly absent historical facts.
+ * A consumer reads the views and reading support rather than re-deriving outcomes.
  *
  * <p>{@link #root()} is the verdict's own aggregate and its judges, so a flat verdict with no
  * composite stage is fully explained. {@link #stages()} are the attempts a composite jury
  * entered, recursively, depth-first in attempt order, each with its own full path.
  *
- * @param schemaVersion the version of this shape: {@code 1}. Additive optional fields do not
- * bump it; anything else does
+ * @param schemaVersion the version of this shape: {@code 2}
  * @param sourceVersion what was read: {@code 0} for an unstamped verdict written before 0.17,
- * {@code 1} for the seven-component form 0.17 writes
- * @param reading what the verdict says about the subject; null only when the root records no
- * readable status, which the defects say
+ * {@code 1} for the unversioned 0.17 form, {@code 2} for modern results, another integer for
+ * an unknown version, or {@code -1} for a malformed/missing modern stamp
+ * @param reading what the verdict says about the subject; null when the historical root has no readable status or a modern reading is unsupported
  * @param readingSupport whether the recorded facts support the reading
  * @param decidedBy which stage decided, as the record says, or null when the root decided
  * itself or the record does not say
@@ -47,7 +45,7 @@ public record Interpretation(int schemaVersion, int sourceVersion, @Nullable Ver
 		List<Defect> defects, String summary) {
 
 	/** The version of this shape. */
-	public static final int SCHEMA_VERSION = 1;
+	public static final int SCHEMA_VERSION = 2;
 
 	/** Validate and copy. */
 	public Interpretation {

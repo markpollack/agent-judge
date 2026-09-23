@@ -196,7 +196,7 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("A7: a root individual_rejection reports the tier it names")
 	void aRootIndividualRejectionNamesItsTier() {
-		Interpretation interpretation = Verdicts.interpret(golden(BOUNDARY_GOLDEN));
+		Interpretation interpretation = Verdicts.interpret(Fixtures.readMap(BOUNDARY_GOLDEN));
 
 		assertThat(interpretation.decidedBy())
 			.isEqualTo(new DecidedBy("rubric", List.of("rubric"), "individual_rejection"));
@@ -230,7 +230,7 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("a meta-jury whose member failed reads NOT_ASSESSED and lists the failed member")
 	void aMetaJuryStageFailure() {
-		Interpretation interpretation = Verdicts.interpret(golden(COMPOSITE_GOLDEN));
+		Interpretation interpretation = Verdicts.interpret(Fixtures.readMap(COMPOSITE_GOLDEN));
 
 		assertThat(interpretation.reading()).isEqualTo(VerdictReading.NOT_ASSESSED);
 		assertThat(interpretation.decidedBy()).isNull();
@@ -247,7 +247,7 @@ class LiveRulesTest {
 	@ValueSource(strings = { COMPOSITE_GOLDEN, BOUNDARY_GOLDEN })
 	@DisplayName("A9: the live and stored paths agree on every 0.17 golden")
 	void theTwoPathsAgree(String resource) throws Exception {
-		Interpretation live = Verdicts.interpret(golden(resource));
+		Interpretation live = Verdicts.interpret(Fixtures.mutableCopy(readMap(resource)));
 		Interpretation fromMap = Verdicts.interpret(readMap(resource));
 
 		assertThat(live).isEqualTo(fromMap);

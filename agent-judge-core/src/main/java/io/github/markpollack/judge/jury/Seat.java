@@ -8,46 +8,65 @@ package io.github.markpollack.judge.jury;
 import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import io.github.markpollack.judge.internal.StrictIntegerDeserializer;
 
 import io.github.markpollack.judge.description.KeySource;
 
 /**
- * One judgment's place in a verdict: where it sat, what key it is stored under, and where that
- * key came from.
+ * One judgment's place in a verdict: where it sat, what key it is stored under, and where
+ * that key came from.
  *
  * <p>
  * A verdict has always carried {@link Verdict#individual()} in order and
- * {@link Verdict#individualByName()} by key, and joining them was left to the reader. That
- * worked until the join stopped being obvious — a duplicate declared name collapses two
- * judgments into one map entry, a meta-jury omits members that failed, and a key like
+ * {@link Verdict#individualByName()} by key, and joining them was left to the reader.
+ * That worked until the join stopped being obvious — a duplicate declared name collapses
+ * two judgments into one map entry, a meta-jury omits members that failed, and a key like
  * {@code "Judge#2"} identifies a position rather than a judge. A seat records the join
- * explicitly, so a stored result can be attributed to the judge that produced it rather than to
- * whichever key happened to survive.
+ * explicitly, so a stored result can be attributed to the judge that produced it rather
+ * than to whichever key happened to survive.
  * </p>
  *
  * <p>
  * {@link #keySource()} is the part worth reading. Only {@link KeySource#DECLARED} is an
- * identity: a positional key means something different the moment a judge is inserted above it,
- * and a deduplicated key depends on the order the judges were supplied in. A reader attributing
- * results across runs should treat anything but {@code DECLARED} as unattributable rather than
- * as a name.
+ * identity: a positional key means something different the moment a judge is inserted
+ * above it, and a deduplicated key depends on the order the judges were supplied in. A
+ * reader attributing results across runs should treat anything but {@code DECLARED} as
+ * unattributable rather than as a name.
  * </p>
  *
  * @param position the seat's zero-based configured position, which indexes
  * {@link Verdict#individual()} and keys {@link Verdict#weights()}
- * @param verdictKey the key this judgment is stored under in {@link Verdict#individualByName()}
+ * @param verdictKey the key this judgment is stored under in
+ * {@link Verdict#individualByName()}
+ * @param execution recorded invocation outcome
  * @param keySource where the verdict key came from
  * @author Mark Pollack
  * @since 0.17.0
  */
-@JsonPropertyOrder({ "position", "verdictKey", "keySource" })
-public record Seat(int position, String verdictKey, KeySource keySource) {
+@JsonPropertyOrder({ "position", "verdictKey", "keySource", "execution" })
+public record Seat(
+		@JsonProperty(required = true) @JsonDeserialize(using = StrictIntegerDeserializer.class) int position,
+		String verdictKey, KeySource keySource, SeatExecution execution) {
+
+	/**
+	 * Construct a seat explicitly asserting a valid returned judgment.
+	 * @param position configured position
+	 * @param verdictKey result key
+	 * @param keySource source of the key
+	 */
+	public Seat(int position, String verdictKey, KeySource keySource) {
+		this(position, verdictKey, keySource, SeatExecution.RETURNED);
+	}
 
 	/**
 	 * Validate the seat.
-	 * @throws IllegalArgumentException if the position is negative or the verdict key is blank
+	 * @throws IllegalArgumentException if the position is negative or the verdict key is
+	 * blank
 	 */
 	public Seat {
+		Objects.requireNonNull(execution, "execution must be explicit");
 		if (position < 0) {
 			throw new IllegalArgumentException("position must not be negative, but was " + position);
 		}

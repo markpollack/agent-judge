@@ -78,22 +78,33 @@ final class Interpreter {
 	}
 
 	static Interpretation interpret(Map<String, Object> stored) {
-		return new Interpreter().run(stored);
+		return stored.containsKey("schemaVersion") || ModernInterpreter.containsModern(stored)
+			? ModernInterpreter.interpret(stored) : new Interpreter().run(stored);
 	}
+
+	static Reduction reduction(Judgment judgment) {
+		Interpreter reader = new Interpreter();
+		Map<String,Object> facts = new LinkedHashMap<>();
+		facts.put("metadata", judgment.metadata());
+		facts.put("score", judgment.score());
+		Evidence evidence = reader.readEvidence(facts, "verdict.aggregated");
+		if (evidence == null) reader.absent("verdict.aggregated", "metadata.aggregation", "No reduction evidence.");
+		else reader.checkEvidence(evidence, judgment.status().wireName(),
+			judgment.operationalReasonCode() == null ? null : judgment.operationalReasonCode().wireName(),
+			facts, "verdict.aggregated");
+		return new Reduction(evidence, List.copyOf(reader.defects), reader.undeterminable);
+	}
+
+	record Reduction(@Nullable Evidence evidence, List<Defect> defects, boolean undetermined) { }
 
 	// ==================== The whole ====================
 
 	private Interpretation run(Map<String, Object> verdict) {
-		verdict = LegacyInterpretationBridge.project(verdict, path -> {
-			this.undeterminable = true;
-			unknown(path, "modernResult", "Modern judgment semantics require the version-2 interpreter; "
-					+ "this temporary v1 view does not establish support for them.");
-		});
 		int sourceVersion = verdict.get("decision") != null && verdict.get("seats") != null ? 1 : 0;
 
 		Node rootNode = readVerdict(verdict, "verdict", true);
 		Stage root = new Stage(null, List.of(), null, null, null, null, null, null, rootNode.status(),
-				rootNode.reasonCode(), rootNode.reasoning(), rootNode.evidence(), rootNode.judges());
+				rootNode.reasonCode(), rootNode.reasoning(), rootNode.evidence(), rootNode.judges(), rootNode.judgment());
 		readAttempts(verdict, "verdict", List.of(), 1);
 
 		Walk walk = walk(verdict);
@@ -115,7 +126,7 @@ final class Interpreter {
 	/** What one verdict node — the root or an attempt's verdict — says on its own. */
 	private record Node(@Nullable String status, @Nullable String reasonCode, @Nullable String reasoning,
 			@Nullable Evidence evidence, List<JudgeSeat> judges, @Nullable Map<String, Object> aggregated,
-			List<String> individualStatuses, boolean evidenceBlockPresent) {
+			List<String> individualStatuses, boolean evidenceBlockPresent, @Nullable JudgmentView judgment) {
 	}
 
 	private Node readVerdict(Map<String, Object> verdict, String path, boolean root) {
@@ -124,7 +135,7 @@ final class Interpreter {
 		boolean blockPresent = false;
 		if (aggregated == null) {
 			absent(path, "aggregated", "No aggregate judgment is recorded, so the node has no status to read.");
-			facts = new Facts(null, null, null, null, null, List.of());
+			facts = new Facts(null, null, null, null, null, List.of(), null);
 		}
 		else {
 			facts = readJudgment(aggregated, path + ".aggregated");
@@ -140,13 +151,13 @@ final class Interpreter {
 			}
 		}
 		return new Node(facts.status(), facts.reasonCode(), facts.reasoning(), evidence, judges, aggregated,
-				individualStatuses, blockPresent);
+				individualStatuses, blockPresent, facts.judgment());
 	}
 
 	// ==================== One judgment ====================
 
 	private record Facts(@Nullable String status, @Nullable String reasonCode, @Nullable String reasoning,
-			@Nullable Double score, @Nullable ScoreScale scale, List<Check> checks) {
+			@Nullable Double score, @Nullable ScoreScale scale, List<Check> checks, @Nullable JudgmentView judgment) {
 	}
 
 	private Facts readJudgment(Map<String, Object> judgment, String path) {
@@ -164,7 +175,11 @@ final class Interpreter {
 			unparseable(path, "reasoning", "The reasoning is not text.");
 		}
 		Score score = readScore(judgment, path);
-		return new Facts(status, reasonCode, reasoning, score.value(), score.scale(), readChecks(judgment, path));
+		List<Check> checks = readChecks(judgment, path);
+		String label = judgment.get("label") instanceof String text ? text : null;
+		JudgmentView view = new JudgmentView(null, status, reasonCode, reasoning, null, null, null, null, null,
+			null, null, checks, label, score.value(), Map.of());
+		return new Facts(status, reasonCode, reasoning, score.value(), score.scale(), checks, view);
 	}
 
 	private @Nullable String readStatus(Map<String, Object> judgment, String path) {
@@ -247,7 +262,15 @@ final class Interpreter {
 			return new Score(null, null);
 		}
 		ScoreScale scale = new ScoreScale(low, high);
-		double normalised = (raw.doubleValue() - low) / (high - low);
+		double valueOnScale = raw.doubleValue();
+		if (!Double.isFinite(valueOnScale) || valueOnScale < low || valueOnScale > high) {
+			unparseable(path, "score", "The raw value lies outside its recorded scale. Ignored.");
+			return new Score(null, scale);
+		}
+		double width = high - low;
+		double normalised = valueOnScale == low ? 0 : valueOnScale == high ? 1
+				: Double.isFinite(width) ? (valueOnScale - low) / width
+				: (valueOnScale / 2 - low / 2) / (high / 2 - low / 2);
 		if (!Double.isFinite(normalised) || normalised < 0.0 || normalised > 1.0) {
 			unparseable(path, "score", "The value " + raw + " lies outside its recorded scale [" + low + ", " + high
 					+ "]. Ignored.");
@@ -519,7 +542,7 @@ final class Interpreter {
 		}
 		Facts facts = readJudgment(judgment, judgmentPath);
 		return new JudgeSeat(position, name, keySource, facts.status(), facts.reasonCode(), facts.score(),
-				facts.scale(), facts.reasoning() == null ? "" : facts.reasoning(), facts.checks());
+				facts.scale(), facts.reasoning() == null ? "" : facts.reasoning(), facts.checks(), facts.judgment());
 	}
 
 	// ==================== Attempts, recursively ====================
@@ -553,7 +576,7 @@ final class Interpreter {
 				absent(subPath, "name", "Legacy subVerdicts carry no stage name, relation, policy or disposition.");
 				Node node = readVerdict(sub, subPath, false);
 				this.stages.add(new Stage(null, parentPath, null, null, null, null, null, null, node.status(),
-						node.reasonCode(), node.reasoning(), node.evidence(), node.judges()));
+						node.reasonCode(), node.reasoning(), node.evidence(), node.judges(), node.judgment()));
 				readAttempts(sub, subPath, parentPath, depth + 1);
 			}
 		}
@@ -596,7 +619,7 @@ final class Interpreter {
 		}
 		Node node = readVerdict(verdict, path + ".verdict", false);
 		this.stages.add(new Stage(name, ownPath, relation, policy, disposition, reason, failure, usedByParent,
-				node.status(), node.reasonCode(), node.reasoning(), node.evidence(), node.judges()));
+				node.status(), node.reasonCode(), node.reasoning(), node.evidence(), node.judges(), node.judgment()));
 		readAttempts(verdict, path + ".verdict", ownPath, depth + 1);
 	}
 

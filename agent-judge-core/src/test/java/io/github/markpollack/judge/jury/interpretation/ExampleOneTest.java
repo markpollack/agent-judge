@@ -63,17 +63,17 @@ class ExampleOneTest {
 	void theStoredVerdictProducesTheBlock() {
 		Interpretation interpretation = Verdicts.interpret(stored(EXAMPLE_ONE));
 
-		assertThat(interpretation.schemaVersion()).isEqualTo(1);
+		assertThat(interpretation.schemaVersion()).isEqualTo(2);
 		assertThat(interpretation.sourceVersion()).as("the seven-component form 0.17 writes").isEqualTo(1);
 		assertThat(interpretation.reading()).isEqualTo(VerdictReading.UNDECIDED);
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
 		assertThat(interpretation.decidedBy()).isEqualTo(new DecidedBy("structure", List.of("structure"), "tier_outcome"));
 		assertThat(interpretation.defects()).isEmpty();
 
-		assertThat(interpretation.root()).isEqualTo(new Stage(null, List.of(), null, null, null, null, null, null,
+		assertThat(interpretation.root()).usingRecursiveComparison().ignoringFieldsMatchingRegexes(".*judgment").isEqualTo(new Stage(null, List.of(), null, null, null, null, null, null,
 				"abstain", null, REASONING, EVIDENCE, JUDGES));
-		assertThat(interpretation.stages()).containsExactly(new Stage("structure", List.of("structure"), "cascade_tier",
-				"REJECT_ON_ANY_FAIL", "used", null, null, true, "abstain", null, REASONING, EVIDENCE, JUDGES));
+		assertThat(interpretation.stages()).usingRecursiveComparison().ignoringFieldsMatchingRegexes(".*judgment").isEqualTo(List.of(new Stage("structure", List.of("structure"), "cascade_tier",
+				"REJECT_ON_ANY_FAIL", "used", null, null, true, "abstain", null, REASONING, EVIDENCE, JUDGES)));
 		assertThat(interpretation.summary()).isEqualTo(Summaries.of(interpretation));
 	}
 
@@ -83,8 +83,10 @@ class ExampleOneTest {
 		Interpretation fromStore = Verdicts.interpret(stored(EXAMPLE_ONE));
 		Interpretation fromJury = Verdicts.interpret(sameJury());
 
-		assertThat(fromJury).isEqualTo(fromStore);
-		assertThat(MAPPER.writeValueAsString(fromJury)).isEqualTo(MAPPER.writeValueAsString(fromStore));
+		assertThat(fromJury.sourceVersion()).isEqualTo(2);
+		assertThat(fromStore.sourceVersion()).isEqualTo(1);
+		assertThat(fromJury.reading()).isEqualTo(fromStore.reading());
+		assertThat(fromJury).isEqualTo(Verdicts.interpret(Fixtures.asMap(sameJury())));
 	}
 
 	@Test

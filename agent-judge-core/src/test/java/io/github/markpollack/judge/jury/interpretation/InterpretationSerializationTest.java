@@ -56,7 +56,7 @@ class InterpretationSerializationTest {
 						+ j.get("status").asText() + (j.get("reasonCode").isNull() ? "" : " (" + j.get("reasonCode").asText() + ")")
 						+ " — " + j.get("reasoning").asText());
 				for (JsonNode c : j.get("checks")) {
-					lines.add("      [" + (c.get("passed").asBoolean() ? "x" : " ") + "] " + c.get("name").asText() + ": "
+					lines.add("      [" + (c.get("legacyPassed").asBoolean() ? "x" : " ") + "] " + c.get("name").asText() + ": "
 							+ c.get("detail").asText());
 				}
 			}
@@ -80,10 +80,10 @@ class InterpretationSerializationTest {
 		assertThat(i.get("decidedBy").toString()).isEqualTo("{\"stage\":\"structure\",\"path\":[\"structure\"],\"basis\":\"tier_outcome\"}");
 		assertThat(i.get("stages").get(0).fieldNames()).toIterable()
 			.containsExactly("stage", "path", "relation", "policy", "disposition", "reason", "failure", "usedByParent",
-					"status", "reasonCode", "reasoning", "evidence", "judges");
+					"status", "reasonCode", "reasoning", "evidence", "judges", "judgment", "declaredCardinality", "decision");
 		assertThat(i.get("stages").get(0).get("reasonCode").isNull()).as("an absent reason code is an explicit null").isTrue();
 		assertThat(i.get("stages").get(0).get("judges").get(0).fieldNames()).toIterable()
-			.containsExactly("position", "name", "keySource", "status", "reasonCode", "score", "reasoning", "checks");
+			.containsExactly("position", "name", "keySource", "status", "reasonCode", "score", "reasoning", "checks", "judgment", "execution");
 		assertThat(i.get("stages").get(0).get("evidence").get("passCount").asInt()).isEqualTo(1);
 		assertThat(i.get("stages").get(0).get("evidence").get("errorCodeCounts").toString()).isEqualTo("{}");
 		assertThat(i.get("defects").toString()).isEqualTo("[]");

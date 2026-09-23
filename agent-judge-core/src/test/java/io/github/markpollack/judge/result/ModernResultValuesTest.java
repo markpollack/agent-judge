@@ -405,18 +405,20 @@ class ModernResultValuesTest {
 	}
 
 	@Test
-	void temporaryV1InterpretationCannotCertifyModernOnlyFacts() {
+	void versionTwoRetainsModernPolicyFailureFacts() {
 		Judgment result = raw(JudgmentStatus.FAIL, PRODUCT, reported(AssessmentTarget.PROPOSITION),
 				propositionDistribution(),
 				new PolicyFailure(POLICY, JudgmentReasonCode.POLICY_FAILED, "policy unavailable"));
 		var reading = Verdicts.interpret(Verdict.single("judge", result));
-		assertThat(reading.readingSupport()).isEqualTo(ReadingSupport.UNDETERMINED);
+		assertThat(reading.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
 		assertThat(reading.root().reasonCode()).isEqualTo("policy_failed");
-		assertThat(reading.defects()).anySatisfy(defect -> assertThat(defect.field()).isEqualTo("modernResult"));
+		assertThat(reading.root().judgment().policyApplication()).isEqualTo(result.policyApplication());
+		assertThat(reading.root().judgment().assessment()).isEqualTo(PRODUCT);
+		assertThat(reading.defects()).isEmpty();
 	}
 
 	@Test
-	void temporaryBridgeRefusesLostCategoryDomainsAndDisguisedNumericScales() {
+	void versionTwoRetainsCategoryDomainsAndNumericScaleDirections() {
 		List<Assessment> assessments = List.of(new Assessment(null, null, new Category("yes", List.of("yes", "no"))),
 				new Assessment(null, null, new Category(null, List.of("yes", "no"))),
 				new Assessment(null,
@@ -436,8 +438,8 @@ class ModernResultValuesTest {
 			var reading = Verdicts.interpret(jury
 				.vote(io.github.markpollack.judge.context.JudgmentContext.builder().goal("bridge test").build()));
 			softly.assertThat(reading.readingSupport())
-				.as("lost modern assessment %s", assessment)
-				.isEqualTo(ReadingSupport.UNDETERMINED);
+				.as("retained modern assessment %s", assessment)
+				.isEqualTo(ReadingSupport.SUPPORTED);
 		}
 		softly.assertAll();
 	}

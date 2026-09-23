@@ -350,12 +350,14 @@ public class SimpleJury implements Jury {
 		List<Seat> seats = new ArrayList<>(judges.size());
 		for (int i = 0; i < judges.size(); i++) {
 			judgmentByName.put(keys.get(i).verdictKey(), individualJudgments.get(i));
-			seats.add(new Seat(i, keys.get(i).verdictKey(), keySourceAt(i, keys.get(i))));
+			seats.add(new Seat(i, keys.get(i).verdictKey(), keySourceAt(i, keys.get(i)),
+					invocations.get(i).returned() ? SeatExecution.RETURNED : SeatExecution.CONTAINED_FAILURE));
 		}
 
 		Judgment aggregated = identity ? individualJudgments.get(0) : aggregateWithinBoundary(individualJudgments);
 
 		Verdict verdict = Verdict.builder()
+			.declaredCardinality(judges.size())
 			.aggregated(aggregated)
 			.individual(individualJudgments)
 			.individualByName(judgmentByName)

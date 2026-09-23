@@ -131,7 +131,7 @@ class ModernProducerMigrationTest {
 			.orElseThrow();
 		assertThat(policySeat.reasonCode()).isEqualTo("policy_failed");
 		assertThat(policySeat.reasoning()).isEqualTo("policy configuration unavailable");
-		assertThat(interpretation.summary()).doesNotContain("raw subject rejection");
+		assertThat(interpretation.summary()).contains("rawReason=raw subject rejection");
 	}
 
 }

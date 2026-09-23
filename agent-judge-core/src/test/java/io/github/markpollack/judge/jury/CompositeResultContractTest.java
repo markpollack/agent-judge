@@ -38,15 +38,15 @@ class CompositeResultContractTest {
 	@Test
 	void verdictDeclarationAndJsonExposeOnlyTheCorrectedSevenComponentTruth() throws Exception {
 		assertThat(Arrays.stream(Verdict.class.getRecordComponents()).map(RecordComponent::getName))
-			.containsExactly("aggregated", "individual", "individualByName", "weights", "seats", "decision",
-					"compositeAttempts");
+			.containsExactly("schemaVersion", "aggregated", "individual", "individualByName", "weights", "seats", "decision",
+					"compositeAttempts", "declaredCardinality");
 
 		JsonNode json = MAPPER.readTree(MAPPER.writeValueAsString(Verdict.single("leaf", booleanPass("passed"))));
 		assertThat(json.fieldNames()).toIterable()
-			.containsExactly("aggregated", "individual", "individualByName", "weights", "seats", "decision",
+			.containsExactly("schemaVersion", "declaredCardinality", "aggregated", "individual", "individualByName", "weights", "seats", "decision",
 					"compositeAttempts");
 		assertThat(json.at("/seats/0").toString())
-			.isEqualTo("{\"position\":0,\"verdictKey\":\"leaf\",\"keySource\":\"DECLARED\"}");
+			.isEqualTo("{\"position\":0,\"verdictKey\":\"leaf\",\"keySource\":\"DECLARED\",\"execution\":\"RETURNED\"}");
 		assertThat(json.at("/decision").toString()).isEqualTo("{\"kind\":\"own\"}");
 		assertThat(json.has("sub" + "Verdicts")).isFalse();
 	}

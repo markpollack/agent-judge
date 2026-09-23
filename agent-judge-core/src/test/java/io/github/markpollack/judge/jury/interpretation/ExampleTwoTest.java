@@ -41,15 +41,15 @@ class ExampleTwoTest {
 	void theReadingIsHonestAndLimited() {
 		Interpretation interpretation = Verdicts.interpret(stored(EXAMPLE_TWO));
 
-		assertThat(interpretation.schemaVersion()).isEqualTo(1);
+		assertThat(interpretation.schemaVersion()).isEqualTo(2);
 		assertThat(interpretation.sourceVersion()).as("an unstamped record").isEqualTo(0);
 		assertThat(interpretation.reading()).as("the record says FAIL").isEqualTo(VerdictReading.REJECTED);
 		assertThat(interpretation.decidedBy()).as("not inferred from the root equalling its sub-verdict").isNull();
 
-		assertThat(interpretation.root()).isEqualTo(new Stage(null, List.of(), null, null, null, null, null, null,
+		assertThat(interpretation.root()).usingRecursiveComparison().ignoringFieldsMatchingRegexes(".*judgment").isEqualTo(new Stage(null, List.of(), null, null, null, null, null, null,
 				"fail", null, REASONING, null, JUDGES));
-		assertThat(interpretation.stages()).containsExactly(new Stage(null, List.of(), null, null, null, null, null,
-				null, "fail", null, REASONING, null, JUDGES));
+		assertThat(interpretation.stages()).usingRecursiveComparison().ignoringFieldsMatchingRegexes(".*judgment").isEqualTo(List.of(new Stage(null, List.of(), null, null, null, null, null,
+				null, "fail", null, REASONING, null, JUDGES)));
 	}
 
 	@Test

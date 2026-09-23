@@ -30,7 +30,10 @@ class ScoreRuleTest {
 	/** A one-judge verdict whose three copies of the judgment all carry the given score. */
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> singleWithScore(Object score) {
-		Map<String, Object> stored = mutableCopy(asMap(Verdict.single("grader", Judgment.pass("graded"))));
+		Map<String, Object> baseJudgment = new LinkedHashMap<>(Map.of("status", "pass", "reasoning", "graded", "checks", java.util.List.of(), "metadata", Map.of()));
+		Map<String,Object> stored = new LinkedHashMap<>(Map.of("aggregated", new LinkedHashMap<>(baseJudgment),
+			"individual", java.util.List.of(new LinkedHashMap<>(baseJudgment)), "individualByName", new LinkedHashMap<>(Map.of("grader", new LinkedHashMap<>(baseJudgment)))));
+		stored.put("seats", java.util.List.of(Map.of("position", 0, "verdictKey", "grader", "keySource", "DECLARED")));
 		for (Map<String, Object> judgment : java.util.List.<Map<String, Object>>of(at(stored, "aggregated"),
 				(Map<String, Object>) Fixtures.listAt(stored, "individual").get(0),
 				at(stored, "individualByName", "grader"))) {
@@ -132,6 +135,15 @@ class ScoreRuleTest {
 		at(explicitNull, "individualByName", "grader").put("score", null);
 		assertThat(grader(Verdicts.interpret(explicitNull)).score()).isNull();
 		assertThat(scoreDefects(Verdicts.interpret(explicitNull))).isEmpty();
+	}
+
+	@Test void extremeFiniteBoundsRetainMidpointAndEndpoints() {
+		for (double raw : new double[]{-1e308, 0, 1e308}) {
+			Interpretation i = Verdicts.interpret(singleWithScore(bounded(raw, -1e308, 1e308)));
+			assertThat(grader(i).score()).isEqualTo(raw < 0 ? 0.0 : raw > 0 ? 1.0 : 0.5);
+			assertThat(scoreDefects(i)).isEmpty();
+		}
+		assertThat(grader(Verdicts.interpret(singleWithScore(bounded(1.5e308, -1e308, 1e308)))).score()).isNull();
 	}
 
 }

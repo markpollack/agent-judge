@@ -11,9 +11,9 @@
  * <p>One shape, two entry points. {@link io.github.markpollack.judge.jury.interpretation.Verdicts#interpret(io.github.markpollack.judge.jury.Verdict)}
  * reads a live verdict; {@link io.github.markpollack.judge.jury.interpretation.Verdicts#interpret(java.util.Map)}
  * reads a stored one of any age — the 0.13 {@code subVerdicts} form, the 0.14–0.16
- * {@code compositeAttempts} form without decisions, and the complete 0.17 form. What differs
- * between a complete record and an incomplete one is only the
- * {@link io.github.markpollack.judge.jury.interpretation.Interpretation#defects() defects} list.
+ * {@code compositeAttempts} form without decisions, the unversioned 0.17 form, and explicit version-2 semantic results. Historical absence remains
+ * distinct from malformed modern data; modern unknown/mixed versions cannot supply a usable
+ * subject determination. Complete modern views retain raw facts separately from derived policy outcomes.
  *
  * <h2>Nothing is inferred</h2>
  *

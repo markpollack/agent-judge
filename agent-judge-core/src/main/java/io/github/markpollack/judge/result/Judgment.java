@@ -17,6 +17,9 @@ import java.util.OptionalDouble;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import io.github.markpollack.judge.internal.StrictIntegerDeserializer;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -25,6 +28,7 @@ import org.jspecify.annotations.Nullable;
  * Legacy score/label methods are derived compatibility views, never stored duplicates.
  * Metadata is recursively copied and restricted to portable JSON values.
  *
+ * @param schemaVersion wire version, always 2
  * @param producerStatus disposition before application policy
  * @param assessment optional product assessment
  * @param certainty optional metric-specific support
@@ -38,12 +42,35 @@ import org.jspecify.annotations.Nullable;
  * @param metadata recursively immutable portable metadata
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonPropertyOrder({ "producerStatus", "assessment", "certainty", "distribution", "reasonCode", "reasoning", "checks",
-		"provenance", "policyApplication", "metadata" })
-public record Judgment(JudgmentStatus producerStatus, @Nullable Assessment assessment, @Nullable Certainty certainty,
+@JsonPropertyOrder({ "schemaVersion", "producerStatus", "assessment", "certainty", "distribution", "reasonCode",
+		"reasoning", "checks", "provenance", "policyApplication", "metadata" })
+public record Judgment(
+		@JsonProperty(required = true) @JsonDeserialize(using = StrictIntegerDeserializer.class) int schemaVersion,
+		JudgmentStatus producerStatus, @Nullable Assessment assessment, @Nullable Certainty certainty,
 		@Nullable Distribution distribution, @Nullable JudgmentReasonCode reasonCode, String reasoning,
 		List<Check> checks, @Nullable EvaluationProvenance provenance, @Nullable PolicyApplication policyApplication,
 		Map<String, Object> metadata) {
+
+	/**
+	 * Construct a version-2 judgment from its semantic values.
+	 * @param producerStatus producer disposition
+	 * @param assessment assessment
+	 * @param certainty certainty
+	 * @param distribution distribution
+	 * @param reasonCode raw cause
+	 * @param reasoning raw explanation
+	 * @param checks child checks
+	 * @param provenance provenance
+	 * @param policyApplication application policy
+	 * @param metadata incidental metadata
+	 */
+	public Judgment(JudgmentStatus producerStatus, @Nullable Assessment assessment, @Nullable Certainty certainty,
+			@Nullable Distribution distribution, @Nullable JudgmentReasonCode reasonCode, String reasoning,
+			List<Check> checks, @Nullable EvaluationProvenance provenance,
+			@Nullable PolicyApplication policyApplication, Map<String, Object> metadata) {
+		this(2, producerStatus, assessment, certainty, distribution, reasonCode, reasoning, checks, provenance,
+				policyApplication, metadata);
+	}
 
 	/**
 	 * Metadata key reserved for aggregation evidence written by voting strategies.
@@ -94,6 +121,8 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Assessment asses
 
 	/** Validate, copy, and recursively freeze every judgment component. */
 	public Judgment {
+		if (schemaVersion != 2)
+			throw new IllegalArgumentException("Judgment schemaVersion must be 2");
 		Objects.requireNonNull(producerStatus, "producer status must not be null");
 		Objects.requireNonNull(reasoning, "reasoning must not be null");
 		checks = List.copyOf(Objects.requireNonNull(checks, "checks must not be null"));
@@ -183,7 +212,8 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Assessment asses
 	}
 
 	/**
-	 * Returns operational disposition derived from producer status and policy application.
+	 * Returns operational disposition derived from producer status and policy
+	 * application.
 	 * @return operational disposition derived from producer status and policy application
 	 */
 	public JudgmentStatus status() {
@@ -197,7 +227,8 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Assessment asses
 	}
 
 	/**
-	 * Returns operational instrument/subject cause, never a retained subject code on policy ERROR.
+	 * Returns operational instrument/subject cause, never a retained subject code on
+	 * policy ERROR.
 	 * @return operational instrument/subject cause, never a retained subject code on
 	 * policy ERROR
 	 */
@@ -212,7 +243,8 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Assessment asses
 	}
 
 	/**
-	 * Returns policy explanation on policy failure/withholding, otherwise producer reasoning.
+	 * Returns policy explanation on policy failure/withholding, otherwise producer
+	 * reasoning.
 	 * @return policy explanation on policy failure/withholding, otherwise producer
 	 * reasoning
 	 */
@@ -227,7 +259,8 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Assessment asses
 	}
 
 	/**
-	 * Returns derived normalized numeric quality, absent without an explicit quality direction.
+	 * Returns derived normalized numeric quality, absent without an explicit quality
+	 * direction.
 	 * @return derived normalized numeric quality, absent without an explicit quality
 	 * direction
 	 */
