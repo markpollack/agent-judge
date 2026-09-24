@@ -55,7 +55,7 @@ class JevJudgeTest {
 		executor = Executors.newVirtualThreadPerTaskExecutor();
 		server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 		server.setExecutor(executor);
-		server.createContext("/v1/systemone", exchange -> {
+		com.sun.net.httpserver.HttpHandler handler = exchange -> {
 			int call = calls.incrementAndGet();
 			byte[] request = exchange.getRequestBody().readAllBytes();
 			requests.put("request-" + call, request);
@@ -64,7 +64,9 @@ class JevJudgeTest {
 			exchange.sendResponseHeaders(code.get(), body.length);
 			exchange.getResponseBody().write(body);
 			exchange.close();
-		});
+		};
+		server.createContext("/v1/systemone", handler);
+		server.createContext("/typesafe/v1/systemone", handler);
 		server.start();
 		http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
 		response.set(fixture("noul-valid"));
@@ -602,6 +604,211 @@ class JevJudgeTest {
 		var decoded = Checks.JSON.readValue(Checks.JSON.writeValueAsBytes(verdict), Verdict.class);
 		assertThat(decoded).isEqualTo(verdict);
 		assertThat(Verdicts.interpret(decoded).root().judgment().metadata()).isEqualTo(j.metadata());
+	}
+
+	URI gatewayEndpoint() {
+		return URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/typesafe/v1/systemone");
+	}
+
+	JevJudge gatewayJudge(JevQuestion q) {
+		return new JevJudge("fake-key", "typesafe-ai/jev", gatewayEndpoint(), Duration.ofSeconds(3), 16000, 32000, q,
+				http, this::capture);
+	}
+
+	ObjectNode gatewayResponse(String name) {
+		ObjectNode body = (ObjectNode) Checks.parse(fixture(name));
+		body.put("model", "typesafe-ai/jev");
+		var metadata = body.putObject("provider_metadata");
+		metadata.putObject("typesafe").putObject("confidence").put("q", .123);
+		var gateway = metadata.putObject("gateway");
+		gateway.putObject("routing").put("resolvedProvider", "typesafe-ai").put("finalProvider", "typesafe-ai");
+		gateway.put("generationId", "fake-generation").put("cost", "0").put("marketCost", "0.00001");
+		return body;
+	}
+
+	@Test
+	void gatewayRetainsNativeSupportAndRoutingWithoutInventingVersion() throws Exception {
+		ObjectNode body = gatewayResponse("choice-valid");
+		response.set(Checks.json(body));
+		Judgment j = gatewayJudge(choice()).judge(context());
+		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(j.certainty().value()).isEqualTo(.8);
+		assertThat(j.distribution().masses()).contains(new ProbabilityMass("violated", .9));
+		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
+		assertThat(providerMetadata(j)).isEqualTo(body.path("provider_metadata"));
+		assertThat(trace(j).path("underlyingModelVersion").asText()).isEqualTo("unknown");
+		assertThat(trace(j).path("endpoint").asText()).isEqualTo(gatewayEndpoint().toString());
+		assertThat(trace(j).path("route").asText()).isEqualTo("vercel-typesafe");
+		assertThat(Checks.parse(artifact(j, "configuration")).path("endpoint").asText())
+			.isEqualTo(gatewayEndpoint().toString());
+		assertThat(j.provenance().revision())
+			.contains("requested=typesafe-ai/jev", "reported=typesafe-ai/jev", "underlyingModelVersion=unknown")
+			.doesNotContain("jev-1.13.0");
+		assertThat(Checks.JSON.readValue(Checks.json(j), Judgment.class)).isEqualTo(j);
+		assertThat(calls).hasValue(1);
+	}
+
+	@Test
+	void gatewayOptionalMetadataStaysAbsent() {
+		ObjectNode body = gatewayResponse("choice-valid");
+		body.remove("provider_metadata");
+		response.set(Checks.json(body));
+		Judgment j = gatewayJudge(choice()).judge(context());
+		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(trace(j).has("providerMetadata")).isFalse();
+		assertThat(trace(j).path("underlyingModelVersion").asText()).isEqualTo("unknown");
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "confidence", "probabilities", "model", "usage" })
+	void gatewayMissingRequiredFactsRemainErrorsWithRawAbsence(String field) {
+		ObjectNode body = gatewayResponse("choice-valid");
+		if (field.equals("model") || field.equals("usage"))
+			body.remove(field);
+		else
+			((ObjectNode) body.path("answers").path("q")).remove(field);
+		response.set(Checks.json(body));
+		Judgment j = gatewayJudge(choice()).judge(context());
+		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(j.assessment()).isNull();
+		assertThat(j.certainty()).isNull();
+		assertThat(calls).hasValue(1);
+		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "score-valid", "score-missing-legend", "score-reversed-legend", "score-changed-legend" })
+	void gatewayScoreKeepsExistingLegendValidation(String fixture) {
+		response.set(Checks.json(gatewayResponse(fixture)));
+		Judgment j = gatewayJudge(score(true)).judge(context());
+		assertThat(j.status()).isEqualTo(fixture.equals("score-valid") ? JudgmentStatus.ABSTAIN : JudgmentStatus.ERROR);
+		assertThat(calls).hasValue(1);
+		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
+	}
+
+	@Test
+	void routeAndModelMustBePairedAndReportedAliasIsRouteBound() {
+		for (String[] pair : List.of(new String[] { "typesafe-ai/jev", endpoint().toString() },
+				new String[] { "jev-1.13.0", gatewayEndpoint().toString() },
+				new String[] { "typesafe-ai/jev", "https://api.typesafe.ai/v1/systemone" },
+				new String[] { "jev-1.13.0", "https://ai-gateway.vercel.sh/typesafe/v1/systemone" },
+				new String[] { "typesafe-ai/jev", "https://ai-gateway.vercel.sh/typesafe/v1/systemone?x=1" },
+				new String[] { "typesafe-ai/jev", "https://user@ai-gateway.vercel.sh/typesafe/v1/systemone" },
+				new String[] { "typesafe-ai/jev", "https://ai-gateway.vercel.sh/typesafe/v1/systemone#fragment" },
+				new String[] { "typesafe-ai/jev", "http://ai-gateway.vercel.sh/typesafe/v1/systemone" }, new String[] {
+						"typesafe-ai/jev", "https://ai-gateway.vercel.sh.evil.invalid/typesafe/v1/systemone" })) {
+			var judge = new JevJudge("fake-key", pair[0], URI.create(pair[1]), Duration.ofSeconds(1), 16000, 32000,
+					choice(), http, this::capture);
+			assertThat(judge.judge(context()).status()).isEqualTo(JudgmentStatus.ERROR);
+		}
+		assertThat(calls).hasValue(0);
+		response.set(Checks.json(gatewayResponse("choice-valid")));
+		assertThat(judge(choice()).judge(context()).status()).isEqualTo(JudgmentStatus.ERROR);
+		response.set(fixture("choice-valid"));
+		Judgment versioned = gatewayJudge(choice()).judge(context());
+		assertThat(versioned.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(trace(versioned).path("reportedModel").asText()).isEqualTo("jev-1.13.0");
+		assertThat(trace(versioned).path("underlyingModelVersion").asText()).isEqualTo("1.13.0");
+		assertThat(calls).hasValue(2);
+	}
+
+	@Test
+	void configurationDigestIncludesExactEndpoint() {
+		Judgment first = judge(NOUL).judge(context());
+		URI alternate = URI.create("http://localhost:" + server.getAddress().getPort() + "/v1/systemone");
+		Judgment second = new JevJudge("fake-key", "jev-1.13.0", alternate, Duration.ofSeconds(3), 16000, 32000, NOUL,
+				http, this::capture)
+			.judge(context());
+		assertThat(second.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(first.provenance().configurationDigest()).isNotEqualTo(second.provenance().configurationDigest());
+	}
+
+	@Test
+	void rejectedEndpointSecretsNeverEnterCapturedProvenance() {
+		for (String url : List.of("https://sentinel-secret@ai-gateway.vercel.sh/typesafe/v1/systemone",
+				"https://ai-gateway.vercel.sh/typesafe/v1/systemone?api_key=sentinel-secret")) {
+			Judgment j = new JevJudge("fake-key", "typesafe-ai/jev", URI.create(url), Duration.ofSeconds(1), 16000,
+					32000, choice(), http, this::capture)
+				.judge(context());
+			assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(trace(j).has("endpoint")).isFalse();
+			assertThat(trace(j).path("route").asText()).isEqualTo("unvalidated");
+			for (byte[] bytes : captured.values())
+				assertThat(new String(bytes, StandardCharsets.UTF_8)).doesNotContain("sentinel-secret");
+		}
+		assertThat(calls).hasValue(0);
+	}
+
+	@ParameterizedTest
+	@ValueSource(ints = { 0, 64000, 65000 })
+	void boundedMetadataNeverErasesValidAssessmentOrProvenance(int padding) throws Exception {
+		ObjectNode body = gatewayResponse("choice-valid");
+		((ObjectNode) body.path("provider_metadata")).put("padding", "x".repeat(padding));
+		response.set(Checks.json(body));
+		assertThat(response.get().length).isLessThanOrEqualTo(65536);
+		Judgment j = new JevJudge("fake-key", "typesafe-ai/jev", gatewayEndpoint(), Duration.ofSeconds(3), 24576, 65536,
+				choice(), http, this::capture)
+			.judge(context());
+		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(j.provenance()).isNotNull();
+		assertThat(j.assessment().category().selected()).isEqualTo("violated");
+		assertThat(j.certainty().value()).isEqualTo(.8);
+		assertThat(j.distribution().masses()).contains(new ProbabilityMass("violated", .9));
+		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
+		assertThat(calls).hasValue(1);
+		assertThat(Checks.JSON.readValue(Checks.json(j), Judgment.class)).isEqualTo(j);
+		for (byte[] artifact : captured.values())
+			assertThat(artifact.length).isLessThanOrEqualTo(65536);
+		assertThat(artifact(j, "trace").length).isLessThan(4096);
+		assertThat(providerMetadata(j)).isEqualTo(body.path("provider_metadata"));
+	}
+
+	JsonNode providerMetadata(Judgment judgment) throws Exception {
+		ArtifactRef metadata = Checks.JSON.treeToValue(trace(judgment).path("providerMetadata"), ArtifactRef.class);
+		assertThat(metadata.id()).isEqualTo(judgment.provenance().response().id());
+		assertThat(metadata.sha256()).isEqualTo(judgment.provenance().response().sha256());
+		assertThat(metadata.selector()).isEqualTo("/provider_metadata");
+		byte[] original = captured.get(metadata.id());
+		assertThat(ArtifactRef.ofBytes(metadata.id(), original, null).sha256()).isEqualTo(metadata.sha256());
+		return Checks.parse(original).at(metadata.selector());
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "confidence", "answers" })
+	void nearLimitInvalidAnswerKeepsExactDiagnosticResponseAndProvenance(String missing) throws Exception {
+		ObjectNode body = gatewayResponse("choice-valid");
+		((ObjectNode) body.path("provider_metadata")).put("padding", "x".repeat(65000));
+		if (missing.equals("answers"))
+			body.remove("answers");
+		else
+			((ObjectNode) body.at("/answers/q")).remove("confidence");
+		response.set(Checks.json(body));
+		assertThat(response.get().length).isLessThanOrEqualTo(65536);
+		Judgment j = new JevJudge("fake-key", "typesafe-ai/jev", gatewayEndpoint(), Duration.ofSeconds(3), 24576, 65536,
+				choice(), http, this::capture)
+			.judge(context());
+		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(j.provenance()).isNotNull();
+		assertThat(j.assessment()).isNull();
+		assertThat(j.certainty()).isNull();
+		assertThat(j.distribution()).isNull();
+		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
+		assertThat(providerMetadata(j)).isEqualTo(body.path("provider_metadata"));
+		assertThat(artifact(j, "trace").length).isLessThan(4096);
+		assertThat(Checks.JSON.readValue(Checks.json(j), Judgment.class)).isEqualTo(j);
+		assertThat(calls).hasValue(1);
+	}
+
+	@Test
+	void explicitNullProviderMetadataRetainsAResolvableReference() throws Exception {
+		ObjectNode body = gatewayResponse("choice-valid");
+		body.putNull("provider_metadata");
+		response.set(Checks.json(body));
+		Judgment j = gatewayJudge(choice()).judge(context());
+		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(trace(j).has("providerMetadata")).isTrue();
+		assertThat(providerMetadata(j).isNull()).isTrue();
+		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
 	}
 
 }

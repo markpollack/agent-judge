@@ -12,16 +12,17 @@ import org.jspecify.annotations.Nullable;
 
 record NativeResponse(String model, long inputTokens, long outputTokens, JudgmentStatus status, Assessment assessment,
 		@Nullable Certainty certainty, Distribution distribution) {
-	record Envelope(String model, long inputTokens, long outputTokens) {
+	record Envelope(String model, long inputTokens, long outputTokens, boolean providerMetadataPresent) {
 	}
 
-	static Envelope envelope(byte[] bytes) {
+	static Envelope envelope(byte[] bytes, boolean gateway) {
 		JsonNode root = Checks.parse(bytes);
 		String model = text(root.path("model"));
-		if (!model.matches("jev-[0-9]+\\.[0-9]+\\.[0-9]+"))
+		if (!(model.matches("jev-[0-9]+\\.[0-9]+\\.[0-9]+") || gateway && model.equals("typesafe-ai/jev")))
 			throw invalid();
 		JsonNode usage = root.path("usage");
-		return new Envelope(model, tokens(usage.path("input_tokens")), tokens(usage.path("output_tokens")));
+		return new Envelope(model, tokens(usage.path("input_tokens")), tokens(usage.path("output_tokens")),
+				root.has("provider_metadata"));
 	}
 
 	static NativeResponse read(byte[] bytes, JevQuestion question) {

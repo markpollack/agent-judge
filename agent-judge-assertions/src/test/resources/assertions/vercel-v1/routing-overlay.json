@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "conference-vercel-typesafe-route:v1",
+  "baseArtifacts": {
+    "configuration": {
+      "path": "assertions/v1/configuration.json",
+      "sha256": "da6ca48de15d03e1507549ebc5d00e99db6c0d5e521c1d374dcbbff42cb16794"
+    },
+    "bindings": {
+      "path": "assertions/v1/bindings.json",
+      "sha256": "bb18c2746924755c23a65d474da26eb9240adc105557aa154bb886e2ce4dcfa2"
+    },
+    "policy": {
+      "path": "assertions/v1/policy.json",
+      "sha256": "2734174c8e9752a5dae6886922a483a47fe7d69dca0ebafa123d4566fd20929b"
+    },
+    "binding-review": {
+      "path": "assertions/v1/binding-review.json",
+      "sha256": "bf16d68641a1aff3574756ec464c5db74e47480ae2d84a6c4b9fd43d38b88e88"
+    }
+  },
+  "endpoint": "https://ai-gateway.vercel.sh/typesafe/v1/systemone",
+  "requestedModel": "typesafe-ai/jev",
+  "credentialEnvironmentVariable": "AI_GATEWAY_API_KEY",
+  "underlyingModelVersion": "unknown",
+  "composedConfigurationSha256": "0c787292e2a5964b7e42a93836e6b6052cb659636c9eaa562b30bf1ac9a05748"
+}

@@ -219,4 +219,32 @@ class TransportTest {
 		}
 	}
 
+	@Test
+	void exactOfficialGatewayRouteReachesOnlyTheInjectedTransport() {
+		try (var http = new PendingHttp()) {
+			http.actual.completeExceptionally(new IOException("fake failure; no network"));
+			var evaluator = new JevJudge("fake-key", "typesafe-ai/jev",
+					URI.create("https://ai-gateway.vercel.sh/typesafe/v1/systemone"), Duration.ofSeconds(1), 16000,
+					32000, JevJudgeTest.choice(), http, TransportTest::capture);
+			assertThat(evaluator.judge(JevJudgeTest.context()).status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(http.calls).hasValue(1);
+		}
+	}
+
+	@Test
+	void gatewayRedirectsAreRejectedBeforeInjectedTransport() {
+		try (var http = new PendingHttp() {
+			@Override
+			public Redirect followRedirects() {
+				return Redirect.ALWAYS;
+			}
+		}) {
+			var evaluator = new JevJudge("fake-key", "typesafe-ai/jev",
+					URI.create("https://ai-gateway.vercel.sh/typesafe/v1/systemone"), Duration.ofSeconds(1), 16000,
+					32000, JevJudgeTest.choice(), http, TransportTest::capture);
+			assertThat(evaluator.judge(JevJudgeTest.context()).status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(http.calls).hasValue(0);
+		}
+	}
+
 }

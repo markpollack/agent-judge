@@ -13,8 +13,8 @@ import java.util.*;
  * Explicitly invoked two-request fixture runner, never a JUnit test. Normal builds cannot
  * call a provider. The caller must separately authorize exact evidence/configuration,
  * account, two calls, 30-second per-call deadline and spend before invoking this class.
- * It reads no environment variables or credential files and has no automatic live
- * fallback.
+ * Only its explicit Vercel entry reads AI_GATEWAY_API_KEY; it never reads credential
+ * files and has no automatic live fallback.
  */
 public final class ConferenceAssertionRun {
 
@@ -32,18 +32,24 @@ public final class ConferenceAssertionRun {
 	 * @throws Exception if setup or artifact retention fails
 	 */
 	public static List<AssertionResult> run(String apiKey, Path output) throws Exception {
+		return run(apiKey, output, false);
+	}
+
+	private static List<AssertionResult> run(String apiKey, Path output, boolean vercel) throws Exception {
 		Objects.requireNonNull(apiKey);
 		if (apiKey.isBlank())
 			throw new IllegalArgumentException("Explicit nonblank credential required");
-		var fixture = new ConferenceFixture();
+		var fixture = new ConferenceFixture(vercel);
 		var contexts = List.of(fixture.context(0), fixture.context(1));
 		Files.createDirectory(output);
+		fixture.saveRouting(output);
+		URI endpoint = URI
+			.create(vercel ? fixture.routing.path("endpoint").asText() : "https://api.typesafe.ai/v1/systemone");
 		List<AssertionResult> results = new ArrayList<>();
 		try (var http = HttpClient.newHttpClient()) {
 			for (int i = 0; i < 2; i++) {
 				Path caseOutput = output.resolve(i == 0 ? "rule-4" : "uc6-ac8");
-				var assertions = fixture.facade(
-						fixture.judge(apiKey, URI.create("https://api.typesafe.ai/v1/systemone"), http, caseOutput));
+				var assertions = fixture.facade(fixture.judge(apiKey, endpoint, http, caseOutput));
 				var result = assertions.evaluate(contexts.get(i), fixture.requirement(i));
 				ConferenceFixture.save(result, caseOutput, "LIVE explicitly invoked; inspect actual outcome");
 				String outcome = "PASSED";
@@ -61,11 +67,20 @@ public final class ConferenceAssertionRun {
 	}
 
 	/**
-	 * Explicit interactive entry; the credential is entered through a console prompt.
-	 * @param args exactly --live-two-calls and a new protected output directory
+	 * Explicit entry. Direct calls prompt for a credential; the opted-in Vercel command
+	 * reads AI_GATEWAY_API_KEY from the protected process environment.
+	 * @param args --live-two-calls or --live-two-calls-vercel-env and a new protected
+	 * output directory
 	 * @throws Exception when setup or the run fails
 	 */
 	public static void main(String[] args) throws Exception {
+		if (args.length == 2 && args[0].equals("--live-two-calls-vercel-env")) {
+			String key = System.getenv("AI_GATEWAY_API_KEY");
+			if (key == null || key.isBlank())
+				throw new IllegalStateException("AI_GATEWAY_API_KEY must be supplied explicitly");
+			run(key, Path.of(args[1]), true);
+			return;
+		}
 		if (args.length != 2 || !args[0].equals("--live-two-calls"))
 			throw new IllegalArgumentException("Explicit --live-two-calls OUTPUT required; no normal-build execution");
 		var console = System.console();

@@ -1,0 +1,36 @@
+{
+  "id": "conference-vercel-routing-review:v1",
+  "author": "routing-fixture-author",
+  "reviewer": "independent-routing-reviewer",
+  "approved": true,
+  "overlaySha256": "69fce238d5b0ad3bb62a0f8350aca3d4fabce2f5293f4ed9b5f5415139160a14",
+  "composedConfigurationSha256": "0c787292e2a5964b7e42a93836e6b6052cb659636c9eaa562b30bf1ac9a05748",
+  "baseArtifacts": {
+    "configuration": {
+      "path": "assertions/v1/configuration.json",
+      "sha256": "da6ca48de15d03e1507549ebc5d00e99db6c0d5e521c1d374dcbbff42cb16794"
+    },
+    "bindings": {
+      "path": "assertions/v1/bindings.json",
+      "sha256": "bb18c2746924755c23a65d474da26eb9240adc105557aa154bb886e2ce4dcfa2"
+    },
+    "policy": {
+      "path": "assertions/v1/policy.json",
+      "sha256": "2734174c8e9752a5dae6886922a483a47fe7d69dca0ebafa123d4566fd20929b"
+    },
+    "binding-review": {
+      "path": "assertions/v1/binding-review.json",
+      "sha256": "bf16d68641a1aff3574756ec464c5db74e47480ae2d84a6c4b9fd43d38b88e88"
+    }
+  },
+  "review": [
+    "All four original artifacts remain byte-identical, including the prior independent binding review. Its requirement/evidence/sufficiency scope and limits continue to apply.",
+    "The composed configuration differs only in requestedModel; exact question instructions, criteria, label meanings, projection, deadline, attempt/evidence/body bounds and policy remain unchanged.",
+    "The exact TypeSafe-compatible Vercel endpoint and typesafe-ai/jev pair is an explicit route exception. The alias does not identify an underlying Jev model revision; observed returned identity must be retained and absence represented without invention.",
+    "Gateway routing, usage and cost are provenance; they neither alter assessment/support semantics nor certify calibration or a preferred primitive."
+  ],
+  "limits": [
+    "Configuration review is not authorization for live conference requests.",
+    "The existing conditional source-level evidence scope is unchanged; no fresh subject execution or whole-system proof is implied."
+  ]
+}

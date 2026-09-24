@@ -31,13 +31,19 @@ final class ConferenceFixture {
 
 	final JsonNode policy;
 
+	final JsonNode routing;
+
 	final PolicyBinding binding;
 
 	final JevQuestion.Choice question;
 
 	ConferenceFixture() throws Exception {
+		this(false);
+	}
+
+	ConferenceFixture(boolean vercel) throws Exception {
 		bindings = JSON.readTree(resource("assertions/v1/bindings.json"));
-		configuration = JSON.readTree(resource("assertions/v1/configuration.json"));
+		var originalConfiguration = JSON.readTree(resource("assertions/v1/configuration.json"));
 		policy = JSON.readTree(resource("assertions/v1/policy.json"));
 		byte[] reviewBytes = resource("assertions/v1/binding-review.json");
 		if (!sha(reviewBytes).equals("bf16d68641a1aff3574756ec464c5db74e47480ae2d84a6c4b9fd43d38b88e88"))
@@ -46,6 +52,15 @@ final class ConferenceFixture {
 		for (String name : List.of("bindings", "configuration", "policy"))
 			if (!sha(resource("assertions/v1/" + name + ".json")).equals(review.path(name + "Sha256").asText()))
 				throw new IllegalStateException("Stale review: " + name);
+		routing = vercel ? reviewedRouting() : null;
+		configuration = originalConfiguration.deepCopy();
+		if (routing != null) {
+			((com.fasterxml.jackson.databind.node.ObjectNode) configuration).put("requestedModel",
+					routing.path("requestedModel").asText());
+			if (!sha(JSON.writeValueAsBytes(configuration))
+				.equals(routing.path("composedConfigurationSha256").asText()))
+				throw new IllegalStateException("Changed composed configuration");
+		}
 		binding = new PolicyBinding(
 				new PolicyRef(policy.path("id").asText(), policy.path("revision").asText(),
 						sha(resource("assertions/v1/policy.json"))),
@@ -59,6 +74,33 @@ final class ConferenceFixture {
 			.forEachRemaining(e -> meanings.put(e.getKey(), JevQuestion.Meaning.valueOf(e.getValue().asText())));
 		question = new JevQuestion.Choice(configuration.path("instructions").asText(),
 				configuration.path("projectionId").asText(), criteria, meanings);
+	}
+
+	private static JsonNode reviewedRouting() throws Exception {
+		byte[] bytes = resource("assertions/vercel-v1/routing-overlay.json");
+		byte[] reviewBytes = resource("assertions/vercel-v1/routing-review.json");
+		if (!sha(reviewBytes).equals("3191dcb8804eaa90e13dfa7f1d96e52bc12e57ffc430e9fab4b9b0c2dcfdb44e"))
+			throw new IllegalStateException("Unreviewed provider routing");
+		var review = JSON.readTree(reviewBytes);
+		var overlay = JSON.readTree(bytes);
+		if (!review.path("approved").asBoolean() || !sha(bytes).equals(review.path("overlaySha256").asText())
+				|| !overlay.path("composedConfigurationSha256").equals(review.path("composedConfigurationSha256")))
+			throw new IllegalStateException("Stale routing review");
+		for (String name : List.of("configuration", "bindings", "policy", "binding-review")) {
+			var ref = overlay.path("baseArtifacts").path(name);
+			if (!ref.path("path").asText().equals("assertions/v1/" + name + ".json")
+					|| !sha(resource(ref.path("path").asText())).equals(ref.path("sha256").asText()))
+				throw new IllegalStateException("Changed base artifact: " + name);
+		}
+		return overlay;
+	}
+
+	void saveRouting(Path output) throws Exception {
+		if (routing == null)
+			return;
+		Files.write(output.resolve("routing-overlay.json"), resource("assertions/vercel-v1/routing-overlay.json"));
+		Files.write(output.resolve("routing-review.json"), resource("assertions/vercel-v1/routing-review.json"));
+		Files.write(output.resolve("composed-configuration.json"), JSON.writeValueAsBytes(configuration));
 	}
 
 	Requirement requirement(int index) {
