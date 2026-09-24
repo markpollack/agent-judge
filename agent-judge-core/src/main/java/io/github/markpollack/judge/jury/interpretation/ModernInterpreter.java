@@ -15,6 +15,9 @@ import java.util.Set;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import org.jspecify.annotations.Nullable;
 
 import io.github.markpollack.judge.jury.*;
@@ -27,6 +30,11 @@ final class ModernInterpreter {
 
 	private static final JsonMapper MAPPER = JsonMapper.builder()
 		.disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
+		// Jackson treats scalar-to-String conversion separately from scalar coercion.
+		.withCoercionConfig(LogicalType.Textual, config -> config
+			.setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail)
+			.setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
+			.setCoercion(CoercionInputShape.Float, CoercionAction.Fail))
 		.disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
 		.enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
 		.enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)

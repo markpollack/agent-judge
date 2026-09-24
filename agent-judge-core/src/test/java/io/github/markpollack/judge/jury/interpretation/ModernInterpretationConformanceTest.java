@@ -12,9 +12,15 @@ import java.util.Map;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.Arguments;
+import java.util.stream.Stream;
 
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.context.JudgmentContext;
@@ -233,6 +239,63 @@ class ModernInterpretationConformanceTest {
 			child.remove("schemaVersion");
 			unsupported(map);
 		}
+	}
+
+	static Stream<Arguments> textualTokens() {
+		return Stream.of("/reasoning", "/assessment/category/selected", "/assessment/category/alternatives/0",
+				"/assessment/numeric/scaleId", "/assessment/numeric/levels/0", "/certainty/metricId",
+				"/distribution/domainId", "/distribution/masses/0/alternative", "/provenance/instrumentId",
+				"/provenance/revision", "/provenance/evidence/0/id", "/provenance/evidence/0/selector",
+				"/provenance/calibrationClaims/0/issuer", "/provenance/calibrationClaims/0/statement",
+				"/provenance/calibrationClaims/0/signalIds/0", "/policyApplication/policy/id",
+				"/policyApplication/policy/revision", "/policyApplication/reason", "/checks/0/id",
+				"/checks/0/judgment/reasoning")
+			.flatMap(path -> Stream.of(true, 123, 1.25).map(value -> Arguments.of(path, value)));
+	}
+
+	@ParameterizedTest
+	@MethodSource("textualTokens")
+	void modernTextRequiresTextTokensAcrossNestedValues(String path, Object token) {
+		JsonNode original = JSON.valueToTree(Verdict.single("seat", rich(AcceptanceAction.USE_ASSESSMENT)));
+		String text = original.at("/aggregated" + path).textValue();
+		assertThat(text).as(path).isNotNull();
+		// Change every redundant copy and matching domain member together: otherwise an
+		// identity/domain mismatch could hide the scalar-to-text coercion being tested.
+		JsonNode control = replaceText(original.deepCopy(), text, JSON.valueToTree(token.toString()));
+		assertThat(Verdicts.interpret(wire(control)).readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
+		JsonNode malformed = replaceText(original.deepCopy(), text, JSON.valueToTree(token));
+		unsupported(wire(malformed));
+	}
+
+	static JsonNode replaceText(JsonNode value, String text, JsonNode replacement) {
+		if (value.isTextual() && value.textValue().equals(text))
+			return replacement;
+		if (value instanceof ObjectNode object) {
+			List<String> names = new ArrayList<>();
+			object.fieldNames().forEachRemaining(names::add);
+			for (String name : names)
+				object.set(name, replaceText(object.get(name), text, replacement));
+		}
+		else if (value instanceof ArrayNode array) {
+			for (int index = 0; index < array.size(); index++)
+				array.set(index, replaceText(array.get(index), text, replacement));
+		}
+		return value;
+	}
+
+	@ParameterizedTest
+	@MethodSource("scalarTokens")
+	void scalarCategoryAndReasoningCannotBecomeAccepted(Object token) {
+		Judgment j = new Judgment(JudgmentStatus.PASS, new Assessment(null, null,
+				new Category(token.toString(), List.of(token.toString(), "other"))), null, null, null,
+				token.toString(), List.of(), null, null, Map.of("opaque", token));
+		JsonNode original = JSON.valueToTree(Verdict.single("seat", j));
+		assertThat(Verdicts.interpret(wire(original)).reading()).isEqualTo(VerdictReading.ACCEPTED);
+		unsupported(wire(replaceText(original, token.toString(), JSON.valueToTree(token))));
+	}
+
+	static Stream<Object> scalarTokens() {
+		return Stream.of(true, 123, 1.25);
 	}
 
 	@Test

@@ -42,9 +42,12 @@ primitive and explicit use-assessment policy are provisional demonstration confi
 `ConferenceAssertionRun` is a test-source command-line harness, never a normal JUnit test. After
 separate approval of evidence/configuration, account, two calls, timeout and spend, build the test
 classpath and explicitly invoke its `main` with `--live-two-calls NEW_PROTECTED_OUTPUT_DIRECTORY`.
-It requires an interactive credential prompt; programmatic callers may explicitly supply the key to
-`run`. No environment variable or credential file enables it. Each of the two reviewed cases gets
-at most one request to the official endpoint, with the frozen pinned model and 30-second SDK HTTP
-deadline, no retries. Both actual outcomes and exact requests, native responses and result artifacts
+That direct-route entry requires an interactive credential prompt; programmatic callers may
+explicitly supply the key to `run`. The separate explicit
+`--live-two-calls-vercel-env NEW_PROTECTED_OUTPUT_DIRECTORY` entry reads `AI_GATEWAY_API_KEY`
+and uses the reviewed Vercel endpoint/model alias. Setting the variable alone does not run the
+harness; no credential file is read. Each of the two reviewed cases gets at most one request
+to the selected endpoint, with its frozen model configuration and 30-second SDK HTTP deadline,
+no retries. Both actual outcomes and exact requests, native responses and result artifacts
 are retained. Artifact storage must complete promptly; the SDK deadline is not an end-to-end storage
 budget, and cancellation does not prove a server did not process or bill a request.

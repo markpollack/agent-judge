@@ -100,8 +100,9 @@ unique `signalIds`, and nonempty `sources` with unique artifact IDs. Required st
 are nonblank. Claims are provider declarations, not empirical certification by the
 library. An empty list means no retained declaration, not proof of miscalibration.
 
-Metadata is incidental portable information. Keys are nonblank strings; values are
-strings, booleans, finite numbers, interoperable integers within ±(2^53−1), arrays
+Metadata is incidental portable information. Keys are strings (including empty or
+whitespace-only strings); values are strings, booleans, finite numbers, interoperable
+integers within ±(2^53−1), arrays
 and string-keyed objects, recursively. Nulls and runtime objects are not metadata
 values. Collections are copied and recursively immutable. The reserved `aggregation`
 block records a reduction's strategy/population/policies; it is not an authenticity

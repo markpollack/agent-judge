@@ -1,11 +1,14 @@
 # Jev adapter
 
-`JevJudge` implements the ordinary `Judge` contract with TypeSafe's direct System One API,
+`JevJudge` implements the ordinary `Judge` contract with TypeSafe's System One API,
 using `io.github.gudcks0305:jev-typesafe:0.2.0`. It has no Spring or generative-model runtime.
-The caller supplies a pinned model, credential, HTTP client, explicit question/projection,
+The caller supplies a model, credential, HTTP client, explicit question/projection,
 deadline, byte bounds and a protected `ArtifactCapture`. The HTTP client must disable
-redirects and remains caller-owned. The official endpoint is
-`https://api.typesafe.ai/v1/systemone`; HTTP loopback endpoints are allowed for tests.
+redirects and remains caller-owned. The direct endpoint
+`https://api.typesafe.ai/v1/systemone` requires a pinned `jev-MAJOR.MINOR.PATCH` model.
+The exact Vercel endpoint `https://ai-gateway.vercel.sh/typesafe/v1/systemone` instead
+requires `typesafe-ai/jev`; an alias response leaves the underlying version unknown.
+HTTP loopback endpoints with the corresponding paths are allowed for tests.
 No environment credentials are read.
 
 The adapter sends exactly `context.goal()` as `state.requirement` and the text from a
@@ -33,7 +36,7 @@ All native signal identities have `:v1` versions. The result's first-class asses
 certainty, distribution and source-backed `CalibrationClaim` pass through ordinary Jury
 and authoritative Interpretation. The TypeSafe claim is a provider declaration, not local
 empirical calibration. Requested/reported versions remain distinct in provenance revision
-(`jev-adapter:1;jev-java:0.2.0;requested=...;reported=...`) and the protected trace.
+(`jev-adapter:2;jev-java:0.2.0;requested=...;reported=...;route=...;underlyingModelVersion=...`) and the protected trace.
 The exact native response and serialized configuration are retained through artifact refs.
 
 There is exactly one SDK HTTP attempt (`maxRetries(0)`). The SDK owns its request deadline;
@@ -52,8 +55,16 @@ result diagnostics use fixed safe messages. Intended request bytes do not certif
 transmission; connection failure or cancellation may prevent it. Response headers and request
 IDs may be absent when the response did not complete. Capture failure is instrument ERROR. The trace
 records request/response refs, requested/reported model, optional request ID, attempt count,
-HTTP status (zero means no response), elapsed nanoseconds and cancellation. Configuration,
-requirement, request and trace refs accompany bundle/manifest refs in provenance evidence;
+HTTP status (zero means no response), elapsed nanoseconds and cancellation. If these facts
+would exceed the artifact byte bound, `requestedModel`, `reportedModel`,
+`underlyingModelVersion` and `requestId` (when present) instead hold `ArtifactRef` objects.
+Each uses the artifact kind `diagnostic-FIELD`, refers to exact UTF-8 string bytes
+with no selector, and also appears in
+provenance evidence. Ordinary traces retain inline strings. No field is truncated and
+each referenced artifact remains subject to the same byte bound. Native provider metadata,
+when present, is referenced by the response artifact with selector `/provider_metadata`.
+Configuration, requirement, request and trace refs accompany bundle/manifest refs in
+provenance evidence;
 the native response has its dedicated provenance response ref. Request-level token usage
 appears once on the judgment under `metadata.usage` (`inputTokens`, `outputTokens`) and in
 the protected trace; known valid usage is retained even when an assessment is malformed.

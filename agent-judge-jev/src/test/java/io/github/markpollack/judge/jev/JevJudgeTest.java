@@ -44,6 +44,8 @@ class JevJudgeTest {
 
 	AtomicReference<byte[]> response = new AtomicReference<>();
 
+	AtomicReference<String> requestId = new AtomicReference<>();
+
 	AtomicInteger code = new AtomicInteger(200), calls = new AtomicInteger();
 
 	ConcurrentMap<String, byte[]> captured = new ConcurrentHashMap<>();
@@ -59,7 +61,8 @@ class JevJudgeTest {
 			int call = calls.incrementAndGet();
 			byte[] request = exchange.getRequestBody().readAllBytes();
 			requests.put("request-" + call, request);
-			exchange.getResponseHeaders().add("x-typesafe-request-id", "request-" + call);
+			exchange.getResponseHeaders().add("x-typesafe-request-id",
+					requestId.get() == null ? "request-" + call : requestId.get());
 			byte[] body = response.get();
 			exchange.sendResponseHeaders(code.get(), body.length);
 			exchange.getResponseBody().write(body);
@@ -247,6 +250,55 @@ class JevJudgeTest {
 
 	JsonNode trace(Judgment j) {
 		return Checks.parse(artifact(j, "trace"));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "model", "requestId", "both" })
+	void boundedNativeAnswersSurviveLargeDiagnosticStrings(String field) throws Exception {
+		ObjectNode body = (ObjectNode) Checks.parse(fixture("noul-valid"));
+		String reportedModel = field.equals("requestId") ? "jev-1.13.1" : "jev-" + "1".repeat(33000) + ".1.0";
+		String id = field.equals("model") ? "request-1" : "r".repeat(65000);
+		body.put("model", reportedModel);
+		requestId.set(id);
+		response.set(Checks.json(body));
+		assertThat(response.get().length).isLessThanOrEqualTo(65536);
+		Judgment j = new JevJudge("fake-key", "jev-1.13.0", endpoint(), Duration.ofSeconds(3), 24576, 65536,
+				NOUL, http, this::capture).judge(context());
+		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(j.provenance()).isNotNull();
+		assertThat(j.assessment().proposition().value()).isFalse();
+		assertThat(j.distribution().masses()).containsExactly(new ProbabilityMass("false", 0.95),
+				new ProbabilityMass("true", 0.05));
+		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
+		assertThat(diagnosticText(j, "reportedModel")).isEqualTo(reportedModel);
+		assertThat(diagnosticText(j, "underlyingModelVersion")).isEqualTo(reportedModel.substring(4));
+		assertThat(diagnosticText(j, "requestId")).isEqualTo(id);
+		assertThat(diagnosticText(j, "requestedModel")).isEqualTo("jev-1.13.0");
+		assertThat(captured.values()).allSatisfy(bytes -> assertThat(bytes.length).isLessThanOrEqualTo(65536));
+		PolicyRef policy = new PolicyRef("use", "1", MANIFEST.sha256());
+		Judgment applied = Policies.apply(j, policy,
+				input -> new Acceptance(AcceptanceAction.USE_ASSESSMENT, "Use retained assessment"));
+		var verdict = io.github.markpollack.judge.jury.SimpleJury.builder().judge(context -> applied)
+			.votingStrategy(new io.github.markpollack.judge.jury.AverageVotingStrategy()).build()
+			.vote(context());
+		assertThat(verdict.aggregated()).isEqualTo(applied);
+		assertThat(applied.provenance()).isEqualTo(j.provenance());
+		assertThat(applied.assessment()).isEqualTo(j.assessment());
+		assertThat(io.github.markpollack.judge.jury.interpretation.Verdicts.interpret(verdict).reading())
+			.isEqualTo(io.github.markpollack.judge.jury.interpretation.VerdictReading.REJECTED);
+		assertThat(calls).hasValue(1);
+	}
+
+	String diagnosticText(Judgment judgment, String field) throws Exception {
+		JsonNode value = trace(judgment).path(field);
+		if (value.isTextual())
+			return value.textValue();
+		ArtifactRef ref = Checks.JSON.treeToValue(value, ArtifactRef.class);
+		assertThat(judgment.provenance().evidence()).contains(ref);
+		assertThat(ref.selector()).isNull();
+		byte[] bytes = captured.get(ref.id());
+		assertThat(ArtifactRef.ofBytes(ref.id(), bytes, null).sha256()).isEqualTo(ref.sha256());
+		return new String(bytes, StandardCharsets.UTF_8);
 	}
 
 	@Test

@@ -194,7 +194,20 @@ public final class JevJudge implements Judge {
 			String underlyingModelVersion = envelope == null || envelope.model().equals("typesafe-ai/jev") ? "unknown"
 					: envelope.model().substring(4);
 			facts.put("underlyingModelVersion", underlyingModelVersion);
-			refs.add(retain("trace", Checks.json(facts)));
+			byte[] traceBytes = Checks.json(facts);
+			if (traceBytes.length > maxBodyBytes) {
+				// Native strings may individually fit while their diagnostic copies do
+				// not. Preserve exact UTF-8 bytes through bounded references instead.
+				for (String field : List.of("requestedModel", "reportedModel", "underlyingModelVersion", "requestId")) {
+					if (facts.get(field) instanceof String text) {
+						ArtifactRef ref = retain("diagnostic-" + field, text.getBytes(StandardCharsets.UTF_8));
+						refs.add(ref);
+						facts.put(field, ref);
+					}
+				}
+				traceBytes = Checks.json(facts);
+			}
+			refs.add(retain("trace", traceBytes));
 			String revision = "jev-adapter:2;jev-java:0.2.0;requested=" + model
 					+ (envelope == null ? "" : ";reported=" + envelope.model()) + ";route=" + route
 					+ ";underlyingModelVersion=" + underlyingModelVersion;
