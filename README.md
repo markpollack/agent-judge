@@ -1,124 +1,111 @@
 # Agent Judge
 
-Agent Judge is the portable verification layer for JVM agent systems.
-It evaluates agent output and workspace evidence with the same judges, juries, and policies whether the result came from Spring AI, LangChain4j, Koog, AgentClient, or a custom runtime.
+Agent Judge is a Java library for verifying what an AI agent did: judges check executable evidence against a goal, and juries combine their judgments into a verdict.
+It is for teams building JVM agents, and it works the same whether the result came from Spring AI, LangChain4j, Koog, AgentClient or a custom runtime.
 
 Judges answer one question: did this execution satisfy its goal, and what evidence supports that conclusion?
-
-## Research foundations
-
-Agent Judge evaluates whether work satisfies an explicit definition of done, using executable evidence and independent checks—not whether it resembles one reference answer.
-
-[Read the research foundations](https://lab.pollack.ai/docs/agent-judge/research-foundations) for the motivating migration experiment, five design principles, their current implementation in Agent Judge, and the complete source map.
-
-## Result model
-
-Every `Judgment` records a required outcome—`PASS`, `FAIL`, `ABSTAIN`, `NOT_APPLICABLE`, or `ERROR`—plus an optional normalized score, an optional classification label, and an optional countable reason code.
-These are independent facts: an abstention is not a failing vote, an error is not a negative finding, and a status-only pass does not manufacture a stored score.
-
-The difference between the last three outcomes is what a denominator does with them.
-`ABSTAIN` means the question applied and has no answer yet; `NOT_APPLICABLE` means the question should not have been asked, so the criterion is excluded from the denominator and counted separately; `ERROR` means the instrument never reached a finding.
-A judge may only exclude a subject where it declared in advance that it can—an undeclared exclusion is contained as an error rather than honoured.
-
-Every `ERROR` carries a `JudgmentReasonCode`, because an instrument failure nobody can count is a failure nobody fixes.
-A failure the library's own machinery produced is never converted into a rejection of the subject, under any error policy.
-
-Result metadata is recursively immutable and restricted to ordinary JSON-compatible values.
-Token usage preserves independently reported input, output, reasoning, cache-creation, cache-read, and total quantities; pricing is a downstream derivation.
-
-A `Verdict` records where each judgment sat (`seats`) and what produced its aggregate (`decision`), so a stored composite result can be read correctly without knowing how the jury was built.
-Composite juries return complete ordered execution evidence in `Verdict.compositeAttempts()`.
-Each named attempt says whether its parent could use what the stage returned, and contains exactly one returned child verdict or one stable code-only failure, so
-callers can distinguish a negative finding from a stage that did not execute successfully—even when a later stage succeeds.
-`CompositePaths.flatten(verdict)` derives deterministic RFC 6901 paths across nested meta-juries and
-cascades without placing paths or runtime exceptions in the wire result.
-
-## Modules
-
-| Module | Responsibility |
-|---|---|
-| `agent-judge-core` | `JudgmentContext`, `Judgment`, judges, juries, verdicts, and voting strategies |
-| `agent-judge-ai-core` | Framework-neutral prompt, model, and classifier infrastructure for AI-backed judges |
-| `agent-judge-exec` | Command, build, class-version, and coverage judges |
-| `agent-judge-file` | Java, Maven, XML, and text semantic comparison |
-| `agent-judge-llm` | Spring AI-backed semantic judging |
-| `agent-judge-rag` | Faithfulness, contextual relevance, and hallucination judges |
-| `agent-judge-spring-ai` | Evaluated-side `ChatResponse` bridge |
-| `agent-judge-langchain4j` | Evaluated-side `Result<T>` bridge |
-| `agent-judge-koog` | Evaluated-side Koog `AIAgent` bridge |
-| `agent-judge-agent-client` | Evaluated-side AgentClient bridge and AgentClient judging backend |
-
-`agent-judge-core` is framework-neutral, not dependency-free.
-It uses Jackson Databind, SLF4J API, and compile-scope JSpecify annotations; no core dependency is an agent framework, model provider, dependency-injection container, or hosted evaluation service.
+They check an explicit definition of done with executable evidence and independent checks, not resemblance to one reference answer.
+The [research foundations](https://lab.pollack.ai/docs/agent-judge/research-foundations) explain why.
 
 ## Install
+
+Requires Java 21.
 
 ```xml
 <dependency>
     <groupId>io.github.markpollack</groupId>
     <artifactId>agent-judge-core</artifactId>
-    <version>0.14.0</version>
+    <version>0.17.0</version>
 </dependency>
 ```
 
-Add only the judge-family and runtime-bridge modules your application needs.
-All published modules use the same version.
+Add only the judge-family and runtime-bridge modules you need; all modules share one version.
+The `io.github.markpollack:agentworks-bom` also manages it.
 
 ## Quick start
 
-This example is maintained as compiled source in [Tutorial module 04](https://github.com/markpollack/agent-judge-tutorial/blob/main/module-04-simple-jury/src/main/java/io/github/markpollack/judge/tutorial/module04/SimpleJuryDemo.java):
+A deterministic judge and a scored judge, both required, so the jury is conjunctive:
 
 ```java
-Path workspace = Path.of("test-workspace");
-String controllerPath = "src/main/java/com/example/HelloController.java";
-
 JudgmentContext context = JudgmentContext.builder()
     .goal("Add a HelloController class")
-    .workspace(workspace)
+    .workspace(Path.of("my-project"))
     .status(ExecutionStatus.SUCCESS)
     .startedAt(Instant.now())
     .executionTime(Duration.ofSeconds(5))
     .build();
 
-Judge fileExists = Judges.named(
-    new FileExistsJudge(controllerPath),
-    "file-exists", "Controller file created");
+// A deterministic judge checks evidence in the workspace.
+Judge controllerExists = Judges.named(
+    new FileExistsJudge("src/main/java/com/example/HelloController.java"),
+    "controller-exists", "Controller file created");
 
-Judge hasMethod = Judges.named(
-    new FileContentJudge(controllerPath, "hello",
-        FileContentJudge.MatchMode.CONTAINS),
-    "has-method", "Contains hello method");
+// A scored judge states its pass mark; the score is kept beside the outcome.
+Judge coverage = Judges.named(
+    ctx -> Judgment.scored(0.82).passingAt(0.80).reasoning("82% line coverage").build(),
+    "coverage", "Line coverage at least 80%");
 
-Judge hasPom = Judges.named(
-    new FileExistsJudge("pom.xml"),
-    "has-pom", "Maven project file exists");
-
-SimpleJury majorityJury = SimpleJury.builder()
-    .judge(fileExists, 1.0)
-    .judge(hasMethod, 1.0)
-    .judge(hasPom, 1.0)
-    .votingStrategy(new MajorityVotingStrategy())
-    .parallel(true)
+SimpleJury jury = SimpleJury.builder()
+    .judge(controllerExists)
+    .judge(coverage)
+    .votingStrategy(new AllMustPassStrategy())
     .build();
 
-Verdict majorityVerdict = majorityJury.vote(context);
-
-System.out.println("Overall: " + majorityVerdict.aggregated().status());
+Verdict verdict = jury.vote(context);
+System.out.println("Overall: " + verdict.aggregated().status());
+verdict.individualByName().forEach((name, judgment) ->
+    System.out.println(name + ": " + judgment.status() + " score=" + judgment.score()));
 ```
 
-## Executable examples and documentation
+Voting strategies such as `MajorityVotingStrategy` and `ConsensusStrategy` are for several independent estimates of the same property.
+[Tutorial module 08](https://github.com/markpollack/agent-judge-tutorial/blob/main/module-08-jury/src/main/java/io/github/markpollack/judge/tutorial/module08/JuryDemo.java) shows when to use them.
 
-The [Agent Judge Tutorial](https://github.com/markpollack/agent-judge-tutorial) is the canonical executable sample repository.
-Its ten credential-free Maven modules cover core judging, composition, juries, custom judges, model-backed judges, Koog, and LangChain4j.
+## Result model
 
-The narrative guides—writing judges, describing juries, the normalized-`Judgment` handoff, and the migration guides—live on the documentation site.
-This repository keeps the code, the API Javadoc, and the release notes.
+Every `Judgment` records a required outcome, which is `PASS`, `FAIL`, `ABSTAIN`, `NOT_APPLICABLE` or `ERROR`.
+It can also carry a normalized score, a classification label and a countable reason code.
+These are independent facts. An abstention is not a failing vote, an error is not a negative finding, and a status-only pass stores no score.
 
-- [Getting started](https://lab.pollack.ai/docs/agent-judge/getting-started)
-- [Documentation](https://lab.pollack.ai/docs/agent-judge)
-- [Tutorial source](https://github.com/markpollack/agent-judge-tutorial)
-- [0.17 release notes](RELEASE_NOTES_0.17.0.md)
-- [0.16 release notes](RELEASE_NOTES_0.16.0.md)
+`ABSTAIN` means the question applied and has no answer yet.
+`NOT_APPLICABLE` means the question should not have been asked, so the criterion is excluded from the denominator and counted separately.
+`ERROR` means the instrument never reached a finding, and it always carries a `JudgmentReasonCode`.
+A failure of the library's own machinery is never turned into a rejection of the subject, under any error policy.
+
+A `Verdict` records where each judgment sat and what produced the aggregate, so a stored result can be read without knowing how the jury was built.
+[Interpreting verdicts](https://lab.pollack.ai/docs/agent-judge/interpreting-verdicts) covers seats, decisions and composite juries.
+
+## Modules
+
+| Module | Responsibility |
+|---|---|
+| `agent-judge-core` | `JudgmentContext`, `Judgment`, judges, juries, verdicts and voting strategies |
+| `agent-judge-ai-core` | Framework-neutral prompt, model and classifier support for AI-backed judges |
+| `agent-judge-exec` | Command, build, class-version and coverage judges |
+| `agent-judge-file` | Java, Maven, XML and text semantic comparison |
+| `agent-judge-llm` | Spring AI-backed semantic judges |
+| `agent-judge-rag` | Faithfulness, contextual-relevance and hallucination judges |
+| `agent-judge-spring-ai` | Evaluated-side `ChatResponse` bridge |
+| `agent-judge-langchain4j` | Evaluated-side `Result<T>` bridge |
+| `agent-judge-koog` | Evaluated-side Koog `AIAgent` bridge |
+| `agent-judge-agent-client` | Evaluated-side AgentClient bridge and AgentClient judging backend |
+
+`agent-judge-core` depends only on Jackson Databind, the SLF4J API and JSpecify annotations.
+It pulls in no agent framework, model provider, dependency-injection container or hosted evaluation service.
+
+## Documentation
+
+- [Documentation](https://lab.pollack.ai/docs/agent-judge), starting with [Getting started](https://lab.pollack.ai/docs/agent-judge/getting-started)
+- [Agent Judge Tutorial](https://github.com/markpollack/agent-judge-tutorial): credential-free, runnable Maven modules
+- [Releases](https://github.com/markpollack/agent-judge/releases) and the [0.17.0 release notes](RELEASE_NOTES_0.17.0.md)
+- API Javadoc ships with each release on Maven Central
+
+## Building from source
+
+```bash
+./mvnw clean verify
+```
+
+[AGENTS.md](AGENTS.md) lists the other build profiles and the project's hard rules.
 
 ## License
 
