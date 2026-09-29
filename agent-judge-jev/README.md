@@ -70,6 +70,29 @@ appears once on the judgment under `metadata.usage` (`inputTokens`, `outputToken
 the protected trace; known valid usage is retained even when an assessment is malformed.
 Absent/untrusted usage is omitted, never fabricated as zero. No pricing is computed.
 
+For the Vercel route, valid `/provider_metadata/gateway/cost` is also exposed in
+`metadata.usage` as `cost` (a finite nonnegative `Double`), `currency: "USD"`, and
+`costSource: "vercel-gateway-reported:v1:/provider_metadata/gateway/cost"`.
+The protected trace's `usage` object carries those same three fields alongside its
+existing `input_tokens` and `output_tokens` fields. This is the gateway's reported
+request charge, not a price derived from tokens; no `priceRuleId` is invented.
+See the [gateway response format](https://vercel.com/docs/ai-gateway/sdks-and-apis/typesafe).
+
+Numeric values and decimal strings are accepted, including an explicit zero.
+Missing, null, negative, malformed or out-of-range costs remain absent; they do not
+invalidate an otherwise valid assessment. A nonzero value that would underflow to
+zero as a `Double` is also omitted. The exact decimal remains available in the
+protected response bytes; the metadata value is a floating-point projection.
+`marketCost` and other pricing fields are not substitutes for `cost`. Direct-provider
+responses do not acquire gateway billing semantics. Validated request usage and cost
+survive a protocol ERROR caused by a malformed assessment. They are retained once
+at the producer judgment root, not copied onto individual checks.
+
+Recording integrations must map these optional fields explicitly; retaining native
+response bytes alone does not populate a recorder's typed cost field. Older saved
+results remain unchanged. Reported gateway cost excludes evidence acquisition and
+preparation and must not be presented as end-to-end evaluation cost.
+
 Local tests exercise fake HTTP and the released SDK, not live provider correctness. The
 committed independent rubric review covers a synthetic finite-clause fixture only. It does
 not certify arbitrary real requirements, their evidence sufficiency or model behavior.

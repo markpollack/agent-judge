@@ -709,6 +709,102 @@ class JevJudgeTest {
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(trace(j).has("providerMetadata")).isFalse();
 		assertThat(trace(j).path("underlyingModelVersion").asText()).isEqualTo("unknown");
+		assertThat((Map<?, ?>) j.metadata().get("usage")).hasSize(2);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "\"0.000182742\"", "0.000182742", "\"1.82742e-4\"", "\"0\"", "0" })
+	void gatewayCostIsReportedOnceAndSurvivesVerdictPersistence(String nativeCost) throws Exception {
+		ObjectNode body = gatewayResponse("choice-valid");
+		((ObjectNode) body.at("/provider_metadata/gateway")).set("cost",
+				Checks.parse(nativeCost.getBytes(StandardCharsets.UTF_8)));
+		response.set(Checks.json(body));
+		Judgment j = gatewayJudge(choice()).judge(context());
+		double expected = new java.math.BigDecimal(nativeCost.replace("\"", "")).doubleValue();
+		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(j.certainty().value()).isEqualTo(.8);
+		assertThat(j.distribution().masses()).contains(new ProbabilityMass("violated", .9));
+		JsonNode usage = Checks.JSON.valueToTree(j.metadata().get("usage"));
+		assertThat(usage.path("cost").isNumber()).isTrue();
+		assertThat(usage.path("cost").doubleValue()).isEqualTo(expected);
+		assertThat(usage.path("currency").asText()).isEqualTo("USD");
+		assertThat(usage.path("costSource").asText())
+			.isEqualTo("vercel-gateway-reported:v1:/provider_metadata/gateway/cost");
+		assertThat(usage.has("priceRuleId")).isFalse();
+		assertThat(trace(j).at("/usage/cost").doubleValue()).isEqualTo(expected);
+		assertThat(trace(j).at("/usage/currency").asText()).isEqualTo("USD");
+		assertThat(trace(j).at("/usage/costSource")).isEqualTo(usage.path("costSource"));
+		assertThat(j.checks()).isEmpty();
+		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
+		assertThat(Checks.JSON.readValue(Checks.json(j), Judgment.class)).isEqualTo(j);
+		var verdict = SimpleJury.builder().judge(c -> j).votingStrategy(new ConsensusStrategy()).build().vote(context());
+		var reopened = Checks.JSON.readValue(Checks.json(verdict), Verdict.class);
+		assertThat(reopened).isEqualTo(verdict);
+		assertThat(Verdicts.interpret(reopened).root().judgment().metadata()).isEqualTo(j.metadata());
+		assertThat(calls).hasValue(1);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "null", "true", "{}", "[]", "\"\"", "\"unknown\"", "-1", "\"-0.01\"", "\"NaN\"",
+			"\"Infinity\"", "\"0x1.0p0\"", "\"1e9999\"", "\"1e-9999\"", "1e9999", "1e-9999", "-1e-9999" })
+	void gatewayCostInvalidValuesStayUnknownWithoutChangingAssessment(String nativeCost) {
+		String body = new String(Checks.json(gatewayResponse("choice-valid")), StandardCharsets.UTF_8);
+		response.set(body.replace("\"cost\":\"0\"", "\"cost\":" + nativeCost).getBytes(StandardCharsets.UTF_8));
+		Judgment j = gatewayJudge(choice()).judge(context());
+		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(j.certainty().value()).isEqualTo(.8);
+		assertThat(j.metadata().get("usage")).isEqualTo(Map.of("inputTokens", 120, "outputTokens", 12));
+		assertThat(trace(j).path("usage").has("cost")).isFalse();
+		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
+		assertThat(calls).hasValue(1);
+	}
+
+	@Test
+	void gatewayCostNeverUsesMarketPriceOrDirectRouteMetadata() {
+		ObjectNode body = gatewayResponse("choice-valid");
+		((ObjectNode) body.at("/provider_metadata/gateway")).remove("cost");
+		response.set(Checks.json(body));
+		Judgment missing = gatewayJudge(choice()).judge(context());
+		assertThat(missing.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat((Map<?, ?>) missing.metadata().get("usage")).hasSize(2);
+		body.put("model", "jev-1.13.0");
+		((ObjectNode) body.at("/provider_metadata/gateway")).put("cost", "0.000182742");
+		response.set(Checks.json(body));
+		Judgment direct = judge(choice()).judge(context());
+		assertThat(direct.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat((Map<?, ?>) direct.metadata().get("usage")).hasSize(2);
+		assertThat(trace(direct).path("usage").has("cost")).isFalse();
+		assertThat(calls).hasValue(2);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "choice-not-maximum", "choice-insufficient", "noul-valid", "score-valid" })
+	void gatewayCostBelongsToRequestRegardlessOfAssessment(String fixture) {
+		ObjectNode body = gatewayResponse(fixture.equals("choice-insufficient") ? "choice-valid" : fixture);
+		if (fixture.equals("choice-insufficient")) {
+			ObjectNode answer = (ObjectNode) body.at("/answers/q");
+			answer.put("choice", "insufficient_evidence");
+			answer.putObject("probabilities").put("satisfied", .05).put("violated", .05).put("insufficient_evidence", .9);
+		}
+		((ObjectNode) body.at("/provider_metadata/gateway")).put("cost", "0.000182742");
+		response.set(Checks.json(body));
+		JevQuestion question = fixture.startsWith("noul") ? NOUL : fixture.startsWith("score") ? score(true) : choice();
+		Judgment j = gatewayJudge(question).judge(context());
+		JudgmentStatus expected = switch (fixture) {
+			case "choice-not-maximum" -> JudgmentStatus.ERROR;
+			case "noul-valid" -> JudgmentStatus.FAIL;
+			default -> JudgmentStatus.ABSTAIN;
+		};
+		assertThat(j.status()).isEqualTo(expected);
+		if (expected == JudgmentStatus.ERROR) {
+			assertThat(j.assessment()).isNull();
+			assertThat(j.certainty()).isNull();
+		}
+		assertThat(Checks.JSON.valueToTree(j.metadata()).at("/usage/cost").isNumber()).isTrue();
+		assertThat(Checks.JSON.valueToTree(j.metadata()).at("/usage/cost").doubleValue()).isEqualTo(.000182742);
+		assertThat(trace(j).at("/usage/cost").doubleValue()).isEqualTo(.000182742);
+		assertThat(j.checks()).isEmpty();
+		assertThat(calls).hasValue(1);
 	}
 
 	@ParameterizedTest

@@ -6,13 +6,25 @@
 package io.github.markpollack.judge.jev;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import io.github.markpollack.judge.result.*;
+import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.*;
 import org.jspecify.annotations.Nullable;
 
 record NativeResponse(String model, long inputTokens, long outputTokens, JudgmentStatus status, Assessment assessment,
 		@Nullable Certainty certainty, Distribution distribution) {
-	record Envelope(String model, long inputTokens, long outputTokens, boolean providerMetadataPresent) {
+	record Envelope(String model, long inputTokens, long outputTokens, boolean providerMetadataPresent,
+			@Nullable Double cost) {
+
+		void addCostTo(Map<String, Object> usage) {
+			if (cost != null) {
+				usage.put("cost", cost);
+				usage.put("currency", "USD");
+				usage.put("costSource", "vercel-gateway-reported:v1:/provider_metadata/gateway/cost");
+			}
+		}
 	}
 
 	static Envelope envelope(byte[] bytes, boolean gateway) {
@@ -22,7 +34,30 @@ record NativeResponse(String model, long inputTokens, long outputTokens, Judgmen
 			throw invalid();
 		JsonNode usage = root.path("usage");
 		return new Envelope(model, tokens(usage.path("input_tokens")), tokens(usage.path("output_tokens")),
-				root.has("provider_metadata"));
+				root.has("provider_metadata"), gateway ? gatewayCost(bytes) : null);
+	}
+
+	/** Read optional billing independently of assessment validity and token pricing. */
+	private static @Nullable Double gatewayCost(byte[] bytes) {
+		try {
+			// Read only this decimal at full precision before projecting to portable
+			// Double, so an out-of-range charge cannot silently underflow to zero.
+			JsonNode node = Checks.JSON.readerFor(JsonNode.class)
+				.with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+				.at("/provider_metadata/gateway/cost")
+				.readValue(bytes);
+			if (node == null || !(node.isNumber() || node.isTextual()))
+				return null;
+			BigDecimal decimal = new BigDecimal(node.asText());
+			double amount = decimal.doubleValue();
+			return decimal.signum() < 0 || !Double.isFinite(amount) || amount == 0 && decimal.signum() != 0
+					? null : amount;
+		}
+		catch (IOException | NumberFormatException e) {
+			// Missing or invalid optional billing is unknown, not a free request or
+			// an invalid assessment. Exact native bytes remain in protected capture.
+			return null;
+		}
 	}
 
 	static NativeResponse read(byte[] bytes, JevQuestion question) {

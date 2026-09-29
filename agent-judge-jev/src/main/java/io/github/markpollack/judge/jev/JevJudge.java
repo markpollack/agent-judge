@@ -24,6 +24,12 @@ import org.jspecify.annotations.Nullable;
  * exactly one HTTP attempt. Caller owns HTTP client lifecycle and protected artifact
  * storage. No environment credentials, implicit retrieval, truncation, live calibration
  * guarantee or acceptance policy.
+ * <p>
+ * Request usage is retained in {@code Judgment.metadata().get("usage")}. On the
+ * Vercel route, a valid gateway-reported charge adds {@code cost} (a Double in USD),
+ * {@code currency} and {@code costSource}; missing or invalid cost stays absent.
+ * This is reported request cost, not a token-price calculation or evidence-preparation
+ * cost. A malformed assessment can still retain valid request usage and cost.
  */
 public final class JevJudge implements Judge {
 
@@ -188,8 +194,11 @@ public final class JevJudge implements Judge {
 					// would overflow the trace bound after adding transport facts.
 					facts.put("providerMetadata",
 							new ArtifactRef(responseRef.id(), responseRef.sha256(), "/provider_metadata"));
-				facts.put("usage",
-						Map.of("input_tokens", envelope.inputTokens(), "output_tokens", envelope.outputTokens()));
+				Map<String, Object> usage = new LinkedHashMap<>();
+				usage.put("input_tokens", envelope.inputTokens());
+				usage.put("output_tokens", envelope.outputTokens());
+				envelope.addCostTo(usage);
+				facts.put("usage", usage);
 			}
 			String underlyingModelVersion = envelope == null || envelope.model().equals("typesafe-ai/jev") ? "unknown"
 					: envelope.model().substring(4);
@@ -213,20 +222,23 @@ public final class JevJudge implements Judge {
 					+ ";underlyingModelVersion=" + underlyingModelVersion;
 			EvaluationProvenance provenance = new EvaluationProvenance("typesafe.jev", revision, digest, refs,
 					responseRef, success ? List.of(calibrationClaim()) : List.of());
+			Map<String, Object> metadata = new LinkedHashMap<>();
+			if (envelope != null) {
+				Map<String, Object> usage = new LinkedHashMap<>();
+				usage.put("inputTokens", portableInteger(envelope.inputTokens()));
+				usage.put("outputTokens", portableInteger(envelope.outputTokens()));
+				envelope.addCostTo(usage);
+				metadata.put("usage", usage);
+			}
+			if (success)
+				metadata.put(Judgment.ELAPSED_MILLIS_KEY, portableInteger(trace.elapsedNanos() / 1000000));
 			if (success && value != null)
 				return new Judgment(value.status(), value.assessment(), value.certainty(), value.distribution(), null,
 						value.status() == JudgmentStatus.ABSTAIN
 								? "Declared projection has no supported determination" : "",
-						List.of(), provenance, null,
-						Map.of("usage",
-								Map.of("inputTokens", portableInteger(value.inputTokens()), "outputTokens",
-										portableInteger(value.outputTokens())),
-								Judgment.ELAPSED_MILLIS_KEY, portableInteger(trace.elapsedNanos() / 1000000)));
+						List.of(), provenance, null, metadata);
 			return new Judgment(JudgmentStatus.ERROR, null, null, null, JudgmentReasonCode.JUDGE_REPORTED, problem,
-					List.of(), provenance, null,
-					envelope == null ? Map.of()
-							: Map.of("usage", Map.of("inputTokens", portableInteger(envelope.inputTokens()),
-									"outputTokens", portableInteger(envelope.outputTokens()))));
+					List.of(), provenance, null, metadata);
 		}
 		catch (RuntimeException e) {
 			return Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "Jev artifact capture failed");
