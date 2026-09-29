@@ -20,13 +20,25 @@ import io.github.markpollack.judge.jury.interpretation.ReadingSupport;
 import io.github.markpollack.judge.result.ArtifactRef;
 
 /**
- * Immutable ordinary-assertion facade; no global policy, implicit threshold or resource
- * lookup. Resolve provider resources in caller setup. Route resolution occurs on the
- * caller thread before the normal one-seat jury, which invokes its judge on that same
- * thread so caller cancellation remains visible; the caller must provide thread-safe
- * route, Judge and policy delegates and immutable evidence payloads for parallel use.
- * This facade never changes the context goal or metadata to make evidence match a
- * requirement.
+ * Evaluates requirements through a configured Judge and application policy, then asserts
+ * the resulting Verdict's authoritative Interpretation. Configure one instance in a test
+ * fixture and call {@link #assertThat(JudgmentContext)} to bind evidence. Its
+ * {@code satisfies} terminal evaluates eagerly;
+ * {@link #evaluate(JudgmentContext, Requirement)} instead returns the result for
+ * inspection before {@link #requireSatisfied(AssertionResult)}.
+ *
+ * <p>
+ * Policy decides whether to use, withhold or request escalation of the Judge's
+ * assessment; it does not rewrite that assessment. This one-seat facade records
+ * escalation intent but does not call another Judge or a human. There is no global
+ * policy, implicit threshold or resource lookup. Resolve provider resources in caller
+ * setup. Route resolution occurs on the caller thread before the normal one-seat jury,
+ * which invokes its judge on that same thread so caller cancellation remains visible; the
+ * caller must provide thread-safe route, Judge and policy delegates and immutable
+ * evidence payloads for parallel use. This facade never changes the context goal or
+ * metadata to make evidence match a requirement. A supported Interpretation means its
+ * recorded structure supports the reading, not that the evaluator is confident or its
+ * assessment is correct.
  */
 public final class SemanticAssertions {
 
@@ -55,9 +67,12 @@ public final class SemanticAssertions {
 	}
 
 	/**
-	 * Evaluate once for audit/replay consumers, retaining a normal jury result. Setup
-	 * errors fail before inference; judge invocation failures are contained by the jury.
-	 * This method does not assert success.
+	 * Invoke the configured Judge once, retaining a normal jury result. This may perform
+	 * provider inference. Inspect or store the returned result and then pass it to
+	 * {@link #requireSatisfied(AssertionResult)} to assert it without evaluating again.
+	 * Setup errors fail before inference; judge invocation failures are contained by the
+	 * jury. This method does not assert success. Calling it after {@code satisfies}
+	 * performs a second evaluation, which may yield a different assessment.
 	 * @param evidence exact requirement-specific context
 	 * @param requirement named requirement and optional prior policy
 	 * @return retained resolution, verdict and authoritative reading
@@ -91,7 +106,30 @@ public final class SemanticAssertions {
 		return new Requirement("text:sha256:" + digest, "1", text);
 	}
 
-	static void requireSatisfied(AssertionResult result) {
+	/**
+	 * Assert an existing result without running evaluation again. Only a
+	 * {@link ReadingSupport#SUPPORTED SUPPORTED} Interpretation with an ACCEPTED reading
+	 * returns normally. This deterministic check invokes no Judge, provider or policy,
+	 * and does not modify the result or its retained producer assessment.
+	 *
+	 * <p>
+	 * Use this after {@link #evaluate(JudgmentContext, Requirement)} or with a result
+	 * reconstructed from supported current typed V2 values. Unknown/legacy documents
+	 * belong to the stored-map Interpretation reader; do not manufacture a supported
+	 * modern result from them. An accepted negative assessment is still REJECTED, and
+	 * ABSTAIN/ERROR outcomes stay distinct from subject violations.
+	 * @param result existing result with its authoritative Interpretation
+	 * @throws SemanticAssertionError.Rejected for supported REJECTED
+	 * @throws SemanticAssertionError.Inconclusive for supported UNDECIDED
+	 * @throws SemanticAssertionError.InstrumentFailure for supported NOT_ASSESSED
+	 * @throws SemanticAssertionError.NotApplicable for supported NOT_APPLICABLE
+	 * @throws SemanticAssertionError.UnsupportedReading for absent, contradicted or
+	 * undetermined reading support
+	 * @throws NullPointerException if result is null
+	 * @since 0.18.0
+	 */
+	public static void requireSatisfied(AssertionResult result) {
+		Objects.requireNonNull(result, "result");
 		var reading = result.interpretation();
 		if (reading.readingSupport() != ReadingSupport.SUPPORTED || reading.reading() == null)
 			throw new SemanticAssertionError.UnsupportedReading(result);

@@ -9,7 +9,19 @@ import java.util.Objects;
 import org.opentest4j.AssertionFailedError;
 import io.github.markpollack.judge.jury.interpretation.Interpretation;
 
-/** Unsuccessful semantic assertion retaining the unchanged result and cause category. */
+/**
+ * An unsuccessful requirement assertion with a concise explanation and the complete
+ * unchanged result. The message connects producer assessment, metric-specific support,
+ * application policy and the authoritative Interpretation. Long text and identifiers are
+ * abbreviated; use {@link #result()} for full assessment, provenance and evidence
+ * references.
+ *
+ * <p>
+ * The subclasses describe why the assertion did not pass. An inconclusive result or
+ * instrument error is an assertion failure, not a rewritten subject violation or a test
+ * skip. Message wording is for people; use {@link #category()} and the structured result
+ * for programmatic decisions.
+ */
 public abstract class SemanticAssertionError extends AssertionFailedError {
 
 	/** Complete evaluation carried for diagnostics. */
@@ -23,7 +35,7 @@ public abstract class SemanticAssertionError extends AssertionFailedError {
 
 		/** Supported negative assessment. */
 		REJECTED,
-		/** No usable conclusion, including exhausted escalation. */
+		/** No usable conclusion, including a request for escalation. */
 		INCONCLUSIVE,
 		/** Judge, policy or invocation failure. */
 		INSTRUMENT_FAILURE,
@@ -35,8 +47,7 @@ public abstract class SemanticAssertionError extends AssertionFailedError {
 	}
 
 	private SemanticAssertionError(AssertionResult result, Category category) {
-		super(category + ": " + result.requirement().id() + "@" + result.requirement().revision() + " — "
-				+ result.interpretation().summary());
+		super(AssertionDiagnostics.message(result, category));
 		this.result = Objects.requireNonNull(result);
 		this.category = category;
 	}
@@ -74,7 +85,10 @@ public abstract class SemanticAssertionError extends AssertionFailedError {
 
 	}
 
-	/** An uncertain or exhausted escalation result. */
+	/**
+	 * An uncertain result or escalation request; this failure does not execute
+	 * escalation.
+	 */
 	public static final class Inconclusive extends SemanticAssertionError {
 
 		Inconclusive(AssertionResult result) {
