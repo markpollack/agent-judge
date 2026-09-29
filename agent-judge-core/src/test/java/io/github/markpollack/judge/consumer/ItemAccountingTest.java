@@ -139,9 +139,9 @@ class ItemAccountingTest {
 	@Test
 	@DisplayName("a rejection copied through two cascade levels is still one rejection and one machinery failure")
 	void aRejectionCopiedThroughTwoLevels() {
-		Jury inner = boundaryRejectingCascade();
-		Jury middle = CascadedJury.builder().tier("inner", inner, TierPolicy.FINAL_TIER).build();
-		Verdict root = CascadedJury.builder().tier("middle", middle, TierPolicy.FINAL_TIER).build().vote(CONTEXT);
+		Jury<JudgmentContext> inner = boundaryRejectingCascade();
+		Jury<JudgmentContext> middle = CascadedJury.<JudgmentContext>builder().tier("inner", inner, TierPolicy.FINAL_TIER).build();
+		Verdict root = CascadedJury.<JudgmentContext>builder().tier("middle", middle, TierPolicy.FINAL_TIER).build().vote(CONTEXT);
 
 		Verdict selected = selectedDetermination(root);
 
@@ -156,7 +156,7 @@ class ItemAccountingTest {
 	@Test
 	@DisplayName("a refused stage followed by a passing tier: the item passes, and the refusal is still counted")
 	void aRefusedStageFollowedByAPass() {
-		Verdict root = CascadedJury.builder()
+		Verdict root = CascadedJury.<JudgmentContext>builder()
 			.tier("rubric", excludingTier(), TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic", SimpleJury.of(Judgment.pass("OK")), TierPolicy.FINAL_TIER)
 			.build()
@@ -176,7 +176,7 @@ class ItemAccountingTest {
 	@Test
 	@DisplayName("an excluded aggregate leaves the denominator rather than passing or failing")
 	void anExcludedItem() {
-		Verdict root = CascadedJury.builder()
+		Verdict root = CascadedJury.<JudgmentContext>builder()
 			.tier("rubric", capableExcludingTier(), TierPolicy.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
@@ -190,7 +190,7 @@ class ItemAccountingTest {
 	@Test
 	@DisplayName("only named copy edges are followed: a later completed determination is not searched for")
 	void onlyNamedEdgesAreFollowed() {
-		Verdict root = CascadedJury.builder()
+		Verdict root = CascadedJury.<JudgmentContext>builder()
 			.tier("first", brokenReduction(Judgment.fail("a requirement was not met"), Judgment.pass("other")),
 					TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("second", SimpleJury.of(Judgment.pass("OK")), TierPolicy.FINAL_TIER)
@@ -210,8 +210,8 @@ class ItemAccountingTest {
 	/** A leaf jury over one judgment. */
 	private interface SimpleJury {
 
-		static Jury of(Judgment judgment) {
-			return io.github.markpollack.judge.jury.SimpleJury.builder()
+		static Jury<JudgmentContext> of(Judgment judgment) {
+			return io.github.markpollack.judge.jury.SimpleJury.<JudgmentContext>builder()
 				.judge(Judges.named(context -> judgment, "leaf"))
 				.votingStrategy(new AllMustPassStrategy())
 				.build();
@@ -220,9 +220,9 @@ class ItemAccountingTest {
 	}
 
 	/** A leaf jury whose reduction breaks, over the judgments given. */
-	private static Jury brokenReduction(Judgment... judgments) {
-		io.github.markpollack.judge.jury.SimpleJury.Builder builder = io.github.markpollack.judge.jury.SimpleJury
-			.builder()
+	private static Jury<JudgmentContext> brokenReduction(Judgment... judgments) {
+		io.github.markpollack.judge.jury.SimpleJury.Builder<JudgmentContext> builder = io.github.markpollack.judge.jury.SimpleJury
+			.<JudgmentContext>builder()
 			.votingStrategy(new VotingStrategy() {
 				@Override
 				public Judgment aggregate(List<Judgment> input, java.util.Map<String, Double> weights) {
@@ -242,7 +242,7 @@ class ItemAccountingTest {
 	}
 
 	/** An opaque tier that excludes the subject without ever declaring it may. */
-	private static Jury excludingTier() {
+	private static Jury<JudgmentContext> excludingTier() {
 		return opaque(Verdict.builder()
 			.aggregated(Judgment.notApplicable("nothing here applies"))
 			.decision(Decision.own())
@@ -250,14 +250,14 @@ class ItemAccountingTest {
 	}
 
 	/** The same shape, but holding a genuine individual FAIL the cascade can reject on. */
-	private static Jury rejectableExcludingTier() {
+	private static Jury<JudgmentContext> rejectableExcludingTier() {
 		Judgment failing = Judgment.fail("a requirement was not met");
 		return opaque(
 				Verdict.of(Judgment.notApplicable("nothing here applies"), java.util.Map.of("strict", failing)));
 	}
 
 	/** A judge that declared, in advance, that it may exclude a subject. */
-	private record ConditionalJudge() implements io.github.markpollack.judge.JudgeWithMetadata {
+	private record ConditionalJudge() implements io.github.markpollack.judge.JudgeWithMetadata<JudgmentContext> {
 
 		@Override
 		public Judgment judge(JudgmentContext context) {
@@ -273,25 +273,25 @@ class ItemAccountingTest {
 	}
 
 	/** A tier whose judge declared it may exclude, so the exclusion is honoured. */
-	private static Jury capableExcludingTier() {
-		return io.github.markpollack.judge.jury.SimpleJury.builder()
+	private static Jury<JudgmentContext> capableExcludingTier() {
+		return io.github.markpollack.judge.jury.SimpleJury.<JudgmentContext>builder()
 			.judge(new ConditionalJudge())
 			.votingStrategy(new ConsensusStrategy(io.github.markpollack.judge.jury.ErrorPolicy.PROPAGATE,
 					io.github.markpollack.judge.jury.NotApplicablePolicy.EXCLUDE))
 			.build();
 	}
 
-	private static Jury boundaryRejectingCascade() {
-		return CascadedJury.builder()
+	private static Jury<JudgmentContext> boundaryRejectingCascade() {
+		return CascadedJury.<JudgmentContext>builder()
 			.tier("rubric", rejectableExcludingTier(), TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic", SimpleJury.of(Judgment.pass("OK")), TierPolicy.FINAL_TIER)
 			.build();
 	}
 
-	private static Jury opaque(Verdict verdict) {
-		return new Jury() {
+	private static Jury<JudgmentContext> opaque(Verdict verdict) {
+		return new Jury<JudgmentContext>() {
 			@Override
-			public List<Judge> getJudges() {
+			public List<Judge<JudgmentContext>> getJudges() {
 				return List.of();
 			}
 

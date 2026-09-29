@@ -50,7 +50,7 @@ class RejectedExclusionExplanationTest {
 	private static final Judgment PASSING = Judgment.pass("every requirement was met");
 
 	/** An opaque child that excludes the subject while declaring no capability to do so. */
-	private static Jury excluding(Judgment... individuals) {
+	private static Jury<JudgmentContext> excluding(Judgment... individuals) {
 		return returning(
 				Verdict.of(Judgment.notApplicable("the change set contains no Java sources"), byName(individuals)));
 	}
@@ -63,8 +63,8 @@ class RejectedExclusionExplanationTest {
 		return map;
 	}
 
-	private static Jury passing() {
-		return SimpleJury.builder()
+	private static Jury<JudgmentContext> passing() {
+		return SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> PASSING, "backstop"))
 			.votingStrategy(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN))
 			.build();
@@ -77,7 +77,7 @@ class RejectedExclusionExplanationTest {
 		@Test
 		@DisplayName("a sole final tier's refused exclusion is named in the root reasoning")
 		void aSoleFinalTierIsExplained() {
-			Verdict verdict = CascadedJury.builder()
+			Verdict verdict = CascadedJury.<JudgmentContext>builder()
 				.tier("rubric", excluding(PASSING), TierPolicy.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
@@ -93,7 +93,7 @@ class RejectedExclusionExplanationTest {
 		@Test
 		@DisplayName("a refused exclusion at an earlier tier is named when nothing later decided")
 		void anEarlierTierIsExplainedWhenNothingDecided() {
-			Verdict verdict = CascadedJury.builder()
+			Verdict verdict = CascadedJury.<JudgmentContext>builder()
 				.tier("rubric", excluding(PASSING), TierPolicy.REJECT_ON_ANY_FAIL)
 				.tier("semantic", ContainmentTest.throwing(new IllegalStateException("the backend was unreachable")),
 						TierPolicy.FINAL_TIER)
@@ -108,8 +108,8 @@ class RejectedExclusionExplanationTest {
 		@DisplayName("a meta member's refused exclusion is named in the root reasoning")
 		void aMetaMemberIsExplained() {
 			Verdict verdict = Juries
-				.meta(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN), new NamedJury("healthy", passing()),
-						new NamedJury("rubric", excluding(PASSING)))
+				.meta(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN), new NamedJury<JudgmentContext>("healthy", passing()),
+						new NamedJury<JudgmentContext>("rubric", excluding(PASSING)))
 				.vote(CONTEXT);
 
 			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
@@ -129,7 +129,7 @@ class RejectedExclusionExplanationTest {
 		@Test
 		@DisplayName("R-E: a later selected tier keeps its own reasoning as the root")
 		void aLaterSelectedTierKeepsItsReasoning() {
-			Verdict verdict = CascadedJury.builder()
+			Verdict verdict = CascadedJury.<JudgmentContext>builder()
 				.tier("rubric", excluding(PASSING), TierPolicy.REJECT_ON_ANY_FAIL)
 				.tier("semantic", passing(), TierPolicy.FINAL_TIER)
 				.build()
@@ -145,7 +145,7 @@ class RejectedExclusionExplanationTest {
 		@Test
 		@DisplayName("D1: the parent-built stage_failed root keeps its own text")
 		void theD1RootIsUnchanged() {
-			Verdict verdict = CascadedJury.builder()
+			Verdict verdict = CascadedJury.<JudgmentContext>builder()
 				.tier("rubric", excluding(FAILING), TierPolicy.REJECT_ON_ANY_FAIL)
 				.tier("semantic", passing(), TierPolicy.FINAL_TIER)
 				.build()
@@ -162,7 +162,7 @@ class RejectedExclusionExplanationTest {
 		@Test
 		@DisplayName("a tier that threw still reports exactly what it reported before")
 		void aThrownTierIsUnchanged() {
-			Verdict verdict = CascadedJury.builder()
+			Verdict verdict = CascadedJury.<JudgmentContext>builder()
 				.tier("rubric", ContainmentTest.throwing(new IllegalStateException("the backend was unreachable")),
 						TierPolicy.FINAL_TIER)
 				.build()
@@ -175,8 +175,8 @@ class RejectedExclusionExplanationTest {
 		@DisplayName("a member that threw still reports exactly what it reported before")
 		void aThrownMemberIsUnchanged() {
 			Verdict verdict = Juries
-				.meta(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN), new NamedJury("healthy", passing()),
-						new NamedJury("broken",
+				.meta(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN), new NamedJury<JudgmentContext>("healthy", passing()),
+						new NamedJury<JudgmentContext>("broken",
 								ContainmentTest.throwing(new IllegalStateException("the backend was unreachable"))))
 				.vote(CONTEXT);
 

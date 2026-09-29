@@ -45,12 +45,12 @@ class NullChildContainmentTest {
 
 	private static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("contain a null child").build();
 
-	private static Jury silent() {
+	private static Jury<JudgmentContext> silent() {
 		return returning(null);
 	}
 
-	private static Jury passing(String judgeName) {
-		return SimpleJury.builder()
+	private static Jury<JudgmentContext> passing(String judgeName) {
+		return SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> Judgment.pass("all good"), judgeName))
 			.votingStrategy(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN))
 			.build();
@@ -63,8 +63,8 @@ class NullChildContainmentTest {
 		@Test
 		@DisplayName("is a stage failure, and every member that succeeded is kept")
 		void isAStageFailureThatKeepsItsOtherMembers() {
-			Jury meta = Juries.meta(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN),
-					new NamedJury("healthy", passing("first")), new NamedJury("silent", silent()));
+			Jury<JudgmentContext> meta = Juries.meta(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN),
+					new NamedJury<JudgmentContext>("healthy", passing("first")), new NamedJury<JudgmentContext>("silent", silent()));
 
 			Verdict verdict = meta.vote(CONTEXT);
 
@@ -91,7 +91,7 @@ class NullChildContainmentTest {
 		@Test
 		@DisplayName("a non-final tier that returns null still lets the final tier decide")
 		void aNonFinalNullTierReachesTheFinalTier() {
-			Verdict verdict = CascadedJury.builder()
+			Verdict verdict = CascadedJury.<JudgmentContext>builder()
 				.tier("silent", silent(), TierPolicy.REJECT_ON_ANY_FAIL)
 				.tier("backstop", passing("backstop"), TierPolicy.FINAL_TIER)
 				.build()
@@ -110,7 +110,7 @@ class NullChildContainmentTest {
 		@Test
 		@DisplayName("a final tier that returns null is no_tier_decided, not an escaping exception")
 		void aFinalNullTierIsNoTierDecided() {
-			Verdict verdict = CascadedJury.builder()
+			Verdict verdict = CascadedJury.<JudgmentContext>builder()
 				.tier("silent", silent(), TierPolicy.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
@@ -132,15 +132,15 @@ class NullChildContainmentTest {
 		@Test
 		@DisplayName("a composite limit still escapes both parents")
 		void aCompositeLimitStillEscapes() {
-			Jury overLimit = ContainmentTest
+			Jury<JudgmentContext> overLimit = ContainmentTest
 				.throwing(new CompositeLimitExceededException("Composite attempt limit of 64 exceeded"));
 
 			assertThatThrownBy(() -> Juries
 				.meta(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN),
-						new NamedJury("healthy", passing("first")), new NamedJury("limit", overLimit))
+						new NamedJury<JudgmentContext>("healthy", passing("first")), new NamedJury<JudgmentContext>("limit", overLimit))
 				.vote(CONTEXT)).isInstanceOf(CompositeLimitExceededException.class);
 
-			assertThatThrownBy(() -> CascadedJury.builder()
+			assertThatThrownBy(() -> CascadedJury.<JudgmentContext>builder()
 				.tier("limit", overLimit, TierPolicy.REJECT_ON_ANY_FAIL)
 				.tier("backstop", passing("backstop"), TierPolicy.FINAL_TIER)
 				.build()
@@ -150,9 +150,9 @@ class NullChildContainmentTest {
 		@Test
 		@DisplayName("an Error still escapes both parents")
 		void anErrorStillEscapes() {
-			Jury broken = new Jury() {
+			Jury<JudgmentContext> broken = new Jury<JudgmentContext>() {
 				@Override
-				public List<Judge> getJudges() {
+				public List<Judge<JudgmentContext>> getJudges() {
 					return List.of();
 				}
 
@@ -168,10 +168,10 @@ class NullChildContainmentTest {
 			};
 
 			assertThatThrownBy(() -> Juries
-				.meta(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN), new NamedJury("broken", broken))
+				.meta(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN), new NamedJury<JudgmentContext>("broken", broken))
 				.vote(CONTEXT)).isInstanceOf(StackOverflowError.class);
 
-			assertThatThrownBy(() -> CascadedJury.builder()
+			assertThatThrownBy(() -> CascadedJury.<JudgmentContext>builder()
 				.tier("broken", broken, TierPolicy.FINAL_TIER)
 				.build()
 				.vote(CONTEXT)).isInstanceOf(StackOverflowError.class);

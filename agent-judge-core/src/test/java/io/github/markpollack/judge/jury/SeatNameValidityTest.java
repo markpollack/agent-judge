@@ -49,7 +49,7 @@ class SeatNameValidityTest {
 	private static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("name the seats").build();
 
 	/** A judge whose metadata is only built when it is asked for. */
-	private record LazilyNamed(String name, Judgment judgment) implements JudgeWithMetadata {
+	private record LazilyNamed(String name, Judgment judgment) implements JudgeWithMetadata<JudgmentContext> {
 
 		@Override
 		public Judgment judge(JudgmentContext context) {
@@ -63,8 +63,8 @@ class SeatNameValidityTest {
 
 	}
 
-	private static SimpleJury juryWith(Judge blankNamed, boolean parallel) {
-		return SimpleJury.builder()
+	private static SimpleJury<JudgmentContext> juryWith(Judge<JudgmentContext> blankNamed, boolean parallel) {
+		return SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> Judgment.pass("the build succeeded"), "healthy"))
 			.judge(blankNamed)
 			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
@@ -88,7 +88,7 @@ class SeatNameValidityTest {
 		@Test
 		@DisplayName("a blank name is refused by the naming wrapper, before any jury is assembled")
 		void namedRefusesABlankName() {
-			Judge judge = context -> Judgment.pass("ok");
+			Judge<JudgmentContext> judge = context -> Judgment.pass("ok");
 
 			assertThatThrownBy(() -> Judges.named(judge, "   ")).isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("name must be non-blank");
@@ -119,7 +119,7 @@ class SeatNameValidityTest {
 			assertContained(juryWith(new LazilyNamed("   ", Judgment.pass("a judgment the jury must not keep")), false));
 		}
 
-		private static void assertContained(SimpleJury jury) {
+		private static void assertContained(SimpleJury<JudgmentContext> jury) {
 			Verdict verdict = jury.vote(CONTEXT);
 
 			assertThat(verdict.individual()).as("every configured judge is represented").hasSize(2);
@@ -140,7 +140,7 @@ class SeatNameValidityTest {
 		@Test
 		@DisplayName("the jury still builds, and describing it fails loudly naming the seat")
 		void buildAndDescribeAgreeWithTheVote() {
-			SimpleJury jury = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
+			SimpleJury<JudgmentContext> jury = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
 
 			assertThatThrownBy(jury::describe).isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("seats[1]")
@@ -156,11 +156,11 @@ class SeatNameValidityTest {
 		@Test
 		@DisplayName("a blank-named seat does not collapse its tier")
 		void aBlankNameDoesNotCollapseItsTier() {
-			Jury tier = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
+			Jury<JudgmentContext> tier = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
 
-			Verdict verdict = CascadedJury.builder()
+			Verdict verdict = CascadedJury.<JudgmentContext>builder()
 				.tier("gate", tier, TierPolicy.REJECT_ON_ANY_FAIL)
-				.tier("final", SimpleJury.builder()
+				.tier("final", SimpleJury.<JudgmentContext>builder()
 					.judge(Judges.named(context -> Judgment.pass("also fine"), "backstop"))
 					.votingStrategy(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN))
 					.build(), TierPolicy.FINAL_TIER)

@@ -4,6 +4,8 @@
  */
 package io.github.markpollack.judge.result;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -430,7 +432,7 @@ class ModernResultValuesTest {
 		org.assertj.core.api.SoftAssertions softly = new org.assertj.core.api.SoftAssertions();
 		for (Assessment assessment : assessments) {
 			Judgment judgment = raw(JudgmentStatus.PASS, assessment, null, null, null);
-			var jury = io.github.markpollack.judge.jury.SimpleJury.builder()
+			var jury = io.github.markpollack.judge.jury.SimpleJury.<JudgmentContext>builder()
 				.judge(context -> judgment)
 				.judge(context -> Judgment.pass("other"))
 				.votingStrategy(new ConsensusStrategy())

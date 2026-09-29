@@ -40,7 +40,7 @@ import io.github.markpollack.judge.result.Judgment;
  * @since 0.1.0
  * @see Judge
  */
-public interface AsyncJudge {
+public interface AsyncJudge<E> {
 
 	/**
 	 * Asynchronously evaluate an agent execution result.
@@ -48,6 +48,6 @@ public interface AsyncJudge {
 	 * execution
 	 * @return a CompletableFuture that will complete with the judgment
 	 */
-	CompletableFuture<Judgment> judgeAsync(JudgmentContext context);
+	CompletableFuture<Judgment> judgeAsync(E context);
 
 }

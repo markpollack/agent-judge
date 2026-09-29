@@ -42,7 +42,7 @@ public final class AgentClientEvaluator {
 	 * @param judge judge applied to the captured execution
 	 * @return the judge result
 	 */
-	public static Judgment evaluate(String goal, Path workspace, Supplier<AgentClientResponse> call, Judge judge) {
+	public static Judgment evaluate(String goal, Path workspace, Supplier<AgentClientResponse> call, Judge<JudgmentContext> judge) {
 		return evaluate(goal, workspace, call, judge, Map.of());
 	}
 
@@ -55,7 +55,7 @@ public final class AgentClientEvaluator {
 	 * @param extraMetadata caller-supplied context metadata
 	 * @return the judge result
 	 */
-	public static Judgment evaluate(String goal, Path workspace, Supplier<AgentClientResponse> call, Judge judge,
+	public static Judgment evaluate(String goal, Path workspace, Supplier<AgentClientResponse> call, Judge<JudgmentContext> judge,
 			Map<String, Object> extraMetadata) {
 		JudgmentContext context = AgentClientJudgmentContextBuilder.execute(goal, workspace, call, extraMetadata);
 		return judge.judge(context);
@@ -69,7 +69,7 @@ public final class AgentClientEvaluator {
 	 * @param jury jury applied to the captured execution
 	 * @return the jury verdict
 	 */
-	public static Verdict evaluate(String goal, Path workspace, Supplier<AgentClientResponse> call, Jury jury) {
+	public static Verdict evaluate(String goal, Path workspace, Supplier<AgentClientResponse> call, Jury<JudgmentContext> jury) {
 		return evaluate(goal, workspace, call, jury, Map.of());
 	}
 
@@ -82,7 +82,7 @@ public final class AgentClientEvaluator {
 	 * @param extraMetadata caller-supplied context metadata
 	 * @return the jury verdict
 	 */
-	public static Verdict evaluate(String goal, Path workspace, Supplier<AgentClientResponse> call, Jury jury,
+	public static Verdict evaluate(String goal, Path workspace, Supplier<AgentClientResponse> call, Jury<JudgmentContext> jury,
 			Map<String, Object> extraMetadata) {
 		JudgmentContext context = AgentClientJudgmentContextBuilder.execute(goal, workspace, call, extraMetadata);
 		return jury.vote(context);

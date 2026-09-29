@@ -211,7 +211,7 @@ class JevJudgeTest {
 				.getBytes(StandardCharsets.UTF_8));
 		JevQuestion q = primitive.equals("noul") ? NOUL : primitive.equals("choice") ? choice() : score(true);
 		Judgment j = judge(q).judge(context());
-		Verdict verdict = SimpleJury.builder()
+		Verdict verdict = SimpleJury.<JudgmentContext>builder()
 			.judge(c -> j)
 			.votingStrategy(new ConsensusStrategy())
 			.build()
@@ -278,7 +278,7 @@ class JevJudgeTest {
 		PolicyRef policy = new PolicyRef("use", "1", MANIFEST.sha256());
 		Judgment applied = Policies.apply(j, policy,
 				input -> new Acceptance(AcceptanceAction.USE_ASSESSMENT, "Use retained assessment"));
-		var verdict = io.github.markpollack.judge.jury.SimpleJury.builder().judge(context -> applied)
+		var verdict = io.github.markpollack.judge.jury.SimpleJury.<JudgmentContext>builder().judge(context -> applied)
 			.votingStrategy(new io.github.markpollack.judge.jury.AverageVotingStrategy()).build()
 			.vote(context());
 		assertThat(verdict.aggregated()).isEqualTo(applied);
@@ -648,7 +648,7 @@ class JevJudgeTest {
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		Judgment restored = Checks.JSON.readValue(Checks.JSON.writeValueAsBytes(j), Judgment.class);
 		assertThat(restored).isEqualTo(j);
-		var verdict = SimpleJury.builder()
+		var verdict = SimpleJury.<JudgmentContext>builder()
 			.judge(c -> j)
 			.votingStrategy(new ConsensusStrategy())
 			.build()
@@ -737,7 +737,7 @@ class JevJudgeTest {
 		assertThat(j.checks()).isEmpty();
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
 		assertThat(Checks.JSON.readValue(Checks.json(j), Judgment.class)).isEqualTo(j);
-		var verdict = SimpleJury.builder().judge(c -> j).votingStrategy(new ConsensusStrategy()).build().vote(context());
+		var verdict = SimpleJury.<JudgmentContext>builder().judge(c -> j).votingStrategy(new ConsensusStrategy()).build().vote(context());
 		var reopened = Checks.JSON.readValue(Checks.json(verdict), Verdict.class);
 		assertThat(reopened).isEqualTo(verdict);
 		assertThat(Verdicts.interpret(reopened).root().judgment().metadata()).isEqualTo(j.metadata());

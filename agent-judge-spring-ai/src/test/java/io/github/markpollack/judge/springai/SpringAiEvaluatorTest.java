@@ -29,7 +29,7 @@ class SpringAiEvaluatorTest {
 
 	@Test
 	void shouldEvaluateWithSingleJudge() {
-		Judge judge = (JudgmentContext ctx) -> Judgment.pass("Output is correct");
+		Judge<JudgmentContext> judge = (JudgmentContext ctx) -> Judgment.pass("Output is correct");
 
 		Judgment result = SpringAiEvaluator.evaluate("Summarize", this::mockResponse, judge);
 
@@ -38,11 +38,11 @@ class SpringAiEvaluatorTest {
 
 	@Test
 	void shouldEvaluateWithJury() {
-		Judge passJudge = (JudgmentContext ctx) -> Judgment.pass("Good");
-		Judge failJudge = (JudgmentContext ctx) -> Judgment.fail("Bad");
-		Judge passJudge2 = (JudgmentContext ctx) -> Judgment.pass("Fine");
+		Judge<JudgmentContext> passJudge = (JudgmentContext ctx) -> Judgment.pass("Good");
+		Judge<JudgmentContext> failJudge = (JudgmentContext ctx) -> Judgment.fail("Bad");
+		Judge<JudgmentContext> passJudge2 = (JudgmentContext ctx) -> Judgment.pass("Fine");
 
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(passJudge)
 			.judge(failJudge)
 			.judge(passJudge2)

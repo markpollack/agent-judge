@@ -16,7 +16,7 @@ import java.util.Objects;
  * @author Mark Pollack
  * @since 0.9.0
  */
-public record TierConfig(String name, Jury jury, TierPolicy policy) {
+public record TierConfig<E>(String name, Jury<E> jury, TierPolicy policy) {
 
 	/** Validate all tier components. */
 	public TierConfig {

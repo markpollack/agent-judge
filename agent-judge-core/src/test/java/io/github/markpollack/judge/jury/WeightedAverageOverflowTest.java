@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.jury;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import java.util.List;
 import java.util.Map;
 
@@ -136,7 +138,7 @@ class WeightedAverageOverflowTest {
 
 	@Test
 	void aSimpleJuryWithMaxValueWeightsVotesNormally() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(context -> passJudgment(0.9), MAX)
 			.judge(context -> failJudgment(0.3), MAX)
 			.votingStrategy(new WeightedAverageStrategy())

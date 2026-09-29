@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.jury.interpretation;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import java.util.List;
 import java.util.Map;
 
@@ -140,7 +142,7 @@ class StoredShapesTest {
 	@Test
 	@DisplayName("a flat verdict with no composite container: the root carries it and stages is empty")
 	void aFlatRoot() {
-		Verdict flat = SimpleJury.builder()
+		Verdict flat = SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> Judgment.pass("compiled"), "build"))
 			.judge(Judges.named(context -> Judgment.fail("two tests failed"), "tests"))
 			.votingStrategy(new ConsensusStrategy())

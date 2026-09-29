@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.jury;
 
+import io.github.markpollack.judge.result.PolicyBinding;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -29,14 +31,14 @@ import io.github.markpollack.judge.result.JudgmentReasonCode;
  * member retains its complete aggregate without invoking the meta-strategy. Failed members
  * remain stage failures; one survivor among multiple declared members is not identity.
  */
-class MetaJury implements Jury {
+class MetaJury<E> implements Jury<E> {
 
 	private static final Logger logger = LoggerFactory.getLogger(MetaJury.class);
 
 	private static final CompositeFailure EXECUTION_FAILURE =
 			new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED);
 
-	private final List<NamedJury> members;
+	private final List<NamedJury<E>> members;
 
 	private final VotingStrategy metaStrategy;
 
@@ -51,7 +53,7 @@ class MetaJury implements Jury {
 				&& members.stream().anyMatch(member -> member.jury().aggregateMayBeNotApplicable());
 	}
 
-	MetaJury(List<NamedJury> members, VotingStrategy metaStrategy) {
+	MetaJury(List<NamedJury<E>> members, VotingStrategy metaStrategy) {
 		if (members == null || members.isEmpty()) {
 			throw new IllegalArgumentException("At least one named jury is required");
 		}
@@ -59,7 +61,7 @@ class MetaJury implements Jury {
 			throw new IllegalArgumentException("Meta voting strategy is required");
 		}
 		Set<String> names = new HashSet<>();
-		for (NamedJury member : members) {
+		for (NamedJury<E> member : members) {
 			if (member == null) {
 				throw new IllegalArgumentException("Named jury must not be null");
 			}
@@ -70,7 +72,7 @@ class MetaJury implements Jury {
 		this.members = List.copyOf(members);
 		this.metaStrategy = metaStrategy;
 		if (metaStrategy.notApplicablePolicy() == NotApplicablePolicy.REFUSE) {
-			for (NamedJury member : this.members) {
+			for (NamedJury<E> member : this.members) {
 				if (member.jury().aggregateMayBeNotApplicable()) {
 					throw new IllegalArgumentException("member '" + member.name()
 							+ "' declares that its aggregate may be NOT_APPLICABLE, but strategy '"
@@ -82,8 +84,13 @@ class MetaJury implements Jury {
 		}
 	}
 
+    MetaJury<E> withPolicy(PolicyBinding policy) {
+        return new MetaJury<>(members.stream().map(member -> new NamedJury<>(member.name(),
+            Juries.withAcceptancePolicy(member.jury(), policy))).toList(), metaStrategy);
+    }
+
 	@Override
-	public List<Judge> getJudges() {
+	public List<Judge<E>> getJudges() {
 		return List.of();
 	}
 
@@ -105,7 +112,7 @@ class MetaJury implements Jury {
 	@Override
 	public JuryDescription describe() {
 		List<MemberDescription> described = new ArrayList<>(members.size());
-		for (NamedJury member : members) {
+		for (NamedJury<E> member : members) {
 			try {
 				described.add(new MemberDescription(member.name(), member.jury().describe()));
 			}
@@ -117,11 +124,11 @@ class MetaJury implements Jury {
 	}
 
 	@Override
-	public Verdict vote(JudgmentContext context) {
+	public Verdict vote(E context) {
 		return CompositeExecutionScope.withinCompositeVote(() -> execute(context));
 	}
 
-	private Verdict execute(JudgmentContext context) {
+	private Verdict execute(E context) {
 		List<CompositeAttempt> attempts = new ArrayList<>();
 		List<Judgment> successful = new ArrayList<>();
 		Map<String, Judgment> successfulByName = new LinkedHashMap<>();
@@ -129,7 +136,7 @@ class MetaJury implements Jury {
 		boolean anyStageFailed = false;
 
 		for (int position = 0; position < members.size(); position++) {
-			NamedJury member = members.get(position);
+			NamedJury<E> member = members.get(position);
 			Verdict verdict;
 			try {
 				verdict = CompositeExecutionScope.invokeChild(member.name(), () -> member.jury().vote(context));

@@ -92,7 +92,7 @@ class ModernProducerMigrationTest {
 	@Test
 	void multiSeatAggregationRetainsCompleteInputsWithoutInheritingNativeSupport() {
 		Judgment original = rich(new AppliedPolicy(POLICY, AcceptanceAction.USE_ASSESSMENT, "use assessment"));
-		Verdict verdict = SimpleJury.builder()
+		Verdict verdict = SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> original, "negative"))
 			.judge(Judges.named(context -> Judgment.pass("other"), "positive"))
 			.votingStrategy(new ConsensusStrategy())
@@ -110,7 +110,7 @@ class ModernProducerMigrationTest {
 	void policyErrorIsReportedAndCountedAsMachineryRatherThanRawSubjectFailure() {
 		Judgment original = rich(
 				new PolicyFailure(POLICY, JudgmentReasonCode.POLICY_FAILED, "policy configuration unavailable"));
-		Verdict verdict = SimpleJury.builder()
+		Verdict verdict = SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> original, "policy"))
 			.judge(Judges.named(context -> Judgment.pass("other"), "positive"))
 			.votingStrategy(new ConsensusStrategy(ErrorPolicy.TREAT_AS_FAIL))

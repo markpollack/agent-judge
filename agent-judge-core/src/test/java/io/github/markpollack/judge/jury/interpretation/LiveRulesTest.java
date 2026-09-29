@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.jury.interpretation;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
@@ -40,8 +42,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("The rules on live verdicts")
 class LiveRulesTest {
 
-	private static Jury boundaryRejectingCascade() {
-		return CascadedJury.builder()
+	private static Jury<JudgmentContext> boundaryRejectingCascade() {
+		return CascadedJury.<JudgmentContext>builder()
 			.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic", passingTier("ok", "OK"), TierPolicy.FINAL_TIER)
 			.build();
@@ -50,7 +52,7 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("A4: a root error from a propagated judge error reads NOT_ASSESSED, never REJECTED")
 	void aPropagatedJudgeErrorIsNotAssessed() {
-		Verdict verdict = SimpleJury.builder()
+		Verdict verdict = SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> Judgment.error("the index was unreachable"), "flaky"))
 			.judge(Judges.named(context -> Judgment.pass("fine"), "ok"))
 			.votingStrategy(new ConsensusStrategy())
@@ -73,7 +75,7 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("A4: a cascade that decided nothing reads NOT_ASSESSED, not UNDECIDED")
 	void noTierDecidedIsNotAssessed() {
-		Verdict verdict = CascadedJury.builder()
+		Verdict verdict = CascadedJury.<JudgmentContext>builder()
 			.tier("only", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
@@ -91,7 +93,7 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("A5: an all-not-applicable roster reads NOT_APPLICABLE, and each exclusion is listed with its reason")
 	void anAllNotApplicableRosterIsNotApplicable() {
-		Verdict verdict = SimpleJury.builder()
+		Verdict verdict = SimpleJury.<JudgmentContext>builder()
 			.judge(new Fixtures.Conditional("style", Judgment.notApplicable(EXCLUSION)))
 			.judge(new Fixtures.Conditional("layout", Judgment.notApplicable("no layout to check")))
 			.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
@@ -113,7 +115,7 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("A5: an excluded judge beside a passing one is listed as not applicable, not as a failure")
 	void anExcludedJudgeIsNotAFailure() {
-		Verdict verdict = SimpleJury.builder()
+		Verdict verdict = SimpleJury.<JudgmentContext>builder()
 			.judge(new Fixtures.Conditional("style", Judgment.notApplicable(EXCLUSION)))
 			.judge(Judges.named(context -> Judgment.pass("compiled"), "build"))
 			.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
@@ -132,7 +134,7 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("A6: the CHILD_UNDECIDED variant reads REJECTED, decided by the parent's tier")
 	void theChildUndecidedVariant() {
-		Verdict verdict = CascadedJury.builder()
+		Verdict verdict = CascadedJury.<JudgmentContext>builder()
 			.tier("gate", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic", passingTier("ok", "OK"), TierPolicy.FINAL_TIER)
 			.build()
@@ -171,7 +173,7 @@ class LiveRulesTest {
 	@ValueSource(booleans = { true, false })
 	@DisplayName("A6: a rejecting cascade nested in another is decided by the inner tier, at its full path")
 	void aNestedRejection(boolean asFinalTier) {
-		CascadedJury.Builder builder = CascadedJury.builder();
+		CascadedJury.Builder<JudgmentContext> builder = CascadedJury.<JudgmentContext>builder();
 		if (asFinalTier) {
 			builder.tier("inner", boundaryRejectingCascade(), TierPolicy.FINAL_TIER);
 		}
@@ -217,8 +219,8 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("an outcome adopted through two tiers is decided by the last edge, with basis tier_outcome")
 	void anAdoptedOutcomeIsDecidedByTheLastEdge() {
-		Jury inner = CascadedJury.builder().tier("leaf", twoSeatPassingReduction(), TierPolicy.FINAL_TIER).build();
-		Verdict verdict = CascadedJury.builder().tier("outer-tier", inner, TierPolicy.FINAL_TIER).build().vote(CONTEXT);
+		Jury<JudgmentContext> inner = CascadedJury.<JudgmentContext>builder().tier("leaf", twoSeatPassingReduction(), TierPolicy.FINAL_TIER).build();
+		Verdict verdict = CascadedJury.<JudgmentContext>builder().tier("outer-tier", inner, TierPolicy.FINAL_TIER).build().vote(CONTEXT);
 
 		Interpretation interpretation = Verdicts.interpret(verdict);
 
@@ -257,8 +259,8 @@ class LiveRulesTest {
 	}
 
 	/** These legacy-reader tests exercise an explicit reduction, not modern identity. */
-	private static Jury twoSeatPassingReduction() {
-		return io.github.markpollack.judge.jury.SimpleJury.builder()
+	private static Jury<JudgmentContext> twoSeatPassingReduction() {
+		return io.github.markpollack.judge.jury.SimpleJury.<JudgmentContext>builder()
 			.judge(io.github.markpollack.judge.Judges.named(context -> Judgment.pass("first"), "first"))
 			.judge(io.github.markpollack.judge.Judges.named(context -> Judgment.pass("second"), "second"))
 			.votingStrategy(new io.github.markpollack.judge.jury.ConsensusStrategy()).build();

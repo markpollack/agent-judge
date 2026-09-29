@@ -50,7 +50,7 @@ class JudgeMetadataConvenienceConstructorTest {
 	}
 
 	/** A judge whose metadata is written in the three-argument style. */
-	private record NeverExcludes(String name, Judgment result) implements JudgeWithMetadata {
+	private record NeverExcludes(String name, Judgment result) implements JudgeWithMetadata<JudgmentContext> {
 
 		@Override
 		public Judgment judge(JudgmentContext judgmentContext) {
@@ -106,10 +106,10 @@ class JudgeMetadataConvenienceConstructorTest {
 		@Test
 		@DisplayName("wrapping it in a NamedJudge does not manufacture one")
 		void aWrapperDoesNotManufactureOne() {
-			Judge wrapped = Judges.named(new NeverExcludes("inner", Judgment.pass("ok")), "renamed");
+			Judge<JudgmentContext> wrapped = Judges.named(new NeverExcludes("inner", Judgment.pass("ok")), "renamed");
 
 			assertThat(Judges.notApplicableCapability(wrapped)).isEmpty();
-			assertThat(Judges.notApplicableCapability(new NamedJudge(new NeverExcludes("inner", Judgment.pass("ok")),
+			assertThat(Judges.notApplicableCapability(new NamedJudge<JudgmentContext>(new NeverExcludes("inner", Judgment.pass("ok")),
 					new JudgeMetadata("outer", "", JudgeType.DETERMINISTIC))))
 				.as("an outer wrapper written the same way declares nothing either")
 				.isEmpty();
@@ -126,12 +126,12 @@ class JudgeMetadataConvenienceConstructorTest {
 		@Test
 		@DisplayName("a jury of such judges cannot exclude, and builds under the refusing default")
 		void aJuryOfThemCannotExclude() {
-			assertThatCode(() -> SimpleJury.builder()
+			assertThatCode(() -> SimpleJury.<JudgmentContext>builder()
 				.judge(new NeverExcludes("plain", Judgment.pass("ok")))
 				.votingStrategy(new ConsensusStrategy())
 				.build()).doesNotThrowAnyException();
 
-			Jury jury = SimpleJury.builder()
+			Jury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 				.judge(new NeverExcludes("plain", Judgment.pass("ok")))
 				.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
 				.build();
@@ -142,7 +142,7 @@ class JudgeMetadataConvenienceConstructorTest {
 		@Test
 		@DisplayName("the seat guard contains an exclusion from a seat built on it")
 		void theSeatGuardContainsAnExclusion() {
-			Jury jury = SimpleJury.builder()
+			Jury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 				.judge(new NeverExcludes("sneaky", Judgment.notApplicable("the change set contains no Java sources")))
 				.judge(Judges.named(judgmentContext -> Judgment.pass("ok"), "honest"))
 				.votingStrategy(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE))

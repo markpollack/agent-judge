@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.jury;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -55,7 +57,7 @@ public final class NotApplicableGuard {
 	 * @param verdict the verdict the child returned
 	 * @return the reason the verdict cannot be used, or null when the parent may use it
 	 */
-	public static @Nullable DispositionReason stageFailure(Jury child, Verdict verdict) {
+	public static @Nullable DispositionReason stageFailure(Jury<?> child, Verdict verdict) {
 		Objects.requireNonNull(child, "child must not be null");
 		Objects.requireNonNull(verdict, "verdict must not be null");
 		if (verdict.decision().kind() == DecisionKind.UNDECIDED) {

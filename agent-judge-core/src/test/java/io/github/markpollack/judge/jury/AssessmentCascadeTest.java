@@ -111,11 +111,11 @@ class AssessmentCascadeTest {
 
 	@Test
 	void failedInvocationsAndUndeclaredExclusionsCannotBecomeUsableFail() {
-		List<Judge> invalid = List.of(context -> null, context -> {
+		List<Judge<JudgmentContext>> invalid = List.of(context -> null, context -> {
 			throw new IllegalStateException("transport");
 		}, context -> Judgment.notApplicable("undeclared"));
-		for (Judge judge : invalid) {
-			SimpleJury first = SimpleJury.builder()
+		for (Judge<JudgmentContext> judge : invalid) {
+			SimpleJury<JudgmentContext> first = SimpleJury.<JudgmentContext>builder()
 				.judge(judge)
 				.votingStrategy(new AverageVotingStrategy(ErrorPolicy.TREAT_AS_FAIL))
 				.build();
@@ -133,19 +133,19 @@ class AssessmentCascadeTest {
 	@Test
 	void invalidDeclaredCardinalityAndNestedOrCustomTierStopBeforeSpendingCalls() {
 		AtomicInteger calls = new AtomicInteger();
-		Judge judge = context -> {
+		Judge<JudgmentContext> judge = context -> {
 			calls.incrementAndGet();
 			return apply(Judgment.pass("called"), AcceptanceAction.USE_ASSESSMENT);
 		};
-		SimpleJury two = SimpleJury.builder()
+		SimpleJury<JudgmentContext> two = SimpleJury.<JudgmentContext>builder()
 			.judge(judge)
 			.judge(judge)
 			.votingStrategy(new AverageVotingStrategy())
 			.build();
-		Jury nested = Juries.meta(
+		Jury<JudgmentContext> nested = Juries.meta(
 				new AverageVotingStrategy(0.5, ErrorPolicy.PROPAGATE, NotApplicablePolicy.TREAT_AS_FAIL),
-				new NamedJury("nested", seat(apply(Judgment.pass("x"), AcceptanceAction.USE_ASSESSMENT))));
-		Jury forged = new Jury() {
+				new NamedJury<JudgmentContext>("nested", seat(apply(Judgment.pass("x"), AcceptanceAction.USE_ASSESSMENT))));
+		Jury<JudgmentContext> forged = new Jury<JudgmentContext>() {
 			@Override
 			public Verdict vote(JudgmentContext context) {
 				calls.incrementAndGet();
@@ -153,7 +153,7 @@ class AssessmentCascadeTest {
 			}
 
 			@Override
-			public List<Judge> getJudges() {
+			public List<Judge<JudgmentContext>> getJudges() {
 				return List.of(judge);
 			}
 
@@ -162,7 +162,7 @@ class AssessmentCascadeTest {
 				return new AverageVotingStrategy();
 			}
 		};
-		for (Jury invalid : List.of(two, nested, forged)) {
+		for (Jury<JudgmentContext> invalid : List.of(two, nested, forged)) {
 			AtomicInteger later = new AtomicInteger();
 			Verdict result = cascade(invalid, finalSeat(later)).vote(CONTEXT);
 			assertThat(result.aggregated().operationalReasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
@@ -181,7 +181,7 @@ class AssessmentCascadeTest {
 
 	@Test
 	void selectedDescriptionCarriesStableRoutingIdentity() {
-		Jury cascade = cascade(seat(apply(Judgment.pass("first"), AcceptanceAction.ESCALATE)),
+		Jury<JudgmentContext> cascade = cascade(seat(apply(Judgment.pass("first"), AcceptanceAction.ESCALATE)),
 				seat(apply(Judgment.fail("negative"), AcceptanceAction.USE_ASSESSMENT)));
 		assertThat(cascade.describe().toPortable().toString()).contains("STOP_ON_USABLE_ASSESSMENT", "FINAL_TIER");
 		assertThat(TierPolicy.fromWire("STOP_ON_USABLE_ASSESSMENT")).isEqualTo(TierPolicy.STOP_ON_USABLE_ASSESSMENT);
@@ -200,18 +200,18 @@ class AssessmentCascadeTest {
 		return Policies.apply(raw, POLICY, view -> new Acceptance(action, "configured consequence"));
 	}
 
-	private static SimpleJury seat(Judgment judgment) {
-		Judge judge = new NamedJudge(context -> judgment,
+	private static SimpleJury<JudgmentContext> seat(Judgment judgment) {
+		Judge<JudgmentContext> judge = new NamedJudge<JudgmentContext>(context -> judgment,
 				new JudgeMetadata("assessor", "assessment", JudgeType.DETERMINISTIC, "outside declared scope"));
-		return SimpleJury.builder()
+		return SimpleJury.<JudgmentContext>builder()
 			.judge(judge)
 			.votingStrategy(
 					new AverageVotingStrategy(0.9, ErrorPolicy.TREAT_AS_FAIL, NotApplicablePolicy.TREAT_AS_FAIL))
 			.build();
 	}
 
-	private static SimpleJury finalSeat(AtomicInteger calls) {
-		return SimpleJury.builder().judge(PolicyJudges.apply(context -> {
+	private static SimpleJury<JudgmentContext> finalSeat(AtomicInteger calls) {
+		return SimpleJury.<JudgmentContext>builder().judge(PolicyJudges.apply(context -> {
 			calls.incrementAndGet();
 			return Judgment.fail("verified final violation");
 		}, POLICY, view -> new Acceptance(AcceptanceAction.USE_ASSESSMENT, "usable")))
@@ -219,8 +219,8 @@ class AssessmentCascadeTest {
 			.build();
 	}
 
-	private static CascadedJury cascade(Jury first, Jury last) {
-		return CascadedJury.builder()
+	private static CascadedJury<JudgmentContext> cascade(Jury<JudgmentContext> first, Jury<JudgmentContext> last) {
+		return CascadedJury.<JudgmentContext>builder()
 			.tier("first", first, TierPolicy.STOP_ON_USABLE_ASSESSMENT)
 			.tier("last", last, TierPolicy.FINAL_TIER)
 			.build();

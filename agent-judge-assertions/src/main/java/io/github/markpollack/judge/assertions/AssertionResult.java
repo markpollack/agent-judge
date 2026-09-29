@@ -5,6 +5,9 @@
 
 package io.github.markpollack.judge.assertions;
 
+import io.github.markpollack.judge.requirement.Requirement;
+import io.github.markpollack.judge.result.PolicyBinding;
+
 import java.util.Objects;
 import io.github.markpollack.judge.result.PolicyRef;
 import io.github.markpollack.judge.jury.Verdict;
@@ -37,7 +40,7 @@ import io.github.markpollack.judge.jury.interpretation.Verdicts;
  * @param verdict complete normal jury result
  * @param interpretation authoritative reading, checked against the verdict
  */
-public record AssertionResult(Requirement requirement, PolicyRef policy, PolicySource policySource, Verdict verdict,
+public record AssertionResult(Requirement<?> requirement, PolicyRef policy, PolicySource policySource, Verdict verdict,
 		Interpretation interpretation) {
 
 	/**
@@ -54,8 +57,8 @@ public record AssertionResult(Requirement requirement, PolicyRef policy, PolicyS
 		Objects.requireNonNull(verdict, "verdict");
 		Objects.requireNonNull(interpretation, "interpretation");
 		PolicyBinding override = requirement.acceptancePolicy();
-		if (policySource == PolicySource.REQUIREMENT && (override == null || !policy.equals(override.reference()))) {
-			throw new IllegalArgumentException("REQUIREMENT requires an override matching the resolved policy");
+		if (policySource == PolicySource.ASSOCIATED && (override == null || !policy.equals(override.reference()))) {
+			throw new IllegalArgumentException("ASSOCIATED requires an override matching the resolved policy");
 		}
 		if (policySource == PolicySource.DEFAULT && override != null) {
 			throw new IllegalArgumentException("DEFAULT cannot accompany a requirement policy override");
@@ -71,7 +74,9 @@ public record AssertionResult(Requirement requirement, PolicyRef policy, PolicyS
 	public enum PolicySource {
 
 		/** Explicit Requirement.under binding. */
-		REQUIREMENT,
+		ASSOCIATED,
+		/** Explicit application override at the assertion. */
+		EXPLICIT,
 		/** Explicit configured facade default. */
 		DEFAULT
 
@@ -86,7 +91,7 @@ public record AssertionResult(Requirement requirement, PolicyRef policy, PolicyS
 	 * @throws IllegalArgumentException if policy/source facts contradict one another
 	 * @throws NullPointerException if a required component is null
 	 */
-	public AssertionResult(Requirement requirement, PolicyRef policy, PolicySource policySource, Verdict verdict) {
+	public AssertionResult(Requirement<?> requirement, PolicyRef policy, PolicySource policySource, Verdict verdict) {
 		this(requirement, policy, policySource, verdict, Verdicts.interpret(verdict));
 	}
 }

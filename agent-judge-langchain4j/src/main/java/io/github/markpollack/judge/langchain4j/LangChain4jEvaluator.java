@@ -1,5 +1,7 @@
 package io.github.markpollack.judge.langchain4j;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import java.util.Map;
 import java.util.function.Function;
 
@@ -36,7 +38,7 @@ public final class LangChain4jEvaluator {
 	 * @param judge the judge to evaluate the result
 	 * @return the judgment
 	 */
-	public static <T> Judgment evaluate(String goal, Function<String, Result<T>> serviceCall, Judge judge) {
+	public static <T> Judgment evaluate(String goal, Function<String, Result<T>> serviceCall, Judge<JudgmentContext> judge) {
 		return evaluate(goal, serviceCall, judge, Map.of());
 	}
 
@@ -50,7 +52,7 @@ public final class LangChain4jEvaluator {
 	 * @param extraMetadata additional metadata to attach (e.g., run ID, experiment tag)
 	 * @return the judgment
 	 */
-	public static <T> Judgment evaluate(String goal, Function<String, Result<T>> serviceCall, Judge judge,
+	public static <T> Judgment evaluate(String goal, Function<String, Result<T>> serviceCall, Judge<JudgmentContext> judge,
 			Map<String, Object> extraMetadata) {
 		return judge.judge(LangChain4jJudgmentContextBuilder.execute(goal, serviceCall, extraMetadata));
 	}
@@ -63,7 +65,7 @@ public final class LangChain4jEvaluator {
 	 * @param jury the jury to evaluate the result
 	 * @return the verdict
 	 */
-	public static <T> Verdict evaluate(String goal, Function<String, Result<T>> serviceCall, Jury jury) {
+	public static <T> Verdict evaluate(String goal, Function<String, Result<T>> serviceCall, Jury<JudgmentContext> jury) {
 		return evaluate(goal, serviceCall, jury, Map.of());
 	}
 
@@ -77,7 +79,7 @@ public final class LangChain4jEvaluator {
 	 * @param extraMetadata additional metadata to attach
 	 * @return the verdict
 	 */
-	public static <T> Verdict evaluate(String goal, Function<String, Result<T>> serviceCall, Jury jury,
+	public static <T> Verdict evaluate(String goal, Function<String, Result<T>> serviceCall, Jury<JudgmentContext> jury,
 			Map<String, Object> extraMetadata) {
 		return jury.vote(LangChain4jJudgmentContextBuilder.execute(goal, serviceCall, extraMetadata));
 	}

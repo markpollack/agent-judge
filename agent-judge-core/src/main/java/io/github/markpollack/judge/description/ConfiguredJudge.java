@@ -41,7 +41,7 @@ import io.github.markpollack.judge.JudgeWithMetadata;
  * @since 0.17.0
  * @see io.github.markpollack.judge.Judges#describe(Judge)
  */
-public interface ConfiguredJudge extends Judge {
+public interface ConfiguredJudge<E> extends Judge<E> {
 
 	/**
 	 * The configuration this judge's verdicts depend on, as portable values.

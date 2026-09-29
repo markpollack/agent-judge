@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.description;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import java.util.Map;
 
 import io.github.markpollack.judge.jury.Jury;
@@ -112,7 +114,7 @@ public sealed interface JuryDescription
 	 * @param jury the jury
 	 * @return an opaque description
 	 */
-	static JuryDescription opaque(Jury jury) {
+	static JuryDescription opaque(Jury<?> jury) {
 		return OpaqueJuryDescription.of(jury);
 	}
 

@@ -4,6 +4,9 @@
  */
 package io.github.markpollack.judge.assertions;
 
+import io.github.markpollack.judge.requirement.Requirement;
+import io.github.markpollack.judge.result.PolicyBinding;
+
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +43,7 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 class AssertionDiagnosticsTest {
 
-	private static final Requirement LOCKS = new Requirement("lock-order", "1", "Locks follow the required order");
+	private static final Requirement<?> LOCKS = Requirement.text("lock-order", "1", "Locks follow the required order");
 
 	private static final PolicyRef POLICY = new PolicyRef("independent-confirmation", "1", "a".repeat(64));
 
@@ -135,7 +138,7 @@ class AssertionDiagnosticsTest {
 	@Test
 	void hugeFieldsAndEvidenceDoNotDominateThePrimaryDiagnostic() {
 		String huge = "long-value\n".repeat(2000);
-		var requirement = new Requirement(huge, huge, huge);
+		var requirement = Requirement.text(huge, huge, huge);
 		var provenance = new EvaluationProvenance(huge, huge, "b".repeat(64), List.of(RESPONSE), RESPONSE, List.of());
 		Judgment raw = new Judgment(JudgmentStatus.ERROR, null, null, null, JudgmentReasonCode.JUDGE_REPORTED, huge,
 				List.of(), provenance, null, Map.of("payload", "EVIDENCE_BODY_MUST_NOT_BE_DUMPED"));

@@ -60,7 +60,7 @@ class DescribedCapabilityTest {
 	private static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("describe").build();
 
 	/** A judge that declares, in advance, that it may exclude a subject. */
-	private record Conditional(String name) implements JudgeWithMetadata {
+	private record Conditional(String name) implements JudgeWithMetadata<JudgmentContext> {
 
 		@Override
 		public Judgment judge(JudgmentContext context) {
@@ -101,8 +101,8 @@ class DescribedCapabilityTest {
 
 	}
 
-	private static SimpleJury capableJury() {
-		return SimpleJury.builder()
+	private static SimpleJury<JudgmentContext> capableJury() {
+		return SimpleJury.<JudgmentContext>builder()
 			.judge(new Conditional("conditional"))
 			.votingStrategy(new DelegatingExcluder())
 			.build();
@@ -115,7 +115,7 @@ class DescribedCapabilityTest {
 		@Test
 		@DisplayName("the jury and its description agree about the capability")
 		void theJuryAndItsDescriptionAgree() {
-			SimpleJury jury = capableJury();
+			SimpleJury<JudgmentContext> jury = capableJury();
 
 			assertThat(jury.aggregateMayBeNotApplicable()).as("the jury can emit NOT_APPLICABLE").isTrue();
 			assertThat(jury.describe().aggregateMayBeNotApplicable()).as("and says so").isTrue();
@@ -136,7 +136,7 @@ class DescribedCapabilityTest {
 		@Test
 		@DisplayName("a meta-jury over it agrees too")
 		void aMetaJuryAgrees() {
-			Jury meta = Juries.meta(new DelegatingExcluder(), new NamedJury("panel", capableJury()));
+			Jury<JudgmentContext> meta = Juries.meta(new DelegatingExcluder(), new NamedJury<JudgmentContext>("panel", capableJury()));
 
 			assertThat(meta.aggregateMayBeNotApplicable()).isTrue();
 			assertThat(meta.describe().aggregateMayBeNotApplicable()).isTrue();
@@ -152,11 +152,11 @@ class DescribedCapabilityTest {
 		@Test
 		@DisplayName("still describes its capability exactly as before")
 		void builtInsAreUnchanged() {
-			SimpleJury excluding = SimpleJury.builder()
+			SimpleJury<JudgmentContext> excluding = SimpleJury.<JudgmentContext>builder()
 				.judge(new Conditional("conditional"))
 				.votingStrategy(new AllMustPassStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
 				.build();
-			SimpleJury failing = SimpleJury.builder()
+			SimpleJury<JudgmentContext> failing = SimpleJury.<JudgmentContext>builder()
 				.judge(new Conditional("conditional"))
 				.votingStrategy(new AllMustPassStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.TREAT_AS_FAIL))
 				.build();

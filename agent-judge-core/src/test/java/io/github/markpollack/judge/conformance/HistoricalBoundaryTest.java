@@ -104,7 +104,7 @@ class HistoricalBoundaryTest {
 		Verdict excluded = Verdict.of(Judgment.notApplicable("nothing in this rubric applies"),
 				Map.of("strict", failing));
 
-		return CascadedJury.builder()
+		return CascadedJury.<JudgmentContext>builder()
 			.tier("rubric", opaque(excluded), TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic", passing(), TierPolicy.FINAL_TIER)
 			.build()
@@ -335,17 +335,17 @@ class HistoricalBoundaryTest {
 		}
 	}
 
-	private static Jury passing() {
-		return SimpleJury.builder()
+	private static Jury<JudgmentContext> passing() {
+		return SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> Judgment.pass("the semantic tier accepted it"), "semantic"))
 			.votingStrategy(new ConsensusStrategy())
 			.build();
 	}
 
-	private static Jury opaque(Verdict verdict) {
-		return new Jury() {
+	private static Jury<JudgmentContext> opaque(Verdict verdict) {
+		return new Jury<JudgmentContext>() {
 			@Override
-			public List<Judge> getJudges() {
+			public List<Judge<JudgmentContext>> getJudges() {
 				return List.of();
 			}
 

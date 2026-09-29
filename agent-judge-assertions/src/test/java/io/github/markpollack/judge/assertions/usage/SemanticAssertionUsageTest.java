@@ -10,8 +10,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.assertions.AssertionResult;
-import io.github.markpollack.judge.assertions.PolicyBinding;
-import io.github.markpollack.judge.assertions.Requirement;
+import io.github.markpollack.judge.result.PolicyBinding;
+import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.assertions.SemanticAssertionError;
 import io.github.markpollack.judge.assertions.SemanticAssertions;
 import io.github.markpollack.judge.context.JudgmentContext;
@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /** Executable caller examples: this package has no access to package-private helpers. */
 class SemanticAssertionUsageTest {
 
-	private static final Requirement READY = new Requirement("response-ready", "1", "The response is exactly READY");
+	private static final Requirement<?> READY = Requirement.text("response-ready", "1", "The response is exactly READY");
 
 	private final AtomicInteger routeCalls = new AtomicInteger();
 
@@ -60,7 +60,7 @@ class SemanticAssertionUsageTest {
 						"Independent confirmation is required before acting; none is retained");
 			});
 
-	private final Judge judge = context -> {
+	private final Judge<JudgmentContext> judge = context -> {
 		judgeCalls.incrementAndGet();
 		return "READY".equals(context.agentOutput().orElse("")) ? Judgment.pass("Response is exactly READY")
 				: Judgment.fail("Response differs from READY");
@@ -120,13 +120,13 @@ class SemanticAssertionUsageTest {
 
 	@Test
 	void namedCriticalPolicyRequestsEscalationWithoutChangingTheFinding() {
-		Requirement criticalRequirement = READY.under(criticalPolicy);
+		Requirement<?> criticalRequirement = READY.under(criticalPolicy);
 		var error = assertThrows(SemanticAssertionError.Inconclusive.class,
 				() -> assertions.assertThat(evidence("READY")).satisfies(criticalRequirement));
 		AssertionResult result = error.result();
 
 		assertNull(READY.acceptancePolicy());
-		assertEquals(AssertionResult.PolicySource.REQUIREMENT, result.policySource());
+		assertEquals(AssertionResult.PolicySource.ASSOCIATED, result.policySource());
 		assertEquals(criticalPolicy.reference(), result.policy());
 		assertEquals(JudgmentStatus.PASS, result.verdict().aggregated().producerStatus());
 		assertEquals(JudgmentStatus.ABSTAIN, result.verdict().aggregated().status());
@@ -149,7 +149,7 @@ class SemanticAssertionUsageTest {
 
 		Judgment withheld = Policies.apply(originalJudgment, criticalPolicy.reference(), criticalPolicy.policy());
 		AssertionResult reconsidered = new AssertionResult(READY.under(criticalPolicy), criticalPolicy.reference(),
-				AssertionResult.PolicySource.REQUIREMENT, Verdict.single("retained-response", withheld));
+				AssertionResult.PolicySource.ASSOCIATED, Verdict.single("retained-response", withheld));
 		assertCalls(1, 1, 1, 1);
 
 		SemanticAssertions.requireSatisfied(original);

@@ -157,18 +157,18 @@ final class Fixtures {
 
 	// ==================== Live juries ====================
 
-	static Jury passingTier(String name, String reasoning) {
-		return SimpleJury.builder()
+	static Jury<JudgmentContext> passingTier(String name, String reasoning) {
+		return SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> Judgment.pass(reasoning), name))
 			.votingStrategy(new ConsensusStrategy())
 			.build();
 	}
 
 	/** An opaque jury that returns a fixed verdict and declares no capability. */
-	static Jury returning(Verdict verdict) {
-		return new Jury() {
+	static Jury<JudgmentContext> returning(Verdict verdict) {
+		return new Jury<JudgmentContext>() {
 			@Override
-			public List<Judge> getJudges() {
+			public List<Judge<JudgmentContext>> getJudges() {
 				return List.of();
 			}
 
@@ -184,10 +184,10 @@ final class Fixtures {
 		};
 	}
 
-	static Jury throwing(RuntimeException failure) {
-		return new Jury() {
+	static Jury<JudgmentContext> throwing(RuntimeException failure) {
+		return new Jury<JudgmentContext>() {
 			@Override
-			public List<Judge> getJudges() {
+			public List<Judge<JudgmentContext>> getJudges() {
 				return List.of();
 			}
 
@@ -204,8 +204,8 @@ final class Fixtures {
 	}
 
 	/** A leaf jury whose reduction throws, so the tier returns an undecided verdict. */
-	static Jury undecidedTier(Judgment... judgments) {
-		SimpleJury.Builder builder = SimpleJury.builder().votingStrategy(new VotingStrategy() {
+	static Jury<JudgmentContext> undecidedTier(Judgment... judgments) {
+		SimpleJury.Builder<JudgmentContext> builder = SimpleJury.<JudgmentContext>builder().votingStrategy(new VotingStrategy() {
 			@Override
 			public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
 				throw new IllegalStateException("the reduction broke");
@@ -226,7 +226,7 @@ final class Fixtures {
 	/**
 	 * An opaque tier that excludes over real individuals while declaring no capability.
 	 */
-	static Jury opaqueExcludingTier(Judgment... individuals) {
+	static Jury<JudgmentContext> opaqueExcludingTier(Judgment... individuals) {
 		Map<String, Judgment> byName = new LinkedHashMap<>();
 		for (int index = 0; index < individuals.length; index++) {
 			byName.put("judge-" + (index + 1), individuals[index]);
@@ -235,7 +235,7 @@ final class Fixtures {
 	}
 
 	/** A judge that declares it may exclude, so a jury built on it is capable. */
-	record Conditional(String name, Judgment result) implements JudgeWithMetadata {
+	record Conditional(String name, Judgment result) implements JudgeWithMetadata<JudgmentContext> {
 
 		@Override
 		public Judgment judge(JudgmentContext context) {

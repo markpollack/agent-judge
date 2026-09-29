@@ -20,7 +20,7 @@ class LangChain4jEvaluatorTest {
 
 	@Test
 	void shouldEvaluateServiceCallWithJudge() {
-		Judge judge = (JudgmentContext ctx) -> Judgment.pass("Output is correct");
+		Judge<JudgmentContext> judge = (JudgmentContext ctx) -> Judgment.pass("Output is correct");
 
 		Judgment result = LangChain4jEvaluator.evaluate("Summarize", goal -> Result.<String>builder()
 			.content("A concise summary")
@@ -32,11 +32,11 @@ class LangChain4jEvaluatorTest {
 
 	@Test
 	void shouldEvaluateServiceCallWithJury() {
-		Judge passJudge = (JudgmentContext ctx) -> Judgment.pass("Good");
-		Judge failJudge = (JudgmentContext ctx) -> Judgment.fail("Bad");
-		Judge passJudge2 = (JudgmentContext ctx) -> Judgment.pass("Fine");
+		Judge<JudgmentContext> passJudge = (JudgmentContext ctx) -> Judgment.pass("Good");
+		Judge<JudgmentContext> failJudge = (JudgmentContext ctx) -> Judgment.fail("Bad");
+		Judge<JudgmentContext> passJudge2 = (JudgmentContext ctx) -> Judgment.pass("Fine");
 
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(passJudge)
 			.judge(failJudge)
 			.judge(passJudge2)

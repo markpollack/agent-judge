@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.description;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,11 +64,11 @@ public record OpaqueJuryDescription(ImplementationIdentity implementation, boole
 		judges = List.copyOf(Objects.requireNonNull(judges, "judges must not be null"));
 	}
 
-	static OpaqueJuryDescription of(Jury jury) {
+	static OpaqueJuryDescription of(Jury<?> jury) {
 		Objects.requireNonNull(jury, "jury must not be null");
 		VotingStrategy votingStrategy = jury.getVotingStrategy();
 		StrategyDescription strategy = votingStrategy == null ? null : votingStrategy.describe();
-		List<Judge> reported = Objects.requireNonNull(jury.getJudges(), "getJudges() must not return null");
+		List<? extends Judge<?>> reported = Objects.requireNonNull(jury.getJudges(), "getJudges() must not return null");
 		List<JudgeDescription> judges = new ArrayList<>(reported.size());
 		for (int index = 0; index < reported.size(); index++) {
 			try {

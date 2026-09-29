@@ -39,6 +39,7 @@
         <module>agent-judge-core</module>
         <module>agent-judge-jev</module>
         <module>agent-judge-assertions</module>
+        <module>agent-judge-assertj</module>
         <module>agent-judge-exec</module>
         <module>agent-judge-file</module>
         <module>agent-judge-llm</module>

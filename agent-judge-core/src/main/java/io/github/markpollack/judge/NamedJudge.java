@@ -35,9 +35,9 @@ import io.github.markpollack.judge.result.Judgment;
  * @see JudgeMetadata
  * @see Judges
  */
-public final class NamedJudge implements JudgeWithMetadata {
+public final class NamedJudge<E> implements JudgeWithMetadata<E> {
 
-	private final Judge delegate;
+	private final Judge<E> delegate;
 
 	private final JudgeMetadata metadata;
 
@@ -46,13 +46,13 @@ public final class NamedJudge implements JudgeWithMetadata {
 	 * @param delegate the judge to wrap
 	 * @param metadata the metadata for this judge
 	 */
-	public NamedJudge(Judge delegate, JudgeMetadata metadata) {
+	public NamedJudge(Judge<E> delegate, JudgeMetadata metadata) {
 		this.delegate = delegate;
 		this.metadata = metadata;
 	}
 
 	@Override
-	public Judgment judge(JudgmentContext context) {
+	public Judgment judge(E context) {
 		return this.delegate.judge(context);
 	}
 
@@ -74,7 +74,7 @@ public final class NamedJudge implements JudgeWithMetadata {
 	 * @return the wrapped judge
 	 * @since 0.17.0
 	 */
-	public Judge delegate() {
+	public Judge<E> delegate() {
 		return this.delegate;
 	}
 

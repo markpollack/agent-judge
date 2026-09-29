@@ -43,7 +43,7 @@ import org.springframework.ai.chat.client.ChatClient;
  * @author Mark Pollack
  * @since 0.1.0
  */
-public abstract class LLMJudge implements JudgeWithMetadata {
+public abstract class LLMJudge implements JudgeWithMetadata<JudgmentContext> {
 
 	private final JudgeMetadata metadata;
 

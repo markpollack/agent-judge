@@ -4,6 +4,9 @@
  */
 package io.github.markpollack.judge.assertions;
 
+import io.github.markpollack.judge.requirement.Requirement;
+import io.github.markpollack.judge.result.PolicyBinding;
+
 import io.github.markpollack.judge.PolicyJudges;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jury.AllMustPassStrategy;
@@ -24,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AssertionResultCoherenceTest {
 
-	private static final Requirement REQUIREMENT = new Requirement("example", "1", "exact requirement");
+	private static final Requirement<?> REQUIREMENT = Requirement.text("example", "1", "exact requirement");
 
 	private static final PolicyRef A = new PolicyRef("policy", "1", "a".repeat(64));
 
@@ -36,14 +39,14 @@ class AssertionResultCoherenceTest {
 	@Test
 	void requirementSourceNeedsAnOverrideWithTheExactResolvedIdentity() {
 		Verdict verdict = accepted();
-		assertThatThrownBy(() -> result(REQUIREMENT, A, AssertionResult.PolicySource.REQUIREMENT, verdict))
+		assertThatThrownBy(() -> result(REQUIREMENT, A, AssertionResult.PolicySource.ASSOCIATED, verdict))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("override");
 		assertThatThrownBy(
-				() -> result(REQUIREMENT.under(BINDING), B, AssertionResult.PolicySource.REQUIREMENT, verdict))
+				() -> result(REQUIREMENT.under(BINDING), B, AssertionResult.PolicySource.ASSOCIATED, verdict))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("override");
-		assertThatCode(() -> result(REQUIREMENT.under(BINDING), A, AssertionResult.PolicySource.REQUIREMENT, verdict))
+		assertThatCode(() -> result(REQUIREMENT.under(BINDING), A, AssertionResult.PolicySource.ASSOCIATED, verdict))
 			.doesNotThrowAnyException();
 	}
 
@@ -78,7 +81,7 @@ class AssertionResultCoherenceTest {
 
 	@Test
 	void composedVerdictMayHaveDifferentSeatPoliciesAndNoRootApplication() {
-		var jury = SimpleJury.builder()
+		var jury = SimpleJury.<JudgmentContext>builder()
 			.judge(PolicyJudges.apply(c -> Judgment.pass("first"), A, BINDING.policy()))
 			.judge(PolicyJudges.apply(c -> Judgment.pass("second"), B, BINDING.policy()))
 			.votingStrategy(new AllMustPassStrategy())
@@ -97,7 +100,7 @@ class AssertionResultCoherenceTest {
 		for (Judgment raw : new Judgment[] { Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "invalid protocol"),
 				Judgment.notApplicable("outside domain") }) {
 			var verdict = Verdict.single("candidate", raw);
-			var result = result(REQUIREMENT.under(BINDING), A, AssertionResult.PolicySource.REQUIREMENT, verdict);
+			var result = result(REQUIREMENT.under(BINDING), A, AssertionResult.PolicySource.ASSOCIATED, verdict);
 			assertThat(result.verdict().aggregated()).isSameAs(raw);
 			assertThat(raw.policyApplication()).isNull();
 		}
@@ -107,7 +110,7 @@ class AssertionResultCoherenceTest {
 		return Verdict.single("candidate", Policies.apply(Judgment.pass("satisfied"), A, BINDING.policy()));
 	}
 
-	private static AssertionResult result(Requirement requirement, PolicyRef policy,
+	private static AssertionResult result(Requirement<?> requirement, PolicyRef policy,
 			AssertionResult.PolicySource source, Verdict verdict) {
 		return new AssertionResult(requirement, policy, source, verdict);
 	}

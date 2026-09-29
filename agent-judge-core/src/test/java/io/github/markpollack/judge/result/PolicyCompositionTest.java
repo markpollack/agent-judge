@@ -63,7 +63,7 @@ class PolicyCompositionTest {
 	void wrapperInvokesOnceAndPureReplacementIgnoresEarlierWithholding() {
 		AtomicInteger calls = new AtomicInteger();
 		Judgment raw = raw(JudgmentStatus.FAIL);
-		Judge wrapped = PolicyJudges.apply(context -> {
+		Judge<JudgmentContext> wrapped = PolicyJudges.apply(context -> {
 			calls.incrementAndGet();
 			return raw;
 		}, POLICY, view -> new Acceptance(AcceptanceAction.ESCALATE, "critical route"));
@@ -106,15 +106,15 @@ class PolicyCompositionTest {
 
 	@Test
 	void policyWrapperPreservesEffectiveCapabilityThroughBothNamingOrders() {
-		Judge capable = new NamedJudge(context -> Judgment.notApplicable("no Java"),
+		Judge<JudgmentContext> capable = new NamedJudge<JudgmentContext>(context -> Judgment.notApplicable("no Java"),
 				new JudgeMetadata("source", "source judge", JudgeType.DETERMINISTIC, "subject has no Java"));
-		Judge namedThenPolicy = PolicyJudges.apply(Judges.named(capable, "outer"), POLICY, view -> {
+		Judge<JudgmentContext> namedThenPolicy = PolicyJudges.apply(Judges.named(capable, "outer"), POLICY, view -> {
 			throw new AssertionError("N/A must bypass");
 		});
-		Judge policyThenNamed = Judges.named(PolicyJudges.apply(capable, POLICY, view -> {
+		Judge<JudgmentContext> policyThenNamed = Judges.named(PolicyJudges.apply(capable, POLICY, view -> {
 			throw new AssertionError("N/A must bypass");
 		}), "outer");
-		for (Judge wrapper : List.of(namedThenPolicy, policyThenNamed)) {
+		for (Judge<JudgmentContext> wrapper : List.of(namedThenPolicy, policyThenNamed)) {
 			assertThat(Judges.notApplicableCapability(wrapper)).contains("subject has no Java");
 			assertThat(Judges.describe(wrapper).notApplicableWhen()).isEqualTo("subject has no Java");
 			assertThat(Judges.describe(wrapper).name()).isEqualTo("outer");
@@ -122,12 +122,12 @@ class PolicyCompositionTest {
 			var strategy = new io.github.markpollack.judge.jury.AverageVotingStrategy(0.5,
 					io.github.markpollack.judge.jury.ErrorPolicy.PROPAGATE,
 					io.github.markpollack.judge.jury.NotApplicablePolicy.TREAT_AS_FAIL);
-			var simple = io.github.markpollack.judge.jury.SimpleJury.builder()
+			var simple = io.github.markpollack.judge.jury.SimpleJury.<JudgmentContext>builder()
 				.judge(wrapper)
 				.votingStrategy(strategy)
 				.build();
 			var meta = io.github.markpollack.judge.jury.Juries.meta(strategy,
-					new io.github.markpollack.judge.jury.NamedJury("member", simple));
+					new io.github.markpollack.judge.jury.NamedJury<>("member", simple));
 			for (var jury : List.of(simple, meta)) {
 				assertThat(jury.describe().aggregateMayBeNotApplicable()).isTrue();
 				assertThat(jury.vote(CONTEXT).aggregated().status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
@@ -140,12 +140,12 @@ class PolicyCompositionTest {
 		Judgment original = Policies.apply(raw(JudgmentStatus.FAIL), POLICY,
 				view -> new Acceptance(AcceptanceAction.ESCALATE, "independent review"));
 		var strategy = new io.github.markpollack.judge.jury.AverageVotingStrategy();
-		var simple = io.github.markpollack.judge.jury.SimpleJury.builder()
+		var simple = io.github.markpollack.judge.jury.SimpleJury.<JudgmentContext>builder()
 			.judge(context -> original)
 			.votingStrategy(strategy)
 			.build();
 		var meta = io.github.markpollack.judge.jury.Juries.meta(strategy,
-				new io.github.markpollack.judge.jury.NamedJury("one", simple));
+				new io.github.markpollack.judge.jury.NamedJury<>("one", simple));
 		for (var jury : List.of(simple, meta)) {
 			Judgment aggregate = jury.vote(CONTEXT).aggregated();
 			assertThat(aggregate).isSameAs(original);

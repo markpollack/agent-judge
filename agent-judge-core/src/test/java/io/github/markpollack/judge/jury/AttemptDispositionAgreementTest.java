@@ -145,7 +145,7 @@ class AttemptDispositionAgreementTest {
 		@Test
 		@DisplayName("a determined D1 child is a legitimate USED member, since it decided")
 		void aDeterminedRejectionIsUsable() {
-			Verdict rejecting = CascadedJury.builder()
+			Verdict rejecting = CascadedJury.<JudgmentContext>builder()
 				.tier("rubric", ContainmentTest.returning(excluded()), TierPolicy.REJECT_ON_ANY_FAIL)
 				.tier("semantic", ContainmentTest.returning(decided()), TierPolicy.FINAL_TIER)
 				.build()

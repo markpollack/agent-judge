@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.jury;
 
+import io.github.markpollack.judge.result.PolicyBinding;
+
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.Judges;
@@ -38,6 +40,30 @@ public final class Juries {
 		// Utility class - no instantiation
 	}
 
+    /**
+     * Configure an application policy on every leaf of a built-in jury. The original jury
+     * is unchanged. Seats, order, weights, executor, exclusion declarations and tier
+     * strategies are retained; voting still uses the real engine. Policy runs on each
+     * leaf's producer facts before reduction/routing, not on a discarded aggregate.
+     * Custom jury implementations require an explicit application-owned policy route.
+     * @param <E> evidence type
+     * @param jury built-in jury
+     * @param policy application consequence
+     * @return configured jury preserving its full structure
+     * @throws IllegalArgumentException for an opaque or subclassed engine implementation
+     */
+    public static <E> Jury<E> withAcceptancePolicy(Jury<E> jury, PolicyBinding policy) {
+        java.util.Objects.requireNonNull(jury, "jury");
+        java.util.Objects.requireNonNull(policy, "policy");
+        if (jury.getClass() == SimpleJury.class && jury instanceof SimpleJury<E> simple)
+            return simple.withPolicy(policy);
+        if (jury.getClass() == MetaJury.class && jury instanceof MetaJury<E> meta)
+            return meta.withPolicy(policy);
+        if (jury.getClass() == CascadedJury.class && jury instanceof CascadedJury<E> cascade)
+            return cascade.withPolicy(policy);
+        throw new IllegalArgumentException("Application policy composition requires a built-in Jury; opaque wrappers cannot bypass engine guards");
+    }
+
 	/**
 	 * Create a jury from judges with automatic naming and unique identity preservation.
 	 *
@@ -53,17 +79,17 @@ public final class Juries {
 	 * read because its {@code metadata()} returns null or throws; the message names the
 	 * position
 	 */
-	public static Jury fromJudges(VotingStrategy strategy, Judge... judges) {
+	public static <E> Jury<E> fromJudges(VotingStrategy strategy, Judge<E>... judges) {
 		if (judges == null || judges.length == 0) {
 			throw new IllegalArgumentException("At least one judge is required");
 		}
 
-		SimpleJury.Builder builder = SimpleJury.builder().votingStrategy(strategy);
+		SimpleJury.Builder<E> builder = SimpleJury.<E>builder().votingStrategy(strategy);
 
 		Map<String, Integer> nameCount = new HashMap<>();
 
 		for (int i = 0; i < judges.length; i++) {
-			Judge judge = judges[i];
+			Judge<E> judge = judges[i];
 			// Names are needed now to break collisions, so unreadable metadata is a construction
 			// error here rather than an ERROR seat at vote time.
 			SimpleJury.SeatKey key = SimpleJury.SeatKey.of(judge, i);
@@ -104,11 +130,11 @@ public final class Juries {
 	 * @deprecated use {@link #meta(VotingStrategy, NamedJury...)} with explicit names
 	 */
 	@Deprecated(since = "0.14.0")
-	public static Jury combine(Jury first, Jury second, VotingStrategy metaStrategy) {
+	public static <E> Jury<E> combine(Jury<E> first, Jury<E> second, VotingStrategy metaStrategy) {
 		if (first == null || second == null) {
 			throw new IllegalArgumentException("Both juries must be non-null");
 		}
-		return meta(metaStrategy, new NamedJury("member-1", first), new NamedJury("member-2", second));
+		return meta(metaStrategy, new NamedJury<E>("member-1", first), new NamedJury<E>("member-2", second));
 	}
 
 	/**
@@ -119,15 +145,15 @@ public final class Juries {
 	 * @deprecated use {@link #meta(VotingStrategy, NamedJury...)} with explicit names
 	 */
 	@Deprecated(since = "0.14.0")
-	public static Jury allOf(VotingStrategy strategy, Jury... juries) {
+	public static <E> Jury<E> allOf(VotingStrategy strategy, Jury<E>... juries) {
 		if (juries == null || juries.length == 0) {
 			throw new IllegalArgumentException("At least one jury is required");
 		}
-		NamedJury[] members = new NamedJury[juries.length];
+		List<NamedJury<E>> members = new java.util.ArrayList<>();
 		for (int index = 0; index < juries.length; index++) {
-			members[index] = new NamedJury("member-" + (index + 1), juries[index]);
+			members.add(new NamedJury<E>("member-" + (index + 1), juries[index]));
 		}
-		return meta(strategy, members);
+		return new MetaJury<E>(members, strategy);
 	}
 
 	/**
@@ -136,11 +162,11 @@ public final class Juries {
 	 * @param members named members in execution order
 	 * @return configured named meta-jury
 	 */
-	public static Jury meta(VotingStrategy strategy, NamedJury... members) {
+	public static <E> Jury<E> meta(VotingStrategy strategy, NamedJury<E>... members) {
 		if (members == null || members.length == 0) {
 			throw new IllegalArgumentException("At least one named jury is required");
 		}
-		return new MetaJury(List.of(members), strategy);
+		return new MetaJury<E>(List.of(members), strategy);
 	}
 
 }

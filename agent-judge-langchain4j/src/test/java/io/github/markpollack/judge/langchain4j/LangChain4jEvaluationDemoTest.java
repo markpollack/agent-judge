@@ -25,7 +25,7 @@ class LangChain4jEvaluationDemoTest {
 	@Test
 	void langchain4jResultEvaluatedWithJudge() {
 		// A simple judge that checks the answer is non-empty and mentions the question topic
-		Judge relevanceCheck = (JudgmentContext ctx) -> {
+		Judge<JudgmentContext> relevanceCheck = (JudgmentContext ctx) -> {
 			String output = ctx.agentOutput().orElse("");
 			boolean relevant = !output.isEmpty() && output.toLowerCase().contains("spring boot");
 			return (relevant ? Judgment.builder().pass() : Judgment.builder().fail())
@@ -47,7 +47,7 @@ class LangChain4jEvaluationDemoTest {
 
 	@Test
 	void langchain4jResultWithToolExecutionsPreservesMetadata() {
-		Judge anyJudge = (JudgmentContext ctx) -> {
+		Judge<JudgmentContext> anyJudge = (JudgmentContext ctx) -> {
 			// Verify tool executions are accessible in metadata
 			@SuppressWarnings("unchecked")
 			List<ToolExecution> tools = (List<ToolExecution>) ctx.metadata().get("langchain4j.toolExecutions");

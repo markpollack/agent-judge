@@ -147,7 +147,7 @@ class OriginCountDomainTest {
 		@Test
 		@DisplayName("is contained by the jury boundary, leaving every individual result intact")
 		void isContainedByTheJuryBoundary() {
-			Verdict verdict = SimpleJury.builder()
+			Verdict verdict = SimpleJury.<JudgmentContext>builder()
 				.judge(Judges.named(context -> Judgment.pass("all good"), "healthy"))
 				.judge(Judges.named(context -> wrapper(HALF_OVER), "first"))
 				.judge(Judges.named(context -> wrapper(HALF_OVER), "second"))

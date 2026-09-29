@@ -79,7 +79,7 @@ class ModelBackedJudgeCapabilityTests {
 
 		assertThat(unconditional.metadata().notApplicableWhen()).isNull();
 		assertThat(Judges.notApplicableCapability(unconditional)).isEmpty();
-		assertThatCode(() -> SimpleJury.builder()
+		assertThatCode(() -> SimpleJury.<JudgmentContext>builder()
 			.judge(unconditional)
 			.votingStrategy(new ConsensusStrategy())
 			.build()).doesNotThrowAnyException();
@@ -93,7 +93,7 @@ class ModelBackedJudgeCapabilityTests {
 		assertThat(Judges.notApplicableCapability(conditional)).contains(CONDITION);
 		assertThat(Judges.describe(conditional).notApplicableWhen()).isEqualTo(CONDITION);
 
-		Jury jury = SimpleJury.builder()
+		Jury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(conditional)
 			.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
 			.build();
@@ -108,10 +108,10 @@ class ModelBackedJudgeCapabilityTests {
 	@Test
 	@DisplayName("the deduplicating rename keeps the declaration on the judge it wraps")
 	void deduplicationPreservesTheDeclaration() {
-		Judge first = judge("rubric", CONDITION, "excluded");
-		Judge second = judge("rubric", CONDITION, "excluded");
+		Judge<JudgmentContext> first = judge("rubric", CONDITION, "excluded");
+		Judge<JudgmentContext> second = judge("rubric", CONDITION, "excluded");
 
-		Jury jury = Juries.fromJudges(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE), first,
+		Jury<JudgmentContext> jury = Juries.fromJudges(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE), first,
 				second);
 
 		SimpleJuryDescription description = (SimpleJuryDescription) jury.describe();

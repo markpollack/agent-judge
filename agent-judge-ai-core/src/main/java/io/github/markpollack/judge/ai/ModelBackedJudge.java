@@ -44,7 +44,7 @@ import io.github.markpollack.judge.result.Judgment;
  * @author Mark Pollack
  * @since 0.10.0
  */
-public final class ModelBackedJudge implements JudgeWithMetadata, ConfiguredJudge {
+public final class ModelBackedJudge implements JudgeWithMetadata<JudgmentContext>, ConfiguredJudge<JudgmentContext> {
 
 	/**
 	 * Configuration key for the prompt template's {@linkplain JudgePromptTemplate#name() name}.

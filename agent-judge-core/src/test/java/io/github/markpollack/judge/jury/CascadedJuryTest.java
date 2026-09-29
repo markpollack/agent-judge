@@ -27,19 +27,19 @@ class CascadedJuryTest {
 
 	@Test
 	void rejectOnAnyFailStopsOnFirstFailure() {
-		Jury tier1 = SimpleJury.builder()
+		Jury<JudgmentContext> tier1 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Build"))
 			.judge(alwaysFail("Migration"))
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build();
 
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Final"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("final", finalTier, TierPolicy.FINAL_TIER)
 			.build();
@@ -60,19 +60,19 @@ class CascadedJuryTest {
 
 	@Test
 	void rejectOnAnyFailEscalatesWhenAllPass() {
-		Jury tier1 = SimpleJury.builder()
+		Jury<JudgmentContext> tier1 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Build"))
 			.judge(alwaysPass("Migration"))
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build();
 
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Semantic"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("final", finalTier, TierPolicy.FINAL_TIER)
 			.build();
@@ -87,19 +87,19 @@ class CascadedJuryTest {
 
 	@Test
 	void acceptOnAllPassAcceptsWhenAllPass() {
-		Jury tier2 = SimpleJury.builder()
+		Jury<JudgmentContext> tier2 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Import"))
 			.judge(alwaysPass("Annotation"))
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build();
 
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Semantic"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
 			.tier("final", finalTier, TierPolicy.FINAL_TIER)
 			.build();
@@ -112,19 +112,19 @@ class CascadedJuryTest {
 
 	@Test
 	void acceptOnAllPassEscalatesWhenAnyFails() {
-		Jury tier2 = SimpleJury.builder()
+		Jury<JudgmentContext> tier2 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Import"))
 			.judge(alwaysFail("Annotation"))
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build();
 
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Semantic"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
 			.tier("final", finalTier, TierPolicy.FINAL_TIER)
 			.build();
@@ -151,19 +151,19 @@ class CascadedJuryTest {
 	 */
 	@Test
 	void abstainingConsensusAggregateDoesNotWeakenAcceptOnAllPass() {
-		Jury splitTier = SimpleJury.builder()
+		Jury<JudgmentContext> splitTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Import"))
 			.judge(alwaysFail("Annotation"))
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build();
 
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysFail("Semantic"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("structural", splitTier, TierPolicy.ACCEPT_ON_ALL_PASS)
 			.tier("final", finalTier, TierPolicy.FINAL_TIER)
 			.build();
@@ -188,19 +188,19 @@ class CascadedJuryTest {
 	 */
 	@Test
 	void abstainingConsensusAggregateStillRejectsOnAnyIndividualFail() {
-		Jury splitTier = SimpleJury.builder()
+		Jury<JudgmentContext> splitTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Build"))
 			.judge(alwaysFail("Migration"))
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build();
 
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Semantic"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("deterministic", splitTier, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("final", finalTier, TierPolicy.FINAL_TIER)
 			.build();
@@ -216,12 +216,12 @@ class CascadedJuryTest {
 
 	@Test
 	void finalTierAlwaysProducesVerdict() {
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysFail("Semantic"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder().tier("semantic", finalTier, TierPolicy.FINAL_TIER).build();
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder().tier("semantic", finalTier, TierPolicy.FINAL_TIER).build();
 
 		Verdict verdict = jury.vote(context);
 
@@ -233,24 +233,24 @@ class CascadedJuryTest {
 
 	@Test
 	void compositeAttemptsContainCorrectPerTierVerdicts() {
-		Jury tier1 = SimpleJury.builder()
+		Jury<JudgmentContext> tier1 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Build"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.parallel(false)
 			.build();
 
-		Jury tier2 = SimpleJury.builder()
+		Jury<JudgmentContext> tier2 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Import"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.parallel(false)
 			.build();
 
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Semantic"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
 			.tier("semantic", finalTier, TierPolicy.FINAL_TIER)
@@ -268,23 +268,23 @@ class CascadedJuryTest {
 
 	@Test
 	void onlyExecutedTiersAppearInCompositeAttempts() {
-		Jury tier1 = SimpleJury.builder()
+		Jury<JudgmentContext> tier1 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysFail("Build"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.parallel(false)
 			.build();
 
-		Jury tier2 = SimpleJury.builder()
+		Jury<JudgmentContext> tier2 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Import"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Semantic"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
 			.tier("semantic", finalTier, TierPolicy.FINAL_TIER)
@@ -301,14 +301,14 @@ class CascadedJuryTest {
 
 	@Test
 	void tierExceptionCaughtAndEscalated() {
-		Jury throwingTier = new ThrowingJury();
+		Jury<JudgmentContext> throwingTier = new ThrowingJury();
 
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Fallback"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("broken", throwingTier, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("final", finalTier, TierPolicy.FINAL_TIER)
 			.build();
@@ -324,9 +324,9 @@ class CascadedJuryTest {
 
 	@Test
 	void finalTierExceptionReturnsErrorVerdict() {
-		Jury throwingFinal = new ThrowingJury();
+		Jury<JudgmentContext> throwingFinal = new ThrowingJury();
 
-		CascadedJury jury = CascadedJury.builder().tier("final", throwingFinal, TierPolicy.FINAL_TIER).build();
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder().tier("final", throwingFinal, TierPolicy.FINAL_TIER).build();
 
 		Verdict verdict = jury.vote(context);
 
@@ -342,14 +342,14 @@ class CascadedJuryTest {
 
 	@Test
 	void singleTierCascade() {
-		Jury onlyTier = SimpleJury.builder()
+		Jury<JudgmentContext> onlyTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Judge1"))
 			.judge(alwaysPass("Judge2"))
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build();
 
-		CascadedJury jury = CascadedJury.builder().tier("only", onlyTier, TierPolicy.FINAL_TIER).build();
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder().tier("only", onlyTier, TierPolicy.FINAL_TIER).build();
 
 		Verdict verdict = jury.vote(context);
 
@@ -360,19 +360,19 @@ class CascadedJuryTest {
 
 	@Test
 	void allJudgesAbstainInTierWithRejectPolicy() {
-		Jury tier1 = SimpleJury.builder()
+		Jury<JudgmentContext> tier1 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysAbstain("Abstainer1"))
 			.judge(alwaysAbstain("Abstainer2"))
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build();
 
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Semantic"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("final", finalTier, TierPolicy.FINAL_TIER)
 			.build();
@@ -386,19 +386,19 @@ class CascadedJuryTest {
 
 	@Test
 	void mixOfPassAndAbstainEscalatesForRejectPolicy() {
-		Jury tier1 = SimpleJury.builder()
+		Jury<JudgmentContext> tier1 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Build"))
 			.judge(alwaysAbstain("Coverage"))
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build();
 
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Final"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("final", finalTier, TierPolicy.FINAL_TIER)
 			.build();
@@ -411,19 +411,19 @@ class CascadedJuryTest {
 
 	@Test
 	void acceptOnAllPassEscalatesWhenAbstainPresent() {
-		Jury tier2 = SimpleJury.builder()
+		Jury<JudgmentContext> tier2 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Import"))
 			.judge(alwaysAbstain("AST"))
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build();
 
-		Jury finalTier = SimpleJury.builder()
+		Jury<JudgmentContext> finalTier = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Semantic"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
 			.tier("final", finalTier, TierPolicy.FINAL_TIER)
 			.build();
@@ -438,18 +438,18 @@ class CascadedJuryTest {
 
 	@Test
 	void builderRejectsEmptyTiers() {
-		assertThatThrownBy(() -> CascadedJury.builder().build()).isInstanceOf(IllegalStateException.class)
+		assertThatThrownBy(() -> CascadedJury.<JudgmentContext>builder().build()).isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("at least one tier");
 	}
 
 	@Test
 	void builderRejectsNonFinalTierAsLast() {
-		Jury jury = SimpleJury.builder()
+		Jury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Judge1"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		assertThatThrownBy(() -> CascadedJury.builder().tier("only", jury, TierPolicy.REJECT_ON_ANY_FAIL).build())
+		assertThatThrownBy(() -> CascadedJury.<JudgmentContext>builder().tier("only", jury, TierPolicy.REJECT_ON_ANY_FAIL).build())
 			.isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("FINAL_TIER");
 	}
@@ -458,7 +458,7 @@ class CascadedJuryTest {
 
 	@Test
 	void threeTierCascadeWithAllPassingTiers() {
-		Jury tier1 = SimpleJury.builder()
+		Jury<JudgmentContext> tier1 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Build"))
 			.judge(alwaysPass("Migration"))
 			.judge(alwaysPass("Tests"))
@@ -466,19 +466,19 @@ class CascadedJuryTest {
 			.parallel(false)
 			.build();
 
-		Jury tier2 = SimpleJury.builder()
+		Jury<JudgmentContext> tier2 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("ImportDiff"))
 			.judge(alwaysPass("ASTDiff"))
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build();
 
-		Jury tier3 = SimpleJury.builder()
+		Jury<JudgmentContext> tier3 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Semantic"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
 			.tier("semantic", tier3, TierPolicy.FINAL_TIER)
@@ -493,25 +493,25 @@ class CascadedJuryTest {
 
 	@Test
 	void threeTierCascadeEscalatesAllTheWayToFinal() {
-		Jury tier1 = SimpleJury.builder()
+		Jury<JudgmentContext> tier1 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Build"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.parallel(false)
 			.build();
 
-		Jury tier2 = SimpleJury.builder()
+		Jury<JudgmentContext> tier2 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Import"))
 			.judge(alwaysFail("AST"))
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.build();
 
-		Jury tier3 = SimpleJury.builder()
+		Jury<JudgmentContext> tier3 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Semantic"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
 			.tier("semantic", tier3, TierPolicy.FINAL_TIER)
@@ -528,15 +528,15 @@ class CascadedJuryTest {
 
 	@Test
 	void getJudgesReturnsFlattenedJudgesFromAllTiers() {
-		Jury tier1 = SimpleJury.builder()
+		Jury<JudgmentContext> tier1 = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("J1"))
 			.judge(alwaysPass("J2"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		Jury tier2 = SimpleJury.builder().judge(alwaysPass("J3")).votingStrategy(new MajorityVotingStrategy()).build();
+		Jury<JudgmentContext> tier2 = SimpleJury.<JudgmentContext>builder().judge(alwaysPass("J3")).votingStrategy(new MajorityVotingStrategy()).build();
 
-		CascadedJury jury = CascadedJury.builder()
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder()
 			.tier("t1", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("t2", tier2, TierPolicy.FINAL_TIER)
 			.build();
@@ -546,9 +546,9 @@ class CascadedJuryTest {
 
 	@Test
 	void getVotingStrategyReturnsNull() {
-		Jury tier = SimpleJury.builder().judge(alwaysPass("J1")).votingStrategy(new MajorityVotingStrategy()).build();
+		Jury<JudgmentContext> tier = SimpleJury.<JudgmentContext>builder().judge(alwaysPass("J1")).votingStrategy(new MajorityVotingStrategy()).build();
 
-		CascadedJury jury = CascadedJury.builder().tier("final", tier, TierPolicy.FINAL_TIER).build();
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder().tier("final", tier, TierPolicy.FINAL_TIER).build();
 
 		assertThat(jury.getVotingStrategy()).isNull();
 	}
@@ -558,10 +558,10 @@ class CascadedJuryTest {
 	/**
 	 * A jury that throws an exception on vote().
 	 */
-	private static class ThrowingJury implements Jury {
+	private static class ThrowingJury implements Jury<JudgmentContext> {
 
 		@Override
-		public java.util.List<io.github.markpollack.judge.Judge> getJudges() {
+		public java.util.List<io.github.markpollack.judge.Judge<JudgmentContext>> getJudges() {
 			return java.util.List.of();
 		}
 
@@ -584,14 +584,14 @@ class CascadedJuryTest {
 		// Before the fix, the judge's exception escaped SimpleJury and CascadedJury
 		// recorded the whole tier as JURY_EXECUTION_FAILED — every other judge in the
 		// tier lost, and the item scored as though the subject had produced nothing.
-		Jury scoring = SimpleJury.builder()
+		Jury<JudgmentContext> scoring = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Build"))
 			.judge(alwaysThrows("Coverage", new IllegalStateException("rate limited")))
 			.judge(alwaysPass("Style"))
 			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
 			.build();
 
-		CascadedJury jury = CascadedJury.builder().tier("scoring", scoring, TierPolicy.FINAL_TIER).build();
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder().tier("scoring", scoring, TierPolicy.FINAL_TIER).build();
 
 		Verdict verdict = jury.vote(context);
 
@@ -608,7 +608,7 @@ class CascadedJuryTest {
 	void judgeWhoseMetadataFailsDoesNotCollapseItsCascadeTier() {
 		// Before the fix, reading the judge's name threw out of SimpleJury.vote() and the
 		// cascade recorded the whole tier as JURY_EXECUTION_FAILED.
-		Jury scoring = SimpleJury.builder()
+		Jury<JudgmentContext> scoring = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Build"))
 			.judge(nullMetadata(booleanPass("never kept")))
 			.judge(throwingMetadata(new IllegalStateException("registry offline"), booleanPass("never kept")))
@@ -616,7 +616,7 @@ class CascadedJuryTest {
 			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
 			.build();
 
-		CascadedJury jury = CascadedJury.builder().tier("scoring", scoring, TierPolicy.FINAL_TIER).build();
+		CascadedJury<JudgmentContext> jury = CascadedJury.<JudgmentContext>builder().tier("scoring", scoring, TierPolicy.FINAL_TIER).build();
 
 		Verdict verdict = jury.vote(context);
 

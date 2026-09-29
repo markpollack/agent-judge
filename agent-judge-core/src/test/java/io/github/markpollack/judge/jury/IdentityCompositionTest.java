@@ -45,7 +45,7 @@ class IdentityCompositionTest {
 				new NumericAssessment(4, NumericKind.ORDINAL_EXPECTATION, "impact:v1", 0, 4,
 						List.of("none", "low", "medium", "high", "critical"), QualityDirection.INCREASING),
 				null), null, null, null, "verified violation", List.of(), null, null, Map.of());
-		Verdict verdict = SimpleJury.builder()
+		Verdict verdict = SimpleJury.<JudgmentContext>builder()
 			.judge(context -> negative)
 			.votingStrategy(new AverageVotingStrategy())
 			.build()
@@ -57,7 +57,7 @@ class IdentityCompositionTest {
 	void oneSeatDoesNotLoseEscalationIntent() {
 		Judgment escalated = new Judgment(JudgmentStatus.FAIL, null, null, null, null, "verified violation", List.of(),
 				null, new AppliedPolicy(POLICY, AcceptanceAction.ESCALATE, "independent review required"), Map.of());
-		Verdict verdict = SimpleJury.builder()
+		Verdict verdict = SimpleJury.<JudgmentContext>builder()
 			.judge(context -> escalated)
 			.votingStrategy(new AverageVotingStrategy())
 			.build()
@@ -95,16 +95,16 @@ class IdentityCompositionTest {
 				return NotApplicablePolicy.TREAT_AS_FAIL;
 			}
 		};
-		Judge judge = new NamedJudge(context -> original,
+		Judge<JudgmentContext> judge = new NamedJudge<JudgmentContext>(context -> original,
 				new JudgeMetadata("one", "one", JudgeType.DETERMINISTIC, "subject has no Java"));
 		for (boolean parallel : List.of(false, true)) {
-			SimpleJury simple = SimpleJury.builder()
+			SimpleJury<JudgmentContext> simple = SimpleJury.<JudgmentContext>builder()
 				.judge(judge)
 				.parallel(parallel)
 				.votingStrategy(neverReduce)
 				.build();
 			Verdict first = simple.vote(CONTEXT);
-			Verdict meta = Juries.meta(neverReduce, new NamedJury("member", simple)).vote(CONTEXT);
+			Verdict meta = Juries.meta(neverReduce, new NamedJury<JudgmentContext>("member", simple)).vote(CONTEXT);
 			for (Verdict verdict : List.of(first, meta)) {
 				assertThat(verdict.aggregated()).isSameAs(original);
 				assertThat(verdict.individual()).containsExactly(original);
@@ -114,11 +114,11 @@ class IdentityCompositionTest {
 			assertThat(simple.aggregateMayBeNotApplicable()).isTrue();
 			assertThat(simple.describe().aggregateMayBeNotApplicable()).isTrue();
 			assertThat(
-					Juries.meta(neverReduce, new NamedJury("member", simple)).describe().aggregateMayBeNotApplicable())
+					Juries.meta(neverReduce, new NamedJury<JudgmentContext>("member", simple)).describe().aggregateMayBeNotApplicable())
 				.isTrue();
 		}
 		assertThat(reductions.get()).isZero();
-		assertThatThrownBy(() -> SimpleJury.builder().judge(judge).votingStrategy(new AverageVotingStrategy()).build())
+		assertThatThrownBy(() -> SimpleJury.<JudgmentContext>builder().judge(judge).votingStrategy(new AverageVotingStrategy()).build())
 			.isInstanceOf(IllegalArgumentException.class);
 	}
 
@@ -131,12 +131,12 @@ class IdentityCompositionTest {
 					throw new IllegalStateException("policy missing");
 				}), Policies.apply(Judgment.pass("finding"), POLICY,
 						view -> new Acceptance(AcceptanceAction.ESCALATE, "critical consequence")))) {
-			SimpleJury simple = SimpleJury.builder()
+			SimpleJury<JudgmentContext> simple = SimpleJury.<JudgmentContext>builder()
 				.judge(context -> judgment)
 				.votingStrategy(new AverageVotingStrategy(0.9, ErrorPolicy.TREAT_AS_FAIL))
 				.build();
 			assertThat(simple.vote(CONTEXT).aggregated()).isSameAs(judgment);
-			assertThat(Juries.meta(new AverageVotingStrategy(ErrorPolicy.TREAT_AS_FAIL), new NamedJury("one", simple))
+			assertThat(Juries.meta(new AverageVotingStrategy(ErrorPolicy.TREAT_AS_FAIL), new NamedJury<JudgmentContext>("one", simple))
 				.vote(CONTEXT)
 				.aggregated()).isSameAs(judgment);
 		}
@@ -146,7 +146,7 @@ class IdentityCompositionTest {
 	void twoDeclaredSeatsAndDirectStrategyRemainExplicitReductions() {
 		Judgment lowPositive = Judgment.builder().pass().score(0.1).reasoning("accepted positive").build();
 		AverageVotingStrategy strategy = new AverageVotingStrategy(ErrorPolicy.IGNORE);
-		Verdict verdict = SimpleJury.builder()
+		Verdict verdict = SimpleJury.<JudgmentContext>builder()
 			.judge(context -> lowPositive)
 			.judge(context -> Judgment.error("backend unavailable"))
 			.votingStrategy(strategy)
@@ -155,14 +155,14 @@ class IdentityCompositionTest {
 		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(verdict.aggregated()).isNotEqualTo(lowPositive);
 		assertThat(strategy.aggregate(List.of(lowPositive), Map.of()).status()).isEqualTo(JudgmentStatus.FAIL);
-		Jury broken = new Jury() {
+		Jury<JudgmentContext> broken = new Jury<JudgmentContext>() {
 			@Override
 			public Verdict vote(JudgmentContext context) {
 				throw new IllegalStateException("member failed");
 			}
 
 			@Override
-			public List<Judge> getJudges() {
+			public List<Judge<JudgmentContext>> getJudges() {
 				return List.of();
 			}
 
@@ -173,9 +173,9 @@ class IdentityCompositionTest {
 		};
 		Verdict meta = Juries
 			.meta(strategy,
-					new NamedJury("valid",
-							SimpleJury.builder().judge(context -> lowPositive).votingStrategy(strategy).build()),
-					new NamedJury("broken", broken))
+					new NamedJury<JudgmentContext>("valid",
+							SimpleJury.<JudgmentContext>builder().judge(context -> lowPositive).votingStrategy(strategy).build()),
+					new NamedJury<JudgmentContext>("broken", broken))
 			.vote(CONTEXT);
 		assertThat(meta.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(meta.individual()).containsExactly(lowPositive);

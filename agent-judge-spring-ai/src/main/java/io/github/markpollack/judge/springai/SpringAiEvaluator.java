@@ -41,7 +41,7 @@ public final class SpringAiEvaluator {
 	 * @param judge judge to apply
 	 * @return the judgment
 	 */
-	public static Judgment evaluate(String goal, Supplier<ChatResponse> call, Judge judge) {
+	public static Judgment evaluate(String goal, Supplier<ChatResponse> call, Judge<JudgmentContext> judge) {
 		return evaluate(goal, call, judge, Map.of());
 	}
 
@@ -54,7 +54,7 @@ public final class SpringAiEvaluator {
 	 * @param extraMetadata additional context metadata
 	 * @return the judgment
 	 */
-	public static Judgment evaluate(String goal, Supplier<ChatResponse> call, Judge judge,
+	public static Judgment evaluate(String goal, Supplier<ChatResponse> call, Judge<JudgmentContext> judge,
 			Map<String, Object> extraMetadata) {
 		JudgmentContext context = SpringAiJudgmentContextBuilder.execute(goal, call, extraMetadata);
 		return judge.judge(context);
@@ -67,7 +67,7 @@ public final class SpringAiEvaluator {
 	 * @param jury jury to apply
 	 * @return the verdict
 	 */
-	public static Verdict evaluate(String goal, Supplier<ChatResponse> call, Jury jury) {
+	public static Verdict evaluate(String goal, Supplier<ChatResponse> call, Jury<JudgmentContext> jury) {
 		return evaluate(goal, call, jury, Map.of());
 	}
 
@@ -80,7 +80,7 @@ public final class SpringAiEvaluator {
 	 * @param extraMetadata additional context metadata
 	 * @return the verdict
 	 */
-	public static Verdict evaluate(String goal, Supplier<ChatResponse> call, Jury jury,
+	public static Verdict evaluate(String goal, Supplier<ChatResponse> call, Jury<JudgmentContext> jury,
 			Map<String, Object> extraMetadata) {
 		JudgmentContext context = SpringAiJudgmentContextBuilder.execute(goal, call, extraMetadata);
 		return jury.vote(context);

@@ -30,7 +30,7 @@ class KoogEvaluatorTest {
 	@Test
 	void shouldEvaluateWithSingleJudge() {
 		AIAgent<String, String> agent = mockAgent();
-		Judge judge = (JudgmentContext ctx) -> Judgment.pass("Output looks good");
+		Judge<JudgmentContext> judge = (JudgmentContext ctx) -> Judgment.pass("Output looks good");
 
 		Judgment result = KoogEvaluator.evaluate(agent, "Build a REST API", judge);
 
@@ -41,11 +41,11 @@ class KoogEvaluatorTest {
 	@Test
 	void shouldEvaluateWithJury() {
 		AIAgent<String, String> agent = mockAgent();
-		Judge passJudge = (JudgmentContext ctx) -> Judgment.pass("Looks good");
-		Judge failJudge = (JudgmentContext ctx) -> Judgment.fail("Missing tests");
-		Judge passJudge2 = (JudgmentContext ctx) -> Judgment.pass("Compiles fine");
+		Judge<JudgmentContext> passJudge = (JudgmentContext ctx) -> Judgment.pass("Looks good");
+		Judge<JudgmentContext> failJudge = (JudgmentContext ctx) -> Judgment.fail("Missing tests");
+		Judge<JudgmentContext> passJudge2 = (JudgmentContext ctx) -> Judgment.pass("Compiles fine");
 
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(passJudge)
 			.judge(failJudge)
 			.judge(passJudge2)

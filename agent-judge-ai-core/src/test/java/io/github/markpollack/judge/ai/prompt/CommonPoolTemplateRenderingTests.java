@@ -65,9 +65,9 @@ class CommonPoolTemplateRenderingTests {
 		// worker, and the two template-backed judges below vanished from the vote.
 		var template = JudgePromptTemplate.fromClasspath(TEMPLATE);
 
-		Judge renders = context -> Judgment.pass(blindContextClassLoader(() -> template.render(context)));
+		Judge<JudgmentContext> renders = context -> Judgment.pass(blindContextClassLoader(() -> template.render(context)));
 
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(renders)
 			.judge(renders)
 			.judge(context -> Judgment.pass("no template"))

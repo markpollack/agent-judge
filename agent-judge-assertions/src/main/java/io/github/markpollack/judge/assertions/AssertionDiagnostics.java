@@ -4,6 +4,8 @@
  */
 package io.github.markpollack.judge.assertions;
 
+import io.github.markpollack.judge.requirement.Requirement;
+
 import java.util.ArrayList;
 import java.util.List;
 

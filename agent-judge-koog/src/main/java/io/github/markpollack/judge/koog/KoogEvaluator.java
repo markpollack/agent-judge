@@ -34,7 +34,7 @@ public final class KoogEvaluator {
 	 * @param judge the judge to evaluate the result
 	 * @return the judgment
 	 */
-	public static Judgment evaluate(AIAgent<String, String> agent, String input, Judge judge) {
+	public static Judgment evaluate(AIAgent<String, String> agent, String input, Judge<JudgmentContext> judge) {
 		return evaluate(agent, input, judge, Map.of());
 	}
 
@@ -48,7 +48,7 @@ public final class KoogEvaluator {
 	 * run ID, experiment tag, dataset row index)
 	 * @return the judgment
 	 */
-	public static Judgment evaluate(AIAgent<String, String> agent, String input, Judge judge,
+	public static Judgment evaluate(AIAgent<String, String> agent, String input, Judge<JudgmentContext> judge,
 			Map<String, Object> extraMetadata) {
 		JudgmentContext context = KoogJudgmentContextBuilder.from(agent, input, extraMetadata);
 		return judge.judge(context);
@@ -61,7 +61,7 @@ public final class KoogEvaluator {
 	 * @param jury the jury to evaluate the result
 	 * @return the verdict
 	 */
-	public static Verdict evaluate(AIAgent<String, String> agent, String input, Jury jury) {
+	public static Verdict evaluate(AIAgent<String, String> agent, String input, Jury<JudgmentContext> jury) {
 		return evaluate(agent, input, jury, Map.of());
 	}
 
@@ -73,7 +73,7 @@ public final class KoogEvaluator {
 	 * @param extraMetadata additional metadata to attach to the JudgmentContext
 	 * @return the verdict
 	 */
-	public static Verdict evaluate(AIAgent<String, String> agent, String input, Jury jury,
+	public static Verdict evaluate(AIAgent<String, String> agent, String input, Jury<JudgmentContext> jury,
 			Map<String, Object> extraMetadata) {
 		JudgmentContext context = KoogJudgmentContextBuilder.from(agent, input, extraMetadata);
 		return jury.vote(context);

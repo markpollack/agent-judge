@@ -28,7 +28,7 @@ class KoogEvaluationDemoTest {
 		when(agent.getId()).thenReturn("docs-assistant");
 
 		// A simple judge that checks whether the output mentions the key concept
-		Judge containsKeyConceptJudge = (JudgmentContext ctx) -> {
+		Judge<JudgmentContext> containsKeyConceptJudge = (JudgmentContext ctx) -> {
 			String output = ctx.agentOutput().orElse("");
 			boolean mentionsDI = output.toLowerCase().contains("dependencies")
 					&& output.toLowerCase().contains("external");

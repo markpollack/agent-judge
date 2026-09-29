@@ -88,12 +88,12 @@ class SubjectCauseTest {
 	@Test
 	@DisplayName("a cascade copying a tier keeps the leaf's cause, and the leaf is counted once")
 	void aCopiedLeafKeepsItsCause() {
-		Jury tier = SimpleJury.builder()
+		Jury<JudgmentContext> tier = SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> emptySubject(), "diff-size"))
 			.votingStrategy(new AllMustPassStrategy())
 			.build();
 
-		Verdict verdict = CascadedJury.builder()
+		Verdict verdict = CascadedJury.<JudgmentContext>builder()
 			.tier("gate", tier, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic", passing(), TierPolicy.FINAL_TIER)
 			.build()
@@ -111,7 +111,7 @@ class SubjectCauseTest {
 	@Test
 	@DisplayName("an empty subject alongside a quality failure: two leaves, one aggregate, no cause on the aggregate")
 	void anEmptySubjectBesideAQualityFailure() {
-		Verdict verdict = SimpleJury.builder()
+		Verdict verdict = SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> emptySubject(), "diff-size"))
 			.judge(Judges.named(context -> Judgment.fail("the answer contradicted its sources"), "faithfulness"))
 			.votingStrategy(new AllMustPassStrategy())
@@ -151,8 +151,8 @@ class SubjectCauseTest {
 		return (Map<String, Object>) judgment.metadata().get(Judgment.AGGREGATION_KEY);
 	}
 
-	private static Jury passing() {
-		return SimpleJury.builder()
+	private static Jury<JudgmentContext> passing() {
+		return SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> Judgment.pass("OK"), "semantic"))
 			.votingStrategy(new ConsensusStrategy())
 			.build();

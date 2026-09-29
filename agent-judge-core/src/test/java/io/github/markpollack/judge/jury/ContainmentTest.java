@@ -73,8 +73,8 @@ class ContainmentTest {
 
 	}
 
-	private static Jury juryWith(VotingStrategy strategy) {
-		return SimpleJury.builder()
+	private static Jury<JudgmentContext> juryWith(VotingStrategy strategy) {
+		return SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> PASS, "first"))
 			.judge(Judges.named(context -> FAIL, "second"))
 			.votingStrategy(strategy)
@@ -210,7 +210,7 @@ class ContainmentTest {
 		@Test
 		@DisplayName("an Error is not a judgment any jury can report on, so it is not caught")
 		void errorsAreNotCaught() {
-			Jury jury = juryWith(new Misbehaving("fatal", () -> {
+			Jury<JudgmentContext> jury = juryWith(new Misbehaving("fatal", () -> {
 				throw new StackOverflowError("simulated");
 			}));
 
@@ -228,9 +228,9 @@ class ContainmentTest {
 		void aThrowingMemberIsAStageFailure() {
 			Verdict verdict = Juries
 				.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-						new NamedJury("first", returning(Verdict.single("a", PASS))),
-						new NamedJury("broken", throwing(new IllegalArgumentException("boom"))),
-						new NamedJury("last", returning(Verdict.single("b", PASS))))
+						new NamedJury<JudgmentContext>("first", returning(Verdict.single("a", PASS))),
+						new NamedJury<JudgmentContext>("broken", throwing(new IllegalArgumentException("boom"))),
+						new NamedJury<JudgmentContext>("last", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
 
 			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
@@ -255,8 +255,8 @@ class ContainmentTest {
 
 			Verdict verdict = Juries
 				.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-						new NamedJury("broken", returning(undecided)),
-						new NamedJury("last", returning(Verdict.single("b", PASS))))
+						new NamedJury<JudgmentContext>("broken", returning(undecided)),
+						new NamedJury<JudgmentContext>("last", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
 
 			CompositeAttempt attempt = verdict.compositeAttempts().get(0);
@@ -275,8 +275,8 @@ class ContainmentTest {
 
 			Verdict verdict = Juries
 				.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-						new NamedJury("presumptuous", returning(excluded)),
-						new NamedJury("last", returning(Verdict.single("b", PASS))))
+						new NamedJury<JudgmentContext>("presumptuous", returning(excluded)),
+						new NamedJury<JudgmentContext>("last", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
 
 			CompositeAttempt attempt = verdict.compositeAttempts().get(0);
@@ -299,8 +299,8 @@ class ContainmentTest {
 
 			Verdict verdict = Juries
 				.meta(new ConsensusStrategy(errorPolicy, NotApplicablePolicy.EXCLUDE),
-						new NamedJury("propagating", returning(member)),
-						new NamedJury("healthy", returning(Verdict.single("b", PASS))))
+						new NamedJury<JudgmentContext>("propagating", returning(member)),
+						new NamedJury<JudgmentContext>("healthy", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
 
 			assertThat(verdict.compositeAttempts().get(0).disposition()).as("it determined an outcome")
@@ -319,8 +319,8 @@ class ContainmentTest {
 
 			Verdict verdict = Juries
 				.meta(new AllMustPassStrategy(errorPolicy, NotApplicablePolicy.EXCLUDE),
-						new NamedJury("broken", returning(machinery)),
-						new NamedJury("healthy", returning(Verdict.single("b", PASS))))
+						new NamedJury<JudgmentContext>("broken", returning(machinery)),
+						new NamedJury<JudgmentContext>("healthy", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
 
 			assertThat(verdict.aggregated().status()).as("a machinery failure never becomes a rejection")
@@ -332,12 +332,12 @@ class ContainmentTest {
 		@MethodSource("io.github.markpollack.judge.jury.ContainmentTest#stageFailureMatrix")
 		@DisplayName("every machinery cause, every stage-failure reason, every error policy: never a rejection")
 		void theWholeMatrix(ErrorPolicy errorPolicy, JudgmentReasonCode machineryCode, DispositionReason reason) {
-			Jury member = memberFailing(reason, machineryCode);
+			Jury<JudgmentContext> member = memberFailing(reason, machineryCode);
 
 			Verdict verdict = Juries
 				.meta(new AllMustPassStrategy(errorPolicy, NotApplicablePolicy.EXCLUDE),
-						new NamedJury("broken", member),
-						new NamedJury("healthy", returning(Verdict.single("b", PASS))))
+						new NamedJury<JudgmentContext>("broken", member),
+						new NamedJury<JudgmentContext>("healthy", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
 
 			CompositeAttempt attempt = verdict.compositeAttempts().get(0);
@@ -354,7 +354,7 @@ class ContainmentTest {
 		}
 
 		/** A member that fails its stage in the way the matrix asks for. */
-		private Jury memberFailing(DispositionReason reason, JudgmentReasonCode machineryCode) {
+		private Jury<JudgmentContext> memberFailing(DispositionReason reason, JudgmentReasonCode machineryCode) {
 			return switch (reason) {
 				case INVALID_TIER_RESULT -> throw new IllegalArgumentException("Only assessment cascade tiers use this reason");
 				case EXECUTION_FAILED -> throwing(new IllegalStateException("boom"));
@@ -372,10 +372,10 @@ class ContainmentTest {
 		@Test
 		@DisplayName("a nested meta-jury contains its child's failure rather than inheriting it")
 		void nestedMetaJuriesContainTheirChildren() {
-			Jury inner = Juries.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-					new NamedJury("broken", throwing(new IllegalStateException("boom"))));
-			Jury outer = Juries.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-					new NamedJury("inner", inner), new NamedJury("healthy", returning(Verdict.single("b", PASS))));
+			Jury<JudgmentContext> inner = Juries.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+					new NamedJury<JudgmentContext>("broken", throwing(new IllegalStateException("boom"))));
+			Jury<JudgmentContext> outer = Juries.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+					new NamedJury<JudgmentContext>("inner", inner), new NamedJury<JudgmentContext>("healthy", returning(Verdict.single("b", PASS))));
 
 			Verdict verdict = outer.vote(CONTEXT);
 
@@ -419,10 +419,10 @@ class ContainmentTest {
 			.build();
 	}
 
-	static Jury returning(Verdict verdict) {
-		return new Jury() {
+	static Jury<JudgmentContext> returning(Verdict verdict) {
+		return new Jury<JudgmentContext>() {
 			@Override
-			public List<Judge> getJudges() {
+			public List<Judge<JudgmentContext>> getJudges() {
 				return List.of();
 			}
 
@@ -438,10 +438,10 @@ class ContainmentTest {
 		};
 	}
 
-	static Jury throwing(RuntimeException failure) {
-		return new Jury() {
+	static Jury<JudgmentContext> throwing(RuntimeException failure) {
+		return new Jury<JudgmentContext>() {
 			@Override
-			public List<Judge> getJudges() {
+			public List<Judge<JudgmentContext>> getJudges() {
 				return List.of();
 			}
 

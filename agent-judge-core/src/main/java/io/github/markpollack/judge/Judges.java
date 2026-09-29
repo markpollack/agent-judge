@@ -102,7 +102,7 @@ public final class Judges {
 	 * @return named judge with metadata
 	 * @throws IllegalArgumentException if the name is blank
 	 */
-	public static NamedJudge named(Judge judge, String name) {
+	public static <E> NamedJudge<E> named(Judge<E> judge, String name) {
 		return named(judge, name, null, JudgeType.DETERMINISTIC);
 	}
 
@@ -114,7 +114,7 @@ public final class Judges {
 	 * @return named judge with metadata
 	 * @throws IllegalArgumentException if the name is blank
 	 */
-	public static NamedJudge named(Judge judge, String name, String description) {
+	public static <E> NamedJudge<E> named(Judge<E> judge, String name, String description) {
 		return named(judge, name, description, JudgeType.DETERMINISTIC);
 	}
 
@@ -127,10 +127,10 @@ public final class Judges {
 	 * @return named judge with metadata
 	 * @throws IllegalArgumentException if the name is blank
 	 */
-	public static NamedJudge named(Judge judge, String name, String description, JudgeType type) {
+	public static <E> NamedJudge<E> named(Judge<E> judge, String name, String description, JudgeType type) {
 		// Absence, deliberately: a wrapper that manufactured a capability would let any judge
 		// exclude a criterion simply by being renamed.
-		return new NamedJudge(judge, new JudgeMetadata(name, description, type, null));
+		return new NamedJudge<E>(judge, new JudgeMetadata(name, description, type, null));
 	}
 
 	/**
@@ -138,7 +138,7 @@ public final class Judges {
 	 * @param reasoning the reasoning to include in judgment
 	 * @return judge that always passes
 	 */
-	public static Judge alwaysPass(String reasoning) {
+	public static <E> Judge<E> alwaysPass(String reasoning) {
 		return ctx -> Judgment.pass(reasoning);
 	}
 
@@ -147,7 +147,7 @@ public final class Judges {
 	 * @param reasoning the reasoning to include in judgment
 	 * @return judge that always fails
 	 */
-	public static Judge alwaysFail(String reasoning) {
+	public static <E> Judge<E> alwaysFail(String reasoning) {
 		return ctx -> Judgment.fail(reasoning);
 	}
 
@@ -162,8 +162,8 @@ public final class Judges {
 	 * @param judge the judge to extract metadata from
 	 * @return metadata if available, otherwise empty
 	 */
-	public static Optional<JudgeMetadata> tryMetadata(Judge judge) {
-		return (judge instanceof JudgeWithMetadata jwm) ? Optional.of(jwm.metadata()) : Optional.empty();
+	public static Optional<JudgeMetadata> tryMetadata(Judge<?> judge) {
+		return (judge instanceof JudgeWithMetadata<?> jwm) ? Optional.of(jwm.metadata()) : Optional.empty();
 	}
 
 	/**
@@ -194,16 +194,16 @@ public final class Judges {
 	 * silently turn an unreadable judge into an incapable one
 	 * @since 0.17.0
 	 */
-	public static Optional<String> notApplicableCapability(Judge judge) {
+	public static Optional<String> notApplicableCapability(Judge<?> judge) {
 		Objects.requireNonNull(judge, "judge must not be null");
-		Judge current = judge;
+		Judge<?> current = judge;
 		while (true) {
 			JudgeMetadata metadata = readableMetadataOf(current,
 					"Judge implemented by " + ImplementationIdentity.of(current.getClass()).toPortable());
 			if (metadata != null && metadata.notApplicableWhen() != null) {
 				return Optional.of(metadata.notApplicableWhen());
 			}
-			if (!(current instanceof NamedJudge wrapper)) {
+			if (!(current instanceof NamedJudge<?> wrapper)) {
 				return Optional.empty();
 			}
 			current = Objects.requireNonNull(wrapper.delegate(), "a NamedJudge must wrap a judge");
@@ -234,10 +234,10 @@ public final class Judges {
 	 * misstate it
 	 * @since 0.17.0
 	 */
-	public static JudgeDescription describe(Judge judge) {
+	public static JudgeDescription describe(Judge<?> judge) {
 		Objects.requireNonNull(judge, "judge must not be null");
-		Judge innermost = judge;
-		while (innermost instanceof NamedJudge named) {
+		Judge<?> innermost = judge;
+		while (innermost instanceof NamedJudge<?> named) {
 			innermost = Objects.requireNonNull(named.delegate(), "a NamedJudge must wrap a judge");
 		}
 		ImplementationIdentity implementation = ImplementationIdentity.of(innermost.getClass());
@@ -246,13 +246,13 @@ public final class Judges {
 		// around a NamedJudge that Juries.fromJudges builds for a duplicate name, that is the
 		// caller's own label and type, not the innermost implementation's (usually none).
 		JudgeMetadata inner = null;
-		if (judge instanceof NamedJudge wrapper) {
+		if (judge instanceof NamedJudge<?> wrapper) {
 			String outerLabel = (outer != null && outer.name() != null) ? "'" + outer.name() + "'"
 					: "implemented by " + implementation.toPortable();
 			inner = readableMetadataOf(wrapper.delegate(), "The judge wrapped by judge " + outerLabel);
 		}
 		Map<String, Object> configuration = null;
-		if (innermost instanceof ConfiguredJudge configured) {
+		if (innermost instanceof ConfiguredJudge<?> configured) {
 			configuration = configured.configuration();
 			if (configuration == null) {
 				throw new NullPointerException("ConfiguredJudge " + implementation.toPortable()
@@ -279,8 +279,8 @@ public final class Judges {
 	 * @return its metadata, or null when the judge does not implement {@link JudgeWithMetadata}
 	 * @throws IllegalArgumentException if {@code metadata()} returns null or throws
 	 */
-	private static JudgeMetadata readableMetadataOf(Judge judge, String subject) {
-		if (!(judge instanceof JudgeWithMetadata withMetadata)) {
+	private static JudgeMetadata readableMetadataOf(Judge<?> judge, String subject) {
+		if (!(judge instanceof JudgeWithMetadata<?> withMetadata)) {
 			return null;
 		}
 		JudgeMetadata metadata;
@@ -315,7 +315,7 @@ public final class Judges {
 	 * @param second the second judge to execute (only if first passes)
 	 * @return composed judge with AND logic
 	 */
-	public static Judge and(Judge first, Judge second) {
+	public static <E> Judge<E> and(Judge<? super E> first, Judge<? super E> second) {
 		return ctx -> {
 			Judgment firstResult = first.judge(ctx);
 			return firstResult.pass() ? second.judge(ctx) : firstResult;
@@ -339,7 +339,7 @@ public final class Judges {
 	 * @param second the second judge to execute (only if the first does not pass)
 	 * @return composed judge with OR logic
 	 */
-	public static Judge or(Judge first, Judge second) {
+	public static <E> Judge<E> or(Judge<? super E> first, Judge<? super E> second) {
 		return ctx -> {
 			Judgment firstResult = first.judge(ctx);
 			return firstResult.pass() ? firstResult : second.judge(ctx);
@@ -360,9 +360,9 @@ public final class Judges {
 	 * @param judges the judges to compose (varargs)
 	 * @return composed judge with AND logic
 	 */
-	public static Judge allOf(Judge... judges) {
+	public static <E> Judge<E> allOf(Judge<? super E>... judges) {
 		return ctx -> {
-			for (Judge judge : judges) {
+			for (Judge<? super E> judge : judges) {
 				Judgment judgment = judge.judge(ctx);
 				if (!judgment.pass()) {
 					return judgment;
@@ -388,9 +388,9 @@ public final class Judges {
 	 * @param judges the judges to compose (varargs)
 	 * @return composed judge with OR logic
 	 */
-	public static Judge anyOf(Judge... judges) {
+	public static <E> Judge<E> anyOf(Judge<? super E>... judges) {
 		return ctx -> {
-			for (Judge judge : judges) {
+			for (Judge<? super E> judge : judges) {
 				Judgment judgment = judge.judge(ctx);
 				if (judgment.pass()) {
 					return judgment;

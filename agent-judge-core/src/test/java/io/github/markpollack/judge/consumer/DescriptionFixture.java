@@ -61,9 +61,9 @@ public final class DescriptionFixture {
 		return new ObjectMapper().writeValueAsBytes(jury().describe().toPortable());
 	}
 
-	static Jury jury() {
-		Judge lambda = ctx -> Judgment.pass("lambda");
-		Judge anonymous = new Judge() {
+	static Jury<JudgmentContext> jury() {
+		Judge<JudgmentContext> lambda = ctx -> Judgment.pass("lambda");
+		Judge<JudgmentContext> anonymous = new Judge<JudgmentContext>() {
 			@Override
 			public Judgment judge(JudgmentContext context) {
 				return Judgment.fail("anonymous");
@@ -72,23 +72,23 @@ public final class DescriptionFixture {
 		Map<String, Object> rubric = Map.of("passMark", 0.75, "criteria", List.of("correct", "complete"), "version", 3,
 				"strict", true, "levels", Map.of("high", 1.0, "mid", 0.5, "low", 0.0));
 
-		Jury gate = SimpleJury.builder()
+		Jury<JudgmentContext> gate = SimpleJury.<JudgmentContext>builder()
 			.judge(lambda)
 			.judge(anonymous, 2.0)
 			.judge(Judges.allOf(lambda, anonymous), 0.5)
 			.votingStrategy(new WeightedAverageStrategy(0.5, ErrorPolicy.IGNORE))
 			.build();
-		Jury rubricJury = SimpleJury.builder()
+		Jury<JudgmentContext> rubricJury = SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(new DeclaringJudge(rubric), "rubric", "declares its rubric", JudgeType.LLM_POWERED))
 			.votingStrategy(new AverageVotingStrategy(0.8))
 			.build();
-		Jury duplicates = Juries.fromJudges(new ConsensusStrategy(), Judges.named(lambda, "same"),
+		Jury<JudgmentContext> duplicates = Juries.fromJudges(new ConsensusStrategy(), Judges.named(lambda, "same"),
 				Judges.named(anonymous, "same"));
-		Jury review = Juries.meta(new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.TREAT_AS_ABSTAIN),
-				new NamedJury("rubric", rubricJury), new NamedJury("duplicates", duplicates));
-		Jury last = Juries.fromJudges(new ConjunctiveStrategy(0.6), new KeywordJudge("done"), lambda);
+		Jury<JudgmentContext> review = Juries.meta(new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.TREAT_AS_ABSTAIN),
+				new NamedJury<JudgmentContext>("rubric", rubricJury), new NamedJury<JudgmentContext>("duplicates", duplicates));
+		Jury<JudgmentContext> last = Juries.fromJudges(new ConjunctiveStrategy(0.6), new KeywordJudge("done"), lambda);
 
-		return CascadedJury.builder()
+		return CascadedJury.<JudgmentContext>builder()
 			.tier("gate", gate, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("review", review, TierPolicy.ACCEPT_ON_ALL_PASS)
 			.tier("final", last, TierPolicy.FINAL_TIER)

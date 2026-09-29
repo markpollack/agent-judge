@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.jury.interpretation;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
@@ -23,7 +25,7 @@ final class LiveFixturesForSummaries {
 	}
 
 	static Verdict childUndecidedRejection() {
-		return CascadedJury.builder()
+		return CascadedJury.<JudgmentContext>builder()
 			.tier("gate", Fixtures.undecidedTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic", Fixtures.passingTier("ok", "OK"), TierPolicy.FINAL_TIER)
 			.build()
@@ -31,16 +33,16 @@ final class LiveFixturesForSummaries {
 	}
 
 	static Verdict nestedRejection() {
-		Jury inner = CascadedJury.builder()
+		Jury<JudgmentContext> inner = CascadedJury.<JudgmentContext>builder()
 			.tier("rubric", Fixtures.opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")),
 					TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic", Fixtures.passingTier("ok", "OK"), TierPolicy.FINAL_TIER)
 			.build();
-		return CascadedJury.builder().tier("inner", inner, TierPolicy.FINAL_TIER).build().vote(CONTEXT);
+		return CascadedJury.<JudgmentContext>builder().tier("inner", inner, TierPolicy.FINAL_TIER).build().vote(CONTEXT);
 	}
 
 	static Verdict propagatedError() {
-		return SimpleJury.builder()
+		return SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(context -> Judgment.error("the index was unreachable"), "flaky"))
 			.judge(Judges.named(context -> Judgment.pass("fine"), "ok"))
 			.votingStrategy(new ConsensusStrategy())

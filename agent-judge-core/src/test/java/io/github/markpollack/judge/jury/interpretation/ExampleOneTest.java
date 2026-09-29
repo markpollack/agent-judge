@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.jury.interpretation;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import java.util.List;
 import java.util.Map;
 
@@ -47,8 +49,8 @@ class ExampleOneTest {
 
 	/** The jury that produced example one: the structure tier stops on its FAIL, the final tier never runs. */
 	static Verdict sameJury() {
-		return CascadedJury.builder()
-			.tier("structure", SimpleJury.builder()
+		return CascadedJury.<JudgmentContext>builder()
+			.tier("structure", SimpleJury.<JudgmentContext>builder()
 				.judge(Judges.named(context -> Judgment.pass("report present"), "structure:ddd-review.md"))
 				.judge(Judges.named(context -> Judgment.fail("report has no bounded contexts"), "reportStructure"))
 				.votingStrategy(new ConsensusStrategy())

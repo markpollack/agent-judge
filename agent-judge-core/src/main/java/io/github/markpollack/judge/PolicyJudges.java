@@ -31,30 +31,30 @@ public final class PolicyJudges {
 	 * @return the composed judge
 	 * @throws NullPointerException if an argument is null
 	 */
-	public static Judge apply(Judge judge, PolicyRef reference, AcceptancePolicy policy) {
+	public static <E> Judge<E> apply(Judge<? super E> judge, PolicyRef reference, AcceptancePolicy policy) {
 		Objects.requireNonNull(judge, "judge");
 		Objects.requireNonNull(reference, "reference");
 		Objects.requireNonNull(policy, "policy");
-		return judge instanceof JudgeWithMetadata ? new MetadataPolicyJudge(judge, reference, policy)
-				: new PolicyJudge(judge, reference, policy);
+		return judge instanceof JudgeWithMetadata<?> ? new MetadataPolicyJudge<E>(judge, reference, policy)
+				: new PolicyJudge<E>(judge, reference, policy);
 	}
 
-	private static class PolicyJudge implements ConfiguredJudge {
+	private static class PolicyJudge<E> implements ConfiguredJudge<E> {
 
-		final Judge delegate;
+		final Judge<? super E> delegate;
 
 		private final PolicyRef reference;
 
 		private final AcceptancePolicy policy;
 
-		PolicyJudge(Judge delegate, PolicyRef reference, AcceptancePolicy policy) {
+		PolicyJudge(Judge<? super E> delegate, PolicyRef reference, AcceptancePolicy policy) {
 			this.delegate = delegate;
 			this.reference = reference;
 			this.policy = policy;
 		}
 
 		@Override
-		public Judgment judge(JudgmentContext context) {
+		public Judgment judge(E context) {
 			return Policies.apply(delegate.judge(context), reference, policy);
 		}
 
@@ -67,15 +67,15 @@ public final class PolicyJudges {
 
 	}
 
-	private static final class MetadataPolicyJudge extends PolicyJudge implements JudgeWithMetadata {
+	private static final class MetadataPolicyJudge<E> extends PolicyJudge<E> implements JudgeWithMetadata<E> {
 
-		MetadataPolicyJudge(Judge delegate, PolicyRef reference, AcceptancePolicy policy) {
+		MetadataPolicyJudge(Judge<? super E> delegate, PolicyRef reference, AcceptancePolicy policy) {
 			super(delegate, reference, policy);
 		}
 
 		@Override
 		public JudgeMetadata metadata() {
-			JudgeMetadata metadata = Objects.requireNonNull(((JudgeWithMetadata) delegate).metadata(),
+			JudgeMetadata metadata = Objects.requireNonNull(((JudgeWithMetadata<?>) delegate).metadata(),
 					"judge metadata");
 			return new JudgeMetadata(metadata.name(), metadata.description(), metadata.type(),
 					Judges.notApplicableCapability(delegate).orElse(null));

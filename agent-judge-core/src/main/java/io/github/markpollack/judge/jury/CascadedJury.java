@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.jury;
 
+import io.github.markpollack.judge.result.PolicyBinding;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -34,20 +36,20 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * @see TierPolicy
  * @see TierConfig
  */
-public class CascadedJury implements Jury {
+public class CascadedJury<E> implements Jury<E> {
 
 	private static final Logger logger = LoggerFactory.getLogger(CascadedJury.class);
 
 	private static final CompositeFailure EXECUTION_FAILURE =
 			new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED);
 
-	private final List<TierConfig> tiers;
+	private final List<TierConfig<E>> tiers;
 
 	private final boolean assessmentCascade;
 
-	private CascadedJury(List<TierConfig> tiers) {
+	private CascadedJury(List<TierConfig<E>> tiers) {
 		Set<String> names = new HashSet<>();
-		for (TierConfig tier : tiers) {
+		for (TierConfig<E> tier : tiers) {
 			if (!names.add(tier.name())) {
 				throw new IllegalArgumentException("Duplicate cascade tier name: " + tier.name());
 			}
@@ -56,8 +58,13 @@ public class CascadedJury implements Jury {
 		this.assessmentCascade = tiers.stream().anyMatch(tier -> tier.policy() == TierPolicy.STOP_ON_USABLE_ASSESSMENT);
 	}
 
+    CascadedJury<E> withPolicy(PolicyBinding policy) {
+        return new CascadedJury<>(tiers.stream().map(tier -> new TierConfig<>(tier.name(),
+            Juries.withAcceptancePolicy(tier.jury(), policy), tier.policy())).toList());
+    }
+
 	@Override
-	public List<Judge> getJudges() {
+	public List<Judge<E>> getJudges() {
 		return tiers.stream().flatMap(tier -> tier.jury().getJudges().stream()).toList();
 	}
 
@@ -97,7 +104,7 @@ public class CascadedJury implements Jury {
 	@Override
 	public JuryDescription describe() {
 		List<TierDescription> described = new ArrayList<>(tiers.size());
-		for (TierConfig tier : tiers) {
+		for (TierConfig<E> tier : tiers) {
 			try {
 				described.add(new TierDescription(tier.name(), tier.policy(), tier.jury().describe()));
 			}
@@ -109,7 +116,7 @@ public class CascadedJury implements Jury {
 	}
 
 	@Override
-	public Verdict vote(JudgmentContext context) {
+	public Verdict vote(E context) {
 		return CompositeExecutionScope.withinCompositeVote(() -> execute(context));
 	}
 
@@ -134,9 +141,9 @@ public class CascadedJury implements Jury {
 	 * @param context the judgment context
 	 * @return the cascade's verdict
 	 */
-	private Verdict execute(JudgmentContext context) {
+	private Verdict execute(E context) {
 		List<CompositeAttempt> attempts = new ArrayList<>();
-		for (TierConfig tier : tiers) {
+		for (TierConfig<E> tier : tiers) {
 			boolean bounded = tier.policy() == TierPolicy.STOP_ON_USABLE_ASSESSMENT
 					|| (assessmentCascade && tier.policy() == TierPolicy.FINAL_TIER);
 			boolean[] identity = { false };
@@ -146,7 +153,7 @@ public class CascadedJury implements Jury {
 					if (!bounded) {
 						return tier.jury().vote(context);
 					}
-					if (!(tier.jury() instanceof SimpleJury simple) || simple.getJudges().size() != 1) {
+					if (!(tier.jury() instanceof SimpleJury<E> simple) || simple.getJudges().size() != 1) {
 						throw new IllegalStateException("Assessment tier requires one declared SimpleJury seat");
 					}
 					SimpleJury.CompositionVote result = simple.voteForComposition(context);
@@ -209,7 +216,7 @@ public class CascadedJury implements Jury {
 		return noTierDecided(attempts, "No cascade tier produced a determination.");
 	}
 
-	private static String assessmentTierDefect(TierConfig tier, Verdict verdict, boolean identity) {
+	private static <E> String assessmentTierDefect(TierConfig<E> tier, Verdict verdict, boolean identity) {
 		if (!identity || verdict.decision().kind() != DecisionKind.OWN
 				|| !verdict.compositeAttempts().isEmpty() || verdict.individual().size() != 1
 				|| verdict.seats().size() != 1 || verdict.seats().get(0).position() != 0) {
@@ -230,7 +237,7 @@ public class CascadedJury implements Jury {
 				: "The assessment tier's seat has no applied acceptance policy.";
 	}
 
-	private Verdict assessmentTierFailed(TierConfig tier, List<CompositeAttempt> attempts, String explanation) {
+	private Verdict assessmentTierFailed(TierConfig<E> tier, List<CompositeAttempt> attempts, String explanation) {
 		return Verdict.builder()
 			.aggregated(Judgment.error(JudgmentReasonCode.STAGE_FAILED, "Tier '" + tier.name() + "': " + explanation))
 			.decision(Decision.undecided())
@@ -238,7 +245,7 @@ public class CascadedJury implements Jury {
 			.build();
 	}
 
-	private boolean shouldStop(TierConfig tier, Verdict verdict) {
+	private boolean shouldStop(TierConfig<E> tier, Verdict verdict) {
 		return switch (tier.policy()) {
 			case REJECT_ON_ANY_FAIL -> hasAnyFail(verdict);
 			case ACCEPT_ON_ALL_PASS -> allPassed(verdict);
@@ -296,7 +303,7 @@ public class CascadedJury implements Jury {
 	 * @param attempts the attempts so far
 	 * @return the cascade's verdict
 	 */
-	private Verdict individualRejection(TierConfig tier, Verdict tierVerdict, DispositionReason reason,
+	private Verdict individualRejection(TierConfig<E> tier, Verdict tierVerdict, DispositionReason reason,
 			List<CompositeAttempt> attempts) {
 		Judgment root = reason == DispositionReason.CHILD_UNDECIDED ? tierVerdict.aggregated()
 				: Judgment.error(JudgmentReasonCode.STAGE_FAILED, "Tier '" + tier.name()
@@ -341,14 +348,14 @@ public class CascadedJury implements Jury {
 	 * Create a new builder for CascadedJury.
 	 * @return builder instance
 	 */
-	public static Builder builder() {
-		return new Builder();
+	public static <E> Builder<E> builder() {
+		return new Builder<E>();
 	}
 
-	/** Builder for {@link CascadedJury}. */
-	public static class Builder {
+	/** Builder<E> for {@link CascadedJury}. */
+	public static class Builder<E> {
 
-		private final List<TierConfig> tiers = new ArrayList<>();
+		private final List<TierConfig<E>> tiers = new ArrayList<>();
 
 		/** Create an empty cascade builder. */
 		public Builder() {
@@ -361,8 +368,8 @@ public class CascadedJury implements Jury {
 		 * @param policy how this tier maps to stop or escalation
 		 * @return this builder
 		 */
-		public Builder tier(String name, Jury jury, TierPolicy policy) {
-			tiers.add(new TierConfig(name, jury, policy));
+		public Builder<E> tier(String name, Jury<E> jury, TierPolicy policy) {
+			tiers.add(new TierConfig<E>(name, jury, policy));
 			return this;
 		}
 
@@ -370,16 +377,16 @@ public class CascadedJury implements Jury {
 		 * Build the CascadedJury instance.
 		 * @return configured CascadedJury
 		 */
-		public CascadedJury build() {
+		public CascadedJury<E> build() {
 			if (tiers.isEmpty()) {
 				throw new IllegalStateException("CascadedJury requires at least one tier");
 			}
-			TierConfig lastTier = tiers.get(tiers.size() - 1);
+			TierConfig<E> lastTier = tiers.get(tiers.size() - 1);
 			if (lastTier.policy() != TierPolicy.FINAL_TIER) {
 				throw new IllegalStateException("Last tier must use FINAL_TIER policy, but '" + lastTier.name()
 						+ "' uses " + lastTier.policy());
 			}
-			return new CascadedJury(tiers);
+			return new CascadedJury<E>(tiers);
 		}
 
 	}

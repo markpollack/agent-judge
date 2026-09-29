@@ -540,7 +540,7 @@ class NormalizedJudgmentConformanceTest {
 	 * implementation does not reach.
 	 */
 	private static Verdict verdict() {
-		Jury jury = SimpleJury.builder()
+		Jury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.votingStrategy(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE))
 			.parallel(false)
 			.judge(Judges.named(context -> buildSuccess(), "build-success"))
@@ -558,25 +558,25 @@ class NormalizedJudgmentConformanceTest {
 	}
 
 	private static Verdict compositeVerdict() {
-		Jury successful = SimpleJury.builder()
+		Jury<JudgmentContext> successful = SimpleJury.<JudgmentContext>builder()
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.judge(Judges.named(context -> Judgment.pass("Semantic fallback accepted"), "semantic-check"))
 			.build();
-		Jury cascade = CascadedJury.builder()
+		Jury<JudgmentContext> cascade = CascadedJury.<JudgmentContext>builder()
 			.tier("broken-check", throwingJury(new IllegalStateException("/home/alice/.ssh/id_ed25519")),
 					TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic-check", successful, TierPolicy.FINAL_TIER)
 			.build();
-		Jury meta = Juries.meta(new ConsensusStrategy(), new NamedJury("pipeline", cascade),
-				new NamedJury("audit", throwingJury(new IllegalArgumentException("token=opaque-secret"))));
+		Jury<JudgmentContext> meta = Juries.meta(new ConsensusStrategy(), new NamedJury<JudgmentContext>("pipeline", cascade),
+				new NamedJury<JudgmentContext>("audit", throwingJury(new IllegalArgumentException("token=opaque-secret"))));
 		return meta.vote(JudgmentContext.builder().goal("Verify the corrected composite result").build());
 	}
 
-	private static Jury throwingJury(RuntimeException failure) {
-		return new Jury() {
+	private static Jury<JudgmentContext> throwingJury(RuntimeException failure) {
+		return new Jury<JudgmentContext>() {
 			@Override
-			public List<Judge> getJudges() {
+			public List<Judge<JudgmentContext>> getJudges() {
 				return List.of();
 			}
 
@@ -666,7 +666,7 @@ class NormalizedJudgmentConformanceTest {
 	 * the point.
 	 * </p>
 	 */
-	private record ConditionalJudge(String name) implements JudgeWithMetadata {
+	private record ConditionalJudge(String name) implements JudgeWithMetadata<JudgmentContext> {
 
 		@Override
 		public Judgment judge(JudgmentContext context) {

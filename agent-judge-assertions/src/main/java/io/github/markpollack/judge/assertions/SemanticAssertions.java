@@ -5,6 +5,9 @@
 
 package io.github.markpollack.judge.assertions;
 
+import io.github.markpollack.judge.requirement.Requirement;
+import io.github.markpollack.judge.result.PolicyBinding;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.function.Function;
@@ -42,7 +45,7 @@ import io.github.markpollack.judge.result.ArtifactRef;
  */
 public final class SemanticAssertions {
 
-	private final Function<Requirement, Judge> route;
+	private final Function<Requirement<?>, Judge<JudgmentContext>> route;
 
 	private final @Nullable PolicyBinding defaultPolicy;
 
@@ -52,7 +55,7 @@ public final class SemanticAssertions {
 	 * @param defaultPolicy default, or null when every named requirement needs an
 	 * override
 	 */
-	public SemanticAssertions(Function<Requirement, Judge> route, @Nullable PolicyBinding defaultPolicy) {
+	public SemanticAssertions(Function<Requirement<?>, Judge<JudgmentContext>> route, @Nullable PolicyBinding defaultPolicy) {
 		this.route = Objects.requireNonNull(route);
 		this.defaultPolicy = defaultPolicy;
 	}
@@ -77,7 +80,7 @@ public final class SemanticAssertions {
 	 * @param requirement named requirement and optional prior policy
 	 * @return retained resolution, verdict and authoritative reading
 	 */
-	public AssertionResult evaluate(JudgmentContext evidence, Requirement requirement) {
+	public AssertionResult evaluate(JudgmentContext evidence, Requirement<?> requirement) {
 		Objects.requireNonNull(evidence);
 		Objects.requireNonNull(requirement);
 		PolicyBinding override = requirement.acceptancePolicy();
@@ -87,23 +90,23 @@ public final class SemanticAssertions {
 		if (!requirement.text().equals(evidence.goal()))
 			throw new IllegalArgumentException(
 					"Evidence goal must exactly match requirement text; rebinding is forbidden");
-		Judge judge = Objects.requireNonNull(route.apply(requirement), "route returned no judge");
-		var jury = SimpleJury.builder()
+		Judge<JudgmentContext> judge = Objects.requireNonNull(route.apply(requirement), "route returned no judge");
+		var jury = SimpleJury.<JudgmentContext>builder()
 			.judge(PolicyJudges.apply(judge, binding.reference(), binding.policy()))
 			.votingStrategy(new AllMustPassStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
 			.parallel(false)
 			.build();
 		return new AssertionResult(requirement, binding.reference(),
-				override == null ? AssertionResult.PolicySource.DEFAULT : AssertionResult.PolicySource.REQUIREMENT,
+				override == null ? AssertionResult.PolicySource.DEFAULT : AssertionResult.PolicySource.ASSOCIATED,
 				jury.vote(evidence));
 	}
 
-	Requirement stringRequirement(String text) {
+	Requirement<?> stringRequirement(String text) {
 		if (defaultPolicy == null)
 			throw new IllegalStateException("String requirements need a configured default policy before inference");
 		Requirement.requireText(text);
 		String digest = ArtifactRef.ofBytes("requirement", text.getBytes(StandardCharsets.UTF_8), null).sha256();
-		return new Requirement("text:sha256:" + digest, "1", text);
+		return Requirement.text("text:sha256:" + digest, "1", text);
 	}
 
 	/**

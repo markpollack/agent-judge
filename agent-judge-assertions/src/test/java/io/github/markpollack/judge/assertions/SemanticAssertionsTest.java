@@ -4,6 +4,9 @@
  */
 package io.github.markpollack.judge.assertions;
 
+import io.github.markpollack.judge.requirement.Requirement;
+import io.github.markpollack.judge.result.PolicyBinding;
+
 import io.github.markpollack.judge.*;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jury.*;
@@ -20,7 +23,7 @@ import static org.assertj.core.api.Assertions.*;
 
 class SemanticAssertionsTest {
 
-	static final Requirement REQUIREMENT = new Requirement("requirement", "1", "exact text");
+	static final Requirement<?> REQUIREMENT = Requirement.text("requirement", "1", "exact text");
 	static final JudgmentContext EVIDENCE = JudgmentContext.builder()
 		.goal(REQUIREMENT.text())
 		.metadata("retained", "yes")
@@ -31,7 +34,7 @@ class SemanticAssertionsTest {
 				j -> new Acceptance(action, "explicit application consequence"));
 	}
 
-	static SemanticAssertions facade(Judge judge) {
+	static SemanticAssertions facade(Judge<JudgmentContext> judge) {
 		return new SemanticAssertions(r -> judge, policy(AcceptanceAction.USE_ASSESSMENT));
 	}
 
@@ -77,7 +80,7 @@ class SemanticAssertionsTest {
 				() -> facade(c -> Judgment.fail("violation")).assertThat(EVIDENCE).satisfies(named),
 				SemanticAssertionError.Inconclusive.class);
 		assertThat(error.category()).isEqualTo(SemanticAssertionError.Category.INCONCLUSIVE);
-		assertThat(error.result().policySource()).isEqualTo(AssertionResult.PolicySource.REQUIREMENT);
+		assertThat(error.result().policySource()).isEqualTo(AssertionResult.PolicySource.ASSOCIATED);
 		assertThat(error.result().policy()).isEqualTo(named.acceptancePolicy().reference());
 		var j = error.result().verdict().aggregated();
 		assertThat(j.producerStatus()).isEqualTo(JudgmentStatus.FAIL);
@@ -96,7 +99,7 @@ class SemanticAssertionsTest {
 
 	@Test
 	void failuresRemainInstrumentFailures() {
-		for (Judge judge : List.<Judge>of(c -> Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "unavailable"), c -> {
+		for (Judge<JudgmentContext> judge : List.<Judge<JudgmentContext>>of(c -> Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "unavailable"), c -> {
 			throw new IllegalStateException("transport");
 		}, c -> null)) {
 			var error = catchThrowableOfType(() -> facade(judge).assertThat(EVIDENCE).satisfies(REQUIREMENT),
@@ -115,8 +118,8 @@ class SemanticAssertionsTest {
 
 	@Test
 	void notApplicableHasOwnDiagnosticAndUndeclaredIsInstrumentFailure() {
-		Judge raw = c -> Judgment.notApplicable("outside declared domain");
-		var declared = new NamedJudge(raw,
+		Judge<JudgmentContext> raw = c -> Judgment.notApplicable("outside declared domain");
+		var declared = new NamedJudge<JudgmentContext>(raw,
 				new JudgeMetadata("optional", "domain", JudgeType.DETERMINISTIC, "outside domain"));
 		var error = catchThrowableOfType(() -> facade(declared).assertThat(EVIDENCE).satisfies(REQUIREMENT),
 				SemanticAssertionError.NotApplicable.class);
@@ -143,7 +146,7 @@ class SemanticAssertionsTest {
 			calls.incrementAndGet();
 			return Judgment.pass("");
 		});
-		assertThatThrownBy(() -> other.assertThat(EVIDENCE).satisfies(new Requirement("requirement", "2", "changed")))
+		assertThatThrownBy(() -> other.assertThat(EVIDENCE).satisfies(Requirement.text("requirement", "2", "changed")))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("exactly match");
 		assertThat(calls).hasValue(1);
@@ -153,7 +156,7 @@ class SemanticAssertionsTest {
 
 	@Test
 	void invalidSetupIsImmediate() {
-		assertThatThrownBy(() -> new Requirement(" ", "1", "x")).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> Requirement.text(" ", "1", "x")).isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> REQUIREMENT.under(null)).isInstanceOf(NullPointerException.class);
 		assertThatThrownBy(() -> new PolicyBinding(null, j -> null)).isInstanceOf(NullPointerException.class);
 		assertThatThrownBy(() -> new SemanticAssertions(r -> null, policy(AcceptanceAction.USE_ASSESSMENT))
@@ -177,7 +180,7 @@ class SemanticAssertionsTest {
 				results.add(executor.submit(() -> {
 					String id = "r-" + i;
 					current.put(id, Thread.currentThread());
-					var req = new Requirement(id, "1", id)
+					var req = Requirement.text(id, "1", id)
 						.under(policy(i % 2 == 0 ? AcceptanceAction.USE_ASSESSMENT : AcceptanceAction.ESCALATE));
 					Thread.currentThread().setContextClassLoader(new ClassLoader(null) {
 					});

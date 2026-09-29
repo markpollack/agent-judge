@@ -8,6 +8,8 @@ package io.github.markpollack.judge.jev;
 import io.github.gudcks0305.jev.*;
 import io.github.gudcks0305.jev.typesafe.TypeSafeJevClient;
 import io.github.markpollack.judge.Judge;
+import io.github.markpollack.judge.requirement.Requirement;
+import io.github.markpollack.judge.requirement.RequirementEvidence;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.*;
 import java.net.URI;
@@ -31,7 +33,7 @@ import org.jspecify.annotations.Nullable;
  * This is reported request cost, not a token-price calculation or evidence-preparation
  * cost. A malformed assessment can still retain valid request usage and cost.
  */
-public final class JevJudge implements Judge {
+public final class JevJudge implements Judge<RequirementEvidence<String, JevEvidence>> {
 
 	private final String apiKey;
 
@@ -83,8 +85,51 @@ public final class JevJudge implements Judge {
 		this.maxBodyBytes = maxBodyBytes;
 	}
 
+    /**
+     * Bind a stable native requirement snapshot to its provider-specific rendering.
+     * Rendering happens once on the caller thread. Every invocation validates the complete
+     * envelope before reusing that rendering; the evidence's existing rendered digest is
+     * checked by the adapter, never recomputed to make a stale input match.
+     * @param <S> native specification type
+     * @param requirement stable native requirement snapshot
+     * @param render provider-specific native specification renderer
+     * @return ordinary typed requirement-aware Judge
+     */
+    public <S> Judge<RequirementEvidence<Requirement<S>, JevEvidence>> bind(Requirement<S> requirement,
+            java.util.function.Function<? super S, String> render) {
+        Objects.requireNonNull(requirement, "requirement");
+        String rendered = Objects.requireNonNull(render.apply(requirement.specification()), "rendered requirement");
+        Checks.text(rendered);
+        return input -> {
+            Requirement<S> supplied = input.requirement();
+            if (!requirement.id().equals(supplied.id()) || !requirement.revision().equals(supplied.revision())
+                    || !requirement.specification().equals(supplied.specification())
+                    || !requirement.source().equals(supplied.source())) {
+                return Judgment.error(io.github.markpollack.judge.result.JudgmentReasonCode.JUDGE_REPORTED,
+                    "Native requirement snapshot differs from the configured provider binding");
+            }
+            return judge(new RequirementEvidence<>(rendered, input.evidence()));
+        };
+    }
+
+    /**
+     * Explicit migration bridge for execution-context callers. New callers supply typed
+     * requirement/evidence directly. No metadata field is read on the typed path.
+     * @param context old execution context carrying the selected Jev evidence
+     * @return assessment or an instrument error for missing input
+     * @deprecated use the typed input or bind a native requirement
+     */
+    @Deprecated(since = "0.18.0")
+    public Judgment judge(JudgmentContext context) {
+        Object supplied = context == null ? null : context.metadata().get(JevEvidence.CONTEXT_KEY);
+        if (!(supplied instanceof JevEvidence evidence) || context.goal() == null)
+            return Judgment.error(io.github.markpollack.judge.result.JudgmentReasonCode.JUDGE_REPORTED,
+                "Explicit evidence required");
+        return judge(new RequirementEvidence<>(context.goal(), evidence));
+    }
+
 	@Override
-	public Judgment judge(JudgmentContext context) {
+	public Judgment judge(RequirementEvidence<String, JevEvidence> input) {
 		List<ArtifactRef> refs = new ArrayList<>();
 		AtomicReference<NativeResponse> nativeResult = new AtomicReference<>();
 		AtomicReference<NativeResponse.Envelope> reported = new AtomicReference<>();
@@ -100,13 +145,11 @@ public final class JevJudge implements Judge {
 		try {
 			preflight();
 			configured = true;
-			Objects.requireNonNull(context);
-			String requirement = Objects.requireNonNull(context.goal());
+			Objects.requireNonNull(input);
+			String requirement = input.requirement();
 			Checks.text(requirement);
 			Checks.portable(Map.of("requirement", requirement));
-			Object supplied = context.metadata().get(JevEvidence.CONTEXT_KEY);
-			if (!(supplied instanceof JevEvidence evidence))
-				throw new IllegalArgumentException("Explicit evidence required");
+			JevEvidence evidence = input.evidence();
 			if ((long) requirement.getBytes(StandardCharsets.UTF_8).length
 					+ evidence.text().getBytes(StandardCharsets.UTF_8).length > maxEvidenceBytes)
 				throw new IllegalArgumentException("Evidence bound exceeded");

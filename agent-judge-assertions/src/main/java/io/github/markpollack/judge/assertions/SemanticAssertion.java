@@ -5,6 +5,9 @@
 
 package io.github.markpollack.judge.assertions;
 
+import io.github.markpollack.judge.requirement.Requirement;
+import io.github.markpollack.judge.result.PolicyBinding;
+
 import io.github.markpollack.judge.context.JudgmentContext;
 
 /**
@@ -32,7 +35,7 @@ public final class SemanticAssertion {
 	 * @param requirement exact requirement
 	 * @throws SemanticAssertionError if the authoritative reading cannot pass
 	 */
-	public void satisfies(Requirement requirement) {
+	public void satisfies(Requirement<?> requirement) {
 		SemanticAssertions.requireSatisfied(assertions.evaluate(evidence, requirement));
 	}
 

@@ -34,7 +34,7 @@ package io.github.markpollack.judge;
  * @see NamedJudge
  * @see JudgeMetadata
  */
-public interface JudgeWithMetadata extends Judge {
+public interface JudgeWithMetadata<E> extends Judge<E> {
 
 	/**
 	 * Get metadata about this judge.

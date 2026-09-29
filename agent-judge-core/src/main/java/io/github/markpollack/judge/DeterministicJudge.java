@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.JudgeType;
@@ -41,7 +43,7 @@ import io.github.markpollack.judge.JudgeType;
  * @author Mark Pollack
  * @since 0.1.0
  */
-public abstract class DeterministicJudge implements io.github.markpollack.judge.JudgeWithMetadata {
+public abstract class DeterministicJudge implements io.github.markpollack.judge.JudgeWithMetadata<JudgmentContext> {
 
 	private final JudgeMetadata metadata;
 

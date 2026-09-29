@@ -71,8 +71,8 @@ class ModernInterpretationConformanceTest {
 				j.provenance(), new AppliedPolicy(POLICY, action, "application explanation"), j.metadata());
 	}
 
-	static SimpleJury leaf(Judgment j) {
-		var builder = SimpleJury.builder()
+	static SimpleJury<JudgmentContext> leaf(Judgment j) {
+		var builder = SimpleJury.<JudgmentContext>builder()
 			.votingStrategy(new AverageVotingStrategy(0.2, ErrorPolicy.TREAT_AS_FAIL, NotApplicablePolicy.EXCLUDE));
 		return builder.judge(new Fixtures.Conditional("judge", j)).build();
 	}
@@ -93,9 +93,9 @@ class ModernInterpretationConformanceTest {
 	@EnumSource(JudgmentStatus.class)
 	void everyValidSingleReturnedOutcomeSurvivesSimpleAndMetaIdentity(JudgmentStatus status) throws Exception {
 		Judgment j = raw(status);
-		for (Jury jury : List.of(leaf(j),
+		for (Jury<JudgmentContext> jury : List.of(leaf(j),
 				Juries.meta(new ConsensusStrategy(ErrorPolicy.TREAT_AS_FAIL, NotApplicablePolicy.EXCLUDE),
-						new NamedJury("member", leaf(j))))) {
+						new NamedJury<JudgmentContext>("member", leaf(j))))) {
 			Verdict v = jury.vote(CONTEXT);
 			assertThat(v.aggregated()).isEqualTo(j);
 			Verdict restored = JSON.readValue(JSON.writeValueAsBytes(v), Verdict.class);
@@ -115,7 +115,7 @@ class ModernInterpretationConformanceTest {
 	@EnumSource(AcceptanceAction.class)
 	void completeProductClaimsAndFiveOutcomeChecksSurviveEveryView(AcceptanceAction action) throws Exception {
 		Judgment j = rich(action);
-		Verdict v = CascadedJury.builder().tier("final", leaf(j), TierPolicy.FINAL_TIER).build().vote(CONTEXT);
+		Verdict v = CascadedJury.<JudgmentContext>builder().tier("final", leaf(j), TierPolicy.FINAL_TIER).build().vote(CONTEXT);
 		Interpretation i = Verdicts.interpret(v);
 		assertThat(i.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
 		for (Stage stage : List.of(i.root(), i.stages().getFirst())) {
@@ -155,11 +155,11 @@ class ModernInterpretationConformanceTest {
 	@Test
 	void thrownInvocationIsExplicitlyDifferentFromValidReturnedIdenticalError() {
 		var strategy = new AverageVotingStrategy(0.5, ErrorPolicy.TREAT_AS_FAIL);
-		Verdict contained = SimpleJury.builder().judge(c -> {
+		Verdict contained = SimpleJury.<JudgmentContext>builder().judge(c -> {
 			throw new IllegalStateException("down");
 		}).votingStrategy(strategy).build().vote(CONTEXT);
 		Judgment error = contained.individual().getFirst();
-		Verdict returned = SimpleJury.builder().judge(c -> error).votingStrategy(strategy).build().vote(CONTEXT);
+		Verdict returned = SimpleJury.<JudgmentContext>builder().judge(c -> error).votingStrategy(strategy).build().vote(CONTEXT);
 		assertThat(returned.individual()).isEqualTo(contained.individual());
 		assertThat(returned.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(contained.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
@@ -185,7 +185,7 @@ class ModernInterpretationConformanceTest {
 		Judgment prior = new AverageVotingStrategy().aggregate(List.of(Judgment.pass("a"), Judgment.pass("b")),
 				Map.of());
 		Verdict identity = leaf(prior).vote(CONTEXT);
-		Verdict adopted = CascadedJury.builder()
+		Verdict adopted = CascadedJury.<JudgmentContext>builder()
 			.tier("final", leaf(prior), TierPolicy.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
@@ -199,9 +199,9 @@ class ModernInterpretationConformanceTest {
 
 	@Test
 	void oneSurvivorOfTwoMetaMembersNeverBecomesIdentity() {
-		Jury meta = Juries.meta(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE),
-				new NamedJury("ok", leaf(Judgment.pass("ok"))),
-				new NamedJury("broken", Fixtures.throwing(new IllegalStateException("down"))));
+		Jury<JudgmentContext> meta = Juries.meta(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE),
+				new NamedJury<JudgmentContext>("ok", leaf(Judgment.pass("ok"))),
+				new NamedJury<JudgmentContext>("broken", Fixtures.throwing(new IllegalStateException("down"))));
 		Verdict v = meta.vote(CONTEXT);
 		assertThat(v.declaredCardinality()).isEqualTo(2);
 		assertThat(Verdicts.interpret(v).reading()).isEqualTo(VerdictReading.NOT_ASSESSED);
@@ -377,7 +377,7 @@ class ModernInterpretationConformanceTest {
 	}
 
 	static Verdict cascade(AcceptanceAction first, AcceptanceAction last) {
-		return CascadedJury.builder()
+		return CascadedJury.<JudgmentContext>builder()
 			.tier("fast", leaf(rich(first)), TierPolicy.STOP_ON_USABLE_ASSESSMENT)
 			.tier("final", leaf(rich(last)), TierPolicy.FINAL_TIER)
 			.build()
@@ -413,10 +413,10 @@ class ModernInterpretationConformanceTest {
 
 	@Test
 	void missingPolicyAndContainedTierFailureAreTerminalAndRetained() {
-		for (Jury first : List.of(leaf(Judgment.pass("no policy")), SimpleJury.builder().judge(c -> {
+		for (Jury<JudgmentContext> first : List.of(leaf(Judgment.pass("no policy")), SimpleJury.<JudgmentContext>builder().judge(c -> {
 			throw new IllegalStateException("down");
 		}).votingStrategy(new AverageVotingStrategy(ErrorPolicy.TREAT_AS_FAIL)).build())) {
-			Verdict v = CascadedJury.builder()
+			Verdict v = CascadedJury.<JudgmentContext>builder()
 				.tier("fast", first, TierPolicy.STOP_ON_USABLE_ASSESSMENT)
 				.tier("final", leaf(rich(AcceptanceAction.USE_ASSESSMENT)), TierPolicy.FINAL_TIER)
 				.build()
@@ -490,7 +490,7 @@ class ModernInterpretationConformanceTest {
 
 	@Test
 	void numericReductionCannotInventAQualityValueEvenWhenStatusMatchesThreshold() {
-		Verdict v = SimpleJury.builder()
+		Verdict v = SimpleJury.<JudgmentContext>builder()
 			.judge(c -> Judgment.pass("a"))
 			.judge(c -> Judgment.fail("b"))
 			.votingStrategy(new AverageVotingStrategy(.4))
@@ -514,8 +514,8 @@ class ModernInterpretationConformanceTest {
 	@Test
 	void aUsedMetaMemberCannotForgeContainedInvocationToEvadeIdentity() {
 		Judgment returned = Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "reported error");
-		Jury child = SimpleJury.builder().judge(c -> returned).votingStrategy(new ConsensusStrategy()).build();
-		Verdict meta = Juries.meta(new AverageVotingStrategy(ErrorPolicy.TREAT_AS_FAIL), new NamedJury("member", child))
+		Jury<JudgmentContext> child = SimpleJury.<JudgmentContext>builder().judge(c -> returned).votingStrategy(new ConsensusStrategy()).build();
+		Verdict meta = Juries.meta(new AverageVotingStrategy(ErrorPolicy.TREAT_AS_FAIL), new NamedJury<JudgmentContext>("member", child))
 			.vote(CONTEXT);
 		Map<String, Object> map = wire(meta);
 		((Map<String, Object>) ((List<?>) map.get("seats")).getFirst()).put("execution", "CONTAINED_FAILURE");

@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.consumer;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -50,7 +52,7 @@ class DescriptionPortabilityTest {
 
 	@Test
 	void aLiveObjectIsRefusedWithItsPathAndSeat() {
-		Jury jury = SimpleJury.builder()
+		Jury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(new DeclaringJudge(Map.of("rubric", Map.of("levels", List.of("pass", new Object())))),
 					"rubric-judge"))
 			.votingStrategy(new MajorityVotingStrategy())
@@ -101,12 +103,12 @@ class DescriptionPortabilityTest {
 
 	@Test
 	void theFailingTierMemberAndJudgeAreAllNamed() {
-		Jury bad = SimpleJury.builder()
+		Jury<JudgmentContext> bad = SimpleJury.<JudgmentContext>builder()
 			.judge(new DeclaringJudge(Map.of("x", new Object())))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
-		Jury cascade = CascadedJury.builder()
-			.tier("only", Juries.meta(new MajorityVotingStrategy(), new NamedJury("member", bad)), TierPolicy.FINAL_TIER)
+		Jury<JudgmentContext> cascade = CascadedJury.<JudgmentContext>builder()
+			.tier("only", Juries.meta(new MajorityVotingStrategy(), new NamedJury<JudgmentContext>("member", bad)), TierPolicy.FINAL_TIER)
 			.build();
 
 		assertThatThrownBy(cascade::describe).isInstanceOf(IllegalArgumentException.class)
@@ -117,7 +119,7 @@ class DescriptionPortabilityTest {
 
 	@Test
 	void anOpaqueJuryNamesTheFailingJudgeByPosition() {
-		Jury custom = new JuryDescriptionTest.FirstVoteJury(List.of(new DeclaringJudge(Map.of("x", new Object()))),
+		Jury<JudgmentContext> custom = new JuryDescriptionTest.FirstVoteJury(List.of(new DeclaringJudge(Map.of("x", new Object()))),
 				null);
 
 		assertThatThrownBy(custom::describe).isInstanceOf(IllegalArgumentException.class)
@@ -132,15 +134,15 @@ class DescriptionPortabilityTest {
 		rubric.put("strict", true);
 		rubric.put("criteria", List.of("correct", "complete"));
 		rubric.put("levels", Map.of("high", 1.0, "low", 0.0));
-		Jury review = SimpleJury.builder()
+		Jury<JudgmentContext> review = SimpleJury.<JudgmentContext>builder()
 			.judge(Judges.named(new DeclaringJudge(rubric), "rubric", null, JudgeType.LLM_POWERED), 2.0)
 			.judge(ctx -> Judgment.pass("lambda"))
 			.votingStrategy(new WeightedAverageStrategy(0.6))
 			.build();
-		Jury cascade = CascadedJury.builder()
+		Jury<JudgmentContext> cascade = CascadedJury.<JudgmentContext>builder()
 			.tier("gate", Juries.fromJudges(new AllMustPassStrategy(), new KeywordJudge("ok")),
 					TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("review", Juries.meta(new MajorityVotingStrategy(), new NamedJury("review", review)),
+			.tier("review", Juries.meta(new MajorityVotingStrategy(), new NamedJury<JudgmentContext>("review", review)),
 					TierPolicy.FINAL_TIER)
 			.build();
 
@@ -156,7 +158,7 @@ class DescriptionPortabilityTest {
 	@Test
 	@SuppressWarnings("unchecked")
 	void thePortableFormIsImmutableAtEveryDepth() {
-		JuryDescription description = SimpleJury.builder()
+		JuryDescription description = SimpleJury.<JudgmentContext>builder()
 			.judge(new DeclaringJudge(Map.of("nested", Map.of("k", 1))))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build()

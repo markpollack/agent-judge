@@ -47,7 +47,7 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return always-pass judge
 	 */
-	public static Judge alwaysPass(String name) {
+	public static Judge<JudgmentContext> alwaysPass(String name) {
 		return Judges.named(ctx -> Judgment.pass("Always passes"), name, null, JudgeType.DETERMINISTIC);
 	}
 
@@ -56,7 +56,7 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return always-fail judge
 	 */
-	public static Judge alwaysFail(String name) {
+	public static Judge<JudgmentContext> alwaysFail(String name) {
 		return Judges.named(ctx -> Judgment.fail("Always fails"), name, null, JudgeType.DETERMINISTIC);
 	}
 
@@ -65,7 +65,7 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return always-abstain judge
 	 */
-	public static Judge alwaysAbstain(String name) {
+	public static Judge<JudgmentContext> alwaysAbstain(String name) {
 		return Judges.named(ctx -> Judgment.abstain("Cannot evaluate"), name, null, JudgeType.DETERMINISTIC);
 	}
 
@@ -74,7 +74,7 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return always-error judge
 	 */
-	public static Judge alwaysError(String name) {
+	public static Judge<JudgmentContext> alwaysError(String name) {
 		return Judges.named(ctx -> Judgment.error("Evaluation error"), name, null,
 				JudgeType.DETERMINISTIC);
 	}
@@ -85,7 +85,7 @@ public final class JudgeTestFixtures {
 	 * @param failure the exception the judge throws
 	 * @return always-throwing judge
 	 */
-	public static Judge alwaysThrows(String name, RuntimeException failure) {
+	public static Judge<JudgmentContext> alwaysThrows(String name, RuntimeException failure) {
 		return Judges.named(ctx -> {
 			throw failure;
 		}, name, null, JudgeType.DETERMINISTIC);
@@ -96,7 +96,7 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return judge returning null
 	 */
-	public static Judge returnsNothing(String name) {
+	public static Judge<JudgmentContext> returnsNothing(String name) {
 		return Judges.named(ctx -> null, name, null, JudgeType.DETERMINISTIC);
 	}
 
@@ -106,8 +106,8 @@ public final class JudgeTestFixtures {
 	 * @param result judgment the judge would return if asked
 	 * @return judge whose {@code metadata()} returns null
 	 */
-	public static Judge nullMetadata(Judgment result) {
-		return new JudgeWithMetadata() {
+	public static Judge<JudgmentContext> nullMetadata(Judgment result) {
+		return new JudgeWithMetadata<JudgmentContext>() {
 			@Override
 			public Judgment judge(JudgmentContext context) {
 				return result;
@@ -126,8 +126,8 @@ public final class JudgeTestFixtures {
 	 * @param result judgment the judge would return if asked
 	 * @return judge whose metadata cannot be read
 	 */
-	public static Judge throwingMetadata(RuntimeException failure, Judgment result) {
-		return new JudgeWithMetadata() {
+	public static Judge<JudgmentContext> throwingMetadata(RuntimeException failure, Judgment result) {
+		return new JudgeWithMetadata<JudgmentContext>() {
 			@Override
 			public Judgment judge(JudgmentContext context) {
 				return result;
@@ -146,7 +146,7 @@ public final class JudgeTestFixtures {
 	 * @param score numerical score value
 	 * @return score-based judge
 	 */
-	public static Judge withScore(String name, double score) {
+	public static Judge<JudgmentContext> withScore(String name, double score) {
 		return Judges.named(ctx -> (score >= 0.5 ? Judgment.builder().pass() : Judgment.builder().fail())
 			.score(score)
 			.reasoning("Score: " + score)
@@ -170,7 +170,7 @@ public final class JudgeTestFixtures {
 	 * @param result judgment to return
 	 * @return slow judge
 	 */
-	public static Judge slow(String name, long delayMillis, Judgment result) {
+	public static Judge<JudgmentContext> slow(String name, long delayMillis, Judgment result) {
 		return Judges.named(ctx -> {
 			try {
 				Thread.sleep(delayMillis);
@@ -383,7 +383,7 @@ public final class JudgeTestFixtures {
 	/**
 	 * Judge that records all invocations for verification.
 	 */
-	public static class RecordingJudge implements Judge, JudgeWithMetadata {
+	public static class RecordingJudge implements Judge<JudgmentContext>, JudgeWithMetadata<JudgmentContext> {
 
 		private final JudgeMetadata metadata;
 

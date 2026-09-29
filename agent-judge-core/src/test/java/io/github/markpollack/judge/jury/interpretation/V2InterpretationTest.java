@@ -1,5 +1,7 @@
 package io.github.markpollack.judge.jury.interpretation;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import java.util.Map;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,7 +36,7 @@ class V2InterpretationTest {
 
 	@Test
 	void forgedReductionCannotContradictAllRetainedInputs() {
-		var jury = io.github.markpollack.judge.jury.SimpleJury.builder()
+		var jury = io.github.markpollack.judge.jury.SimpleJury.<JudgmentContext>builder()
 			.judge(c -> Judgment.pass("a"))
 			.judge(c -> Judgment.pass("b"))
 			.votingStrategy(new io.github.markpollack.judge.jury.ConsensusStrategy())

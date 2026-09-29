@@ -42,7 +42,7 @@ import io.github.markpollack.judge.result.Judgment;
  * @see Judges
  */
 @FunctionalInterface
-public interface Judge {
+public interface Judge<E> {
 
 	/**
 	 * Evaluate an agent execution result.
@@ -50,6 +50,6 @@ public interface Judge {
 	 * execution
 	 * @return the judgment with required status, optional score/label, reasoning, and checks
 	 */
-	Judgment judge(JudgmentContext context);
+	Judgment judge(E context);
 
 }

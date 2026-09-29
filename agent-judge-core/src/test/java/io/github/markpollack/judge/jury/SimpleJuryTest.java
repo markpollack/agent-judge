@@ -29,7 +29,7 @@ class SimpleJuryTest {
 
 	@Test
 	void shouldExecuteJudgesInParallel() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Judge1"))
 			.judge(alwaysPass("Judge2"))
 			.judge(alwaysPass("Judge3"))
@@ -48,7 +48,7 @@ class SimpleJuryTest {
 
 	@Test
 	void shouldExecuteJudgesSequentially() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Judge1"))
 			.judge(alwaysFail("Judge2"))
 			.judge(alwaysPass("Judge3"))
@@ -65,7 +65,7 @@ class SimpleJuryTest {
 
 	@Test
 	void shouldPreserveJudgeIdentityByName() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("FileExists"))
 			.judge(alwaysFail("Correctness"))
 			.judge(alwaysPass("BuildSuccess"))
@@ -82,10 +82,10 @@ class SimpleJuryTest {
 
 	@Test
 	void shouldGenerateDefaultNamesForUnnamedJudges() {
-		Judge unnamedJudge1 = ctx -> Judgment.pass("Pass 1");
-		Judge unnamedJudge2 = ctx -> Judgment.fail("Fail 2");
+		Judge<JudgmentContext> unnamedJudge1 = ctx -> Judgment.pass("Pass 1");
+		Judge<JudgmentContext> unnamedJudge2 = ctx -> Judgment.fail("Fail 2");
 
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(unnamedJudge1)
 			.judge(unnamedJudge2)
 			.votingStrategy(new MajorityVotingStrategy())
@@ -99,7 +99,7 @@ class SimpleJuryTest {
 
 	@Test
 	void shouldUseWeightedVoting() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Judge1"), 0.3)
 			.judge(alwaysFail("Judge2"), 0.7)
 			.votingStrategy(new WeightedAverageStrategy())
@@ -117,7 +117,7 @@ class SimpleJuryTest {
 	void shouldUseCustomExecutor() {
 		var executor = Executors.newFixedThreadPool(2);
 
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Judge1"))
 			.judge(alwaysPass("Judge2"))
 			.votingStrategy(new MajorityVotingStrategy())
@@ -135,10 +135,10 @@ class SimpleJuryTest {
 
 	@Test
 	void shouldReturnJudgesList() {
-		Judge judge1 = alwaysPass("Judge1");
-		Judge judge2 = alwaysFail("Judge2");
+		Judge<JudgmentContext> judge1 = alwaysPass("Judge1");
+		Judge<JudgmentContext> judge2 = alwaysFail("Judge2");
 
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(judge1)
 			.judge(judge2)
 			.votingStrategy(new MajorityVotingStrategy())
@@ -151,14 +151,14 @@ class SimpleJuryTest {
 	void shouldReturnVotingStrategy() {
 		VotingStrategy strategy = new MajorityVotingStrategy();
 
-		SimpleJury jury = SimpleJury.builder().judge(alwaysPass("Judge1")).votingStrategy(strategy).build();
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder().judge(alwaysPass("Judge1")).votingStrategy(strategy).build();
 
 		assertThat(jury.getVotingStrategy()).isEqualTo(strategy);
 	}
 
 	@Test
 	void shouldPreserveOrderInIndividualByName() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("First"))
 			.judge(alwaysFail("Second"))
 			.judge(alwaysPass("Third"))
@@ -177,27 +177,27 @@ class SimpleJuryTest {
 
 	@Test
 	void builderShouldRequireVotingStrategy() {
-		assertThatThrownBy(() -> SimpleJury.builder().judge(alwaysPass("Judge1")).build())
+		assertThatThrownBy(() -> SimpleJury.<JudgmentContext>builder().judge(alwaysPass("Judge1")).build())
 			.isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("Voting strategy is required");
 	}
 
 	@Test
 	void builderShouldRequireAtLeastOneJudge() {
-		assertThatThrownBy(() -> SimpleJury.builder().votingStrategy(new MajorityVotingStrategy()).build())
+		assertThatThrownBy(() -> SimpleJury.<JudgmentContext>builder().votingStrategy(new MajorityVotingStrategy()).build())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("at least one judge");
 	}
 
 	@Test
 	void builderShouldRejectNullJudge() {
-		assertThatThrownBy(() -> SimpleJury.builder().judge(null)).isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> SimpleJury.<JudgmentContext>builder().judge(null)).isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Judge cannot be null");
 	}
 
 	@Test
 	void builderShouldRejectNegativeWeight() {
-		assertThatThrownBy(() -> SimpleJury.builder().judge(alwaysPass("Judge1"), -1.0))
+		assertThatThrownBy(() -> SimpleJury.<JudgmentContext>builder().judge(alwaysPass("Judge1"), -1.0))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("non-negative");
 	}
@@ -207,7 +207,7 @@ class SimpleJuryTest {
 		// NaN < 0 is false, so a negative-only guard let NaN and both infinities through to a
 		// jury that could vote with them but could not be described.
 		for (double weight : new double[] { Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY }) {
-			assertThatThrownBy(() -> SimpleJury.builder().judge(alwaysPass("Judge1"), weight), "weight %s", weight)
+			assertThatThrownBy(() -> SimpleJury.<JudgmentContext>builder().judge(alwaysPass("Judge1"), weight), "weight %s", weight)
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("Weight must be finite");
 		}
@@ -215,7 +215,7 @@ class SimpleJuryTest {
 
 	@Test
 	void builderShouldStillAcceptFiniteAndZeroWeights() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Zero"), 0.0)
 			.judge(alwaysPass("Tiny"), Double.MIN_VALUE)
 			.judge(alwaysPass("Heavy"), 2.5)
@@ -232,7 +232,7 @@ class SimpleJuryTest {
 	@Test
 	void builderShouldAcceptZeroWeight() {
 		// Zero weight is valid - judge participates but with no influence
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Judge1"), 0.0)
 			.judge(alwaysFail("Judge2"), 1.0)
 			.votingStrategy(new WeightedAverageStrategy())
@@ -247,7 +247,7 @@ class SimpleJuryTest {
 
 	@Test
 	void builderShouldDefaultToParallelTrue() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Judge1"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
@@ -261,7 +261,7 @@ class SimpleJuryTest {
 
 	@Test
 	void builderShouldSupportJudgeWithoutWeight() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Judge1")) // defaults to weight 1.0
 			.judge(alwaysFail("Judge2")) // defaults to weight 1.0
 			.votingStrategy(new WeightedAverageStrategy())
@@ -280,7 +280,7 @@ class SimpleJuryTest {
 	void shouldHandleRecordingJudges() {
 		var recording = recording("RecordingJudge", booleanPass("Recorded"));
 
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(recording)
 			.judge(alwaysPass("Judge2"))
 			.votingStrategy(new MajorityVotingStrategy())
@@ -295,7 +295,7 @@ class SimpleJuryTest {
 
 	@Test
 	void shouldHandleSlowJudgesWithTimeout() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(slow("SlowJudge", 100, booleanPass("Slow pass")))
 			.judge(alwaysPass("FastJudge"))
 			.votingStrategy(new MajorityVotingStrategy())
@@ -319,7 +319,7 @@ class SimpleJuryTest {
 
 	@Test
 	void throwingJudgeBecomesAnErrorJudgmentTheErrorPolicyResolves() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(withScore("Scorer", 0.9))
 			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
 			.judge(alwaysPass("Checker"))
@@ -349,7 +349,7 @@ class SimpleJuryTest {
 
 	@Test
 	void throwingJudgeIsContainedInSequentialModeToo() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
 			.judge(alwaysPass("Checker"))
 			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
@@ -365,7 +365,7 @@ class SimpleJuryTest {
 
 	@Test
 	void throwingJudgeUnderPropagateErrorsRatherThanEscaping() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Checker"))
 			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
 			.votingStrategy(new MajorityVotingStrategy())
@@ -383,7 +383,7 @@ class SimpleJuryTest {
 
 	@Test
 	void judgeReturningNoJudgmentBecomesAnErrorJudgment() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(returnsNothing("Silent"))
 			.judge(alwaysPass("Checker"))
 			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
@@ -399,7 +399,7 @@ class SimpleJuryTest {
 	@Test
 	@SuppressWarnings("unchecked")
 	void aggregationEvidenceReportsTheCountThatActuallyVoted() {
-		SimpleJury jury = SimpleJury.builder()
+		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Checker"))
 			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
 			.judge(alwaysPass("Reviewer"))
@@ -434,8 +434,8 @@ class SimpleJuryTest {
 		assertMetadataFailuresBecomeErrorSeats(juryWithUnreadableMetadata(false));
 	}
 
-	private static SimpleJury juryWithUnreadableMetadata(boolean parallel) {
-		return SimpleJury.builder()
+	private static SimpleJury<JudgmentContext> juryWithUnreadableMetadata(boolean parallel) {
+		return SimpleJury.<JudgmentContext>builder()
 			.judge(alwaysPass("Build"))
 			.judge(nullMetadata(Judgment.pass("a judgment the jury must not keep")))
 			.judge(withScore("Scorer", 0.9))
@@ -447,7 +447,7 @@ class SimpleJuryTest {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static void assertMetadataFailuresBecomeErrorSeats(SimpleJury jury) {
+	private static void assertMetadataFailuresBecomeErrorSeats(SimpleJury<JudgmentContext> jury) {
 		Verdict verdict = jury.vote(simpleContext("Test goal"));
 
 		// The judges whose metadata could be read keep their judgments.

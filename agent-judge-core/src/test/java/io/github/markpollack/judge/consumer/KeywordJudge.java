@@ -13,7 +13,7 @@ import io.github.markpollack.judge.result.Judgment;
  * A judge class declared by a consumer, outside every library package. It declares neither
  * metadata nor configuration.
  */
-public class KeywordJudge implements Judge {
+public class KeywordJudge implements Judge<JudgmentContext> {
 
 	private final String keyword;
 

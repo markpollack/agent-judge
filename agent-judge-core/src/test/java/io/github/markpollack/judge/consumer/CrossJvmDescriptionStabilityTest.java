@@ -5,6 +5,8 @@
 
 package io.github.markpollack.judge.consumer;
 
+import io.github.markpollack.judge.context.JudgmentContext;
+
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -72,7 +74,7 @@ class CrossJvmDescriptionStabilityTest {
 
 	@Test
 	void theRuntimeNamesTheDescriptionAvoidsAreReallyUnstable() {
-		Judge lambda = ctx -> Judgment.pass("probe");
+		Judge<JudgmentContext> lambda = ctx -> Judgment.pass("probe");
 
 		assertThat(lambda.getClass().getName()).contains("$$Lambda").contains("/0x");
 	}

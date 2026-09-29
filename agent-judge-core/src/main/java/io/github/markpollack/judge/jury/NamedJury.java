@@ -14,7 +14,7 @@ import java.util.Objects;
  * @param jury configured jury
  * @since 0.14.0
  */
-public record NamedJury(String name, Jury jury) {
+public record NamedJury<E>(String name, Jury<E> jury) {
 
 	/** Validate the configured name and jury. */
 	public NamedJury {

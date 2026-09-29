@@ -4,6 +4,8 @@
  */
 package io.github.markpollack.judge.assertions;
 
+import io.github.markpollack.judge.requirement.Requirement;
+
 import com.sun.net.httpserver.HttpServer;
 import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jev.JevEvidence;
@@ -77,7 +79,7 @@ class ConferenceAssertionTest {
 	@Test
 	void canonicalNamedRequirement() throws Exception {
 		JudgmentContext evidence = fixture.context(0);
-		Requirement requirement = fixture.requirement(0);
+		Requirement<?> requirement = fixture.requirement(0);
 		var failure = assertThrows(SemanticAssertionError.Rejected.class, () -> {
 			assertThat(evidence).satisfies(requirement);
 		});
@@ -105,7 +107,7 @@ class ConferenceAssertionTest {
 	void unchangedAc8Positive() throws Exception {
 		choice.set("satisfied");
 		JudgmentContext evidence = fixture.context(1);
-		Requirement requirement = fixture.requirement(1);
+		Requirement<?> requirement = fixture.requirement(1);
 		assertThat(evidence).satisfies(requirement);
 		// The second local call exposes the positive audit result; neither is live
 		// inference.
@@ -138,7 +140,7 @@ class ConferenceAssertionTest {
 		assertEquals(JudgmentStatus.ERROR, failure.result().verdict().aggregated().status());
 		assertEquals(0, calls.get());
 		assertThrows(IllegalArgumentException.class, () -> facade.evaluate(original,
-				new Requirement("RULE-4-lock-order", "2", fixture.requirement(0).text())));
+				Requirement.text("RULE-4-lock-order", "2", fixture.requirement(0).text())));
 		assertEquals(0, calls.get());
 	}
 

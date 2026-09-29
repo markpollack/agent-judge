@@ -38,13 +38,13 @@ import java.util.List;
  * @see VotingStrategy
  * @see Verdict
  */
-public interface Jury {
+public interface Jury<E> {
 
 	/**
 	 * Get the list of judges in this jury.
 	 * @return list of judges
 	 */
-	List<Judge> getJudges();
+	List<Judge<E>> getJudges();
 
 	/**
 	 * Get the voting strategy used to aggregate judgments.
@@ -57,7 +57,7 @@ public interface Jury {
 	 * @param context the judgment context
 	 * @return verdict with aggregated and individual judgments
 	 */
-	Verdict vote(JudgmentContext context);
+	Verdict vote(E context);
 
 	/**
 	 * Describe this jury's configured structure, available before any vote.

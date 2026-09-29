@@ -109,27 +109,27 @@ class CompositeResultContractTest {
 
 	@Test
 	void configuredNamesUseOneStrictUnicodeValidatorAndRejectDuplicatesBeforeInvocation() {
-		assertThat(new NamedJury("a/b~c-\uD83D\uDE80", returning(leaf("ok"))).name()).isEqualTo("a/b~c-\uD83D\uDE80");
-		assertThat(new NamedJury("a".repeat(64), returning(leaf("ok"))).name()).hasSize(64);
+		assertThat(new NamedJury<JudgmentContext>("a/b~c-\uD83D\uDE80", returning(leaf("ok"))).name()).isEqualTo("a/b~c-\uD83D\uDE80");
+		assertThat(new NamedJury<JudgmentContext>("a".repeat(64), returning(leaf("ok"))).name()).hasSize(64);
 
 		for (String invalid : List.of("", " ", " leading", "trailing\u2003", "\u00A0leading", "trailing\u00A0",
 				"e\u0301", "bad\u0001name",
 				"bad\u200Ename", "bad\u2028name", "bad\uD800name", "a".repeat(65))) {
-			assertThatThrownBy(() -> new NamedJury(invalid, returning(leaf("ok"))), "invalid configured name %s",
+			assertThatThrownBy(() -> new NamedJury<JudgmentContext>(invalid, returning(leaf("ok"))), "invalid configured name %s",
 					printable(invalid))
 				.isInstanceOfAny(IllegalArgumentException.class, NullPointerException.class);
 		}
 
 		AtomicInteger invocations = new AtomicInteger();
-		Jury counted = countingLeaf(invocations);
-		assertThatThrownBy(() -> CascadedJury.builder()
+		Jury<JudgmentContext> counted = countingLeaf(invocations);
+		assertThatThrownBy(() -> CascadedJury.<JudgmentContext>builder()
 			.tier("duplicate", counted, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("duplicate", counted, TierPolicy.FINAL_TIER)
 			.build())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Duplicate");
-		assertThatThrownBy(() -> Juries.meta(new ConsensusStrategy(), new NamedJury("same", counted),
-				new NamedJury("same", counted)))
+		assertThatThrownBy(() -> Juries.meta(new ConsensusStrategy(), new NamedJury<JudgmentContext>("same", counted),
+				new NamedJury<JudgmentContext>("same", counted)))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Duplicate");
 		assertThat(invocations).hasValue(0);
@@ -147,7 +147,7 @@ class CompositeResultContractTest {
 		// LINE_SEPARATOR and PARAGRAPH_SEPARATOR are separate Character types, so the line
 		// separator the case above supplies is not a witness for the paragraph separator.
 		for (String separator : List.of("bad name", "bad name")) {
-			assertThatThrownBy(() -> new NamedJury(separator, returning(leaf("ok"))), "separator %s",
+			assertThatThrownBy(() -> new NamedJury<JudgmentContext>(separator, returning(leaf("ok"))), "separator %s",
 					printable(separator))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("forbidden Unicode code point");
@@ -156,25 +156,25 @@ class CompositeResultContractTest {
 		// A high surrogate at the end of the name has no following unit to pair with. The
 		// validator owes the caller that diagnostic rather than a read past the end of the
 		// string, so the expected type is what distinguishes the bound from its absence.
-		assertThatThrownBy(() -> new NamedJury("a\uD800", returning(leaf("ok"))),
+		assertThatThrownBy(() -> new NamedJury<JudgmentContext>("a\uD800", returning(leaf("ok"))),
 				"a name whose last unit is a high surrogate")
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Unicode scalar values");
-		assertThatThrownBy(() -> new NamedJury("bad\uD800name", returning(leaf("ok"))),
+		assertThatThrownBy(() -> new NamedJury<JudgmentContext>("bad\uD800name", returning(leaf("ok"))),
 				"a high surrogate followed by an ordinary character")
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Unicode scalar values");
 
 		// Near misses that are still valid names: a paired astral character is one scalar, and
 		// an interior SPACE_SEPARATOR is neither a line nor a paragraph separator.
-		assertThat(new NamedJury("a🚀b", returning(leaf("ok"))).name()).isEqualTo("a🚀b");
-		assertThat(new NamedJury("two words", returning(leaf("ok"))).name()).isEqualTo("two words");
+		assertThat(new NamedJury<JudgmentContext>("a🚀b", returning(leaf("ok"))).name()).isEqualTo("a🚀b");
+		assertThat(new NamedJury<JudgmentContext>("two words", returning(leaf("ok"))).name()).isEqualTo("two words");
 	}
 
 	@Test
 	void equalValuedTiersRetainDistinctConfiguredIdentityAndOrder() {
 		Verdict equal = leaf("same value");
-		CascadedJury cascade = CascadedJury.builder()
+		CascadedJury<JudgmentContext> cascade = CascadedJury.<JudgmentContext>builder()
 			.tier("alpha", returning(equal), TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("beta", returning(equal), TierPolicy.FINAL_TIER)
 			.build();
@@ -200,7 +200,7 @@ class CompositeResultContractTest {
 			.seats(List.of(new Seat(0, "second", KeySource.DECLARED)))
 			.decision(Decision.own())
 			.build();
-		CascadedJury cascade = CascadedJury.builder()
+		CascadedJury<JudgmentContext> cascade = CascadedJury.<JudgmentContext>builder()
 			.tier("broken", throwing(new IllegalStateException("must not disappear")),
 					TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("fallback", returning(stopping), TierPolicy.FINAL_TIER)
@@ -216,7 +216,7 @@ class CompositeResultContractTest {
 		assertThat(verdict.individualByName()).containsExactlyEntriesOf(byName);
 		assertThat(verdict.weights()).containsExactlyEntriesOf(weights);
 
-		CascadedJury errorCascade = CascadedJury.builder()
+		CascadedJury<JudgmentContext> errorCascade = CascadedJury.<JudgmentContext>builder()
 			.tier("fatal", throwingError(new AssertionError("fatal")), TierPolicy.FINAL_TIER)
 			.build();
 		assertThatThrownBy(() -> errorCascade.vote(CONTEXT)).isInstanceOf(AssertionError.class).hasMessage("fatal");
@@ -224,7 +224,7 @@ class CompositeResultContractTest {
 
 	@Test
 	void aThrowingFinalTierReturnsTheFixedErrorAndItsFailedAttempt() {
-		Verdict verdict = CascadedJury.builder()
+		Verdict verdict = CascadedJury.<JudgmentContext>builder()
 			.tier("final", throwing(new IllegalStateException("caller text")), TierPolicy.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
@@ -255,9 +255,9 @@ class CompositeResultContractTest {
 		};
 		Judgment first = booleanPass("first succeeded");
 		Judgment last = booleanPass("last succeeded");
-		Jury meta = Juries.meta(forbiddenStrategy, new NamedJury("first", returning(Verdict.single("first", first))),
-				new NamedJury("broken", throwing(new IllegalArgumentException("boom"))),
-				new NamedJury("last", returning(Verdict.single("last", last))));
+		Jury<JudgmentContext> meta = Juries.meta(forbiddenStrategy, new NamedJury<JudgmentContext>("first", returning(Verdict.single("first", first))),
+				new NamedJury<JudgmentContext>("broken", throwing(new IllegalArgumentException("boom"))),
+				new NamedJury<JudgmentContext>("last", returning(Verdict.single("last", last))));
 
 		Verdict verdict = meta.vote(CONTEXT);
 
@@ -277,7 +277,7 @@ class CompositeResultContractTest {
 		for (int failureIndex = 0; failureIndex < 3; failureIndex++) {
 			AtomicInteger calls = new AtomicInteger();
 			AtomicInteger strategyCalls = new AtomicInteger();
-			Jury meta = Juries.meta(countingStrategy(strategyCalls),
+			Jury<JudgmentContext> meta = Juries.meta(countingStrategy(strategyCalls),
 					metaMember("first", 0, failureIndex, calls), metaMember("middle", 1, failureIndex, calls),
 					metaMember("final", 2, failureIndex, calls));
 
@@ -292,9 +292,9 @@ class CompositeResultContractTest {
 
 		AtomicInteger calls = new AtomicInteger();
 		AtomicInteger strategyCalls = new AtomicInteger();
-		Jury multiple = Juries.meta(countingStrategy(strategyCalls),
-				new NamedJury("first", countedThrowing(calls)), new NamedJury("middle", countedReturning(calls)),
-				new NamedJury("final", countedThrowing(calls)));
+		Jury<JudgmentContext> multiple = Juries.meta(countingStrategy(strategyCalls),
+				new NamedJury<JudgmentContext>("first", countedThrowing(calls)), new NamedJury<JudgmentContext>("middle", countedReturning(calls)),
+				new NamedJury<JudgmentContext>("final", countedThrowing(calls)));
 		Verdict verdict = multiple.vote(CONTEXT);
 		assertThat(calls).hasValue(3);
 		assertThat(strategyCalls).hasValue(0);
@@ -305,9 +305,9 @@ class CompositeResultContractTest {
 
 	@Test
 	void pathsAreStrictReversibleAndPreorderAcrossMetaCascadeMeta() {
-		Jury inner = Juries.meta(new ConsensusStrategy(), new NamedJury("c~d", returning(leaf("inner"))));
-		Jury cascade = CascadedJury.builder().tier("a/b", inner, TierPolicy.FINAL_TIER).build();
-		Jury outer = Juries.meta(new ConsensusStrategy(), new NamedJury("outer", cascade));
+		Jury<JudgmentContext> inner = Juries.meta(new ConsensusStrategy(), new NamedJury<JudgmentContext>("c~d", returning(leaf("inner"))));
+		Jury<JudgmentContext> cascade = CascadedJury.<JudgmentContext>builder().tier("a/b", inner, TierPolicy.FINAL_TIER).build();
+		Jury<JudgmentContext> outer = Juries.meta(new ConsensusStrategy(), new NamedJury<JudgmentContext>("outer", cascade));
 
 		List<CompositePathEntry> flattened = CompositePaths.flatten(outer.vote(CONTEXT));
 
@@ -426,18 +426,18 @@ class CompositeResultContractTest {
 			.build();
 	}
 
-	private static Jury nestedCascade(int depth, AtomicInteger leafCalls) {
-		Jury jury = countingLeaf(leafCalls);
+	private static Jury<JudgmentContext> nestedCascade(int depth, AtomicInteger leafCalls) {
+		Jury<JudgmentContext> jury = countingLeaf(leafCalls);
 		for (int current = depth; current > 0; current--) {
-			jury = CascadedJury.builder().tier("level-" + current, jury, TierPolicy.FINAL_TIER).build();
+			jury = CascadedJury.<JudgmentContext>builder().tier("level-" + current, jury, TierPolicy.FINAL_TIER).build();
 		}
 		return jury;
 	}
 
-	private static CascadedJury flatCascade(int attempts, AtomicInteger lastCalls) {
-		CascadedJury.Builder builder = CascadedJury.builder();
+	private static CascadedJury<JudgmentContext> flatCascade(int attempts, AtomicInteger lastCalls) {
+		CascadedJury.Builder<JudgmentContext> builder = CascadedJury.<JudgmentContext>builder();
 		for (int index = 1; index <= attempts; index++) {
-			Jury jury = index == attempts ? countingLeaf(lastCalls) : returning(leaf("pass"));
+			Jury<JudgmentContext> jury = index == attempts ? countingLeaf(lastCalls) : returning(leaf("pass"));
 			TierPolicy policy = index == attempts ? TierPolicy.FINAL_TIER : TierPolicy.REJECT_ON_ANY_FAIL;
 			builder.tier("tier-" + index, jury, policy);
 		}
@@ -457,25 +457,25 @@ class CompositeResultContractTest {
 		return Verdict.single("leaf", booleanPass(reasoning));
 	}
 
-	private static Jury countingLeaf(AtomicInteger calls) {
+	private static Jury<JudgmentContext> countingLeaf(AtomicInteger calls) {
 		return jury(() -> {
 			calls.incrementAndGet();
 			return leaf("counted");
 		});
 	}
 
-	private static NamedJury metaMember(String name, int index, int failureIndex, AtomicInteger calls) {
-		return new NamedJury(name, index == failureIndex ? countedThrowing(calls) : countedReturning(calls));
+	private static NamedJury<JudgmentContext> metaMember(String name, int index, int failureIndex, AtomicInteger calls) {
+		return new NamedJury<JudgmentContext>(name, index == failureIndex ? countedThrowing(calls) : countedReturning(calls));
 	}
 
-	private static Jury countedReturning(AtomicInteger calls) {
+	private static Jury<JudgmentContext> countedReturning(AtomicInteger calls) {
 		return jury(() -> {
 			calls.incrementAndGet();
 			return leaf("returned");
 		});
 	}
 
-	private static Jury countedThrowing(AtomicInteger calls) {
+	private static Jury<JudgmentContext> countedThrowing(AtomicInteger calls) {
 		return jury(() -> {
 			calls.incrementAndGet();
 			throw new IllegalStateException("failed");
@@ -497,26 +497,26 @@ class CompositeResultContractTest {
 		};
 	}
 
-	private static Jury returning(Verdict verdict) {
+	private static Jury<JudgmentContext> returning(Verdict verdict) {
 		return jury(() -> verdict);
 	}
 
-	private static Jury throwing(RuntimeException failure) {
+	private static Jury<JudgmentContext> throwing(RuntimeException failure) {
 		return jury(() -> {
 			throw failure;
 		});
 	}
 
-	private static Jury throwingError(Error failure) {
+	private static Jury<JudgmentContext> throwingError(Error failure) {
 		return jury(() -> {
 			throw failure;
 		});
 	}
 
-	private static Jury jury(java.util.function.Supplier<Verdict> vote) {
-		return new Jury() {
+	private static Jury<JudgmentContext> jury(java.util.function.Supplier<Verdict> vote) {
+		return new Jury<JudgmentContext>() {
 			@Override
-			public List<Judge> getJudges() {
+			public List<Judge<JudgmentContext>> getJudges() {
 				return List.of();
 			}
 

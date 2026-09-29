@@ -3,7 +3,7 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 
-package io.github.markpollack.judge.assertions;
+package io.github.markpollack.judge.result;
 
 import java.util.Objects;
 import io.github.markpollack.judge.result.AcceptancePolicy;
