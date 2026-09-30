@@ -57,8 +57,7 @@ class EarsJudgeTests {
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(check(judgment, "UC1-AC2").judgment().pass()).isFalse();
-		assertThat(check(judgment, "UC1-AC2").judgment().operationalReasoning())
-			.as("the binding item's evidence survives")
+		assertThat(check(judgment, "UC1-AC2").judgment().reasoning()).as("the binding item's evidence survives")
 			.contains("compares the wrong way round");
 	}
 

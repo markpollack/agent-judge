@@ -47,9 +47,9 @@ unreachable for these strategies, and in 0.14 it is the only case.
 **If you take one action from this document: find every place you read an aggregate's score behind
 a `Majority` or `Consensus` jury, and make sure it goes through `effectiveScore()`.**
 
-### 1.2 `ErrorPolicy` now defaults to `PROPAGATE` on all five strategies
+### 1.2 `ErrorHandling` now defaults to `PROPAGATE` on all five strategies
 
-If you never passed an `ErrorPolicy`, your behavior changes without a compile error.
+If you never passed an `ErrorHandling`, your behavior changes without a compile error.
 
 | Strategy | 0.13 default | 0.14 default |
 |---|---|---|
@@ -60,7 +60,7 @@ Under `PROPAGATE`, one errored judge makes the whole aggregate `ERROR`. Previous
 became a negative vote it never cast. If you want the old behavior, ask for it explicitly:
 
 ```java
-new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
+new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL);
 ```
 
 Note that an `ERROR` aggregate has no score and `effectiveScore()` is empty, so an error now reaches
@@ -341,7 +341,7 @@ for (CompositePathEntry entry : CompositePaths.flatten(verdict)) {
 The direct list contains the complete attempts entered at that root in configuration order. A
 successful attempt contains the exact child `Verdict`; a failed attempt contains only
 `JURY_EXECUTION_FAILED`, serialized as `jury_execution_failed`. Exactly one outcome is present.
-Cascade attempts have relation `cascade_tier` and require their `TierPolicy`; meta-member attempts
+Cascade attempts have relation `cascade_tier` and require their `RoutingRule`; meta-member attempts
 have relation `meta_member` and omit policy.
 
 Configure meta-juries with stable names:
@@ -416,7 +416,7 @@ Nothing eligible now yields `ABSTAIN` rather than a manufactured failing score.
 | `FAIL` + `ABSTAIN` | `FAIL` |
 | `PASS` + `FAIL` | **`ABSTAIN`** — the applicable judges disagree |
 | all `ABSTAIN` | `ABSTAIN` |
-| any `ERROR` | per `ErrorPolicy`, default `PROPAGATE` |
+| any `ERROR` | per `ErrorHandling`, default `PROPAGATE` |
 
 If you previously treated a consensus `FAIL` as "rejected", note that a split panel now abstains
 instead. A consumer that must fail closed on disagreement should check for `ABSTAIN` explicitly.
@@ -425,7 +425,7 @@ Cascade escalation is unchanged: `REJECT_ON_ANY_FAIL` and `ACCEPT_ON_ALL_PASS` r
 **individual** judgments, not its aggregate, so the new consensus semantics surface only at a
 `FINAL_TIER` or when you read `Verdict.aggregated()` yourself.
 
-### 5.2 `ErrorPolicy` has four values
+### 5.2 `ErrorHandling` has four values
 
 | Policy | Effect |
 |---|---|
@@ -493,7 +493,7 @@ Normalized to stable lower-camel-case, matching the evidence tokens:
 | `WeightedAverage` | `weightedAverage` |
 | `MedianVoting` | `median` |
 
-`ErrorPolicy` tokens are `propagate`, `treatAsFail`, `treatAsAbstain`, `ignore`.
+`ErrorHandling` tokens are `propagate`, `treatAsFail`, `treatAsAbstain`, `ignore`.
 
 ---
 
@@ -580,7 +580,7 @@ This contract applies to the 0.14.0 artifacts.
    compared against `value()` rather than `normalized()`, that was a latent defect — the raw value
    was compared against a normalized threshold — and it is fixed by moving to the single normalized
    number.
-5. Decide your `ErrorPolicy` explicitly rather than inheriting `PROPAGATE` (§1.2).
+5. Decide your `ErrorHandling` explicitly rather than inheriting `PROPAGATE` (§1.2).
 6. Re-check any consumer that treated a consensus `FAIL` as rejection; a split panel now abstains
    (§5.1).
 7. If you gate on coverage, add an explicit report-existence judge (§6.1).

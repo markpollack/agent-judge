@@ -1,48 +1,23 @@
 # Requirement assertions with AssertJ
 
-Use the staged entry point with an ordinary typed Judge:
-
 ```java
 import static io.github.markpollack.judge.assertj.Assertions.assertThat;
-import io.github.markpollack.judge.Judge;
+import io.github.markpollack.judge.RequirementJudge;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.requirement.Requirement;
 
-Requirement<String> READY_REQUIREMENT = Requirement.text(
-    "response-ready", "1", "The response is exactly READY");
-Judge<String> READY_RESPONSE_JUDGE = response -> "READY".equals(response)
-    ? Judgment.pass("The response is READY") : Judgment.fail("The response differs");
-
-assertThat(READY_REQUIREMENT)
-    .judgedBy(READY_RESPONSE_JUDGE)
-    .withEvidence("READY")
-    .isSatisfied();
+var requirement = Requirement.text("ready", "1", "READY");
+RequirementJudge<String, String> matches = (actual, response) -> actual.specification().equals(response)
+    ? Judgment.pass("matches") : Judgment.fail("differs");
+assertThat(requirement).judgedBy(matches).withEvidence("READY").isSatisfied();
 ```
 
-The grammar is `Requirement → Judge<E> or Jury<E> → E → optional AcceptancePolicy → isSatisfied()`.
-The Judge selects the evidence type. A wrong evidence type, premature terminal, or policy
-before evidence fails compilation. Selecting stages performs no evaluation. Each terminal
-call evaluates once. Forgetting the terminal is legal Java and performs no assertion.
+The grammar is `Requirement<S> → RequirementJudge<S,E> or RequirementJury<S,E> → E → optional Policy → terminal`. `evaluate()` retains a result without asserting; `isSatisfied()` asserts it. Stages do not execute until a terminal. Repeating terminals on the same stage reuses its completed result, including any policy failure. Select `withPolicy(...)` before execution; changing it afterward is refused. Separate branches configured before execution are separate evaluations.
 
-The default relies on the Judgment as rendered, with no statistical threshold. Supply an
-`AcceptancePolicy` lambda after evidence to change reliance for that assertion. Configure
-an application default with `Assertions.using(new RequirementAssertions(policy))`.
-Requirements remain pure and never carry policies. Optional recording identity is outside
-the minimal policy interface.
+The requirement path rejects ordinary Judges/Juries instead of discarding a supplied specification. Use `assertThatEvidence(evidence).judgedBy(ordinaryJudgeOrJury).isPassed()` for an evidence-only check. Both retained `Verdict` and `EvaluationResult` have `assertThat(...)` overloads with `hasConclusion(...)`.
 
-A requirement-aware evaluator uses `Judge<RequirementEvidence<S,E>>` and
-`judgedByRequirement(...)`. It receives the exact Requirement and evidence objects.
-This explicit entry keeps ordinary Judge declarations short and avoids a second Judge
-hierarchy or an ambiguous erased Java overload.
+No policy is requested by default. `withPolicy(v -> new PolicyDecision(PolicyAction.RELY, "reviewed"))` receives the entire usable Verdict. RELY preserves negative conclusions; ABSTAIN/ESCALATE withhold reliance; a thrown exception or null return becomes a failed requested policy. None rewrite producer judgments or restart routing.
 
-Jury evaluation preserves its internal rules and full Verdict. The final application rule
-cannot replace seat policies, trigger a fallback tier, or repair an unsupported reading.
-`RELY` on FAIL establishes a violation; ABSTAIN/ESCALATE are inconclusive; ERROR remains
-an instrument failure. N/A and unsupported interpretation have distinct failures.
-The AssertJ error preserves the complete `RequirementAssertionError` as its cause.
+`isSatisfied()` requires PASS plus either no requested policy or RELY, and an actual Requirement association. `isPassed()` checks the conclusion alone. Failures preserve the complete evaluation; an AssertJ description wraps the retained `RequirementAssertionError` as its cause. Reporting or asserting a retained result invokes no evaluator.
 
-For retained inspection, use `RequirementAssertions.evaluate(...)` and
-`RequirementAssertions.requireSatisfied(result)`. The retained terminal invokes no Judge,
-model or policy. See [five progressive API examples](src/test/java/io/github/markpollack/judge/assertj/AssertJApiExperienceTest.java),
-[compile grammar probes](src/test/java/io/github/markpollack/judge/assertj/CompileGrammarTest.java)
-and the [root quickstart](../README.md).
+The compiler rejects evidence/specification mismatches, premature terminals, ordinary-Judge misuse, Jury-as-Judge assignment, and selector output mismatches. Dynamic all-of coverage is validated at runtime before execution. [API examples](src/test/java/io/github/markpollack/judge/assertj/AssertJApiExperienceTest.java), [compiler probes](src/test/java/io/github/markpollack/judge/assertj/CompileGrammarTest.java), and the [root tutorial](../README.md) exercise these paths.

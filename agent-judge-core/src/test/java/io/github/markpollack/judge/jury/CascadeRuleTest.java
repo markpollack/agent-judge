@@ -154,8 +154,8 @@ class CascadeRuleTest {
 	 */
 	private static Jury<CompletionEvidence> boundaryRejectingCascade(Jury<CompletionEvidence> finalTier) {
 		return CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", finalTier, TierPolicy.FINAL_TIER)
+			.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 	}
 
@@ -210,8 +210,8 @@ class CascadeRuleTest {
 	@DisplayName("1. a genuine FAIL plus a broken reduction stops the cascade with a rejection")
 	void genuineFailPlusBrokenReductionStops() {
 		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("gate", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+			.tier("gate", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -230,8 +230,8 @@ class CascadeRuleTest {
 	@DisplayName("2. the same tier under ACCEPT_ON_ALL_PASS escalates: a broken stage accepts nothing")
 	void acceptOnAllPassNeverStopsOnAFailedStage() {
 		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("structural", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.ACCEPT_ON_ALL_PASS)
-			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+			.tier("structural", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.ACCEPT_ON_ALL_PASS)
+			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -248,7 +248,7 @@ class CascadeRuleTest {
 	@DisplayName("3. an undecided final tier decides nothing at all")
 	void anUndecidedFinalTierDecidesNothing() {
 		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("only", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.FINAL_TIER)
+			.tier("only", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -267,13 +267,13 @@ class CascadeRuleTest {
 			.votingStrategy(new ConsensusStrategy())
 			.build();
 		Jury<CompletionEvidence> tier = Juries.meta(
-				new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+				new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 				new NamedJury<CompletionEvidence>("strict", failingMember),
 				new NamedJury<CompletionEvidence>("broken", throwing(new IllegalStateException("boom"))));
 
 		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("review", tier, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+			.tier("review", tier, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -291,7 +291,7 @@ class CascadeRuleTest {
 		@DisplayName("as the sole final tier, nothing is decided, and the refusal is countable")
 		void soleFinalTier() {
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("only", opaqueExcludingTier(Judgment.pass("a")), TierPolicy.FINAL_TIER)
+				.tier("only", opaqueExcludingTier(Judgment.pass("a")), RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -305,8 +305,8 @@ class CascadeRuleTest {
 		@DisplayName("as a non-final tier it escalates, and the refusal stays countable when a later tier passes")
 		void nonFinalTierFollowedByAPass() {
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("rubric", opaqueExcludingTier(Judgment.pass("a")), TierPolicy.REJECT_ON_ANY_FAIL)
-				.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+				.tier("rubric", opaqueExcludingTier(Judgment.pass("a")), RoutingRule.REJECT_ON_ANY_FAIL)
+				.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -327,11 +327,11 @@ class CascadeRuleTest {
 		void aDeclaredExclusionIsUsed() {
 			Jury<CompletionEvidence> capable = SimpleJury.<CompletionEvidence>builder()
 				.judge(new Conditional("conditional", Judgment.notApplicable(EXCLUSION)))
-				.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
+				.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 				.build();
 
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("rubric", capable, TierPolicy.FINAL_TIER)
+				.tier("rubric", capable, RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -351,12 +351,12 @@ class CascadeRuleTest {
 		@DisplayName("an inner rejection is a determination, adopted as a tier outcome without re-rejecting")
 		void anInnerRejectionIsAdopted() {
 			Jury<CompletionEvidence> inner = CascadedJury.<CompletionEvidence>builder()
-				.tier("gate", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.REJECT_ON_ANY_FAIL)
-				.tier("unused", passingTier("never reached"), TierPolicy.FINAL_TIER)
+				.tier("gate", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.REJECT_ON_ANY_FAIL)
+				.tier("unused", passingTier("never reached"), RoutingRule.FINAL_TIER)
 				.build();
 
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("inner", inner, TierPolicy.FINAL_TIER)
+				.tier("inner", inner, RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -378,11 +378,11 @@ class CascadeRuleTest {
 				.votingStrategy(new ConsensusStrategy())
 				.build();
 			Jury<CompletionEvidence> inner = CascadedJury.<CompletionEvidence>builder()
-				.tier("leaf", erroring, TierPolicy.FINAL_TIER)
+				.tier("leaf", erroring, RoutingRule.FINAL_TIER)
 				.build();
 
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("inner", inner, TierPolicy.FINAL_TIER)
+				.tier("inner", inner, RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -395,10 +395,10 @@ class CascadeRuleTest {
 		@DisplayName("names are local: each level names only its own direct tier")
 		void namesAreLocal() {
 			Jury<CompletionEvidence> inner = CascadedJury.<CompletionEvidence>builder()
-				.tier("leaf", passingTier("OK"), TierPolicy.FINAL_TIER)
+				.tier("leaf", passingTier("OK"), RoutingRule.FINAL_TIER)
 				.build();
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("outer-tier", inner, TierPolicy.FINAL_TIER)
+				.tier("outer-tier", inner, RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -412,8 +412,8 @@ class CascadeRuleTest {
 	@DisplayName("7. a refused exclusion holding a real FAIL stops, and the root is parent-authored")
 	void refusedExclusionWithARealFailStops() {
 		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+			.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -444,8 +444,8 @@ class CascadeRuleTest {
 		assertThat(refusing.aggregateMayBeNotApplicable()).isFalse();
 
 		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", refusing, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+			.tier("rubric", refusing, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -486,13 +486,13 @@ class CascadeRuleTest {
 	void nullReductionsBehaveLikeThrows(boolean nested) {
 		Jury<CompletionEvidence> tier = nullReducingTier(Judgment.pass("a"), Judgment.fail("b"));
 		Jury<CompletionEvidence> cascadeTier = nested
-				? Juries.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+				? Juries.meta(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 						new NamedJury<CompletionEvidence>("inner", tier))
 				: tier;
 
 		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("gate", cascadeTier, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+			.tier("gate", cascadeTier, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -544,7 +544,7 @@ class CascadeRuleTest {
 		private Jury<CompletionEvidence> capableTier() {
 			return SimpleJury.<CompletionEvidence>builder()
 				.judge(new Conditional("conditional", Judgment.pass("OK")))
-				.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
+				.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 				.build();
 		}
 
@@ -579,7 +579,7 @@ class CascadeRuleTest {
 			assertThat(inner.aggregateMayBeNotApplicable()).isEqualTo(innerCapable);
 
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("inner", inner, TierPolicy.FINAL_TIER)
+				.tier("inner", inner, RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -606,8 +606,8 @@ class CascadeRuleTest {
 		@DisplayName("as a rejecting non-final tier, its determination is adopted rather than refused")
 		void asARejectingNonFinalTier(boolean innerCapable) {
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("inner", rejectingCascade(innerCapable), TierPolicy.REJECT_ON_ANY_FAIL)
-				.tier("outer-final", passingTier("OK"), TierPolicy.FINAL_TIER)
+				.tier("inner", rejectingCascade(innerCapable), RoutingRule.REJECT_ON_ANY_FAIL)
+				.tier("outer-final", passingTier("OK"), RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -648,13 +648,13 @@ class CascadeRuleTest {
 	 * @param errorPolicy the meta-strategy's configured error policy
 	 */
 	@ParameterizedTest
-	@EnumSource(ErrorPolicy.class)
+	@EnumSource(ErrorHandling.class)
 	@DisplayName("11. a rejecting cascade as a meta member is a determination, and is never scored")
-	void aRejectingCascadeAsAMetaMember(ErrorPolicy errorPolicy) {
+	void aRejectingCascadeAsAMetaMember(ErrorHandling errorPolicy) {
 		Jury<CompletionEvidence> inner = boundaryRejectingCascade(passingTier("OK"));
 
 		Verdict verdict = Juries
-			.meta(new AllMustPassStrategy(errorPolicy, NotApplicablePolicy.EXCLUDE),
+			.meta(new AllMustPassStrategy(errorPolicy, ExclusionHandling.EXCLUDE),
 					new NamedJury<CompletionEvidence>("inner", inner),
 					new NamedJury<CompletionEvidence>("healthy", returning(Verdict.single("b", Judgment.pass("ok")))))
 			.vote(CONTEXT);
@@ -671,7 +671,7 @@ class CascadeRuleTest {
 		assertThat(verdict.judgment().status()).as("the meta-jury never rejects the subject on machinery's behalf")
 			.isNotEqualTo(JudgmentStatus.FAIL);
 
-		if (errorPolicy == ErrorPolicy.PROPAGATE || errorPolicy == ErrorPolicy.TREAT_AS_FAIL) {
+		if (errorPolicy == ErrorHandling.PROPAGATE || errorPolicy == ErrorHandling.TREAT_AS_FAIL) {
 			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.ERRORS_PROPAGATED);
 			assertThat(originOf(verdict.judgment())).as("the machinery cause is carried up by name, counted once")
 				.containsOnlyKeys(JudgmentReasonCode.STAGE_FAILED.wireName())
@@ -683,7 +683,7 @@ class CascadeRuleTest {
 		}
 		else {
 			assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
-			String treatment = errorPolicy == ErrorPolicy.IGNORE ? AggregationEvidence.IGNORED_ERROR_COUNT
+			String treatment = errorPolicy == ErrorHandling.IGNORE ? AggregationEvidence.IGNORED_ERROR_COUNT
 					: AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT;
 			assertThat(evidenceOf(verdict.judgment()))
 				.as("D4: the error was counted and excluded, leaving the healthy member alone eligible")
@@ -703,7 +703,7 @@ class CascadeRuleTest {
 	@DisplayName("a throwing final tier decides nothing; a throwing non-final tier escalates")
 	void throwingTiers() {
 		Verdict undecided = CascadedJury.<CompletionEvidence>builder()
-			.tier("only", throwing(new IllegalStateException("boom")), TierPolicy.FINAL_TIER)
+			.tier("only", throwing(new IllegalStateException("boom")), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 		assertThat(undecided.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.NO_TIER_DECIDED);
@@ -711,8 +711,8 @@ class CascadeRuleTest {
 			.isEqualTo(DispositionReason.EXECUTION_FAILED);
 
 		Verdict escalated = CascadedJury.<CompletionEvidence>builder()
-			.tier("broken", throwing(new IllegalStateException("boom")), TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+			.tier("broken", throwing(new IllegalStateException("boom")), RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 		assertThat(escalated.judgment().status()).isEqualTo(JudgmentStatus.PASS);
@@ -728,25 +728,25 @@ class CascadeRuleTest {
 		Jury<CompletionEvidence> errorDerived = SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> Judgment.error("the index was unreachable"), "flaky"))
 			.judge(Judges.named(context -> Judgment.pass("another seat"), "other"))
-			.votingStrategy(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_FAIL, NotApplicablePolicy.EXCLUDE))
+			.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE))
 			.build();
 		// A member whose exclusion policy turned an exclusion into a failing
 		// contribution.
 		Jury<CompletionEvidence> exclusionDerived = SimpleJury.<CompletionEvidence>builder()
 			.judge(new Conditional("conditional", Judgment.notApplicable(EXCLUSION)))
 			.judge(Judges.named(context -> Judgment.pass("another seat"), "other"))
-			.votingStrategy(new AllMustPassStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.TREAT_AS_FAIL))
+			.votingStrategy(new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.TREAT_AS_FAIL))
 			.build();
 
 		for (Jury<CompletionEvidence> member : List.of(errorDerived, exclusionDerived)) {
 			Jury<CompletionEvidence> tier = Juries.meta(
-					new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+					new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 					new NamedJury<CompletionEvidence>("member", member),
 					new NamedJury<CompletionEvidence>("broken", throwing(new IllegalStateException("boom"))));
 
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("review", tier, TierPolicy.REJECT_ON_ANY_FAIL)
-				.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+				.tier("review", tier, RoutingRule.REJECT_ON_ANY_FAIL)
+				.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -766,13 +766,13 @@ class CascadeRuleTest {
 		// ERROR, and a
 		// second member breaks the tier so the cascade reaches the rule at all.
 		Jury<CompletionEvidence> tier = Juries.meta(
-				new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+				new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 				new NamedJury<CompletionEvidence>("rejected", boundaryRejectingCascade(passingTier("OK"))),
 				new NamedJury<CompletionEvidence>("broken", throwing(new IllegalStateException("boom"))));
 
 		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("review", tier, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+			.tier("review", tier, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -794,12 +794,12 @@ class CascadeRuleTest {
 		Jury<CompletionEvidence> tier = SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> Judgment.error("the index was unreachable"), "flaky"))
 			.judge(Judges.named(context -> Judgment.pass("fine"), "ok"))
-			.votingStrategy(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE))
+			.votingStrategy(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE))
 			.build();
 
 		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("review", tier, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+			.tier("review", tier, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -816,12 +816,12 @@ class CascadeRuleTest {
 	@DisplayName("an undecided tier holding nothing at all escalates: there is no rejection to adopt")
 	void anEmptyUndecidedTierEscalates() {
 		Jury<CompletionEvidence> tier = Juries.meta(
-				new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+				new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 				new NamedJury<CompletionEvidence>("broken", returning(undecidedVerdict())));
 
 		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("review", tier, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", passingTier("OK"), TierPolicy.FINAL_TIER)
+			.tier("review", tier, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 

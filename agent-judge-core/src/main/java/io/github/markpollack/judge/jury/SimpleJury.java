@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * judgment at all, the jury records an
  * {@link io.github.markpollack.judge.judgment.JudgmentStatus#ERROR} judgment naming the
  * judge and the cause, and continues. Every configured judge is therefore represented in
- * the returned {@link Verdict}, and the strategy's {@link ErrorPolicy} decides what an
+ * the returned {@link Verdict}, and the strategy's {@link ErrorHandling} decides what an
  * error means — which is the whole point of having one. Letting the exception escape
  * instead would discard every other judge's result in the same jury and, inside a
  * {@link CascadedJury}, collapse the entire tier: a jury would silently score with fewer
@@ -79,7 +79,7 @@ import org.slf4j.LoggerFactory;
  * @author Mark Pollack
  * @since 0.1.0
  */
-public class SimpleJury<E> implements Jury<E> {
+public class SimpleJury<E> implements VotingJury<E> {
 
 	private static final Logger logger = LoggerFactory.getLogger(SimpleJury.class);
 
@@ -172,7 +172,7 @@ public class SimpleJury<E> implements Jury<E> {
 	 */
 	private static <E> void requireCoherentExclusionPolicy(List<Judge<E>> judges, List<String> capabilities,
 			VotingStrategy strategy) {
-		if (strategy.notApplicablePolicy() != NotApplicablePolicy.REFUSE) {
+		if (strategy.exclusionHandling() != ExclusionHandling.REFUSE) {
 			return;
 		}
 		for (int position = 0; position < capabilities.size(); position++) {
@@ -181,7 +181,7 @@ public class SimpleJury<E> implements Jury<E> {
 				throw new IllegalArgumentException(
 						"seats[" + position + "] declares that it may return NOT_APPLICABLE (" + declared
 								+ "), but strategy '" + strategy.getName()
-								+ "' refuses exclusions; configure NotApplicablePolicy.EXCLUDE or TREAT_AS_FAIL, "
+								+ "' refuses exclusions; configure ExclusionHandling.EXCLUDE or TREAT_AS_FAIL, "
 								+ "or seat a judge that does not exclude");
 			}
 		}
@@ -222,7 +222,7 @@ public class SimpleJury<E> implements Jury<E> {
 	 */
 	@Override
 	public boolean aggregateMayBeNotApplicable() {
-		return (judges.size() == 1 || votingStrategy.notApplicablePolicy() == NotApplicablePolicy.EXCLUDE)
+		return (judges.size() == 1 || votingStrategy.exclusionHandling() == ExclusionHandling.EXCLUDE)
 				&& declaredCapabilities.stream().anyMatch(declared -> declared != null);
 	}
 
@@ -286,7 +286,7 @@ public class SimpleJury<E> implements Jury<E> {
 		}
 		// The capability is stated by the jury rather than re-derived from the strategy's
 		// description: a custom strategy may declare its policy only through
-		// notApplicablePolicy(), which a default describe() does not carry, and a
+		// exclusionHandling(), which a default describe() does not carry, and a
 		// derivation
 		// would then publish a confident false about a jury that can exclude.
 		return new SimpleJuryDescription(votingStrategy.describe(), seats, aggregateMayBeNotApplicable());
@@ -367,12 +367,19 @@ public class SimpleJury<E> implements Jury<E> {
 		for (int i = 0; i < judges.size(); i++) {
 			judgmentByName.put(keys.get(i).verdictKey(), individualJudgments.get(i));
 			seats.add(new Seat(i, keys.get(i).verdictKey(), keySourceAt(i, keys.get(i)),
-					invocations.get(i).returned() ? SeatExecution.RETURNED : SeatExecution.CONTAINED_FAILURE));
+					invocations.get(i).returned() ? SeatExecution.RETURNED : SeatExecution.CONTAINED_FAILURE,
+					Participation.NOT_RECORDED, invocations.get(i).cause()));
 		}
 
-		Judgment judgment = identity ? individualJudgments.get(0) : aggregateWithinBoundary(individualJudgments);
+		var reduction = identity ? new AggregationBoundary.Reduction(individualJudgments.get(0), null)
+				: aggregateWithinBoundary(individualJudgments);
+		Judgment judgment = reduction.judgment();
+		for (int i = 0; i < seats.size(); i++)
+			seats.set(i,
+					seats.get(i).treated(Participation.forJudgment(individualJudgments.get(i), judgment, identity)));
 
 		Verdict verdict = Verdict.builder()
+			.reductionFailure(reduction.failure())
 			.declaredCardinality(judges.size())
 			.judgment(judgment)
 			.individual(individualJudgments)
@@ -385,7 +392,10 @@ public class SimpleJury<E> implements Jury<E> {
 		return new CompositionVote(verdict, identity);
 	}
 
-	private record Invocation(Judgment judgment, boolean returned) {
+	private record Invocation(Judgment judgment, boolean returned, @org.jspecify.annotations.Nullable Throwable cause) {
+		Invocation(Judgment judgment, boolean returned) {
+			this(judgment, returned, null);
+		}
 	}
 
 	private KeySource keySourceAt(int position, SeatKey key) {
@@ -402,7 +412,7 @@ public class SimpleJury<E> implements Jury<E> {
 	 * @param individualJudgments the judgments to reduce
 	 * @return the strategy's aggregate, or the contained error that replaces it
 	 */
-	private Judgment aggregateWithinBoundary(List<Judgment> individualJudgments) {
+	private AggregationBoundary.Reduction aggregateWithinBoundary(List<Judgment> individualJudgments) {
 		return AggregationBoundary.aggregate(votingStrategy, individualJudgments, weights,
 				aggregateMayBeNotApplicable(), logger);
 	}
@@ -425,7 +435,8 @@ public class SimpleJury<E> implements Jury<E> {
 		if (key.metadataFailure() != null) {
 			String reasoning = key.unreadableMetadata();
 			logger.warn("{}; recording an ERROR for the error policy to resolve", reasoning, key.cause());
-			return new Invocation(Judgment.error(JudgmentReasonCode.JUDGE_METADATA_UNREADABLE, reasoning), false);
+			return new Invocation(Judgment.error(JudgmentReasonCode.JUDGE_METADATA_UNREADABLE, reasoning), false,
+					key.cause());
 		}
 		Judge<E> judge = judges.get(index);
 		String name = key.verdictKey();
@@ -442,11 +453,21 @@ public class SimpleJury<E> implements Jury<E> {
 			return new Invocation(judgment, judgment == raw);
 		}
 		catch (Exception ex) {
+			preserveCancellation(ex);
 			logger.warn("Judge '{}' threw {}; recording an ERROR for the error policy to resolve", name,
 					ex.getClass().getName(), ex);
 			return new Invocation(Judgment.error(JudgmentReasonCode.JUDGE_FAILED,
-					"Judge '" + name + "' threw " + ex.getClass().getName() + describeCause(ex)), false);
+					"Judge '" + name + "' threw " + ex.getClass().getName() + describeCause(ex)), false, ex);
 		}
+	}
+
+	static void preserveCancellation(Exception ex) {
+		if (ex instanceof java.util.concurrent.CancellationException cancellation)
+			throw cancellation;
+		if (ex instanceof InterruptedException)
+			Thread.currentThread().interrupt();
+		if (Thread.currentThread().isInterrupted())
+			throw new java.util.concurrent.CancellationException("Judging interrupted");
 	}
 
 	/**
@@ -456,7 +477,7 @@ public class SimpleJury<E> implements Jury<E> {
 	 * is the one a judge could use to dodge a criterion it does not like the look of. A
 	 * seat that declared the capability in advance is honoured; a seat that did not gets
 	 * an {@code ERROR undeclared_not_applicable}, which is a judge-origin error and
-	 * therefore the configured {@link ErrorPolicy}'s to resolve, exactly like any other
+	 * therefore the configured {@link ErrorHandling}'s to resolve, exactly like any other
 	 * judge failure.
 	 * </p>
 	 * @param index the seat's position
@@ -470,7 +491,7 @@ public class SimpleJury<E> implements Jury<E> {
 			return judgment;
 		}
 		String reasoning = "Judge '" + name + "' returned NOT_APPLICABLE without declaring that it may exclude a "
-				+ "subject, so the exclusion is not honoured: " + judgment.operationalReasoning();
+				+ "subject, so the exclusion is not honoured: " + judgment.reasoning();
 		logger.warn("{}; recording an ERROR for the error policy to resolve", reasoning);
 		return Judgment.error(JudgmentReasonCode.UNDECLARED_NOT_APPLICABLE, reasoning);
 	}

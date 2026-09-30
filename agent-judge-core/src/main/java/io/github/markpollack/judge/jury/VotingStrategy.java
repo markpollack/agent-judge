@@ -90,7 +90,7 @@ public interface VotingStrategy {
 	 * How this strategy treats a
 	 * {@link io.github.markpollack.judge.judgment.JudgmentStatus#NOT_APPLICABLE} input.
 	 * <p>
-	 * The default is {@link NotApplicablePolicy#REFUSE}: a strategy that says nothing has
+	 * The default is {@link ExclusionHandling#REFUSE}: a strategy that says nothing has
 	 * not decided that its denominator may shrink, and honouring an exclusion it was
 	 * never configured for would make that provenance on the author's behalf.
 	 * </p>
@@ -106,8 +106,8 @@ public interface VotingStrategy {
 	 * @return the declared not-applicable policy; never null
 	 * @since 0.17.0
 	 */
-	default NotApplicablePolicy notApplicablePolicy() {
-		return NotApplicablePolicy.REFUSE;
+	default ExclusionHandling exclusionHandling() {
+		return ExclusionHandling.REFUSE;
 	}
 
 }

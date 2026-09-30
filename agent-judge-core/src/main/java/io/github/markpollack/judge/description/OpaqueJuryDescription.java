@@ -16,6 +16,7 @@ import org.jspecify.annotations.Nullable;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.jury.Jury;
+import io.github.markpollack.judge.jury.VotingJury;
 import io.github.markpollack.judge.jury.VotingStrategy;
 
 /**
@@ -24,10 +25,11 @@ import io.github.markpollack.judge.jury.VotingStrategy;
  *
  * <p>
  * What it knows comes from the jury's public view: the implementing class,
- * {@link Jury#getVotingStrategy()} and the flattened {@link Jury#getJudges()}. It does
- * not know how the jury seats, keys, weights or orders those judges, and it does not
- * claim to. A jury author who wants a structural description overrides
- * {@code describe()}, and may return one of the other {@link JuryDescription} variants.
+ * {@link VotingJury#getVotingStrategy()} and the flattened
+ * {@link VotingJury#getJudges()}. It does not know how the jury seats, keys, weights or
+ * orders those judges, and it does not claim to. A jury author who wants a structural
+ * description overrides {@code describe()}, and may return one of the other
+ * {@link JuryDescription} variants.
  * </p>
  *
  * <h2>Portable form</h2> <pre>
@@ -63,9 +65,10 @@ public record OpaqueJuryDescription(ImplementationIdentity implementation, boole
 
 	static OpaqueJuryDescription of(Jury<?> jury) {
 		Objects.requireNonNull(jury, "jury must not be null");
-		VotingStrategy votingStrategy = jury.getVotingStrategy();
+		VotingStrategy votingStrategy = jury instanceof VotingJury<?> voting ? voting.getVotingStrategy() : null;
 		StrategyDescription strategy = votingStrategy == null ? null : votingStrategy.describe();
-		List<? extends Judge<?>> reported = Objects.requireNonNull(jury.getJudges(),
+		List<? extends Judge<?>> reported = Objects.requireNonNull(
+				jury instanceof VotingJury<?> voting ? voting.getJudges() : List.of(),
 				"getJudges() must not return null");
 		List<JudgeDescription> judges = new ArrayList<>(reported.size());
 		for (int index = 0; index < reported.size(); index++) {

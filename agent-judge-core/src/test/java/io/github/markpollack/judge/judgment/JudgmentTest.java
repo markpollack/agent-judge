@@ -374,7 +374,7 @@ class JudgmentTest {
 		@DisplayName("boolean verdict omits absent optionals")
 		void booleanWire() throws Exception {
 			assertThat(MAPPER.writeValueAsString(Judgment.pass("All checks passed"))).isEqualTo(
-					"{\"schemaVersion\":3,\"producerStatus\":\"pass\",\"reasoning\":\"All checks passed\",\"checks\":[],\"metadata\":{}}");
+					"{\"schemaVersion\":4,\"producerStatus\":\"pass\",\"reasoning\":\"All checks passed\",\"checks\":[],\"metadata\":{}}");
 		}
 
 		@Test
@@ -387,7 +387,7 @@ class JudgmentTest {
 				.build();
 
 			assertThat(MAPPER.writeValueAsString(judgment)).isEqualTo(
-					"{\"schemaVersion\":3,\"producerStatus\":\"pass\",\"finding\":{\"numeric\":{\"value\":0.82,\"kind\":\"MEASUREMENT\",\"scaleId\":\"normalized-quality:v1\",\"lower\":0.0,\"upper\":1.0,\"levels\":[],\"qualityDirection\":\"INCREASING\"}},"
+					"{\"schemaVersion\":4,\"producerStatus\":\"pass\",\"finding\":{\"numeric\":{\"value\":0.82,\"kind\":\"MEASUREMENT\",\"scaleId\":\"normalized-quality:v1\",\"lower\":0.0,\"upper\":1.0,\"levels\":[],\"qualityDirection\":\"INCREASING\"}},"
 							+ "\"reasoning\":\"Quality exceeded the acceptance threshold\",\"checks\":[],\"metadata\":{}}");
 		}
 
@@ -401,7 +401,7 @@ class JudgmentTest {
 				.build();
 
 			assertThat(MAPPER.writeValueAsString(judgment)).isEqualTo(
-					"{\"schemaVersion\":3,\"producerStatus\":\"pass\",\"finding\":{\"category\":{\"selected\":\"relevant\",\"alternatives\":[\"relevant\"]}},"
+					"{\"schemaVersion\":4,\"producerStatus\":\"pass\",\"finding\":{\"category\":{\"selected\":\"relevant\",\"alternatives\":[\"relevant\"]}},"
 							+ "\"reasoning\":\"The document directly supports the claim\",\"checks\":[],\"metadata\":{}}");
 		}
 
@@ -411,7 +411,7 @@ class JudgmentTest {
 			String json = MAPPER.writeValueAsString(Judgment.error("Judge invocation timed out"));
 
 			assertThat(json)
-				.isEqualTo("{\"schemaVersion\":3,\"producerStatus\":\"error\",\"reasonCode\":\"judge_reported\","
+				.isEqualTo("{\"schemaVersion\":4,\"producerStatus\":\"error\",\"reasonCode\":\"judge_reported\","
 						+ "\"reasoning\":\"Judge invocation timed out\",\"checks\":[],\"metadata\":{}}");
 			assertThat(json).doesNotContain("stackTrace").doesNotContain("cause").doesNotContain("Exception");
 		}

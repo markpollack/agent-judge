@@ -24,6 +24,9 @@ import com.fasterxml.jackson.annotation.JsonValue;
  */
 public enum VerdictProvenanceKind {
 
+	/** Logical composition of distinct required constituents. */
+	CONSTITUENTS("CONSTITUENTS"),
+
 	/**
 	 * This jury's own reduction, or a policy outcome of it.
 	 * <p>

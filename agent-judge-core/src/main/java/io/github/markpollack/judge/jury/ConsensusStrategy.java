@@ -28,9 +28,9 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  *
  * <p>
  * {@link JudgmentStatus#NOT_APPLICABLE} is a different claim — the question should not
- * have been asked here — and is governed by {@link NotApplicablePolicy}, which defaults
- * to refusing it. An exclusion is not silently absorbed into an abstention, because the
- * two produce different denominators.
+ * have been asked here — and is governed by {@link ExclusionHandling}, which defaults to
+ * refusing it. An exclusion is not silently absorbed into an abstention, because the two
+ * produce different denominators.
  * </p>
  *
  * <table border="1">
@@ -65,7 +65,7 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * </tr>
  * <tr>
  * <td>any ERROR</td>
- * <td>per {@link ErrorPolicy}, default PROPAGATE</td>
+ * <td>per {@link ErrorHandling}, default PROPAGATE</td>
  * </tr>
  * </table>
  *
@@ -73,7 +73,7 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * Disagreement yields {@code ABSTAIN}: every applicable judge completed, but they reached
  * no collective finding, so consensus has nothing to report. This is an aggregation
  * conclusion, not a gate provenance — whether a split panel is rejected or escalated
- * belongs to an explicit {@link TierPolicy} or downstream gate, which reads individual
+ * belongs to an explicit {@link RoutingRule} or downstream gate, which reads individual
  * judgments. A consumer that must fail closed on disagreement checks for {@code ABSTAIN}
  * explicitly.
  * </p>
@@ -89,7 +89,7 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * <p>
  * Note this is independent of {@link CascadedJury} escalation, which inspects a tier's
  * <em>individual</em> judgments rather than its aggregate. A tier using
- * {@link TierPolicy#ACCEPT_ON_ALL_PASS} still escalates when any judge abstains.
+ * {@link RoutingRule#ACCEPT_ON_ALL_PASS} still escalates when any judge abstains.
  * </p>
  *
  * <p>
@@ -103,15 +103,15 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  */
 public class ConsensusStrategy implements VotingStrategy {
 
-	private final ErrorPolicy errorPolicy;
+	private final ErrorHandling errorPolicy;
 
-	private final NotApplicablePolicy notApplicablePolicy;
+	private final ExclusionHandling notApplicablePolicy;
 
 	/**
 	 * Create a consensus strategy with the default error policy.
 	 */
 	public ConsensusStrategy() {
-		this(ErrorPolicy.PROPAGATE);
+		this(ErrorHandling.PROPAGATE);
 	}
 
 	/**
@@ -119,8 +119,8 @@ public class ConsensusStrategy implements VotingStrategy {
 	 * @param errorPolicy policy for handling errors
 	 * @throws IllegalArgumentException if {@code errorPolicy} is null
 	 */
-	public ConsensusStrategy(ErrorPolicy errorPolicy) {
-		this(errorPolicy, NotApplicablePolicy.REFUSE);
+	public ConsensusStrategy(ErrorHandling errorPolicy) {
+		this(errorPolicy, ExclusionHandling.REFUSE);
 	}
 
 	/**
@@ -130,7 +130,7 @@ public class ConsensusStrategy implements VotingStrategy {
 	 * @throws IllegalArgumentException if either policy is null
 	 * @since 0.17.0
 	 */
-	public ConsensusStrategy(ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
+	public ConsensusStrategy(ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
 		if (errorPolicy == null) {
 			throw new IllegalArgumentException("errorPolicy must not be null");
 		}
@@ -207,7 +207,7 @@ public class ConsensusStrategy implements VotingStrategy {
 
 	/** {@inheritDoc} */
 	@Override
-	public NotApplicablePolicy notApplicablePolicy() {
+	public ExclusionHandling exclusionHandling() {
 		return this.notApplicablePolicy;
 	}
 

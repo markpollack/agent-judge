@@ -15,9 +15,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
-import io.github.markpollack.judge.jury.ErrorPolicy;
+import io.github.markpollack.judge.jury.ErrorHandling;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.NotApplicablePolicy;
+import io.github.markpollack.judge.jury.ExclusionHandling;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.judgment.Judgment;
@@ -136,7 +136,7 @@ class JudgeMetadataConvenienceConstructorTest {
 
 			Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 				.judge(new NeverExcludes("plain", Judgment.pass("ok")))
-				.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
+				.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 				.build();
 			assertThat(jury.aggregateMayBeNotApplicable()).as("nothing was declared, so nothing may be excluded")
 				.isFalse();
@@ -148,7 +148,7 @@ class JudgeMetadataConvenienceConstructorTest {
 			Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 				.judge(new NeverExcludes("sneaky", Judgment.notApplicable("the change set contains no Java sources")))
 				.judge(Judges.named(judgmentContext -> Judgment.pass("ok"), "honest"))
-				.votingStrategy(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE))
+				.votingStrategy(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE))
 				.build();
 
 			Verdict verdict = jury.vote(context());

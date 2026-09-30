@@ -1,43 +1,28 @@
 # Migrating to the 0.18 domain API
 
-This source line intentionally redesigns the earlier 0.18 candidate. It offers no Java
-compatibility aliases. Modern portable results use [schemaVersion 3](portable-results-v3.md);
-V2 documents are unsupported. Historical unversioned interpretation remains separate.
+This candidate deliberately revises the earlier 0.18 API. There are no deprecated Java aliases. Current typed storage uses [schemaVersion 4](portable-results-v4.md); V2/V3 are explicitly refused. Historical unversioned diagnostics remain separate.
 
-| Earlier concept | Current API |
+| Earlier surface | Current API |
 |---|---|
-| Requirement-owned policy / `under` | Pure Requirement; acceptance on assertion configuration or after evidence |
-| PolicyBinding | AcceptancePolicy lambda; optional `Policies.recorded` provenance |
-| Acceptance / ApplicationDecision | AcceptanceDecision / retained AcceptanceExecution |
-| USE_ASSESSMENT | RELY (positive or negative Judgment) |
-| Assessment / Proposition | Finding / BooleanFinding |
-| NumericAssessment / Category | NumericFinding / CategoryFinding |
-| Certainty / Distribution | Confidence / ProbabilityDistribution |
-| EvaluationProvenance | Provenance |
-| Verdict.aggregated / decision | Verdict.judgment / provenance |
-| Decision / DecisionKind / DecisionBasis | VerdictProvenance and its kind/basis |
-| VerdictReading | RequirementOutcome: SATISFIED, VIOLATED, UNRESOLVED, NOT_APPLICABLE, NOT_ASSESSED |
-| SemanticAssertions / SemanticAssertion / SemanticAssertionError | RequirementAssertions / staged AssertJ / RequirementAssertionError |
-| `Judge<RequirementEvidence<Requirement<S>,E>>` | Ordinary `Judge<E>` or explicit `Judge<RequirementEvidence<S,E>>` |
-| STOP_ON_USABLE_ASSESSMENT | STOP_ON_RELIED_JUDGMENT |
+| `Judge<RequirementEvidence<S,E>>` | `RequirementJudge<S,E>.judge(Requirement<S>,E)` |
+| Requirement-aware Jury encoded as a Judge | `RequirementJury<S,E>.vote(Requirement<S>,E)` returning a full Verdict |
+| Requirement-bound rendering | `JevJudge.rendering(Function<S,String>)`; actual requirement supplied per call |
+| `AcceptancePolicy.decide(Judgment)` | `Policy.decide(Verdict)` |
+| AcceptanceDecision / AcceptanceAction | PolicyDecision / PolicyAction |
+| AppliedPolicy / PolicyApplication on Judgment | Verdict-level `PolicyResult`: NotRequested, Decided, Failed |
+| AssertionResult / AcceptanceExecution | Core `EvaluationResult(Verdict, PolicyResult)` |
+| Public Interpretation / reading outcome | Derived `Verdict.conclusion()`; read-only `VerdictReport` |
+| ErrorPolicy / NotApplicablePolicy / TiePolicy / TierPolicy | ErrorHandling / ExclusionHandling / TieBreakRule / RoutingRule |
+| STOP_ON_RELIED_JUDGMENT | STOP_ON_CONCLUSIVE; application policy runs after composition |
+| `judgedByRequirement` / `withAcceptancePolicy` | `judgedBy(RequirementJudge or RequirementJury)` / `withPolicy` |
+| Default RELY, nullable override | No policy requested unless explicitly supplied; no trailing null |
+| Repeated fluent terminals reexecute | A completed fluent stage caches its EvaluationResult |
+| Jury exposes nullable voting strategy | VotingJury exposes strategy; CascadedJury exposes tiers; common Jury exposes neither |
 
-`result` is split into `judgment`, `acceptance` and `provenance`. Concrete `fs` judges move
-to `agent-judge-file`. The obsolete JudgeSpec is deleted. Wire helpers use `serialization`.
+Requirement remains pure; identity, revision, native specification and source are preserved per Verdict node. All-of specifications own child rosters. `Assignments` owns evaluators and typed evidence selectors; `.validate()` checks complete coverage and freezes the plan before calls. A child Jury retains its entire record.
 
-There is no universal JudgmentContext replacement. File existence/content, command/build,
-class-version and workspace requirement audits take `Path`. File and directory comparisons
-use `FileComparison` and `DirectoryComparison`. Coverage takes `CoverageComparison`, with a
-numeric baseline. Class-version expectations are constructor configuration. RAG uses
-`RagEvidence`; response bridges use `CompletionEvidence`; AgentClient execution combines a
-workspace with completion in `AgentExecutionEvidence`. Jev keeps selected `JevEvidence`.
-No required input is obtained from arbitrary metadata keys.
+Packages now separate `judgment`, `requirement`, `jury`, `policy`, `evaluation`, `reporting`, and `serialization`. Historical diagnostic types live under `serialization.diagnostics`; they are not domain conclusion objects. The earlier `result` package and `JudgeSpec` remain removed; concrete filesystem judges live in `agent-judge-file`.
 
-`DeterministicJudge<E>`, `LLMJudge<E>` and `ModelBackedJudge<E>` preserve the selected evidence
-type. ModelBackedJudge requires explicit `.variables(...)` rendering. CompletionVariables
-is an optional helper for request/response templates. JudgeModelResponse reports backend
-completion with a typed `completed` component, separate from incidental telemetry.
+Typed evidence remains specific to each family: `Path`, `FileComparison`, `DirectoryComparison`, `CoverageComparison`, `RagEvidence`, `CompletionEvidence`, `AgentExecutionEvidence`, and `JevEvidence`. `ModelBackedJudge<E>` uses explicit variable rendering. No universal context or required magic metadata replaces these types.
 
-For AssertJ use `judgedBy(Judge<E>)` or `judgedBy(Jury<E>)`. When an evaluator needs the
-Requirement, use `judgedByRequirement(...)`; its pair type is `RequirementEvidence<S,E>`.
-Both produce the same evidence → optional policy → isSatisfied progression. See the
-[compiled experience examples](agent-judge-assertj/src/test/java/io/github/markpollack/judge/assertj/AssertJApiExperienceTest.java).
+[Executable examples](agent-judge-assertj/src/test/java/io/github/markpollack/judge/assertj/AssertJApiExperienceTest.java) and [package diagrams](domain-model.md) show the current construction and execution grammar. Frozen V2/V3 resources and release notes remain historical evidence, not current examples.

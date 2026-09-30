@@ -7,12 +7,11 @@ package io.github.markpollack.judge.assertions;
 import io.github.markpollack.judge.requirement.Requirement;
 
 import com.sun.net.httpserver.HttpServer;
-import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.requirement.RequirementEvidence;
+import io.github.markpollack.judge.RequirementJudge;
+import io.github.markpollack.judge.evaluation.*;
+import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.jev.JevEvidence;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
-import io.github.markpollack.judge.jury.interpretation.ReadingSupport;
-import io.github.markpollack.judge.jury.interpretation.RequirementOutcome;
 import java.net.*;
 import java.net.http.*;
 import java.nio.file.*;
@@ -30,9 +29,7 @@ class ConferenceAssertionTest {
 
 	HttpClient http;
 
-	RequirementAssertions facade;
-
-	Judge<RequirementEvidence<String, JevEvidence>> judge;
+	RequirementJudge<String, JevEvidence> judge;
 
 	final AtomicReference<String> choice = new AtomicReference<>("violated");
 
@@ -66,7 +63,7 @@ class ConferenceAssertionTest {
 		});
 		server.start();
 		http = HttpClient.newHttpClient();
-		facade = new RequirementAssertions(fixture.binding);
+
 		judge = fixture.bind(fixture.judge("FAKE-LOCAL-KEY",
 				URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v1/systemone"), http, output));
 	}
@@ -77,8 +74,8 @@ class ConferenceAssertionTest {
 		http.close();
 	}
 
-	AssertionResult evaluate(JevEvidence evidence, Requirement<String> requirement) {
-		return facade.evaluateRequirement(requirement, judge, evidence, null);
+	EvaluationResult evaluate(JevEvidence evidence, Requirement<String> requirement) {
+		return Evaluations.evaluate(requirement, judge, evidence, fixture.binding);
 	}
 
 	private void satisfies(JevEvidence evidence, Requirement<String> requirement) {
@@ -89,12 +86,12 @@ class ConferenceAssertionTest {
 	void canonicalNamedRequirement() throws Exception {
 		JevEvidence evidence = fixture.evidence(0);
 		Requirement<String> requirement = fixture.requirement(0);
-		var failure = assertThrows(RequirementAssertionError.Rejected.class, () -> {
+		var failure = assertThrows(RequirementAssertionError.class, () -> {
 			satisfies(evidence, requirement);
 		});
 		ConferenceFixture.save(failure.result(), output, "FAKE loopback; source-review expectation separate");
-		assertEquals(ReadingSupport.SUPPORTED, failure.interpretation().readingSupport());
-		assertEquals(RequirementOutcome.VIOLATED, failure.interpretation().outcome());
+
+		assertEquals(Verdict.Conclusion.FAIL, failure.result().verdict().conclusion());
 		assertEquals(1, calls.get());
 		verifyRequest(evidence);
 		assertSame(failure.result().verdict().judgment(), failure.result().verdict().individual().getFirst());
@@ -104,8 +101,7 @@ class ConferenceAssertionTest {
 	void sameDisplayTextDoesNotSubstituteReviewedIdentity() throws Exception {
 		var evidence = fixture.evidence(0);
 		var requirement = Requirement.text("unregistered", "1", fixture.requirement(0).text());
-		var failure = assertThrows(RequirementAssertionError.InstrumentFailure.class,
-				() -> satisfies(evidence, requirement));
+		var failure = assertThrows(RequirementAssertionError.class, () -> satisfies(evidence, requirement));
 		assertEquals(JudgmentStatus.ERROR, failure.result().verdict().judgment().status());
 		assertEquals(0, calls.get());
 	}
@@ -120,7 +116,7 @@ class ConferenceAssertionTest {
 		// inference.
 		var result = evaluate(evidence, requirement);
 		ConferenceFixture.save(result, output, "FAKE loopback; source-review expectation separate");
-		assertEquals(RequirementOutcome.SATISFIED, result.interpretation().outcome());
+		assertEquals(Verdict.Conclusion.PASS, result.verdict().conclusion());
 		assertEquals(2, calls.get());
 		verifyRequest(evidence);
 	}
@@ -128,7 +124,7 @@ class ConferenceAssertionTest {
 	@Test
 	void nativeInsufficientLabelRemainsUnsuccessfulAbstention() throws Exception {
 		choice.set("insufficient_evidence");
-		var failure = assertThrows(RequirementAssertionError.Inconclusive.class,
+		var failure = assertThrows(RequirementAssertionError.class,
 				() -> satisfies(fixture.evidence(0), fixture.requirement(0)));
 		ConferenceFixture.save(failure.result(), output, "FAKE loopback insufficient control");
 		assertEquals(JudgmentStatus.ABSTAIN, failure.result().verdict().judgment().producerStatus());
@@ -138,11 +134,10 @@ class ConferenceAssertionTest {
 	@Test
 	void changingRequirementDoesNotTransferExactSufficiency() throws Exception {
 		var original = fixture.evidence(0);
-		var failure = assertThrows(RequirementAssertionError.InstrumentFailure.class,
-				() -> satisfies(original, fixture.requirement(1)));
+		var failure = assertThrows(RequirementAssertionError.class, () -> satisfies(original, fixture.requirement(1)));
 		assertEquals(JudgmentStatus.ERROR, failure.result().verdict().judgment().status());
 		assertEquals(0, calls.get());
-		assertThrows(RequirementAssertionError.InstrumentFailure.class, () -> satisfies(original,
+		assertThrows(RequirementAssertionError.class, () -> satisfies(original,
 				Requirement.text(fixture.requirement(0).id(), "2", fixture.requirement(0).text())));
 		assertEquals(0, calls.get());
 	}
@@ -152,9 +147,8 @@ class ConferenceAssertionTest {
 		JevEvidence evidence = fixture.evidence(0);
 		try {
 			Thread.currentThread().interrupt();
-			var failure = assertThrows(RequirementAssertionError.InstrumentFailure.class,
+			assertThrows(java.util.concurrent.CancellationException.class,
 					() -> satisfies(evidence, fixture.requirement(0)));
-			assertEquals(JudgmentStatus.ERROR, failure.result().verdict().judgment().status());
 			assertEquals(0, calls.get());
 			assertTrue(Thread.currentThread().isInterrupted());
 		}

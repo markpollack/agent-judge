@@ -24,7 +24,7 @@ class CheckTest {
 
 		assertThat(check.id()).isEqualTo("Test passed");
 		assertThat(check.judgment().pass()).isTrue();
-		assertThat(check.judgment().operationalReasoning()).isEmpty();
+		assertThat(check.judgment().reasoning()).isEmpty();
 	}
 
 	@Test
@@ -33,7 +33,7 @@ class CheckTest {
 
 		assertThat(check.id()).isEqualTo("Test passed");
 		assertThat(check.judgment().pass()).isTrue();
-		assertThat(check.judgment().operationalReasoning()).isEqualTo("All assertions succeeded");
+		assertThat(check.judgment().reasoning()).isEqualTo("All assertions succeeded");
 	}
 
 	@Test
@@ -42,7 +42,7 @@ class CheckTest {
 
 		assertThat(check.id()).isEqualTo("Test failed");
 		assertThat(check.judgment().pass()).isFalse();
-		assertThat(check.judgment().operationalReasoning()).isEqualTo("Expected 5 but was 3");
+		assertThat(check.judgment().reasoning()).isEqualTo("Expected 5 but was 3");
 	}
 
 	@Test
@@ -51,7 +51,7 @@ class CheckTest {
 
 		assertThat(check.id()).isEqualTo("Custom check");
 		assertThat(check.judgment().pass()).isTrue();
-		assertThat(check.judgment().operationalReasoning()).isEqualTo("Custom message");
+		assertThat(check.judgment().reasoning()).isEqualTo("Custom message");
 	}
 
 	// ==================== Record Tests ====================
@@ -95,14 +95,14 @@ class CheckTest {
 		assertThat(compilationCheck.judgment().pass()).isTrue();
 		assertThat(testCheck.judgment().pass()).isTrue();
 		assertThat(coverageCheck.judgment().pass()).isFalse();
-		assertThat(coverageCheck.judgment().operationalReasoning()).contains("70%");
+		assertThat(coverageCheck.judgment().reasoning()).contains("70%");
 	}
 
 	@Test
 	void shouldHandleEmptyMessage() {
 		Check check = Check.pass("Test");
 
-		assertThat(check.judgment().operationalReasoning()).isEmpty();
+		assertThat(check.judgment().reasoning()).isEmpty();
 	}
 
 	@Test

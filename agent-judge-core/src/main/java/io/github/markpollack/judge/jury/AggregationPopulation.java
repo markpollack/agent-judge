@@ -45,7 +45,7 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * <li><b>Reduce.</b> A failing contribution is an input to the reduction, not a forced
  * aggregate FAIL, and the original judgment never receives a score.</li>
  * <li><b>No eligible contributions:</b> an all-excluded population under
- * {@link NotApplicablePolicy#EXCLUDE} is {@code NOT_APPLICABLE}; anything else is
+ * {@link ExclusionHandling#EXCLUDE} is {@code NOT_APPLICABLE}; anything else is
  * {@code ABSTAIN}.</li>
  * </ol>
  *
@@ -56,7 +56,7 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * FAIL would charge the library's failure to the subject, and a rejection that nobody can
  * distinguish from a real one is worse than no rejection at all. So a machinery-origin
  * error is never a failing contribution, <em>even under</em>
- * {@link ErrorPolicy#TREAT_AS_FAIL}; that combination propagates instead.
+ * {@link ErrorHandling#TREAT_AS_FAIL}; that combination propagates instead.
  * </p>
  *
  * @author Mark Pollack
@@ -65,7 +65,7 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
 record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndices, int inputCount,
 		int explicitAbstainCount, int notApplicableCount, int errorCount, Map<JudgmentReasonCode, Long> errorCodeCounts,
 		int ignoredErrorCount, int errorsTreatedAsAbstainCount, int errorsTreatedAsFailCount,
-		int notApplicableTreatedAsFailCount, ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy,
+		int notApplicableTreatedAsFailCount, ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy,
 		@Nullable PolicyExit policyExit) {
 
 	/**
@@ -89,8 +89,8 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @param notApplicablePolicy how excluded judgments are handled
 	 * @return the resolved population
 	 */
-	static AggregationPopulation resolve(List<Judgment> judgments, ErrorPolicy errorPolicy,
-			NotApplicablePolicy notApplicablePolicy) {
+	static AggregationPopulation resolve(List<Judgment> judgments, ErrorHandling errorPolicy,
+			ExclusionHandling notApplicablePolicy) {
 		if (judgments == null || judgments.isEmpty()) {
 			throw new IllegalArgumentException("Cannot aggregate empty judgment list");
 		}
@@ -160,12 +160,11 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 					// A judge that reached no provenance casts no vote.
 				}
 				case NOT_APPLICABLE -> {
-					if (notApplicablePolicy == NotApplicablePolicy.TREAT_AS_FAIL) {
+					if (notApplicablePolicy == ExclusionHandling.TREAT_AS_FAIL) {
 						// The contribution fails; the original judgment is untouched and
 						// still
 						// carries no score.
-						eligible.add(
-								Judgment.fail("Not applicable treated as failure: " + judgment.operationalReasoning()));
+						eligible.add(Judgment.fail("Not applicable treated as failure: " + judgment.reasoning()));
 						eligibleIndices.add(index);
 						notApplicableTreatedAsFailCount++;
 					}
@@ -177,7 +176,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 							// every
 							// error reaching here is a judge's own and the policy governs
 							// it.
-							eligible.add(Judgment.fail("Error treated as failure: " + judgment.operationalReasoning()));
+							eligible.add(Judgment.fail("Error treated as failure: " + judgment.reasoning()));
 							eligibleIndices.add(index);
 							errorsTreatedAsFailCount++;
 						}
@@ -207,17 +206,17 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @return the policy exit, or null
 	 */
 	private static @Nullable PolicyExit policyExitFor(int inputCount, int notApplicableCount, int errorCount,
-			int machineryOriginErrorCount, ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
-		if (notApplicablePolicy == NotApplicablePolicy.REFUSE && notApplicableCount > 0) {
+			int machineryOriginErrorCount, ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
+		if (notApplicablePolicy == ExclusionHandling.REFUSE && notApplicableCount > 0) {
 			return new PolicyExit(JudgmentReasonCode.NOT_APPLICABLE_REFUSED,
 					String.format("%d of %d judgment(s) were not applicable and the not-applicable policy is refuse",
 							notApplicableCount, inputCount));
 		}
-		if (errorPolicy == ErrorPolicy.PROPAGATE && errorCount > 0) {
+		if (errorPolicy == ErrorHandling.PROPAGATE && errorCount > 0) {
 			return new PolicyExit(JudgmentReasonCode.ERRORS_PROPAGATED, String
 				.format("%d of %d judgments errored and the error policy is propagate", errorCount, inputCount));
 		}
-		if (errorPolicy == ErrorPolicy.TREAT_AS_FAIL && machineryOriginErrorCount > 0) {
+		if (errorPolicy == ErrorHandling.TREAT_AS_FAIL && machineryOriginErrorCount > 0) {
 			return new PolicyExit(JudgmentReasonCode.ERRORS_PROPAGATED,
 					String.format(
 							"%d of %d judgments errored, and %d originated in jury machinery rather than in a judge; "
@@ -242,7 +241,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @return true when the error came from machinery
 	 */
 	static boolean hasMachineryOrigin(Judgment judgment) {
-		JudgmentReasonCode code = judgment.operationalReasonCode();
+		JudgmentReasonCode code = judgment.reasonCode();
 		if (code == null) {
 			return true;
 		}
@@ -281,7 +280,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @param totals the running total, keyed by terminal code
 	 */
 	private static void flattenOrigin(Judgment judgment, Map<JudgmentReasonCode, Long> totals) {
-		JudgmentReasonCode code = judgment.operationalReasonCode();
+		JudgmentReasonCode code = judgment.reasonCode();
 		if (code == null) {
 			return;
 		}
@@ -326,7 +325,8 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	}
 
 	/**
-	 * @return true when a policy decided the aggregate before anything was reduced */
+	 * @return true when a policy decided the aggregate before anything was reduced
+	 */
 	boolean hasPolicyExit() {
 		return this.policyExit != null;
 	}
@@ -354,7 +354,8 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	}
 
 	/**
-	 * @return the flattened origin totals as portable wire-name keys */
+	 * @return the flattened origin totals as portable wire-name keys
+	 */
 	private Map<String, Object> portableErrorCodeCounts() {
 		// Projected by the type that owns the origin invariant, so the evidence block and
 		// the
@@ -423,7 +424,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @return true when the aggregate is itself not applicable
 	 */
 	private boolean allExcluded() {
-		return this.notApplicablePolicy == NotApplicablePolicy.EXCLUDE && this.notApplicableCount > 0
+		return this.notApplicablePolicy == ExclusionHandling.EXCLUDE && this.notApplicableCount > 0
 				&& this.notApplicableCount == this.inputCount;
 	}
 
@@ -431,10 +432,10 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 		// IGNORE and TREAT_AS_ABSTAIN can both empty the population; say which one did,
 		// so the two policies stay distinguishable in the reasoning as well as the
 		// counts.
-		if (this.errorCount > 0 && this.errorPolicy == ErrorPolicy.IGNORE) {
+		if (this.errorCount > 0 && this.errorPolicy == ErrorHandling.IGNORE) {
 			return String.format("No eligible judgments; %d error(s) ignored", this.errorCount);
 		}
-		if (this.errorCount > 0 && this.errorPolicy == ErrorPolicy.TREAT_AS_ABSTAIN) {
+		if (this.errorCount > 0 && this.errorPolicy == ErrorHandling.TREAT_AS_ABSTAIN) {
 			return String.format("All %d judgment(s) abstained because of evaluation errors", this.errorCount);
 		}
 		if (this.explicitAbstainCount == this.inputCount) {

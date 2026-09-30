@@ -40,17 +40,17 @@ class CompositeResultContractTest {
 	@Test
 	void verdictDeclarationAndJsonExposeOnlyTheCorrectedSevenComponentTruth() throws Exception {
 		assertThat(Arrays.stream(Verdict.class.getRecordComponents()).map(RecordComponent::getName)).containsExactly(
-				"schemaVersion", "judgment", "individual", "individualByName", "weights", "seats", "provenance",
-				"compositeAttempts", "declaredCardinality");
+				"judgment", "individual", "individualByName", "weights", "seats", "provenance", "compositeAttempts",
+				"declaredCardinality", "requirement", "reductionFailure");
 
 		JsonNode json = MAPPER.readTree(MAPPER.writeValueAsString(Verdict.single("leaf", booleanPass("passed"))));
 		assertThat(json.fieldNames()).toIterable()
-			.containsExactly("schemaVersion", "declaredCardinality", "judgment", "individual", "individualByName",
-					"weights", "seats", "provenance", "compositeAttempts");
+			.containsExactly("schemaVersion", "judgment", "individual", "individualByName", "weights", "seats",
+					"provenance", "compositeAttempts", "declaredCardinality");
 		assertThat(json.at("/seats/0").toString()).isEqualTo(
-				"{\"position\":0,\"verdictKey\":\"leaf\",\"keySource\":\"DECLARED\",\"execution\":\"RETURNED\"}");
+				"{\"position\":0,\"verdictKey\":\"leaf\",\"keySource\":\"DECLARED\",\"execution\":\"RETURNED\",\"participation\":\"IDENTITY\"}");
 		assertThat(json.at("/provenance").toString()).isEqualTo("{\"kind\":\"own\"}");
-		assertThat(json.has("sub" + "Verdicts")).isFalse();
+		assertThat(json.has("sub" + "StoredVerdicts")).isFalse();
 	}
 
 	@Test
@@ -68,30 +68,30 @@ class CompositeResultContractTest {
 			.hasMessageContaining("exactly one");
 		assertThatThrownBy(() -> CompositeAttempt.used("stage", CompositeRelation.CASCADE_TIER, null, verdict))
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("requires a policy");
+			.hasMessageContaining("requires a routing rule");
 		assertThatThrownBy(
-				() -> CompositeAttempt.used("stage", CompositeRelation.META_MEMBER, TierPolicy.FINAL_TIER, verdict))
+				() -> CompositeAttempt.used("stage", CompositeRelation.META_MEMBER, RoutingRule.FINAL_TIER, verdict))
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("forbids a policy");
+			.hasMessageContaining("forbids a routing rule");
 	}
 
 	@Test
 	void relationPolicyAndFailureTokensAreExactAndCaseSensitive() throws Exception {
 		assertThat(MAPPER.writeValueAsString(CompositeRelation.CASCADE_TIER)).isEqualTo("\"cascade_tier\"");
 		assertThat(MAPPER.writeValueAsString(CompositeRelation.META_MEMBER)).isEqualTo("\"meta_member\"");
-		assertThat(MAPPER.writeValueAsString(TierPolicy.REJECT_ON_ANY_FAIL)).isEqualTo("\"REJECT_ON_ANY_FAIL\"");
+		assertThat(MAPPER.writeValueAsString(RoutingRule.REJECT_ON_ANY_FAIL)).isEqualTo("\"REJECT_ON_ANY_FAIL\"");
 		assertThat(MAPPER.writeValueAsString(executionFailure())).isEqualTo("{\"code\":\"jury_execution_failed\"}");
 		assertThatThrownBy(() -> CompositeRelation.fromWire("CASCADE_TIER"))
 			.isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> CompositeFailureCode.fromWire("JURY_EXECUTION_FAILED"))
 			.isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> TierPolicy.fromWire("final_tier")).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> RoutingRule.fromWire("final_tier")).isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
 	void failureEvidenceDeclaresAndSerializesOnlyItsStableCode() throws Exception {
 		assertThat(Arrays.stream(CompositeFailure.class.getRecordComponents()).map(RecordComponent::getName))
-			.containsExactly("code");
+			.containsExactly("code", "cause");
 		assertThat(MAPPER.readTree(MAPPER.writeValueAsString(executionFailure())).fieldNames()).toIterable()
 			.containsExactly("code");
 
@@ -124,8 +124,8 @@ class CompositeResultContractTest {
 		AtomicInteger invocations = new AtomicInteger();
 		Jury<CompletionEvidence> counted = countingLeaf(invocations);
 		assertThatThrownBy(() -> CascadedJury.<CompletionEvidence>builder()
-			.tier("duplicate", counted, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("duplicate", counted, TierPolicy.FINAL_TIER)
+			.tier("duplicate", counted, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("duplicate", counted, RoutingRule.FINAL_TIER)
 			.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Duplicate");
 		assertThatThrownBy(() -> Juries.meta(new ConsensusStrategy(),
 				new NamedJury<CompletionEvidence>("same", counted), new NamedJury<CompletionEvidence>("same", counted)))
@@ -178,8 +178,8 @@ class CompositeResultContractTest {
 	void equalValuedTiersRetainDistinctConfiguredIdentityAndOrder() {
 		Verdict equal = leaf("same value");
 		CascadedJury<CompletionEvidence> cascade = CascadedJury.<CompletionEvidence>builder()
-			.tier("alpha", returning(equal), TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("beta", returning(equal), TierPolicy.FINAL_TIER)
+			.tier("alpha", returning(equal), RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("beta", returning(equal), RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = cascade.vote(CONTEXT);
@@ -204,8 +204,8 @@ class CompositeResultContractTest {
 			.provenance(VerdictProvenance.own())
 			.build();
 		CascadedJury<CompletionEvidence> cascade = CascadedJury.<CompletionEvidence>builder()
-			.tier("broken", throwing(new IllegalStateException("must not disappear")), TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("fallback", returning(stopping), TierPolicy.FINAL_TIER)
+			.tier("broken", throwing(new IllegalStateException("must not disappear")), RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("fallback", returning(stopping), RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = cascade.vote(CONTEXT);
@@ -219,7 +219,7 @@ class CompositeResultContractTest {
 		assertThat(verdict.weights()).containsExactlyEntriesOf(weights);
 
 		CascadedJury<CompletionEvidence> errorCascade = CascadedJury.<CompletionEvidence>builder()
-			.tier("fatal", throwingError(new AssertionError("fatal")), TierPolicy.FINAL_TIER)
+			.tier("fatal", throwingError(new AssertionError("fatal")), RoutingRule.FINAL_TIER)
 			.build();
 		assertThatThrownBy(() -> errorCascade.vote(CONTEXT)).isInstanceOf(AssertionError.class).hasMessage("fatal");
 	}
@@ -227,7 +227,7 @@ class CompositeResultContractTest {
 	@Test
 	void aThrowingFinalTierReturnsTheFixedErrorAndItsFailedAttempt() {
 		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("final", throwing(new IllegalStateException("caller text")), TierPolicy.FINAL_TIER)
+			.tier("final", throwing(new IllegalStateException("caller text")), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -312,7 +312,7 @@ class CompositeResultContractTest {
 		Jury<CompletionEvidence> inner = Juries.meta(new ConsensusStrategy(),
 				new NamedJury<CompletionEvidence>("c~d", returning(leaf("inner"))));
 		Jury<CompletionEvidence> cascade = CascadedJury.<CompletionEvidence>builder()
-			.tier("a/b", inner, TierPolicy.FINAL_TIER)
+			.tier("a/b", inner, RoutingRule.FINAL_TIER)
 			.build();
 		Jury<CompletionEvidence> outer = Juries.meta(new ConsensusStrategy(),
 				new NamedJury<CompletionEvidence>("outer", cascade));
@@ -436,7 +436,7 @@ class CompositeResultContractTest {
 		Jury<CompletionEvidence> jury = countingLeaf(leafCalls);
 		for (int current = depth; current > 0; current--) {
 			jury = CascadedJury.<CompletionEvidence>builder()
-				.tier("level-" + current, jury, TierPolicy.FINAL_TIER)
+				.tier("level-" + current, jury, RoutingRule.FINAL_TIER)
 				.build();
 		}
 		return jury;
@@ -446,14 +446,14 @@ class CompositeResultContractTest {
 		CascadedJury.Builder<CompletionEvidence> builder = CascadedJury.<CompletionEvidence>builder();
 		for (int index = 1; index <= attempts; index++) {
 			Jury<CompletionEvidence> jury = index == attempts ? countingLeaf(lastCalls) : returning(leaf("pass"));
-			TierPolicy policy = index == attempts ? TierPolicy.FINAL_TIER : TierPolicy.REJECT_ON_ANY_FAIL;
+			RoutingRule policy = index == attempts ? RoutingRule.FINAL_TIER : RoutingRule.REJECT_ON_ANY_FAIL;
 			builder.tier("tier-" + index, jury, policy);
 		}
 		return builder.build();
 	}
 
 	private static CompositeAttempt successAttempt(String name, Verdict verdict, CompositeRelation relation,
-			TierPolicy policy) {
+			RoutingRule policy) {
 		return CompositeAttempt.used(name, relation, policy, verdict);
 	}
 
@@ -524,7 +524,7 @@ class CompositeResultContractTest {
 	}
 
 	private static Jury<CompletionEvidence> jury(java.util.function.Supplier<Verdict> vote) {
-		return new Jury<CompletionEvidence>() {
+		return new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
 			@Override
 			public List<Judge<CompletionEvidence>> getJudges() {
 				return List.of();

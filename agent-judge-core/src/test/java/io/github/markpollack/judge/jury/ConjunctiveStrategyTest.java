@@ -113,15 +113,15 @@ class ConjunctiveStrategyTest {
 	}
 
 	@Test
-	void errorsAreGovernedByTheErrorPolicy() {
+	void errorsAreGovernedByTheErrorHandling() {
 		List<Judgment> withError = List.of(passJudgment(0.9), Judgment.error("model unavailable"));
 
 		assertThat(new ConjunctiveStrategy(0.5).aggregate(withError, Map.of()).status())
 			.as("PROPAGATE is the default and must not silently drop the errored judge")
 			.isEqualTo(JudgmentStatus.ERROR);
-		assertThat(new ConjunctiveStrategy(0.5, ErrorPolicy.TREAT_AS_FAIL).aggregate(withError, Map.of()).status())
+		assertThat(new ConjunctiveStrategy(0.5, ErrorHandling.TREAT_AS_FAIL).aggregate(withError, Map.of()).status())
 			.isEqualTo(JudgmentStatus.FAIL);
-		assertThat(new ConjunctiveStrategy(0.5, ErrorPolicy.IGNORE).aggregate(withError, Map.of()).status())
+		assertThat(new ConjunctiveStrategy(0.5, ErrorHandling.IGNORE).aggregate(withError, Map.of()).status())
 			.isEqualTo(JudgmentStatus.PASS);
 	}
 

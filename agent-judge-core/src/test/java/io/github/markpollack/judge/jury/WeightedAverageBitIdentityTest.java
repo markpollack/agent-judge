@@ -147,16 +147,16 @@ class WeightedAverageBitIdentityTest {
 				"PASS score=3feb333333333334 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.85 across 2 applicable judge(s) (threshold: 0.80, result: pass) evidence={eligibleCount=2, eligibleWeight=4.0, "
 						+ UNIVERSAL_PASS_2
 						+ "inputCount=2, inputWeight=4.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.8}"));
-		cases.add(new Case("IGNORE drops a heavily weighted error", new WeightedAverageStrategy(ErrorPolicy.IGNORE),
+		cases.add(new Case("IGNORE drops a heavily weighted error", new WeightedAverageStrategy(ErrorHandling.IGNORE),
 				List.of(Judgment.error("boom"), passJudgment(0.6), failJudgment(0.4)),
 				Map.of("0", 5.0, "1", 1.0, "2", 2.0),
 				"FAIL score=3fdddddddddddddd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.47 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=3.0, errorCodeCounts={judge_reported=1}, errorCount=1, errorPolicy=ignore, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=1, inputCount=3, inputWeight=8.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("TREAT_AS_FAIL keeps the error's weight",
-				new WeightedAverageStrategy(ErrorPolicy.TREAT_AS_FAIL),
+				new WeightedAverageStrategy(ErrorHandling.TREAT_AS_FAIL),
 				List.of(Judgment.error("boom"), passJudgment(0.9)), Map.of("0", 1.0, "1", 1.0),
 				"FAIL score=3fdccccccccccccd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.45 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=2.0, errorCodeCounts={judge_reported=1}, errorCount=1, errorPolicy=treatAsFail, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=1, explicitAbstainCount=0, ignoredErrorCount=0, inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("TREAT_AS_ABSTAIN removes the error's weight",
-				new WeightedAverageStrategy(ErrorPolicy.TREAT_AS_ABSTAIN),
+				new WeightedAverageStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
 				List.of(Judgment.error("boom"), passJudgment(0.9)), Map.of("0", 2.0, "1", 1.0),
 				"PASS score=3feccccccccccccd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.90 across 1 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=1, eligibleWeight=1.0, errorCodeCounts={judge_reported=1}, errorCount=1, errorPolicy=treatAsAbstain, errorsTreatedAsAbstainCount=1, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=0, inputCount=2, inputWeight=3.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("PROPAGATE returns ERROR", standard, List.of(Judgment.error("boom"), passJudgment(0.9)),
@@ -171,7 +171,7 @@ class WeightedAverageBitIdentityTest {
 		cases.add(new Case("every judge abstains", standard, List.of(Judgment.abstain("n/a"), Judgment.abstain("n/a")),
 				Map.of(),
 				"ABSTAIN score=none label=null checks=0 metadataKeys=[aggregation] reasoning=All 2 judge(s) abstained evidence={eligibleCount=0, eligibleWeight=0.0, errorCodeCounts={}, errorCount=0, errorPolicy=propagate, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=2, ignoredErrorCount=0, inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage}"));
-		cases.add(new Case("IGNORE empties the population", new WeightedAverageStrategy(ErrorPolicy.IGNORE),
+		cases.add(new Case("IGNORE empties the population", new WeightedAverageStrategy(ErrorHandling.IGNORE),
 				List.of(Judgment.error("boom"), Judgment.error("boom")), Map.of("0", 2.0),
 				"ABSTAIN score=none label=null checks=0 metadataKeys=[aggregation] reasoning=No eligible judgments; 2 error(s) ignored evidence={eligibleCount=0, eligibleWeight=0.0, errorCodeCounts={judge_reported=2}, errorCount=2, errorPolicy=ignore, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=2, inputCount=2, inputWeight=3.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage}"));
 		cases.add(new Case("an abstention leaves the denominator", standard,

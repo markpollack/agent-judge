@@ -72,7 +72,7 @@ public class FileComparisonJudge extends DeterministicJudge<DirectoryComparison>
 					instrumentFailure |= fileJudgment.status() == JudgmentStatus.ERROR;
 					unresolved |= fileJudgment.status() == JudgmentStatus.ABSTAIN;
 					if (!fileJudgment.pass()) {
-						failures.add(filePath + ": " + fileJudgment.operationalReasoning());
+						failures.add(filePath + ": " + fileJudgment.reasoning());
 					}
 				}
 			}

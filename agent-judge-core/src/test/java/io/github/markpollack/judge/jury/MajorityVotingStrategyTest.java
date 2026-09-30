@@ -26,7 +26,7 @@ class MajorityVotingStrategyTest {
 
 	@Test
 	void shouldReturnPassWhenPassesOutnumberFails() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL);
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1 passed"), booleanPass("Judge 2 passed"),
 				booleanFail("Judge 3 failed"));
@@ -39,7 +39,7 @@ class MajorityVotingStrategyTest {
 
 	@Test
 	void shouldReturnFailWhenFailsOutnumberPasses() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.PASS, ErrorPolicy.TREAT_AS_FAIL);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.PASS, ErrorHandling.TREAT_AS_FAIL);
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1 passed"), booleanFail("Judge 2 failed"),
 				booleanFail("Judge 3 failed"));
@@ -50,11 +50,11 @@ class MajorityVotingStrategyTest {
 		assertThat(result.reasoning()).contains("2 failed");
 	}
 
-	// ==================== TiePolicy Tests ====================
+	// ==================== TieBreakRule Tests ====================
 
 	@Test
 	void tieShouldUsePassPolicyWhenConfigured() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.PASS, ErrorPolicy.TREAT_AS_FAIL);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.PASS, ErrorHandling.TREAT_AS_FAIL);
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), booleanFail("Judge 2"));
 
@@ -66,7 +66,7 @@ class MajorityVotingStrategyTest {
 
 	@Test
 	void tieShouldUseFailPolicyWhenConfigured() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL);
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), booleanFail("Judge 2"));
 
@@ -78,7 +78,7 @@ class MajorityVotingStrategyTest {
 
 	@Test
 	void tieShouldUseAbstainPolicyWhenConfigured() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.TREAT_AS_FAIL);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.ABSTAIN, ErrorHandling.TREAT_AS_FAIL);
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), booleanFail("Judge 2"));
 
@@ -88,11 +88,11 @@ class MajorityVotingStrategyTest {
 		assertThat(result.reasoning()).contains("tie");
 	}
 
-	// ==================== ErrorPolicy Tests ====================
+	// ==================== ErrorHandling Tests ====================
 
 	@Test
 	void allErrorsShouldTreatAsFailWhenConfigured() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL);
 
 		List<Judgment> judgments = List.of(Judgment.error("Error 1"), Judgment.error("Error 2"));
 
@@ -105,7 +105,7 @@ class MajorityVotingStrategyTest {
 
 	@Test
 	void allErrorsShouldTreatAsAbstainWhenConfigured() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN);
 
 		List<Judgment> judgments = List.of(Judgment.error("Error 1"), Judgment.error("Error 2"));
 
@@ -121,7 +121,7 @@ class MajorityVotingStrategyTest {
 
 	@Test
 	void allErrorsShouldBeIgnoredWhenConfigured() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.IGNORE);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.IGNORE);
 
 		List<Judgment> judgments = List.of(Judgment.error("Error 1"), Judgment.error("Error 2"));
 
@@ -138,8 +138,8 @@ class MajorityVotingStrategyTest {
 	}
 
 	@Test
-	void mixedErrorsAndPassesShouldRespectErrorPolicy() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
+	void mixedErrorsAndPassesShouldRespectErrorHandling() {
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL);
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), Judgment.error("Error"), booleanPass("Judge 3"));
 
@@ -153,7 +153,7 @@ class MajorityVotingStrategyTest {
 
 	@Test
 	void allAbstainsShouldReturnAbstain() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL);
 
 		List<Judgment> judgments = List.of(Judgment.abstain("Cannot evaluate 1"),
 				Judgment.abstain("Cannot evaluate 2"));
@@ -170,21 +170,21 @@ class MajorityVotingStrategyTest {
 
 	@Test
 	void abstainsShouldNotCountInMajority() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL);
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), Judgment.abstain("Judge 2"), booleanFail("Judge 3"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		// 1 pass, 1 fail, 1 abstain → tie between pass/fail
-		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL); // TiePolicy.FAIL
+		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL); // TieBreakRule.FAIL
 	}
 
 	// ==================== Mixed Scenarios ====================
 
 	@Test
 	void mixedPassFailAbstainError() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.IGNORE);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.ABSTAIN, ErrorHandling.IGNORE);
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), booleanFail("Judge 2"), Judgment.abstain("Judge 3"),
 				Judgment.error("Judge 4"));
@@ -193,14 +193,14 @@ class MajorityVotingStrategyTest {
 
 		// 1 pass, 1 fail, 1 abstain (not counted), 1 error (ignored) = 1 pass vs 1
 		// fail → tie
-		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN); // TiePolicy.ABSTAIN
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN); // TieBreakRule.ABSTAIN
 	}
 
 	// ==================== Edge Cases ====================
 
 	@Test
 	void emptyJudgmentListShouldThrowException() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL);
 
 		assertThatThrownBy(() -> strategy.aggregate(List.of(), Map.of())).isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("empty");
@@ -208,7 +208,7 @@ class MajorityVotingStrategyTest {
 
 	@Test
 	void singleJudgmentShouldUseItsStatus() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL);
 
 		Judgment result = strategy.aggregate(List.of(booleanPass("Only judge")), Map.of());
 
@@ -219,7 +219,7 @@ class MajorityVotingStrategyTest {
 
 	@Test
 	void shouldReturnCorrectName() {
-		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
+		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL);
 
 		assertThat(strategy.getName()).isEqualTo("majority");
 	}

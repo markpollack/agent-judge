@@ -1,39 +1,19 @@
-# Requirement evaluation and retained assertions
+# Retained requirement assertions
 
-`RequirementAssertions` applies an application reliance rule to a completed Judge/Jury
-result, retaining the original Verdict and its authoritative Interpretation.
+Core's `Evaluations` invokes a Judge or Jury and optionally applies a `Policy` to its complete Verdict. `RequirementAssertions` only inspects the retained `EvaluationResult`:
 
 ```java
-var assertions = RequirementAssertions.relyingOnJudgment();
-var result = assertions.evaluate(READY_REQUIREMENT, READY_RESPONSE_JUDGE, "READY", null);
+Requirement<String> requirement = Requirement.text("ready", "1", "READY");
+RequirementJudge<String, String> judge = (actual, evidence) -> actual.specification().equals(evidence)
+    ? Judgment.pass("matches") : Judgment.fail("differs");
+EvaluationResult result = Evaluations.evaluate(requirement, judge, "READY");
 RequirementAssertions.requireSatisfied(result);
 ```
 
-`READY_RESPONSE_JUDGE` can be an ordinary `Judge<String>`. A Judge requiring the native
-specification uses `Judge<RequirementEvidence<S,E>>` and `evaluateRequirement(...)`.
-A configured `Jury<E>` uses the same evaluate entry. Final acceptance does not reconfigure
-Jury internals. `null` in the final argument selects the configured default; a policy lambda
-there selects EXPLICIT acceptance. `new RequirementAssertions(null)` requires that override
-and refuses missing policy before invoking the Judge.
+The overload with a final `Policy` requests policy execution. Omitting it means `NotRequested`, without an implicit decision. The other policy results are `Decided(originalDecision)` and `Failed(originalThrowable)`; there is no skipped state. Every usable conclusion reaches a requested policy. Invalid configuration and unusable stored records throw without creating an evaluation.
 
-AcceptancePolicy has one method, `AcceptanceDecision decide(Judgment judgment)`. It needs
-no audit identity. `RELY` preserves positive or negative conclusions; `ABSTAIN` and
-`ESCALATE` withhold reliance. An optional `Policies.recorded(reference, policy)` decorator
-records application-supplied provenance.
+Satisfaction requires an associated Requirement, a PASS conclusion, and either no requested policy or a RELY decision. A requested policy failure prevents success. RELY on a negative result remains rejection. `RequirementAssertionError.result()` retains the complete unchanged result, and a policy failure retains its original exception as the cause. ERROR, abstention, non-applicability, and failed attempts remain inspectable in domain records.
 
-`AssertionResult` retains Requirement, Verdict, Interpretation and `AcceptanceExecution`.
-The execution records final policy source, optional identity, and application or bypass.
-A policy failure is separate from producer error. A retained result constructor validates
-its interpretation and required bypass without running a policy. Repeated calls to
-`requireSatisfied` invoke no Judge, provider or policy.
+Use `Evaluations.evaluate(Judge<E>, E)` for ordinary checks and the sibling `RequirementJudge<S,E>`/`RequirementJury<S,E>` overloads when supplying a requirement. Requirements never carry policies or execution configuration. A Jury always retains its complete Verdict.
 
-A supported SATISFIED interpretation and final RELY pass. Supported VIOLATED with RELY
-throws `RequirementAssertionError.Rejected`; unresolved/withheld conclusions are
-Inconclusive; instrument failures are InstrumentFailure. Non-applicability and unsupported
-reading have their own subclasses. Every failure retains the complete result.
-
-The [AssertJ module](../agent-judge-assertj/README.md) provides the fluent grammar. The
-[wire contract](../portable-results-v3.md) describes V3 retention. Tests use local fixtures;
-the manually invoked conference runners are separate and require explicit credentials.
-Historical reviewed fixture bytes remain unchanged; their old policy vocabulary is
-translated only in the test fixture loader.
+Repeated assertions and `VerdictReport` inspection invoke nothing. The [AssertJ integration](../agent-judge-assertj/README.md) adds staged execution and caches a completed fluent stage. [Storage](../portable-results-v4.md) is independent of assertions. Tests use local fixtures; the conference runner remains separately invoked and requires explicit credentials. Frozen fixture vocabulary is translated only by the test loader.

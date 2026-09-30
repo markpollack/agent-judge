@@ -80,11 +80,11 @@ import io.github.markpollack.judge.judgment.Judgment;
  * them here.</b> These combinators bypass the seat guard as well: a judge reached through
  * a combinator returns {@code NOT_APPLICABLE} directly to the caller, with nothing
  * checking that it declared it may. Use a {@link io.github.markpollack.judge.jury.Jury}
- * with an explicit {@link io.github.markpollack.judge.jury.ErrorPolicy}: a jury resolves
- * the population by status, publishes what it actually reduced over in its aggregation
- * evidence, and {@link io.github.markpollack.judge.jury.AllMustPassStrategy} expresses
- * "every applicable judge must pass" without collapsing an abstention into a negative
- * finding.
+ * with an explicit {@link io.github.markpollack.judge.jury.ErrorHandling}: a jury
+ * resolves the population by status, publishes what it actually reduced over in its
+ * aggregation evidence, and {@link io.github.markpollack.judge.jury.AllMustPassStrategy}
+ * expresses "every applicable judge must pass" without collapsing an abstention into a
+ * negative finding.
  * </p>
  * <p>
  * This behaviour is pinned by tests rather than changed. Widening the combinators to be

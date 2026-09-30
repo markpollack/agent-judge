@@ -513,11 +513,11 @@ class VotingStrategyCharacterizationTest {
 		}
 
 		@Test
-		@DisplayName("PRESERVED: TiePolicy resolves an even split")
+		@DisplayName("PRESERVED: TieBreakRule resolves an even split")
 		void tiePolicy() {
-			Judgment failOnTie = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL)
+			Judgment failOnTie = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL)
 				.aggregate(List.of(booleanJudgment(true), booleanJudgment(false)), Map.of());
-			Judgment passOnTie = new MajorityVotingStrategy(TiePolicy.PASS, ErrorPolicy.TREAT_AS_FAIL)
+			Judgment passOnTie = new MajorityVotingStrategy(TieBreakRule.PASS, ErrorHandling.TREAT_AS_FAIL)
 				.aggregate(List.of(booleanJudgment(true), booleanJudgment(false)), Map.of());
 
 			assertThat(failOnTie.status()).isEqualTo(JudgmentStatus.FAIL);
@@ -525,18 +525,18 @@ class VotingStrategyCharacterizationTest {
 		}
 
 		@Test
-		@DisplayName("PRESERVED: ErrorPolicy.TREAT_AS_FAIL converts ERROR to a fail vote")
+		@DisplayName("PRESERVED: ErrorHandling.TREAT_AS_FAIL converts ERROR to a fail vote")
 		void errorTreatedAsFail() {
-			Judgment result = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL)
+			Judgment result = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL)
 				.aggregate(List.of(booleanJudgment(true), Judgment.error("boom"), Judgment.error("boom")), Map.of());
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		}
 
 		@Test
-		@DisplayName("PRESERVED: ErrorPolicy.IGNORE removes ERROR from the counts")
+		@DisplayName("PRESERVED: ErrorHandling.IGNORE removes ERROR from the counts")
 		void errorIgnored() {
-			Judgment result = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.IGNORE)
+			Judgment result = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.IGNORE)
 				.aggregate(List.of(booleanJudgment(true), Judgment.error("boom")), Map.of());
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -553,7 +553,7 @@ class VotingStrategyCharacterizationTest {
 
 		@Test
 		@DisplayName("CHANGED: the default error policy is PROPAGATE (was an implicit TREAT_AS_FAIL)")
-		void defaultErrorPolicyPropagates() {
+		void defaultErrorHandlingPropagates() {
 			// The pre-migration BASELINE case: the default was demonstrably
 			// TREAT_AS_FAIL,
 			// but nothing recorded that as a choice. Both shapes below returned FAIL.
@@ -581,16 +581,16 @@ class VotingStrategyCharacterizationTest {
 
 	@Nested
 	@DisplayName("Error policy accounting")
-	class ErrorPolicyAccounting {
+	class ErrorHandlingAccounting {
 
 		@Test
 		@DisplayName("IGNORE and TREAT_AS_ABSTAIN reach the same status but account differently")
 		void ignoreVersusTreatAsAbstain() {
 			List<Judgment> judgments = List.of(booleanJudgment(true), Judgment.error("boom"));
 
-			Judgment ignored = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.IGNORE).aggregate(judgments,
+			Judgment ignored = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.IGNORE).aggregate(judgments,
 					Map.of());
-			Judgment abstained = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN)
+			Judgment abstained = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN)
 				.aggregate(judgments, Map.of());
 
 			// Same outcome — which is exactly why a status-only assertion cannot tell the
@@ -608,7 +608,7 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: every strategy's default policy propagates rather than voting")
 		void defaultPolicyPropagatesOnEveryStrategy() {
-			// Only Majority had an ErrorPolicy before the migration, defaulting to an
+			// Only Majority had an ErrorHandling before the migration, defaulting to an
 			// implicit TREAT_AS_FAIL; the other four silently scored an error as 0.0. The
 			// gap that let that go unnoticed was the absence of a case exercising the
 			// default constructor, so the default is now pinned on all five.
@@ -633,7 +633,7 @@ class VotingStrategyCharacterizationTest {
 			// weight included — rather than zeroing its contribution while still dividing
 			// by its weight. Consuming the weight would drag the mean toward zero, which
 			// is the silent negative vote the migration exists to remove.
-			Judgment result = new WeightedAverageStrategy(ErrorPolicy.IGNORE).aggregate(
+			Judgment result = new WeightedAverageStrategy(ErrorHandling.IGNORE).aggregate(
 					List.of(numeric(0.8, JudgmentStatus.PASS), Judgment.error("boom")), Map.of("0", 1.0, "1", 3.0));
 
 			assertThat(result.score()).isCloseTo(0.8, within());
@@ -647,9 +647,9 @@ class VotingStrategyCharacterizationTest {
 		void noResultReasoningNamesTheCause() {
 			List<Judgment> allErrored = List.of(Judgment.error("boom"), Judgment.error("boom"));
 
-			Judgment ignored = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.IGNORE).aggregate(allErrored,
+			Judgment ignored = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.IGNORE).aggregate(allErrored,
 					Map.of());
-			Judgment abstained = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN)
+			Judgment abstained = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN)
 				.aggregate(allErrored, Map.of());
 
 			assertThat(ignored.status()).isEqualTo(JudgmentStatus.ABSTAIN);

@@ -39,13 +39,13 @@ import io.github.markpollack.judge.jury.CompositeAttempt;
 import io.github.markpollack.judge.jury.CompositeFailure;
 import io.github.markpollack.judge.jury.CompositeRelation;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
-import io.github.markpollack.judge.jury.ErrorPolicy;
+import io.github.markpollack.judge.jury.ErrorHandling;
 import io.github.markpollack.judge.jury.Juries;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.NamedJury;
-import io.github.markpollack.judge.jury.NotApplicablePolicy;
+import io.github.markpollack.judge.jury.ExclusionHandling;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.jury.RoutingRule;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.jury.VotingStrategy;
 import io.github.markpollack.judge.judgment.Check;
@@ -251,8 +251,9 @@ class NormalizedJudgmentConformanceTest {
 		@Test
 		void declarationsDeriveTheCompleteCompositePropertySet() {
 			for (JsonNode verdictNode : allVerdictNodes(compositeFixtureTree())) {
-				assertThat(fieldNames(verdictNode)).containsExactly("schemaVersion", "declaredCardinality", "judgment",
-						"individual", "individualByName", "weights", "seats", "provenance", "compositeAttempts");
+				assertThat(fieldNames(verdictNode)).containsExactly("schemaVersion", "judgment", "individual",
+						"individualByName", "weights", "seats", "provenance", "compositeAttempts",
+						"declaredCardinality");
 			}
 
 			Set<String> attemptProperties = new LinkedHashSet<>();
@@ -263,16 +264,16 @@ class NormalizedJudgmentConformanceTest {
 					.containsExactlyElementsOf(declared.stream().filter(attempt::has).toList());
 			}
 			assertThat(attemptProperties).containsExactlyInAnyOrderElementsOf(componentNames(CompositeAttempt.class));
-			assertThat(componentNames(CompositeFailure.class)).containsExactly("code");
+			assertThat(componentNames(CompositeFailure.class)).containsExactly("code", "cause");
 			assertThat(Arrays.stream(CompositeRelation.values()).map(CompositeRelation::wireName))
-				.containsExactlyInAnyOrder("cascade_tier", "meta_member");
+				.containsExactlyInAnyOrder("cascade_tier", "meta_member", "CONSTITUENT");
 		}
 
 		@Test
 		void compositeDocumentHasNoNullLegacyTypeFailureDetailOrLiveObjectSurface() {
 			String json = writeCompositeFixture();
 			assertThat(nullPaths(compositeFixtureTree(), "")).isEmpty();
-			assertThat(json).doesNotContain("sub" + "Verdicts")
+			assertThat(json).doesNotContain("sub" + "StoredVerdicts")
 				.doesNotContain("\"message\"")
 				.doesNotContain("\"path\"")
 				.doesNotContain("@class")
@@ -393,7 +394,9 @@ class NormalizedJudgmentConformanceTest {
 		@Test
 		@DisplayName("every Verdict record component appears in the fixture")
 		void coversEveryVerdictComponent() {
-			assertThat(fieldNames(fixtureTree())).containsExactlyInAnyOrderElementsOf(componentNames(Verdict.class));
+			assertThat(fieldNames(fixtureTree())).containsExactlyInAnyOrder("schemaVersion", "judgment", "individual",
+					"individualByName", "weights", "seats", "provenance", "compositeAttempts", "declaredCardinality");
+			assertThat(componentNames(Verdict.class)).doesNotContain("schemaVersion").contains("requirement");
 		}
 
 		@Test
@@ -506,7 +509,7 @@ class NormalizedJudgmentConformanceTest {
 		@DisplayName("M5: disagreement aggregates to ABSTAIN and stays distinguishable from a no-result abstention")
 		void disagreementIsNotUnanimityAndNotEmptiness() {
 			Judgment disagreement = verdict().judgment();
-			Judgment noResult = new ConsensusStrategy(ErrorPolicy.IGNORE)
+			Judgment noResult = new ConsensusStrategy(ErrorHandling.IGNORE)
 				.aggregate(List.of(Judgment.abstain("the retrieval index was empty")), Map.of());
 
 			assertThat(disagreement.status()).isEqualTo(JudgmentStatus.ABSTAIN);
@@ -545,7 +548,7 @@ class NormalizedJudgmentConformanceTest {
 	 */
 	private static Verdict verdict() {
 		Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
-			.votingStrategy(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE))
+			.votingStrategy(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE))
 			.parallel(false)
 			.judge(Judges.named(context -> buildSuccess(), "build-success"))
 			.judge(Judges.named(context -> modelBackedCorrectness(), MODEL_BACKED_JUDGE))
@@ -569,8 +572,8 @@ class NormalizedJudgmentConformanceTest {
 			.build();
 		Jury<CompletionEvidence> cascade = CascadedJury.<CompletionEvidence>builder()
 			.tier("broken-check", throwingJury(new IllegalStateException("/home/alice/.ssh/id_ed25519")),
-					TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic-check", successful, TierPolicy.FINAL_TIER)
+					RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic-check", successful, RoutingRule.FINAL_TIER)
 			.build();
 		Jury<CompletionEvidence> meta = Juries.meta(new ConsensusStrategy(),
 				new NamedJury<CompletionEvidence>("pipeline", cascade), new NamedJury<CompletionEvidence>("audit",
@@ -579,7 +582,7 @@ class NormalizedJudgmentConformanceTest {
 	}
 
 	private static Jury<CompletionEvidence> throwingJury(RuntimeException failure) {
-		return new Jury<CompletionEvidence>() {
+		return new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
 			@Override
 			public List<Judge<CompletionEvidence>> getJudges() {
 				return List.of();
@@ -742,6 +745,9 @@ class NormalizedJudgmentConformanceTest {
 		((com.fasterxml.jackson.databind.node.ObjectNode) pipeline).set("judgment", sole);
 		((com.fasterxml.jackson.databind.node.ArrayNode) expected.get("individual")).set(0, sole);
 		((com.fasterxml.jackson.databind.node.ObjectNode) expected.get("individualByName")).set("pipeline", sole);
+		((com.fasterxml.jackson.databind.node.ObjectNode) expected.at("/seats/0")).put("participation", "NOT_REDUCED");
+		((com.fasterxml.jackson.databind.node.ObjectNode) pipeline.at("/seats/0")).put("participation", "IDENTITY");
+		((com.fasterxml.jackson.databind.node.ObjectNode) leaf.at("/seats/0")).put("participation", "IDENTITY");
 		return expected;
 	}
 

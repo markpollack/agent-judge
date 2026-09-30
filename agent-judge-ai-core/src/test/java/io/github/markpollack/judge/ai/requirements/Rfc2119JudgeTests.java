@@ -53,7 +53,7 @@ class Rfc2119JudgeTests {
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.reasoning()).isEqualTo("2 of 3 hold, 1 violated");
-		assertThat(check(judgment, "RULE-2").judgment().operationalReasoning()).contains("returns the entity directly");
+		assertThat(check(judgment, "RULE-2").judgment().reasoning()).contains("returns the entity directly");
 	}
 
 	@Test

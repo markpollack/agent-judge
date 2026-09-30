@@ -12,15 +12,11 @@ import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.NamedJudge;
-import io.github.markpollack.judge.acceptance.Policies;
-import io.github.markpollack.judge.acceptance.AcceptanceDecision;
 import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.acceptance.AcceptanceAction;
-import io.github.markpollack.judge.acceptance.AppliedPolicy;
 import io.github.markpollack.judge.judgment.Finding;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
@@ -44,7 +40,7 @@ class IdentityCompositionTest {
 		Judgment negative = new Judgment(JudgmentStatus.FAIL, new Finding(null,
 				new NumericFinding(4, NumericKind.ORDINAL_EXPECTATION, "impact:v1", 0, 4,
 						List.of("none", "low", "medium", "high", "critical"), QualityDirection.INCREASING),
-				null), null, null, null, "verified violation", List.of(), null, null, Map.of());
+				null), null, null, null, "verified violation", List.of(), null, Map.of());
 		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
 			.judge(context -> negative)
 			.votingStrategy(new AverageVotingStrategy())
@@ -56,7 +52,7 @@ class IdentityCompositionTest {
 	@Test
 	void oneSeatDoesNotLoseEscalationIntent() {
 		Judgment escalated = new Judgment(JudgmentStatus.FAIL, null, null, null, null, "verified violation", List.of(),
-				null, new AppliedPolicy(POLICY, AcceptanceAction.ESCALATE, "independent review required"), Map.of());
+				null, Map.of());
 		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
 			.judge(context -> escalated)
 			.votingStrategy(new AverageVotingStrategy())
@@ -91,8 +87,8 @@ class IdentityCompositionTest {
 			}
 
 			@Override
-			public NotApplicablePolicy notApplicablePolicy() {
-				return NotApplicablePolicy.TREAT_AS_FAIL;
+			public ExclusionHandling exclusionHandling() {
+				return ExclusionHandling.TREAT_AS_FAIL;
 			}
 		};
 		Judge<CompletionEvidence> judge = new NamedJudge<CompletionEvidence>(context -> original,
@@ -125,31 +121,9 @@ class IdentityCompositionTest {
 	}
 
 	@Test
-	void acceptedNegativeAndPolicyFailureRemainIdentity() {
-		for (Judgment judgment : List.of(
-				Policies.apply(Judgment.fail("violation"), POLICY,
-						view -> new AcceptanceDecision(AcceptanceAction.RELY, "usable negative")),
-				Policies.apply(Judgment.pass("finding"), POLICY, view -> {
-					throw new IllegalStateException("policy missing");
-				}), Policies.apply(Judgment.pass("finding"), POLICY,
-						view -> new AcceptanceDecision(AcceptanceAction.ESCALATE, "critical consequence")))) {
-			SimpleJury<CompletionEvidence> simple = SimpleJury.<CompletionEvidence>builder()
-				.judge(context -> judgment)
-				.votingStrategy(new AverageVotingStrategy(0.9, ErrorPolicy.TREAT_AS_FAIL))
-				.build();
-			assertThat(simple.vote(CONTEXT).judgment()).isSameAs(judgment);
-			assertThat(Juries
-				.meta(new AverageVotingStrategy(ErrorPolicy.TREAT_AS_FAIL),
-						new NamedJury<CompletionEvidence>("one", simple))
-				.vote(CONTEXT)
-				.judgment()).isSameAs(judgment);
-		}
-	}
-
-	@Test
 	void twoDeclaredSeatsAndDirectStrategyRemainExplicitReductions() {
 		Judgment lowPositive = Judgment.builder().pass().score(0.1).reasoning("accepted positive").build();
-		AverageVotingStrategy strategy = new AverageVotingStrategy(ErrorPolicy.IGNORE);
+		AverageVotingStrategy strategy = new AverageVotingStrategy(ErrorHandling.IGNORE);
 		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
 			.judge(context -> lowPositive)
 			.judge(context -> Judgment.error("backend unavailable"))
@@ -159,7 +133,7 @@ class IdentityCompositionTest {
 		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(verdict.judgment()).isNotEqualTo(lowPositive);
 		assertThat(strategy.aggregate(List.of(lowPositive), Map.of()).status()).isEqualTo(JudgmentStatus.FAIL);
-		Jury<CompletionEvidence> broken = new Jury<CompletionEvidence>() {
+		Jury<CompletionEvidence> broken = new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
 			@Override
 			public Verdict vote(CompletionEvidence context) {
 				throw new IllegalStateException("member failed");

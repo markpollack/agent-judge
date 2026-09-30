@@ -63,8 +63,8 @@ import io.github.markpollack.judge.judgment.Judgment;
  * </p>
  *
  * <p>
- * Abstentions leave the population entirely. Errors are governed by {@link ErrorPolicy}
- * (default {@code PROPAGATE}) and exclusions by {@link NotApplicablePolicy} (default
+ * Abstentions leave the population entirely. Errors are governed by {@link ErrorHandling}
+ * (default {@code PROPAGATE}) and exclusions by {@link ExclusionHandling} (default
  * {@code REFUSE}); an exclusion honoured as a failure keeps its configured weight, so a
  * heavily weighted criterion that does not apply counts for as much as it would have.
  * </p>
@@ -103,15 +103,15 @@ public class WeightedAverageStrategy implements VotingStrategy {
 
 	private final double threshold;
 
-	private final ErrorPolicy errorPolicy;
+	private final ErrorHandling errorPolicy;
 
-	private final NotApplicablePolicy notApplicablePolicy;
+	private final ExclusionHandling notApplicablePolicy;
 
 	/**
 	 * Create a weighted average strategy with the default error policy.
 	 */
 	public WeightedAverageStrategy() {
-		this(DEFAULT_THRESHOLD, ErrorPolicy.PROPAGATE);
+		this(DEFAULT_THRESHOLD, ErrorHandling.PROPAGATE);
 	}
 
 	/**
@@ -119,7 +119,7 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	 * @param errorPolicy policy for handling errors
 	 * @throws IllegalArgumentException if {@code errorPolicy} is null
 	 */
-	public WeightedAverageStrategy(ErrorPolicy errorPolicy) {
+	public WeightedAverageStrategy(ErrorHandling errorPolicy) {
 		this(DEFAULT_THRESHOLD, errorPolicy);
 	}
 
@@ -132,7 +132,7 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	 * @since 0.16.0
 	 */
 	public WeightedAverageStrategy(double threshold) {
-		this(threshold, ErrorPolicy.PROPAGATE);
+		this(threshold, ErrorHandling.PROPAGATE);
 	}
 
 	/**
@@ -145,8 +145,8 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	 * {@code [0.0, 1.0]}, or if {@code errorPolicy} is null
 	 * @since 0.16.0
 	 */
-	public WeightedAverageStrategy(double threshold, ErrorPolicy errorPolicy) {
-		this(threshold, errorPolicy, NotApplicablePolicy.REFUSE);
+	public WeightedAverageStrategy(double threshold, ErrorHandling errorPolicy) {
+		this(threshold, errorPolicy, ExclusionHandling.REFUSE);
 	}
 
 	/**
@@ -160,7 +160,7 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	 * {@code [0.0, 1.0]}, or if either policy is null
 	 * @since 0.17.0
 	 */
-	public WeightedAverageStrategy(double threshold, ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
+	public WeightedAverageStrategy(double threshold, ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
 		if (notApplicablePolicy == null) {
 			throw new IllegalArgumentException("notApplicablePolicy must not be null");
 		}
@@ -322,7 +322,7 @@ public class WeightedAverageStrategy implements VotingStrategy {
 
 	/** {@inheritDoc} */
 	@Override
-	public NotApplicablePolicy notApplicablePolicy() {
+	public ExclusionHandling exclusionHandling() {
 		return this.notApplicablePolicy;
 	}
 

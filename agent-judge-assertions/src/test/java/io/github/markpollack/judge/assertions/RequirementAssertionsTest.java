@@ -4,185 +4,154 @@
  */
 package io.github.markpollack.judge.assertions;
 
-import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.NamedJudge;
-import io.github.markpollack.judge.JudgeMetadata;
-import io.github.markpollack.judge.JudgeType;
-import io.github.markpollack.judge.acceptance.AcceptanceAction;
-import io.github.markpollack.judge.acceptance.AcceptanceDecision;
-import io.github.markpollack.judge.acceptance.AcceptancePolicy;
-import io.github.markpollack.judge.acceptance.AppliedPolicy;
-import io.github.markpollack.judge.acceptance.Policies;
-import io.github.markpollack.judge.judgment.Judgment;
-import io.github.markpollack.judge.judgment.JudgmentStatus;
-import io.github.markpollack.judge.jury.interpretation.RequirementOutcome;
-import io.github.markpollack.judge.requirement.Requirement;
-import io.github.markpollack.judge.requirement.RequirementEvidence;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.*;
+import io.github.markpollack.judge.*;
+import io.github.markpollack.judge.judgment.*;
+import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.requirement.*;
+import io.github.markpollack.judge.policy.*;
+import io.github.markpollack.judge.evaluation.*;
+import io.github.markpollack.judge.reporting.VerdictReport;
 import static org.assertj.core.api.Assertions.*;
 
 class RequirementAssertionsTest {
 
-	static final Requirement<String> READY_REQUIREMENT = Requirement.text("ready", "1", "The response is READY");
-	static final Judge<String> READY_RESPONSE_JUDGE = response -> "READY".equals(response) ? Judgment.pass("ready")
-			: Judgment.fail("different response");
-
-	static AcceptancePolicy policy(AcceptanceAction action) {
-		return judgment -> new AcceptanceDecision(action, "application reliance rule");
-	}
-
-	static AssertionResult evaluate(Judge<String> judge, AcceptancePolicy policy) {
-		return new RequirementAssertions(policy).evaluate(READY_REQUIREMENT, judge, "READY", null);
-	}
+	static final Requirement<String> READY = Requirement.text("ready", "1", "READY");
+	static final RequirementJudge<String, String> CHECK = (r, e) -> r.specification().equals(e)
+			? Judgment.pass("matches") : Judgment.fail("differs");
 
 	@Test
-	void requirementContainsOnlyTheSpecificationAndItsSource() {
+	void pureRequirementContainsNoExecutionConfiguration() {
 		assertThat(
 				Arrays.stream(Requirement.class.getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
 			.containsExactly("id", "revision", "text", "specification", "source");
-		assertThat(Arrays.stream(Requirement.class.getMethods()).map(java.lang.reflect.Method::getName))
-			.doesNotContain("under", "acceptancePolicy");
 	}
 
 	@Test
-	void ordinaryLambdaAndRetainedTerminalRequireNoIdentityAndExecuteOnce() throws Exception {
-		var judges = new AtomicInteger();
+	void noPolicyIsACompleteSuccessfulEvaluation() {
+		var result = Evaluations.evaluate(READY, CHECK, "READY");
+		assertThat(result.policyResult()).isInstanceOf(PolicyResult.NotRequested.class);
+		assertThatCode(() -> RequirementAssertions.requireSatisfied(result)).doesNotThrowAnyException();
+		assertThat(result.verdict().requirement()).isSameAs(READY);
+	}
+
+	@ParameterizedTest
+	@EnumSource(PolicyAction.class)
+	void positiveSatisfactionRequiresRequestedPolicyToPermitReliance(PolicyAction action) {
+		var result = Evaluations.evaluate(READY, CHECK, "READY", v -> new PolicyDecision(action, "reviewed"));
+		assertThat(result.verdict().conclusion()).isEqualTo(Verdict.Conclusion.PASS);
+		if (action == PolicyAction.RELY)
+			assertThatCode(() -> RequirementAssertions.requireSatisfied(result)).doesNotThrowAnyException();
+		else
+			assertThatThrownBy(() -> RequirementAssertions.requireSatisfied(result))
+				.isInstanceOf(RequirementAssertionError.class)
+				.hasMessageContaining(action.name());
+	}
+
+	@ParameterizedTest
+	@EnumSource(PolicyAction.class)
+	void negativeNeverBecomesSatisfiedIncludingRely(PolicyAction action) {
+		var result = Evaluations.evaluate(READY, CHECK, "NO", v -> new PolicyDecision(action, "reviewed"));
+		assertThat(result.verdict().conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
+		assertThatThrownBy(() -> RequirementAssertions.requireSatisfied(result))
+			.isInstanceOfSatisfying(RequirementAssertionError.class, error -> {
+				assertThat(error.result()).isSameAs(result);
+				assertThat(error.getMessage()).contains("violated");
+			});
+	}
+
+	@Test
+	void repeatedAssertionsAndReportsDoNotExecuteAgain() {
+		var calls = new AtomicInteger();
 		var policies = new AtomicInteger();
-		Judge<String> judge = evidence -> {
-			judges.incrementAndGet();
-			return READY_RESPONSE_JUDGE.judge(evidence);
+		RequirementJudge<String, String> judge = (r, e) -> {
+			calls.incrementAndGet();
+			assertThat(r).isSameAs(READY);
+			return CHECK.judge(r, e);
 		};
-		AcceptancePolicy policy = judgment -> {
+		var originalDecision = new PolicyDecision(PolicyAction.RELY, "retain original");
+		var result = Evaluations.evaluate(READY, judge, "READY", v -> {
 			policies.incrementAndGet();
-			return new AcceptanceDecision(AcceptanceAction.RELY, "rely");
-		};
-		var result = evaluate(judge, policy);
-		assertThat(result.policy()).isNull();
-		assertThat(result.verdict().judgment().finding()).isNull();
-		assertThat(result.verdict().judgment()).isSameAs(result.verdict().individual().getFirst());
-		var json = new com.fasterxml.jackson.databind.ObjectMapper();
-		var execution = json.readValue(json.writeValueAsBytes(result.acceptanceExecution()), AcceptanceExecution.class);
-		var verdict = json.readValue(json.writeValueAsBytes(result.verdict()),
-				io.github.markpollack.judge.jury.Verdict.class);
-		var reopened = new AssertionResult(READY_REQUIREMENT, execution, verdict);
-		RequirementAssertions.requireSatisfied(reopened);
-		RequirementAssertions.requireSatisfied(reopened);
-		assertThat(judges).hasValue(1);
+			return originalDecision;
+		});
+		for (int i = 0; i < 3; i++) {
+			RequirementAssertions.requireSatisfied(result);
+			VerdictReport.of(result.verdict()).summary();
+		}
+		assertThat(((PolicyResult.Decided) result.policyResult()).decision()).isSameAs(originalDecision);
+		assertThat(calls).hasValue(1);
 		assertThat(policies).hasValue(1);
 	}
 
 	@Test
-	void relyOnANegativeJudgmentEstablishesViolation() {
-		var result = evaluate(evidence -> Judgment.fail("violated"), policy(AcceptanceAction.RELY));
-		assertThat(result.interpretation().outcome()).isEqualTo(RequirementOutcome.VIOLATED);
-		assertThat(result.verdict().judgment().finding()).isNull();
-		var failure = catchThrowableOfType(() -> RequirementAssertions.requireSatisfied(result),
-				RequirementAssertionError.Rejected.class);
-		assertThat(failure.result()).isSameAs(result);
-		assertThat(failure).isInstanceOf(org.opentest4j.AssertionFailedError.class);
+	void policyExceptionAndNullReturnCannotEstablishSatisfaction() {
+		var original = new IllegalStateException("backend unavailable");
+		for (Policy policy : List.<Policy>of(v -> {
+			throw original;
+		}, v -> null)) {
+			var result = Evaluations.evaluate(READY, CHECK, "READY", policy);
+			assertThat(result.verdict().conclusion()).isEqualTo(Verdict.Conclusion.PASS);
+			assertThatThrownBy(() -> RequirementAssertions.requireSatisfied(result))
+				.isInstanceOfSatisfying(RequirementAssertionError.class, error -> assertThat(error.getCause())
+					.isSameAs(((PolicyResult.Failed) result.policyResult()).cause()));
+		}
 	}
 
-	@ParameterizedTest
-	@EnumSource(value = AcceptanceAction.class, names = { "ABSTAIN", "ESCALATE" })
-	void withheldNegativeRetainsViolationButCannotBeReliedOn(AcceptanceAction action) {
-		var result = evaluate(evidence -> Judgment.fail("violated"), policy(action));
-		assertThat(result.interpretation().outcome()).isEqualTo(RequirementOutcome.VIOLATED);
-		assertThat(result.verdict().judgment().status()).isEqualTo(JudgmentStatus.FAIL);
+	@Test
+	void ordinaryEvidenceEvaluationHasNoFabricatedRequirement() {
+		var result = Evaluations.evaluate((Judge<String>) e -> Judgment.pass("checked"), "value");
+		assertThat(result.verdict().requirement()).isNull();
 		assertThatThrownBy(() -> RequirementAssertions.requireSatisfied(result))
-			.isInstanceOf(RequirementAssertionError.Inconclusive.class);
+			.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
-	void errorAbstentionAndApplicabilityStayDistinct() {
-		assertThatThrownBy(() -> RequirementAssertions
-			.requireSatisfied(evaluate(e -> Judgment.abstain("unknown"), policy(AcceptanceAction.RELY))))
-			.isInstanceOf(RequirementAssertionError.Inconclusive.class);
-		for (Judge<String> judge : List.<Judge<String>>of(e -> Judgment.error("broken"), e -> {
-			throw new IllegalStateException("transport");
-		}, e -> null)) {
-			assertThatThrownBy(
-					() -> RequirementAssertions.requireSatisfied(evaluate(judge, policy(AcceptanceAction.RELY))))
-				.isInstanceOf(RequirementAssertionError.InstrumentFailure.class);
-		}
-		Judge<String> outside = e -> Judgment.notApplicable("outside domain");
-		assertThatThrownBy(
-				() -> RequirementAssertions.requireSatisfied(evaluate(outside, policy(AcceptanceAction.RELY))))
-			.isInstanceOf(RequirementAssertionError.InstrumentFailure.class);
-		var declared = new NamedJudge<>(outside,
-				new JudgeMetadata("conditional", "domain", JudgeType.DETERMINISTIC, "outside domain"));
-		assertThatThrownBy(
-				() -> RequirementAssertions.requireSatisfied(evaluate(declared, policy(AcceptanceAction.RELY))))
-			.isInstanceOf(RequirementAssertionError.NotApplicable.class);
-	}
-
-	@Test
-	void missingPolicyAndInvalidSetupFailBeforeEvaluation() {
+	void missingConfigurationMakesZeroCalls() {
 		var calls = new AtomicInteger();
-		Judge<String> judge = e -> {
+		RequirementJudge<String, String> judge = (r, e) -> {
 			calls.incrementAndGet();
-			return Judgment.pass("ready");
+			return Judgment.pass("yes");
 		};
-		assertThatThrownBy(() -> new RequirementAssertions(null).evaluate(READY_REQUIREMENT, judge, "READY", null))
-			.isInstanceOf(IllegalStateException.class);
+		assertThatNullPointerException().isThrownBy(() -> Evaluations.evaluate(null, judge, "x"));
+		assertThatNullPointerException().isThrownBy(() -> Evaluations.evaluate(READY, judge, "x", null));
 		assertThat(calls).hasValue(0);
-		assertThatThrownBy(() -> RequirementAssertions.relyingOnJudgment().evaluate(null, judge, "READY", null))
-			.isInstanceOf(NullPointerException.class);
-		var jury = io.github.markpollack.judge.jury.SimpleJury.<String>builder()
-			.judge(judge)
-			.votingStrategy(new io.github.markpollack.judge.jury.AllMustPassStrategy())
-			.build();
-		assertThatThrownBy(() -> RequirementAssertions.relyingOnJudgment().evaluate(null, jury, "READY", null))
-			.isInstanceOf(NullPointerException.class);
-		assertThat(calls).hasValue(0);
-		assertThatThrownBy(() -> Requirement.text(" ", "1", "x")).isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> Policies.recorded(null, j -> null)).isInstanceOf(NullPointerException.class);
 	}
 
 	@Test
-	void concurrentRequirementAwareCallsRetainTheirOwnRequirementEvidenceAndPolicy() throws Exception {
-		var assertions = RequirementAssertions.relyingOnJudgment();
-		try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-			List<Future<AssertionResult>> futures = new ArrayList<>();
-			for (int n = 0; n < 24; n++) {
-				int index = n;
-				futures.add(executor.submit(() -> {
-					String id = "requirement-" + index;
-					var requirement = Requirement.text(id, "1", id);
-					Judge<RequirementEvidence<String, String>> judge = pair -> {
-						assertThat(pair.requirement()).isSameAs(requirement);
-						assertThat(pair.evidence()).isEqualTo(id);
-						return Judgment.pass(pair.requirement().id());
-					};
-					return assertions.evaluateRequirement(requirement, judge, id,
-							policy(index % 2 == 0 ? AcceptanceAction.RELY : AcceptanceAction.ESCALATE));
-				}));
+	void concurrentInvocationsRetainTheirOwnActualInput() throws Exception {
+		try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+			var results = new ArrayList<java.util.concurrent.Future<EvaluationResult>>();
+			for (int i = 0; i < 30; i++) {
+				String value = "value-" + i;
+				results.add(
+						executor.submit(() -> Evaluations.evaluate(Requirement.text(value, "1", value), CHECK, value)));
 			}
-			for (int n = 0; n < futures.size(); n++) {
-				var result = futures.get(n).get();
-				assertThat(result.verdict().judgment().reasoning()).isEqualTo("requirement-" + n);
-				assertThat(((AppliedPolicy) result.acceptanceExecution().application()).action())
-					.isEqualTo(n % 2 == 0 ? AcceptanceAction.RELY : AcceptanceAction.ESCALATE);
-			}
+			for (var future : results)
+				RequirementAssertions.requireSatisfied(future.get());
 		}
 	}
 
 	@Test
-	void preInterruptedCallerKeepsCancellation() {
+	void cancellationAndFatalErrorsEscapeWithoutCompletedResult() {
+		var calls = new AtomicInteger();
 		try {
 			Thread.currentThread().interrupt();
-			var result = evaluate(e -> Thread.currentThread().isInterrupted() ? Judgment.error("pre-interrupted")
-					: Judgment.pass("lost cancellation"), policy(AcceptanceAction.RELY));
-			assertThat(result.verdict().judgment().status()).isEqualTo(JudgmentStatus.ERROR);
-			assertThat(Thread.currentThread().isInterrupted()).isTrue();
+			assertThatThrownBy(() -> Evaluations.evaluate(READY, CHECK, "READY", v -> {
+				calls.incrementAndGet();
+				return new PolicyDecision(PolicyAction.RELY, "yes");
+			})).isInstanceOf(java.util.concurrent.CancellationException.class);
 		}
 		finally {
 			Thread.interrupted();
 		}
+		assertThat(calls).hasValue(0);
+		assertThatThrownBy(() -> Evaluations.evaluate(READY, (RequirementJudge<String, String>) (r, e) -> {
+			throw new AssertionError("fatal");
+		}, "x")).isInstanceOf(AssertionError.class).hasMessage("fatal");
 	}
 
 }

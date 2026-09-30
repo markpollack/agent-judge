@@ -23,8 +23,8 @@ import io.github.markpollack.judge.judgment.Judgment;
  * <p>
  * Abstentions leave the population entirely — excluded from both the numerator and the
  * denominator, because "no assessment" is not the finding zero. Errors are governed by
- * {@link ErrorPolicy} (default {@code PROPAGATE}) and exclusions by
- * {@link NotApplicablePolicy} (default {@code REFUSE}). If nothing is eligible the result
+ * {@link ErrorHandling} (default {@code PROPAGATE}) and exclusions by
+ * {@link ExclusionHandling} (default {@code REFUSE}). If nothing is eligible the result
  * is {@code ABSTAIN} rather than a manufactured failing score, or {@code NOT_APPLICABLE}
  * when every input was an exclusion this strategy was configured to honour.
  * </p>
@@ -63,15 +63,15 @@ public class AverageVotingStrategy implements VotingStrategy {
 
 	private final double threshold;
 
-	private final ErrorPolicy errorPolicy;
+	private final ErrorHandling errorPolicy;
 
-	private final NotApplicablePolicy notApplicablePolicy;
+	private final ExclusionHandling notApplicablePolicy;
 
 	/**
 	 * Create an average strategy with the default error policy.
 	 */
 	public AverageVotingStrategy() {
-		this(DEFAULT_THRESHOLD, ErrorPolicy.PROPAGATE);
+		this(DEFAULT_THRESHOLD, ErrorHandling.PROPAGATE);
 	}
 
 	/**
@@ -79,7 +79,7 @@ public class AverageVotingStrategy implements VotingStrategy {
 	 * @param errorPolicy policy for handling errors
 	 * @throws IllegalArgumentException if {@code errorPolicy} is null
 	 */
-	public AverageVotingStrategy(ErrorPolicy errorPolicy) {
+	public AverageVotingStrategy(ErrorHandling errorPolicy) {
 		this(DEFAULT_THRESHOLD, errorPolicy);
 	}
 
@@ -91,7 +91,7 @@ public class AverageVotingStrategy implements VotingStrategy {
 	 * @since 0.16.0
 	 */
 	public AverageVotingStrategy(double threshold) {
-		this(threshold, ErrorPolicy.PROPAGATE);
+		this(threshold, ErrorHandling.PROPAGATE);
 	}
 
 	/**
@@ -102,8 +102,8 @@ public class AverageVotingStrategy implements VotingStrategy {
 	 * {@code [0.0, 1.0]}, or if {@code errorPolicy} is null
 	 * @since 0.16.0
 	 */
-	public AverageVotingStrategy(double threshold, ErrorPolicy errorPolicy) {
-		this(threshold, errorPolicy, NotApplicablePolicy.REFUSE);
+	public AverageVotingStrategy(double threshold, ErrorHandling errorPolicy) {
+		this(threshold, errorPolicy, ExclusionHandling.REFUSE);
 	}
 
 	/**
@@ -115,7 +115,7 @@ public class AverageVotingStrategy implements VotingStrategy {
 	 * {@code [0.0, 1.0]}, or if either policy is null
 	 * @since 0.17.0
 	 */
-	public AverageVotingStrategy(double threshold, ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
+	public AverageVotingStrategy(double threshold, ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
 		if (notApplicablePolicy == null) {
 			throw new IllegalArgumentException("notApplicablePolicy must not be null");
 		}
@@ -187,7 +187,7 @@ public class AverageVotingStrategy implements VotingStrategy {
 
 	/** {@inheritDoc} */
 	@Override
-	public NotApplicablePolicy notApplicablePolicy() {
+	public ExclusionHandling exclusionHandling() {
 		return this.notApplicablePolicy;
 	}
 

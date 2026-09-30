@@ -4,100 +4,136 @@
  */
 package io.github.markpollack.judge.assertj;
 
-import java.util.Map;
-import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.acceptance.AcceptanceAction;
-import io.github.markpollack.judge.acceptance.AcceptanceDecision;
-import io.github.markpollack.judge.acceptance.AcceptancePolicy;
-import io.github.markpollack.judge.ai.JudgmentClassifiers;
-import io.github.markpollack.judge.ai.ModelBackedJudge;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
-import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
-import io.github.markpollack.judge.assertions.RequirementAssertions;
-import io.github.markpollack.judge.judgment.Judgment;
-import io.github.markpollack.judge.jury.AllMustPassStrategy;
-import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.interpretation.RequirementOutcome;
-import io.github.markpollack.judge.requirement.Requirement;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.*;
+import io.github.markpollack.judge.*;
+import io.github.markpollack.judge.judgment.*;
+import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.requirement.*;
+import io.github.markpollack.judge.policy.*;
+import io.github.markpollack.judge.evaluation.*;
+import io.github.markpollack.judge.reporting.VerdictReport;
+import io.github.markpollack.judge.serialization.VerdictCodec;
+import io.github.markpollack.judge.assertions.RequirementAssertionError;
+import static io.github.markpollack.judge.assertj.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
-import static io.github.markpollack.judge.assertj.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThat;
-
-/** Five progressive examples for reading the public API. No network or credentials. */
+/** Progressive examples used by the README. All providers here are deterministic. */
 class AssertJApiExperienceTest {
 
-	private static final Requirement<String> TWO_PLUS_TWO_REQUIREMENT = Requirement.text("two-plus-two", "1",
-			"The response correctly communicates that 2 + 2 equals 4.");
+	record ApiLimit(int maximumBreakingChanges) {
+	}
 
-	private static final String RESPONSE = "Two pairs make a group of four.";
-
-	// The judging backend is stubbed for this API test. This exercises prompt rendering
-	// and label classification; it does not claim to measure a model's accuracy.
-	private static final Judge<String> TWO_PLUS_TWO_RESPONSE_JUDGE = ModelBackedJudge.<String>builder()
-		.name("two-plus-two-response")
-		.promptTemplate(JudgePromptTemplate.fromString("two-plus-two", """
-				Requirement: {{requirement}}
-				Response: {{response}}
-				Does the response satisfy the requirement? Reply satisfied, violated, or unknown.
-				"""))
-		.variables(response -> Map.of("requirement", TWO_PLUS_TWO_REQUIREMENT.text(), "response", response))
-		.model(request -> {
-			assertThat(request.messages().getFirst().content()).contains(TWO_PLUS_TWO_REQUIREMENT.text(), RESPONSE);
-			return new JudgeModelResponse("satisfied", "local-api-fixture", null, null);
-		})
-		.judgmentClassifier(JudgmentClassifiers.passFail("satisfied", "violated"))
-		.build();
-
-	@Test
-	void deterministicArithmetic() {
-		var calculator = new Calculator();
-		assertThat(calculator.add(2, 2)).isEqualTo(4);
+	record ReleaseEvidence(int breakingChanges, boolean observable, String securityReport) {
 	}
 
 	@Test
-	void textualArithmetic() {
-		assertThat(TWO_PLUS_TWO_REQUIREMENT).judgedBy(TWO_PLUS_TWO_RESPONSE_JUDGE).withEvidence(RESPONSE).isSatisfied();
+	void ordinaryCheck() {
+		Judge<Integer> positive = n -> n > 0 ? Judgment.pass("positive") : Judgment.fail("not positive");
+		assertThatEvidence(42).judgedBy(positive).isPassed();
 	}
 
 	@Test
-	void explicitAcceptancePolicy() {
-		AcceptancePolicy explainedJudgment = judgment -> judgment.reasoning().isBlank()
-				? new AcceptanceDecision(AcceptanceAction.ABSTAIN, "An explanation is required")
-				: new AcceptanceDecision(AcceptanceAction.RELY, "The judgment includes an explanation");
-		assertThat(TWO_PLUS_TWO_REQUIREMENT).judgedBy(TWO_PLUS_TWO_RESPONSE_JUDGE)
-			.withEvidence(RESPONSE)
-			.withAcceptancePolicy(explainedJudgment)
-			.isSatisfied();
+	void nativeRequirement() {
+		var api = new Requirement<ApiLimit>("api", "1", "No breaking changes", new ApiLimit(0),
+				Requirement.text("source", "1", "Maximum breaking changes: 0").source());
+		RequirementJudge<ApiLimit, Integer> compatible = (r,
+				count) -> count <= r.specification().maximumBreakingChanges() ? Judgment.pass("compatible")
+						: Judgment.fail("breaking change");
+		assertThat(api).judgedBy(compatible).withEvidence(0).isSatisfied();
 	}
 
 	@Test
-	void jury() {
-		Judge<String> nonemptyResponseJudge = response -> response.isBlank() ? Judgment.fail("The response is empty")
-				: Judgment.pass("The response has text");
-		Jury<String> jury = SimpleJury.<String>builder()
-			.judge(nonemptyResponseJudge)
-			.judge(TWO_PLUS_TWO_RESPONSE_JUDGE)
-			.votingStrategy(new AllMustPassStrategy())
-			.build();
-		assertThat(TWO_PLUS_TWO_REQUIREMENT).judgedBy(jury).withEvidence(RESPONSE).isSatisfied();
+	void completeMixedAssignmentsAndExplicitSelectors() {
+		var security = Requirement.text("security", "1", "No critical vulnerabilities");
+		var compatibility = new Requirement<ApiLimit>("compatibility", "1", "No breaking changes", new ApiLimit(0),
+				Requirement.text("source", "1", "Maximum breaking changes: 0").source());
+		var observability = Requirement.text("observability", "1", "Required metrics exist");
+		var readiness = new Requirement<AllOf>("readiness", "1", "Ready to deploy",
+				new AllOf(List.of(security, compatibility, observability)),
+				Requirement.text("source", "1", "security AND compatibility AND observability").source());
+		RequirementJury<String, String> opinions = RequirementJuries.voting(new MajorityVotingStrategy(),
+				List.of((r, e) -> Judgment.pass("scanner A"), (r, e) -> Judgment.pass("scanner B"),
+						(r, e) -> Judgment.fail("dissent")));
+		RequirementJudge<ApiLimit, Integer> compatible = (r,
+				count) -> count <= r.specification().maximumBreakingChanges() ? Judgment.pass("compatible")
+						: Judgment.fail("breaking");
+		RequirementJudge<String, Boolean> observable = (r, present) -> present ? Judgment.pass("metrics exist")
+				: Judgment.fail("metrics missing");
+		var prepared = Assignments.<ReleaseEvidence>forRequirement(readiness)
+			.jury(security, ReleaseEvidence::securityReport, opinions)
+			.judge(compatibility, ReleaseEvidence::breakingChanges, compatible)
+			.judge(observability, ReleaseEvidence::observable, observable)
+			.validate();
+		var verdict = prepared.vote(new ReleaseEvidence(0, false, "scan"));
+		var result = Evaluations.apply(verdict, v -> new PolicyDecision(PolicyAction.RELY, "Trust this rejection"));
+		assertThat(result).hasConclusion(Verdict.Conclusion.FAIL);
+		assertThat(result.verdict().compositeAttempts().getFirst().verdict().individual()).hasSize(3);
+		assertThat(result.verdict().compositeAttempts()).extracting(a -> a.verdict().conclusion())
+			.containsExactly(Verdict.Conclusion.PASS, Verdict.Conclusion.PASS, Verdict.Conclusion.FAIL);
+		assertThatThrownBy(() -> assertThat(result).isSatisfied()).isInstanceOf(RequirementAssertionError.class);
+		var codec = new VerdictCodec(Map.of("apiLimit", ApiLimit.class));
+		var reopened = codec.readEvaluation(codec.write(result));
+		assertThat(reopened).isEqualTo(result);
+		assertThat(VerdictReport.of(reopened.verdict()).attempts()).hasSize(3);
 	}
 
 	@Test
-	void retainedResultInspection() {
-		var result = RequirementAssertions.relyingOnJudgment()
-			.evaluate(TWO_PLUS_TWO_REQUIREMENT, TWO_PLUS_TWO_RESPONSE_JUDGE, RESPONSE, null);
-		assertThat(result.interpretation().outcome()).isEqualTo(RequirementOutcome.SATISFIED);
-		assertThat(result.verdict().individual()).hasSize(1);
-		RequirementAssertions.requireSatisfied(result);
-		RequirementAssertions.requireSatisfied(result);
+	void nestedAllOfRetainsParentAndChildAssociations() {
+		var a = Requirement.text("a", "1", "A");
+		var b = Requirement.text("b", "1", "B");
+		var inner = new Requirement<AllOf>("inner", "1", "Both", new AllOf(List.of(a, b)),
+				Requirement.text("source", "1", "A AND B").source());
+		var outer = new Requirement<AllOf>("outer", "1", "Inner", new AllOf(List.of(inner)),
+				Requirement.text("source", "1", "Inner required").source());
+		RequirementJudge<String, String> check = (r, e) -> Judgment.pass(r.specification());
+		// The nested evaluator prepares against the actual child supplied by the outer
+		// parent.
+		RequirementJury<AllOf, String> child = (actual, evidence) -> Assignments.<String>forRequirement(actual)
+			.judge(a, check)
+			.judge(b, check)
+			.validate()
+			.vote(evidence);
+		var verdict = Assignments.<String>forRequirement(outer).jury(inner, child).validate().vote("evidence");
+		assertThat(verdict).hasConclusion(Verdict.Conclusion.PASS);
+		assertThat(verdict.requirement()).isSameAs(outer);
+		assertThat(verdict.compositeAttempts().getFirst().verdict().requirement()).isSameAs(inner);
+		assertThat(VerdictReport.of(verdict).attempts()).hasSize(3);
+		assertThat(new VerdictCodec().read(new VerdictCodec().write(verdict))).isEqualTo(verdict);
 	}
 
-	private record Calculator() {
-		int add(int left, int right) {
-			return left + right;
-		}
+	@Test
+	void modelBackedTextUsesActualRequirementAndLocalProtocolStub() {
+		var calls = new AtomicInteger();
+		io.github.markpollack.judge.ai.model.JudgeModel judgeModel = request -> {
+			calls.incrementAndGet();
+			String rendered = request.messages()
+				.stream()
+				.map(io.github.markpollack.judge.ai.model.JudgeMessage::content)
+				.reduce("", String::concat);
+			assertThat(rendered).contains("The response communicates that 2 + 2 equals 4.",
+					"Two pairs make a group of four.");
+			return new io.github.markpollack.judge.ai.model.JudgeModelResponse("satisfied", "local-protocol-stub", null,
+					Map.of());
+		};
+		RequirementJudge<String, String> meaning = (actual, response) -> io.github.markpollack.judge.ai.ModelBackedJudge
+			.<String>builder()
+			.name("meaning")
+			.promptTemplate(io.github.markpollack.judge.ai.prompt.JudgePromptTemplate.fromString("meaning", """
+					Requirement: {{requirement}}
+					Response: {{response}}
+					Reply satisfied, violated, or unknown.
+					"""))
+			.variables(text -> Map.of("requirement", actual.specification(), "response", text))
+			.model(judgeModel)
+			.judgmentClassifier(io.github.markpollack.judge.ai.JudgmentClassifiers.passFail("satisfied", "violated"))
+			.build()
+			.judge(response);
+		var arithmetic = Requirement.text("arithmetic", "1", "The response communicates that 2 + 2 equals 4.");
+		assertThat(arithmetic).judgedBy(meaning).withEvidence("Two pairs make a group of four.").isSatisfied();
+		assertThat(calls).hasValue(1);
 	}
 
 }

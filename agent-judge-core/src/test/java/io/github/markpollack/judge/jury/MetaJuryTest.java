@@ -82,7 +82,7 @@ class MetaJuryTest {
 		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
-		// One pass, one fail → tie → depends on TiePolicy (default FAIL)
+		// One pass, one fail → tie → depends on TieBreakRule (default FAIL)
 		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(verdict.individual()).hasSize(2);
 		assertThat(verdict.individual().get(0).status()).isEqualTo(JudgmentStatus.PASS);

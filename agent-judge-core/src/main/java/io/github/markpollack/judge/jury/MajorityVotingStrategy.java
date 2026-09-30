@@ -26,10 +26,10 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * Edge cases are governed by explicit policies rather than buried conditionals:
  * </p>
  * <ul>
- * <li>Ties: resolved by {@link TiePolicy} (default {@code FAIL}).</li>
- * <li>Errors: resolved by {@link ErrorPolicy} (default {@code PROPAGATE}).</li>
+ * <li>Ties: resolved by {@link TieBreakRule} (default {@code FAIL}).</li>
+ * <li>Errors: resolved by {@link ErrorHandling} (default {@code PROPAGATE}).</li>
  * <li>Abstentions: excluded — a judge that reached no provenance casts no vote.</li>
- * <li>Exclusions: resolved by {@link NotApplicablePolicy} (default {@code REFUSE}).</li>
+ * <li>Exclusions: resolved by {@link ExclusionHandling} (default {@code REFUSE}).</li>
  * <li>Nothing eligible: {@code ABSTAIN}, with evidence naming the cause.</li>
  * </ul>
  *
@@ -50,17 +50,17 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  */
 public class MajorityVotingStrategy implements VotingStrategy {
 
-	private final TiePolicy tiePolicy;
+	private final TieBreakRule tiePolicy;
 
-	private final ErrorPolicy errorPolicy;
+	private final ErrorHandling errorPolicy;
 
-	private final NotApplicablePolicy notApplicablePolicy;
+	private final ExclusionHandling notApplicablePolicy;
 
 	/**
 	 * Create majority voting strategy with default policies.
 	 */
 	public MajorityVotingStrategy() {
-		this(TiePolicy.FAIL, ErrorPolicy.PROPAGATE);
+		this(TieBreakRule.FAIL, ErrorHandling.PROPAGATE);
 	}
 
 	/**
@@ -70,8 +70,8 @@ public class MajorityVotingStrategy implements VotingStrategy {
 	 * @throws IllegalArgumentException if {@code tiePolicy} or {@code errorPolicy} is
 	 * null; a null tie policy is refused here rather than at the first tie
 	 */
-	public MajorityVotingStrategy(TiePolicy tiePolicy, ErrorPolicy errorPolicy) {
-		this(tiePolicy, errorPolicy, NotApplicablePolicy.REFUSE);
+	public MajorityVotingStrategy(TieBreakRule tiePolicy, ErrorHandling errorPolicy) {
+		this(tiePolicy, errorPolicy, ExclusionHandling.REFUSE);
 	}
 
 	/**
@@ -83,8 +83,8 @@ public class MajorityVotingStrategy implements VotingStrategy {
 	 * refused here rather than at the first tie
 	 * @since 0.17.0
 	 */
-	public MajorityVotingStrategy(TiePolicy tiePolicy, ErrorPolicy errorPolicy,
-			NotApplicablePolicy notApplicablePolicy) {
+	public MajorityVotingStrategy(TieBreakRule tiePolicy, ErrorHandling errorPolicy,
+			ExclusionHandling notApplicablePolicy) {
 		if (tiePolicy == null) {
 			throw new IllegalArgumentException("tiePolicy must not be null");
 		}
@@ -165,7 +165,7 @@ public class MajorityVotingStrategy implements VotingStrategy {
 
 	/** {@inheritDoc} */
 	@Override
-	public NotApplicablePolicy notApplicablePolicy() {
+	public ExclusionHandling exclusionHandling() {
 		return this.notApplicablePolicy;
 	}
 

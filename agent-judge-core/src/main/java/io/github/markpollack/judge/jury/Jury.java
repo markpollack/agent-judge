@@ -8,7 +8,6 @@ package io.github.markpollack.judge.jury;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.description.JuryDescription;
 
-import java.util.List;
 
 /**
  * Jury of judges evaluating the same typed evidence.
@@ -20,10 +19,9 @@ import java.util.List;
  * </p>
  *
  * <p>
- * The jury executes all its constituent judges (potentially in parallel) and aggregates
- * their judgments using a {@link VotingStrategy}. The final verdict includes identity
- * preservation via judge names and complete named {@link CompositeAttempt} evidence for
- * composite implementations.
+ * Voting juries combine opinions using a {@link VotingStrategy}; cascades use routing
+ * rules. The final verdict includes identity preservation via judge names and complete
+ * named {@link CompositeAttempt} evidence for composite implementations.
  * </p>
  *
  * <p>
@@ -42,19 +40,7 @@ import java.util.List;
 public interface Jury<E> {
 
 	/**
-	 * Get the list of judges in this jury.
-	 * @return list of judges
-	 */
-	List<Judge<E>> getJudges();
-
-	/**
-	 * Get the voting strategy used to aggregate judgments.
-	 * @return voting strategy
-	 */
-	VotingStrategy getVotingStrategy();
-
-	/**
-	 * Execute all judges and aggregate their judgments into a verdict.
+	 * Evaluate the configured composition, which may stop before every tier executes.
 	 * @param context typed evidence for this evaluation
 	 * @return verdict with judgment and individual judgments
 	 */
@@ -64,10 +50,10 @@ public interface Jury<E> {
 	 * Describe this jury's configured structure, available before any vote.
 	 * <p>
 	 * The default describes the jury as {@linkplain JuryDescription#opaque(Jury) opaque}:
-	 * its implementation, its strategy and its flattened judges, without claiming to know
-	 * how it seats, keys or weights them. The library's juries override it with a
-	 * structural description. A jury that composes other juries should override it as
-	 * well, so that its members are described by their own {@code describe()}.
+	 * its implementation and any declared voting structure, without claiming to know how
+	 * it seats, keys or weights them. The library's juries override it with a structural
+	 * description. A jury that composes other juries should override it as well, so that
+	 * its members are described by their own {@code describe()}.
 	 * </p>
 	 * @return the jury's description
 	 * @throws IllegalArgumentException if a judge declares a configuration that is not

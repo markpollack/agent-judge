@@ -5,7 +5,6 @@
 
 package io.github.markpollack.judge.jury;
 
-
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.Judges;
@@ -25,7 +24,8 @@ import java.util.Map;
  * <p>
  * Example usage:
  * </p>
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0
@@ -39,7 +39,6 @@ public final class Juries {
 		// Utility class - no instantiation
 	}
 
-
 	/**
 	 * Create a jury from judges with automatic naming and unique identity preservation.
 	 *
@@ -52,11 +51,11 @@ public final class Juries {
 	 * @param strategy the voting strategy
 	 * @param judges the judges to include
 	 * @return a simple jury with named judges
-	 * @throws IllegalArgumentException if no judges are given, or a judge's metadata cannot be
-	 * read because its {@code metadata()} returns null or throws; the message names the
-	 * position
+	 * @throws IllegalArgumentException if no judges are given, or a judge's metadata
+	 * cannot be read because its {@code metadata()} returns null or throws; the message
+	 * names the position
 	 */
-	public static <E> Jury<E> fromJudges(VotingStrategy strategy, Judge<E>... judges) {
+	public static <E> VotingJury<E> fromJudges(VotingStrategy strategy, Judge<E>... judges) {
 		if (judges == null || judges.length == 0) {
 			throw new IllegalArgumentException("At least one judge is required");
 		}
@@ -67,7 +66,8 @@ public final class Juries {
 
 		for (int i = 0; i < judges.length; i++) {
 			Judge<E> judge = judges[i];
-			// Names are needed now to break collisions, so unreadable metadata is a construction
+			// Names are needed now to break collisions, so unreadable metadata is a
+			// construction
 			// error here rather than an ERROR seat at vote time.
 			SimpleJury.SeatKey key = SimpleJury.SeatKey.of(judge, i);
 			if (key.metadataFailure() != null) {
@@ -86,7 +86,8 @@ public final class Juries {
 				nameCount.put(baseName, 1);
 			}
 
-			// Wrap with unique name if needed, and record that the key was manufactured here
+			// Wrap with unique name if needed, and record that the key was manufactured
+			// here
 			if (!uniqueName.equals(baseName)) {
 				builder.deduplicatedJudge(Judges.named(judge, uniqueName, null, JudgeType.DETERMINISTIC));
 			}
@@ -108,7 +109,7 @@ public final class Juries {
 	 * @deprecated use {@link #meta(VotingStrategy, NamedJury...)} with explicit names
 	 */
 	@Deprecated(since = "0.14.0")
-	public static <E> Jury<E> combine(Jury<E> first, Jury<E> second, VotingStrategy metaStrategy) {
+	public static <E> VotingJury<E> combine(Jury<E> first, Jury<E> second, VotingStrategy metaStrategy) {
 		if (first == null || second == null) {
 			throw new IllegalArgumentException("Both juries must be non-null");
 		}
@@ -124,7 +125,7 @@ public final class Juries {
 	 * @deprecated use {@link #meta(VotingStrategy, NamedJury...)} with explicit names
 	 */
 	@Deprecated(since = "0.14.0")
-	public static <E> Jury<E> allOf(VotingStrategy strategy, Jury<E>... juries) {
+	public static <E> VotingJury<E> allOf(VotingStrategy strategy, Jury<E>... juries) {
 		if (juries == null || juries.length == 0) {
 			throw new IllegalArgumentException("At least one jury is required");
 		}
@@ -142,7 +143,7 @@ public final class Juries {
 	 * @param members named members in execution order
 	 * @return configured named meta-jury
 	 */
-	public static <E> Jury<E> meta(VotingStrategy strategy, NamedJury<E>... members) {
+	public static <E> VotingJury<E> meta(VotingStrategy strategy, NamedJury<E>... members) {
 		if (members == null || members.length == 0) {
 			throw new IllegalArgumentException("At least one named jury is required");
 		}

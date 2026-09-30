@@ -44,7 +44,7 @@ class NumericStrategyThresholdTest {
 		assertThat(new AverageVotingStrategy().getThreshold()).isEqualTo(0.5);
 		assertThat(new MedianVotingStrategy().getThreshold()).isEqualTo(0.5);
 		assertThat(new WeightedAverageStrategy().getThreshold()).isEqualTo(0.5);
-		assertThat(new AverageVotingStrategy(ErrorPolicy.IGNORE).getThreshold()).isEqualTo(0.5);
+		assertThat(new AverageVotingStrategy(ErrorHandling.IGNORE).getThreshold()).isEqualTo(0.5);
 	}
 
 	@Test
@@ -80,9 +80,9 @@ class NumericStrategyThresholdTest {
 	void errorPolicyStillComposesWithAStatedBar() {
 		List<Judgment> withError = List.of(passJudgment(0.6), Judgment.error("model unavailable"));
 
-		assertThat(new AverageVotingStrategy(0.8, ErrorPolicy.IGNORE).aggregate(withError, Map.of()).status())
+		assertThat(new AverageVotingStrategy(0.8, ErrorHandling.IGNORE).aggregate(withError, Map.of()).status())
 			.isEqualTo(JudgmentStatus.FAIL);
-		assertThat(new AverageVotingStrategy(0.5, ErrorPolicy.IGNORE).aggregate(withError, Map.of()).status())
+		assertThat(new AverageVotingStrategy(0.5, ErrorHandling.IGNORE).aggregate(withError, Map.of()).status())
 			.isEqualTo(JudgmentStatus.PASS);
 	}
 

@@ -25,7 +25,7 @@ import io.github.markpollack.judge.jury.VerdictProvenanceBasis;
 import io.github.markpollack.judge.jury.VerdictProvenanceKind;
 import io.github.markpollack.judge.jury.DispositionReason;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.jury.RoutingRule;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.jury.VotingStrategy;
 import io.github.markpollack.judge.judgment.Judgment;
@@ -142,10 +142,10 @@ class ItemAccountingTest {
 	void aRejectionCopiedThroughTwoLevels() {
 		Jury<CompletionEvidence> inner = boundaryRejectingCascade();
 		Jury<CompletionEvidence> middle = CascadedJury.<CompletionEvidence>builder()
-			.tier("inner", inner, TierPolicy.FINAL_TIER)
+			.tier("inner", inner, RoutingRule.FINAL_TIER)
 			.build();
 		Verdict root = CascadedJury.<CompletionEvidence>builder()
-			.tier("middle", middle, TierPolicy.FINAL_TIER)
+			.tier("middle", middle, RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -163,8 +163,8 @@ class ItemAccountingTest {
 	@DisplayName("a refused stage followed by a passing tier: the item passes, and the refusal is still counted")
 	void aRefusedStageFollowedByAPass() {
 		Verdict root = CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", excludingTier(), TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", SimpleJury.of(Judgment.pass("OK")), TierPolicy.FINAL_TIER)
+			.tier("rubric", excludingTier(), RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", SimpleJury.of(Judgment.pass("OK")), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -183,7 +183,7 @@ class ItemAccountingTest {
 	@DisplayName("an excluded aggregate leaves the denominator rather than passing or failing")
 	void anExcludedItem() {
 		Verdict root = CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", capableExcludingTier(), TierPolicy.FINAL_TIER)
+			.tier("rubric", capableExcludingTier(), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -198,8 +198,8 @@ class ItemAccountingTest {
 	void onlyNamedEdgesAreFollowed() {
 		Verdict root = CascadedJury.<CompletionEvidence>builder()
 			.tier("first", brokenReduction(Judgment.fail("a requirement was not met"), Judgment.pass("other")),
-					TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("second", SimpleJury.of(Judgment.pass("OK")), TierPolicy.FINAL_TIER)
+					RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("second", SimpleJury.of(Judgment.pass("OK")), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -283,20 +283,20 @@ class ItemAccountingTest {
 	private static Jury<CompletionEvidence> capableExcludingTier() {
 		return io.github.markpollack.judge.jury.SimpleJury.<CompletionEvidence>builder()
 			.judge(new ConditionalJudge())
-			.votingStrategy(new ConsensusStrategy(io.github.markpollack.judge.jury.ErrorPolicy.PROPAGATE,
-					io.github.markpollack.judge.jury.NotApplicablePolicy.EXCLUDE))
+			.votingStrategy(new ConsensusStrategy(io.github.markpollack.judge.jury.ErrorHandling.PROPAGATE,
+					io.github.markpollack.judge.jury.ExclusionHandling.EXCLUDE))
 			.build();
 	}
 
 	private static Jury<CompletionEvidence> boundaryRejectingCascade() {
 		return CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", rejectableExcludingTier(), TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", SimpleJury.of(Judgment.pass("OK")), TierPolicy.FINAL_TIER)
+			.tier("rubric", rejectableExcludingTier(), RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", SimpleJury.of(Judgment.pass("OK")), RoutingRule.FINAL_TIER)
 			.build();
 	}
 
 	private static Jury<CompletionEvidence> opaque(Verdict verdict) {
-		return new Jury<CompletionEvidence>() {
+		return new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
 			@Override
 			public List<Judge<CompletionEvidence>> getJudges() {
 				return List.of();

@@ -7,9 +7,8 @@ package io.github.markpollack.judge.jev;
 
 import io.github.gudcks0305.jev.*;
 import io.github.gudcks0305.jev.typesafe.TypeSafeJevClient;
-import io.github.markpollack.judge.Judge;
+import io.github.markpollack.judge.RequirementJudge;
 import io.github.markpollack.judge.requirement.Requirement;
-import io.github.markpollack.judge.requirement.RequirementEvidence;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
@@ -37,7 +36,7 @@ import org.jspecify.annotations.Nullable;
  * reported request cost, not a token-price calculation or evidence-preparation cost. A
  * malformed finding can still retain valid request usage and cost.
  */
-public final class JevJudge implements Judge<RequirementEvidence<String, JevEvidence>> {
+public final class JevJudge implements RequirementJudge<String, JevEvidence> {
 
 	private final String apiKey;
 
@@ -90,37 +89,23 @@ public final class JevJudge implements Judge<RequirementEvidence<String, JevEvid
 	}
 
 	/**
-	 * Bind a stable native requirement snapshot to its provider-specific rendering.
-	 * Rendering happens once on the caller thread. Every invocation validates the
-	 * complete envelope before reusing that rendering; the evidence's existing rendered
-	 * digest is checked by the adapter, never recomputed to make a stale input match.
+	 * Render the supplied native specification on each invocation, on the caller thread.
+	 * No separately configured requirement is captured or compared.
 	 * @param <S> native specification type
-	 * @param requirement stable native requirement snapshot
-	 * @param render provider-specific native specification renderer
-	 * @return ordinary typed requirement-aware Judge
+	 * @param render explicit provider rendering
+	 * @return requirement-aware evaluator
 	 */
-	public <S> Judge<RequirementEvidence<S, JevEvidence>> bind(Requirement<S> requirement,
-			java.util.function.Function<? super S, String> render) {
-		Objects.requireNonNull(requirement, "requirement");
-		String rendered = Objects.requireNonNull(render.apply(requirement.specification()), "rendered requirement");
-		Checks.text(rendered);
-		return input -> {
-			Requirement<S> supplied = input.requirement();
-			if (!requirement.id().equals(supplied.id()) || !requirement.revision().equals(supplied.revision())
-					|| !requirement.specification().equals(supplied.specification())
-					|| !requirement.source().equals(supplied.source())) {
-				return Judgment.error(io.github.markpollack.judge.judgment.JudgmentReasonCode.JUDGE_REPORTED,
-						"Native requirement snapshot differs from the configured provider binding");
-			}
-			return evaluate(rendered, input.evidence());
-		};
+	public <S> RequirementJudge<S, JevEvidence> rendering(java.util.function.Function<? super S, String> render) {
+		Objects.requireNonNull(render, "render");
+		return (requirement, evidence) -> evaluate(
+				Objects.requireNonNull(render.apply(requirement.specification()), "rendered specification"), evidence);
 	}
 
 	@Override
-	public Judgment judge(RequirementEvidence<String, JevEvidence> input) {
-		if (input == null)
-			return Judgment.error("Requirement and evidence are required");
-		return evaluate(input.requirement().specification(), input.evidence());
+	public Judgment judge(Requirement<String> requirement, JevEvidence evidence) {
+		Objects.requireNonNull(requirement, "requirement");
+		Objects.requireNonNull(evidence, "evidence");
+		return evaluate(requirement.specification(), evidence);
 	}
 
 	private Judgment evaluate(String requirement, JevEvidence evidence) {
@@ -270,9 +255,9 @@ public final class JevJudge implements Judge<RequirementEvidence<String, JevEvid
 				return new Judgment(value.status(), value.finding(), value.confidence(),
 						value.probabilityDistribution(), null, value.status() == JudgmentStatus.ABSTAIN
 								? "Declared projection has no supported determination" : "",
-						List.of(), provenance, null, metadata);
+						List.of(), provenance, metadata);
 			return new Judgment(JudgmentStatus.ERROR, null, null, null, JudgmentReasonCode.JUDGE_REPORTED, problem,
-					List.of(), provenance, null, metadata);
+					List.of(), provenance, metadata);
 		}
 		catch (RuntimeException e) {
 			return Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "Jev artifact capture failed");

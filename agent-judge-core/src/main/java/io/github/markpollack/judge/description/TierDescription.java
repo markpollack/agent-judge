@@ -9,7 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.jury.RoutingRule;
 
 /**
  * One tier of a {@link io.github.markpollack.judge.jury.CascadedJury}.
@@ -19,30 +19,29 @@ import io.github.markpollack.judge.jury.TierPolicy;
  * carries, so a tier joins its attempt by name.
  * </p>
  *
- * <h2>Portable form</h2>
- * <pre>
+ * <h2>Portable form</h2> <pre>
  * {"name": "fast", "policy": "REJECT_ON_ANY_FAIL", "jury": {...}}
  * </pre>
  *
  * @param name the tier name
- * @param policy the tier's stop-or-escalate policy
+ * @param routingRule the tier's routing rule
  * @param jury the tier's jury
  * @author Mark Pollack
  * @since 0.17.0
  */
-public record TierDescription(String name, TierPolicy policy, JuryDescription jury) {
+public record TierDescription(String name, RoutingRule routingRule, JuryDescription jury) {
 
 	/** Validate that every component is present. */
 	public TierDescription {
 		Objects.requireNonNull(name, "name must not be null");
-		Objects.requireNonNull(policy, "policy must not be null");
+		Objects.requireNonNull(routingRule, "routingRule must not be null");
 		Objects.requireNonNull(jury, "jury must not be null");
 	}
 
 	Map<String, Object> portableTree() {
 		Map<String, Object> tree = new LinkedHashMap<>();
 		tree.put("name", name);
-		tree.put("policy", policy.wireName());
+		tree.put("policy", routingRule.wireName());
 		tree.put("jury", PortableForm.juryTree(jury));
 		return tree;
 	}

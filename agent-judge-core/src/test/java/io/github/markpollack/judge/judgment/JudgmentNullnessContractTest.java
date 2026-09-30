@@ -5,7 +5,7 @@
 
 package io.github.markpollack.judge.judgment;
 
-import io.github.markpollack.judge.acceptance.AcceptancePolicy;
+import io.github.markpollack.judge.policy.Policy;
 import io.github.markpollack.judge.provenance.Provenance;
 
 import java.lang.reflect.AnnotatedType;
@@ -50,7 +50,7 @@ class JudgmentNullnessContractTest {
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 
 	private static final List<String> OPTIONAL_MEMBERS = List.of("finding", "confidence", "probabilityDistribution",
-			"reasonCode", "provenance", "policyApplication");
+			"reasonCode", "provenance");
 
 	private static final List<String> REQUIRED_MEMBERS = List.of("producerStatus", "reasoning", "checks", "metadata");
 
@@ -69,7 +69,7 @@ class JudgmentNullnessContractTest {
 		@Test
 		@DisplayName("domain packages declare their nullness defaults")
 		void domainPackagesAreNullMarked() {
-			assertThat(List.of(Judgment.class, io.github.markpollack.judge.acceptance.AcceptancePolicy.class,
+			assertThat(List.of(Judgment.class, io.github.markpollack.judge.policy.Policy.class,
 					io.github.markpollack.judge.provenance.Provenance.class,
 					io.github.markpollack.judge.completion.CompletionEvidence.class))
 				.allSatisfy(type -> assertThat(type.getPackage().getAnnotation(NullMarked.class)).isNotNull());

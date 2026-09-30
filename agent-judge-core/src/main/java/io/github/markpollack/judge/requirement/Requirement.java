@@ -23,6 +23,10 @@ import io.github.markpollack.judge.provenance.ArtifactRef;
  * @param specification complete stable native specification snapshot
  * @param source source artifact and native/document-local identity
  */
+@com.fasterxml.jackson.databind.annotation.JsonSerialize(
+		using = io.github.markpollack.judge.serialization.ResultJson.RequirementWriter.class)
+@com.fasterxml.jackson.databind.annotation.JsonDeserialize(
+		using = io.github.markpollack.judge.serialization.ResultJson.RequirementReader.class)
 public record Requirement<S>(String id, String revision, String text, S specification, RequirementSource source) {
 	/** Validate required values without normalizing them. */
 	public Requirement {

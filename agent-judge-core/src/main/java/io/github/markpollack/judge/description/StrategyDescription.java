@@ -12,8 +12,8 @@ import java.util.TreeMap;
 
 import org.jspecify.annotations.Nullable;
 
-import io.github.markpollack.judge.jury.ErrorPolicy;
-import io.github.markpollack.judge.jury.NotApplicablePolicy;
+import io.github.markpollack.judge.jury.ErrorHandling;
+import io.github.markpollack.judge.jury.ExclusionHandling;
 import io.github.markpollack.judge.jury.VotingStrategy;
 
 /**
@@ -22,19 +22,19 @@ import io.github.markpollack.judge.jury.VotingStrategy;
  *
  * <p>
  * Obtained from {@link VotingStrategy#describe()}. Every built-in strategy declares its
- * {@link ErrorPolicy}, its threshold where it has one, and any other parameter such as
+ * {@link ErrorHandling}, its threshold where it has one, and any other parameter such as
  * majority's tie policy. A strategy that does not override {@code describe()} is
- * {@linkplain #undeclared(VotingStrategy) undeclared}: its name and implementation are known,
- * its parameters are not.
+ * {@linkplain #undeclared(VotingStrategy) undeclared}: its name and implementation are
+ * known, its parameters are not.
  * </p>
  *
  * <p>
- * A subclass of a built-in strategy inherits the built-in's declaration. Its implementation
- * identity still names the subclass, so a reader can see that the declaration was inherited.
+ * A subclass of a built-in strategy inherits the built-in's declaration. Its
+ * implementation identity still names the subclass, so a reader can see that the
+ * declaration was inherited.
  * </p>
  *
- * <h2>Portable form</h2>
- * <pre>
+ * <h2>Portable form</h2> <pre>
  * {
  *   "descriptionVersion": 1,
  *   "name": "majority",
@@ -44,34 +44,36 @@ import io.github.markpollack.judge.jury.VotingStrategy;
  * }
  * </pre>
  * <p>
- * Declared {@code values} hold {@code errorPolicy} and {@code notApplicablePolicy} (their
- * {@linkplain ErrorPolicy#token() tokens}) and {@code threshold} when present, together with
- * the other parameters, in ascending key order. A strategy that has no threshold has no
- * {@code threshold} key: the declared map is the whole declaration. An undeclared strategy
- * carries {@code "parameters": {"declared": false}}.
+ * Declared {@code values} hold {@code errorHandling} and {@code exclusionHandling} (their
+ * {@linkplain ErrorHandling#token() tokens}) and {@code threshold} when present, together
+ * with the other parameters, in ascending key order. A strategy that has no threshold has
+ * no {@code threshold} key: the declared map is the whole declaration. An undeclared
+ * strategy carries {@code "parameters": {"declared": false}}.
  * </p>
  * <p>
- * {@code notApplicablePolicy} is what makes a jury's
- * {@code aggregateMayBeNotApplicable} derivable from its description alone: a reader holding
- * only the portable form can tell whether this strategy would honour an exclusion, without
- * having to run the jury to find out.
+ * {@code exclusionHandling} is what makes a jury's {@code aggregateMayBeNotApplicable}
+ * derivable from its description alone: a reader holding only the portable form can tell
+ * whether this strategy would honour an exclusion, without having to run the jury to find
+ * out.
  * </p>
  *
  * @param name the strategy's {@link VotingStrategy#getName() name}
  * @param implementation the class that implements the strategy
- * @param errorPolicy the declared error policy, or null when undeclared or when the strategy
- * has none
- * @param notApplicablePolicy the declared not-applicable policy, or null when undeclared
+ * @param errorHandling the declared error policy, or null when undeclared or when the
+ * strategy has none
+ * @param exclusionHandling the declared not-applicable policy, or null when undeclared
  * @param threshold the declared normalized threshold, or null when undeclared or when the
  * strategy has none
  * @param parameters the other declared parameters, ordered by key; null when the strategy
- * declared nothing, empty when it declared no parameters beyond its error policy and threshold
+ * declared nothing, empty when it declared no parameters beyond its error policy and
+ * threshold
  * @author Mark Pollack
  * @since 0.17.0
  */
-public record StrategyDescription(String name, ImplementationIdentity implementation, @Nullable ErrorPolicy errorPolicy,
-		@Nullable NotApplicablePolicy notApplicablePolicy, @Nullable Double threshold,
-		@Nullable Map<String, Object> parameters) {
+public record StrategyDescription(String name, ImplementationIdentity implementation,
+		@com.fasterxml.jackson.annotation.JsonProperty("errorPolicy") @Nullable ErrorHandling errorHandling,
+		@com.fasterxml.jackson.annotation.JsonProperty("notApplicablePolicy") @Nullable ExclusionHandling exclusionHandling,
+		@Nullable Double threshold, @Nullable Map<String, Object> parameters) {
 
 	private static final String ERROR_POLICY = "errorPolicy";
 
@@ -82,14 +84,15 @@ public record StrategyDescription(String name, ImplementationIdentity implementa
 	/**
 	 * Validate the declaration and freeze its parameters.
 	 * @throws IllegalArgumentException if an error policy or threshold is given without
-	 * declared parameters, if the threshold is not finite, if the parameters use the reserved
-	 * {@code errorPolicy} or {@code threshold} keys, or if a parameter is not portable
+	 * declared parameters, if the threshold is not finite, if the parameters use the
+	 * reserved {@code errorHandling} or {@code threshold} keys, or if a parameter is not
+	 * portable
 	 */
 	public StrategyDescription {
 		Objects.requireNonNull(name, "name must not be null");
 		Objects.requireNonNull(implementation, "implementation must not be null");
 		if (parameters == null) {
-			if (errorPolicy != null || notApplicablePolicy != null || threshold != null) {
+			if (errorHandling != null || exclusionHandling != null || threshold != null) {
 				throw new IllegalArgumentException("A strategy that declares a policy or a threshold has "
 						+ "declared its parameters; pass an empty parameter map rather than null");
 			}
@@ -121,20 +124,19 @@ public record StrategyDescription(String name, ImplementationIdentity implementa
 	/**
 	 * Describe a strategy that declares its parameters.
 	 * @param strategy the strategy
-	 * @param errorPolicy its error policy, or null when it has none
-	 * @param notApplicablePolicy its not-applicable policy, or null when it has none
+	 * @param errorHandling its error policy, or null when it has none
+	 * @param exclusionHandling its not-applicable policy, or null when it has none
 	 * @param threshold its normalized threshold, or null when it has none
 	 * @param parameters any other parameters; empty when there are none
 	 * @return a declared description
 	 * @since 0.17.0
 	 */
-	public static StrategyDescription declared(VotingStrategy strategy, @Nullable ErrorPolicy errorPolicy,
-			@Nullable NotApplicablePolicy notApplicablePolicy, @Nullable Double threshold,
-			Map<String, Object> parameters) {
+	public static StrategyDescription declared(VotingStrategy strategy, @Nullable ErrorHandling errorHandling,
+			@Nullable ExclusionHandling exclusionHandling, @Nullable Double threshold, Map<String, Object> parameters) {
 		Objects.requireNonNull(strategy, "strategy must not be null");
 		Objects.requireNonNull(parameters, "parameters must not be null");
-		return new StrategyDescription(strategy.getName(), ImplementationIdentity.of(strategy.getClass()), errorPolicy,
-				notApplicablePolicy, threshold, parameters);
+		return new StrategyDescription(strategy.getName(), ImplementationIdentity.of(strategy.getClass()),
+				errorHandling, exclusionHandling, threshold, parameters);
 	}
 
 	/**
@@ -155,11 +157,11 @@ public record StrategyDescription(String name, ImplementationIdentity implementa
 		}
 		else {
 			Map<String, Object> values = new TreeMap<>(declared);
-			ErrorPolicy policy = errorPolicy;
+			ErrorHandling policy = errorHandling;
 			if (policy != null) {
 				values.put(ERROR_POLICY, policy.token());
 			}
-			NotApplicablePolicy exclusions = notApplicablePolicy;
+			ExclusionHandling exclusions = exclusionHandling;
 			if (exclusions != null) {
 				values.put(NOT_APPLICABLE_POLICY, exclusions.token());
 			}

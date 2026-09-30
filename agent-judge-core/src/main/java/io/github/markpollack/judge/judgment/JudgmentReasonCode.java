@@ -17,13 +17,12 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>
  * Producer code plus {@link Judgment#reasoning()}; policy failures have their own code
- * and reason. Operational readers use {@link Judgment#operationalReasonCode()} and
- * {@link Judgment#operationalReasoning()} so retained producer causes cannot misclassify
- * a policy failure. The code is what a reader counts; the reasoning is what a human
- * reads. Neither replaces the other, and a category is never guessed: every constant
- * below corresponds to an observed failure shape, a source, a policy or provenance
- * outcome, or a library mechanism. New constants are added only when observed reason
- * clusters earn them.
+ * and reason. Operational readers use {@link Judgment#reasonCode()} and
+ * {@link Judgment#reasoning()} so retained producer causes cannot misclassify a policy
+ * failure. The code is what a reader counts; the reasoning is what a human reads. Neither
+ * replaces the other, and a category is never guessed: every constant below corresponds
+ * to an observed failure shape, a source, a policy or provenance outcome, or a library
+ * mechanism. New constants are added only when observed reason clusters earn them.
  * </p>
  *
  * <h2>Two families</h2>
@@ -54,7 +53,7 @@ import org.jspecify.annotations.Nullable;
  * <h2>Three origin families</h2>
  * <p>
  * {@link #originFamily()} says who failed, which decides whether an
- * {@link io.github.markpollack.judge.jury.ErrorPolicy} may convert the error into a
+ * {@link io.github.markpollack.judge.jury.ErrorHandling} may convert the error into a
  * failing contribution:
  * </p>
  * <ul>

@@ -32,7 +32,7 @@ import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.NamedJury;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.jury.RoutingRule;
 import io.github.markpollack.judge.jury.WeightedAverageStrategy;
 import io.github.markpollack.judge.judgment.Judgment;
 
@@ -109,7 +109,7 @@ class DescriptionPortabilityTest {
 			.build();
 		Jury<CompletionEvidence> cascade = CascadedJury.<CompletionEvidence>builder()
 			.tier("only", Juries.meta(new MajorityVotingStrategy(), new NamedJury<CompletionEvidence>("member", bad)),
-					TierPolicy.FINAL_TIER)
+					RoutingRule.FINAL_TIER)
 			.build();
 
 		assertThatThrownBy(cascade::describe).isInstanceOf(IllegalArgumentException.class)
@@ -142,10 +142,10 @@ class DescriptionPortabilityTest {
 			.build();
 		Jury<CompletionEvidence> cascade = CascadedJury.<CompletionEvidence>builder()
 			.tier("gate", Juries.fromJudges(new AllMustPassStrategy(), new KeywordJudge("ok")),
-					TierPolicy.REJECT_ON_ANY_FAIL)
+					RoutingRule.REJECT_ON_ANY_FAIL)
 			.tier("review",
 					Juries.meta(new MajorityVotingStrategy(), new NamedJury<CompletionEvidence>("review", review)),
-					TierPolicy.FINAL_TIER)
+					RoutingRule.FINAL_TIER)
 			.build();
 
 		Map<String, Object> portable = cascade.describe().toPortable();

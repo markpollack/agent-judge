@@ -78,8 +78,8 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * <p>
  * Abstentions leave the population, because a requirement nobody could settle is not a
  * requirement this subject was shown to meet or to miss. Errors are governed by
- * {@link ErrorPolicy} (default {@code PROPAGATE}), so a requirement that could not be
- * evaluated does not quietly pass, and exclusions by {@link NotApplicablePolicy} (default
+ * {@link ErrorHandling} (default {@code PROPAGATE}), so a requirement that could not be
+ * evaluated does not quietly pass, and exclusions by {@link ExclusionHandling} (default
  * {@code REFUSE}), so a gate does not silently shrink its own definition of done.
  * </p>
  *
@@ -90,15 +90,15 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  */
 public class AllMustPassStrategy implements VotingStrategy {
 
-	private final ErrorPolicy errorPolicy;
+	private final ErrorHandling errorPolicy;
 
-	private final NotApplicablePolicy notApplicablePolicy;
+	private final ExclusionHandling notApplicablePolicy;
 
 	/**
 	 * Create a gate strategy with the default error policy.
 	 */
 	public AllMustPassStrategy() {
-		this(ErrorPolicy.PROPAGATE);
+		this(ErrorHandling.PROPAGATE);
 	}
 
 	/**
@@ -106,8 +106,8 @@ public class AllMustPassStrategy implements VotingStrategy {
 	 * @param errorPolicy policy for handling errors
 	 * @throws IllegalArgumentException if {@code errorPolicy} is null
 	 */
-	public AllMustPassStrategy(ErrorPolicy errorPolicy) {
-		this(errorPolicy, NotApplicablePolicy.REFUSE);
+	public AllMustPassStrategy(ErrorHandling errorPolicy) {
+		this(errorPolicy, ExclusionHandling.REFUSE);
 	}
 
 	/**
@@ -117,7 +117,7 @@ public class AllMustPassStrategy implements VotingStrategy {
 	 * @throws IllegalArgumentException if either policy is null
 	 * @since 0.17.0
 	 */
-	public AllMustPassStrategy(ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
+	public AllMustPassStrategy(ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
 		if (errorPolicy == null) {
 			throw new IllegalArgumentException("errorPolicy must not be null");
 		}
@@ -184,7 +184,7 @@ public class AllMustPassStrategy implements VotingStrategy {
 
 	/** {@inheritDoc} */
 	@Override
-	public NotApplicablePolicy notApplicablePolicy() {
+	public ExclusionHandling exclusionHandling() {
 		return this.notApplicablePolicy;
 	}
 

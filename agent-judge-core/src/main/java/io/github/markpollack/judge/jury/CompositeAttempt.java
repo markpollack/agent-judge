@@ -28,7 +28,8 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  *
  * @param name stable configured sibling identity
  * @param relation relationship to the parent verdict
- * @param policy cascade policy, required only for {@link CompositeRelation#CASCADE_TIER}
+ * @param routingRule cascade routingRule, required only for
+ * {@link CompositeRelation#CASCADE_TIER}
  * @param disposition whether the parent could use this stage; always present
  * @param dispositionReason why not, required if and only if the disposition is
  * {@link AttemptDisposition#STAGE_FAILED}
@@ -37,14 +38,14 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * @since 0.14.0
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonPropertyOrder({ "name", "relation", "policy", "disposition", "dispositionReason", "verdict", "failure" })
-public record CompositeAttempt(String name, CompositeRelation relation, @Nullable TierPolicy policy,
+@JsonPropertyOrder({ "name", "relation", "routingRule", "disposition", "dispositionReason", "verdict", "failure" })
+public record CompositeAttempt(String name, CompositeRelation relation, @Nullable RoutingRule routingRule,
 		AttemptDisposition disposition, @Nullable DispositionReason dispositionReason, @Nullable Verdict verdict,
 		@Nullable CompositeFailure failure) {
 
 	/**
-	 * Validate identity, relation/policy legality, the exactly-one outcome rule, and the
-	 * disposition.
+	 * Validate identity, relation/routingRule legality, the exactly-one outcome rule, and
+	 * the disposition.
 	 */
 	public CompositeAttempt {
 		name = NamedJury.requireValidName(name);
@@ -53,11 +54,11 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 		if ((verdict == null) == (failure == null)) {
 			throw new IllegalArgumentException("exactly one of verdict and failure must be present");
 		}
-		if (relation == CompositeRelation.CASCADE_TIER && policy == null) {
-			throw new IllegalArgumentException("CASCADE_TIER requires a policy");
+		if (relation == CompositeRelation.CASCADE_TIER && routingRule == null) {
+			throw new IllegalArgumentException("CASCADE_TIER requires a routing rule");
 		}
-		if (relation == CompositeRelation.META_MEMBER && policy != null) {
-			throw new IllegalArgumentException("META_MEMBER forbids a policy");
+		if (relation != CompositeRelation.CASCADE_TIER && routingRule != null) {
+			throw new IllegalArgumentException("META_MEMBER forbids a routing rule");
 		}
 		if ((disposition == AttemptDisposition.STAGE_FAILED) != (dispositionReason != null)) {
 			throw new IllegalArgumentException(
@@ -120,43 +121,44 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 	 * The parent consumed this stage's verdict normally.
 	 * @param name the stage's configured name
 	 * @param relation how the stage relates to its parent
-	 * @param policy the cascade policy, or null for a meta-jury member
+	 * @param routingRule the cascade routingRule, or null for a meta-jury member
 	 * @param verdict the returned verdict
 	 * @return a used attempt
 	 * @since 0.17.0
 	 */
-	public static CompositeAttempt used(String name, CompositeRelation relation, @Nullable TierPolicy policy,
+	public static CompositeAttempt used(String name, CompositeRelation relation, @Nullable RoutingRule routingRule,
 			Verdict verdict) {
-		return new CompositeAttempt(name, relation, policy, AttemptDisposition.USED, null, verdict, null);
+		return new CompositeAttempt(name, relation, routingRule, AttemptDisposition.USED, null, verdict, null);
 	}
 
 	/**
 	 * The stage returned a verdict the parent could not use.
 	 * @param name the stage's configured name
 	 * @param relation how the stage relates to its parent
-	 * @param policy the cascade policy, or null for a meta-jury member
+	 * @param routingRule the cascade routingRule, or null for a meta-jury member
 	 * @param reason why the verdict could not be used
 	 * @param verdict the verdict the stage actually returned, kept unchanged
 	 * @return a stage-failed attempt
 	 * @since 0.17.0
 	 */
-	public static CompositeAttempt stageFailed(String name, CompositeRelation relation, @Nullable TierPolicy policy,
-			DispositionReason reason, Verdict verdict) {
-		return new CompositeAttempt(name, relation, policy, AttemptDisposition.STAGE_FAILED, reason, verdict, null);
+	public static CompositeAttempt stageFailed(String name, CompositeRelation relation,
+			@Nullable RoutingRule routingRule, DispositionReason reason, Verdict verdict) {
+		return new CompositeAttempt(name, relation, routingRule, AttemptDisposition.STAGE_FAILED, reason, verdict,
+				null);
 	}
 
 	/**
 	 * The stage threw, so it produced no verdict at all.
 	 * @param name the stage's configured name
 	 * @param relation how the stage relates to its parent
-	 * @param policy the cascade policy, or null for a meta-jury member
+	 * @param routingRule the cascade routingRule, or null for a meta-jury member
 	 * @param failure the portable failure evidence
 	 * @return a stage-failed attempt carrying a failure code
 	 * @since 0.17.0
 	 */
-	public static CompositeAttempt executionFailed(String name, CompositeRelation relation, @Nullable TierPolicy policy,
-			CompositeFailure failure) {
-		return new CompositeAttempt(name, relation, policy, AttemptDisposition.STAGE_FAILED,
+	public static CompositeAttempt executionFailed(String name, CompositeRelation relation,
+			@Nullable RoutingRule routingRule, CompositeFailure failure) {
+		return new CompositeAttempt(name, relation, routingRule, AttemptDisposition.STAGE_FAILED,
 				DispositionReason.EXECUTION_FAILED, null, failure);
 	}
 

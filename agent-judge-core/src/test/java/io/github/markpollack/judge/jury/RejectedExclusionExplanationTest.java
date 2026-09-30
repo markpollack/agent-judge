@@ -71,7 +71,7 @@ class RejectedExclusionExplanationTest {
 	private static Jury<CompletionEvidence> passing() {
 		return SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> PASSING, "backstop"))
-			.votingStrategy(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN))
+			.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN))
 			.build();
 	}
 
@@ -83,7 +83,7 @@ class RejectedExclusionExplanationTest {
 		@DisplayName("a sole final tier's refused exclusion is named in the root reasoning")
 		void aSoleFinalTierIsExplained() {
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("rubric", excluding(PASSING), TierPolicy.FINAL_TIER)
+				.tier("rubric", excluding(PASSING), RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -99,9 +99,9 @@ class RejectedExclusionExplanationTest {
 		@DisplayName("a refused exclusion at an earlier tier is named when nothing later decided")
 		void anEarlierTierIsExplainedWhenNothingDecided() {
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("rubric", excluding(PASSING), TierPolicy.REJECT_ON_ANY_FAIL)
+				.tier("rubric", excluding(PASSING), RoutingRule.REJECT_ON_ANY_FAIL)
 				.tier("semantic", ContainmentTest.throwing(new IllegalStateException("the backend was unreachable")),
-						TierPolicy.FINAL_TIER)
+						RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -113,7 +113,7 @@ class RejectedExclusionExplanationTest {
 		@DisplayName("a meta member's refused exclusion is named in the root reasoning")
 		void aMetaMemberIsExplained() {
 			Verdict verdict = Juries
-				.meta(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN),
+				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
 						new NamedJury<CompletionEvidence>("healthy", passing()),
 						new NamedJury<CompletionEvidence>("rubric", excluding(PASSING)))
 				.vote(CONTEXT);
@@ -136,8 +136,8 @@ class RejectedExclusionExplanationTest {
 		@DisplayName("R-E: a later selected tier keeps its own reasoning as the root")
 		void aLaterSelectedTierKeepsItsReasoning() {
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("rubric", excluding(PASSING), TierPolicy.REJECT_ON_ANY_FAIL)
-				.tier("semantic", passing(), TierPolicy.FINAL_TIER)
+				.tier("rubric", excluding(PASSING), RoutingRule.REJECT_ON_ANY_FAIL)
+				.tier("semantic", passing(), RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -151,8 +151,8 @@ class RejectedExclusionExplanationTest {
 		@DisplayName("D1: the parent-built stage_failed root keeps its own text")
 		void theD1RootIsUnchanged() {
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("rubric", excluding(FAILING), TierPolicy.REJECT_ON_ANY_FAIL)
-				.tier("semantic", passing(), TierPolicy.FINAL_TIER)
+				.tier("rubric", excluding(FAILING), RoutingRule.REJECT_ON_ANY_FAIL)
+				.tier("semantic", passing(), RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -169,7 +169,7 @@ class RejectedExclusionExplanationTest {
 		void aThrownTierIsUnchanged() {
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
 				.tier("rubric", ContainmentTest.throwing(new IllegalStateException("the backend was unreachable")),
-						TierPolicy.FINAL_TIER)
+						RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 
@@ -180,7 +180,7 @@ class RejectedExclusionExplanationTest {
 		@DisplayName("a member that threw still reports exactly what it reported before")
 		void aThrownMemberIsUnchanged() {
 			Verdict verdict = Juries
-				.meta(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN),
+				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
 						new NamedJury<CompletionEvidence>("healthy", passing()),
 						new NamedJury<CompletionEvidence>("broken",
 								ContainmentTest.throwing(new IllegalStateException("the backend was unreachable"))))

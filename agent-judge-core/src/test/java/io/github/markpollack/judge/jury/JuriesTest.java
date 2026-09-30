@@ -127,7 +127,7 @@ class JuriesTest {
 		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
-		// jury1 → PASS, jury2 → FAIL, majority → FAIL (tie resolved by TiePolicy)
+		// jury1 → PASS, jury2 → FAIL, majority → FAIL (tie resolved by TieBreakRule)
 		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name)
 			.containsExactly("member-1", "member-2");
 	}

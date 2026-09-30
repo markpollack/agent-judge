@@ -5,6 +5,7 @@
 package io.github.markpollack.judge.assertions;
 
 import java.net.URI;
+import io.github.markpollack.judge.evaluation.*;
 import java.net.http.HttpClient;
 import java.nio.file.*;
 import java.util.*;
@@ -31,11 +32,11 @@ public final class ConferenceAssertionRun {
 	 * @return actual results in RULE-4, AC8 order
 	 * @throws Exception if setup or artifact retention fails
 	 */
-	public static List<AssertionResult> run(String apiKey, Path output) throws Exception {
+	public static List<EvaluationResult> run(String apiKey, Path output) throws Exception {
 		return run(apiKey, output, false);
 	}
 
-	private static List<AssertionResult> run(String apiKey, Path output, boolean vercel) throws Exception {
+	private static List<EvaluationResult> run(String apiKey, Path output, boolean vercel) throws Exception {
 		Objects.requireNonNull(apiKey);
 		if (apiKey.isBlank())
 			throw new IllegalArgumentException("Explicit nonblank credential required");
@@ -45,20 +46,20 @@ public final class ConferenceAssertionRun {
 		fixture.saveRouting(output);
 		URI endpoint = URI
 			.create(vercel ? fixture.routing.path("endpoint").asText() : "https://api.typesafe.ai/v1/systemone");
-		List<AssertionResult> results = new ArrayList<>();
+		List<EvaluationResult> results = new ArrayList<>();
 		try (var http = HttpClient.newHttpClient()) {
 			for (int i = 0; i < 2; i++) {
 				Path caseOutput = output.resolve(i == 0 ? "rule-4" : "uc6-ac8");
-				var assertions = new RequirementAssertions(fixture.binding);
+
 				var judge = fixture.bind(fixture.judge(apiKey, endpoint, http, caseOutput));
-				var result = assertions.evaluateRequirement(fixture.requirement(i), judge, evidence.get(i), null);
+				var result = Evaluations.evaluate(fixture.requirement(i), judge, evidence.get(i), fixture.binding);
 				ConferenceFixture.save(result, caseOutput, "LIVE explicitly invoked; inspect actual outcome");
 				String outcome = "PASSED";
 				try {
 					RequirementAssertions.requireSatisfied(result);
 				}
 				catch (RequirementAssertionError error) {
-					outcome = error.category().name();
+					outcome = error.result().verdict().conclusion().name();
 				}
 				Files.writeString(caseOutput.resolve("assertion-outcome.txt"), outcome + "\n");
 				results.add(result);

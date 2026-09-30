@@ -5,10 +5,6 @@
 
 package io.github.markpollack.judge.judgment;
 
-import io.github.markpollack.judge.acceptance.PolicyFailure;
-import io.github.markpollack.judge.acceptance.PolicyApplication;
-import io.github.markpollack.judge.acceptance.AppliedPolicy;
-import io.github.markpollack.judge.acceptance.AcceptanceAction;
 import io.github.markpollack.judge.provenance.Provenance;
 
 import java.time.Duration;
@@ -23,22 +19,18 @@ import java.util.OptionalDouble;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import io.github.markpollack.judge.serialization.StrictIntegerDeserializer;
 import org.jspecify.annotations.Nullable;
 
 /**
  * A Judge's conclusion after evaluating supplied evidence. Structured findings,
  * confidence, probabilities and provenance are optional; a deterministic PASS or FAIL
- * needs none. Internal composition may attach a policy execution without changing the
- * producer facts. Final application acceptance is recorded separately by the assertion
- * layer. Operational status derives from producer status and any internal policy
- * execution. Normalized score and selected label are derived views, never stored
- * duplicates. Metadata is recursively copied and restricted to portable JSON values.
+ * needs none. Composition participation and application policy are recorded separately
+ * from these producer facts. Normalized score and selected label are derived views, never
+ * stored duplicates. Metadata is recursively copied and restricted to portable JSON
+ * values.
  *
- * @param schemaVersion wire version, always 3
- * @param producerStatus disposition before application policy
+ * @param producerStatus unchanged producer disposition
  * @param finding optional product finding
  * @param confidence optional metric-specific support
  * @param probabilityDistribution optional native probability distribution
@@ -47,39 +39,17 @@ import org.jspecify.annotations.Nullable;
  * @param reasoning producer explanation; required for ABSTAIN, NOT_APPLICABLE and ERROR
  * @param checks bounded child judgments with unique IDs
  * @param provenance optional evaluation identity and retained artifact references
- * @param policyApplication optional immutable application policy result
  * @param metadata recursively immutable portable metadata
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({ "schemaVersion", "producerStatus", "finding", "confidence", "probabilityDistribution",
-		"reasonCode", "reasoning", "checks", "provenance", "policyApplication", "metadata" })
-public record Judgment(
-		@JsonProperty(required = true) @JsonDeserialize(using = StrictIntegerDeserializer.class) int schemaVersion,
-		JudgmentStatus producerStatus, @Nullable Finding finding, @Nullable Confidence confidence,
+		"reasonCode", "reasoning", "checks", "provenance", "metadata" })
+@com.fasterxml.jackson.databind.annotation.JsonSerialize(
+		using = io.github.markpollack.judge.serialization.ResultJson.JudgmentWriter.class)
+@JsonDeserialize(using = io.github.markpollack.judge.serialization.ResultJson.JudgmentReader.class)
+public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding, @Nullable Confidence confidence,
 		@Nullable ProbabilityDistribution probabilityDistribution, @Nullable JudgmentReasonCode reasonCode,
-		String reasoning, List<Check> checks, @Nullable Provenance provenance,
-		@Nullable PolicyApplication policyApplication, Map<String, Object> metadata) {
-
-	/**
-	 * Construct a version-3 judgment from its semantic values.
-	 * @param producerStatus producer disposition
-	 * @param finding finding
-	 * @param confidence confidence
-	 * @param probabilityDistribution probabilityDistribution
-	 * @param reasonCode raw cause
-	 * @param reasoning raw explanation
-	 * @param checks child checks
-	 * @param provenance provenance
-	 * @param policyApplication application policy
-	 * @param metadata incidental metadata
-	 */
-	public Judgment(JudgmentStatus producerStatus, @Nullable Finding finding, @Nullable Confidence confidence,
-			@Nullable ProbabilityDistribution probabilityDistribution, @Nullable JudgmentReasonCode reasonCode,
-			String reasoning, List<Check> checks, @Nullable Provenance provenance,
-			@Nullable PolicyApplication policyApplication, Map<String, Object> metadata) {
-		this(3, producerStatus, finding, confidence, probabilityDistribution, reasonCode, reasoning, checks, provenance,
-				policyApplication, metadata);
-	}
+		String reasoning, List<Check> checks, @Nullable Provenance provenance, Map<String, Object> metadata) {
 
 	/**
 	 * Metadata key reserved for aggregation evidence written by voting strategies.
@@ -130,8 +100,6 @@ public record Judgment(
 
 	/** Validate, copy, and recursively freeze every judgment component. */
 	public Judgment {
-		if (schemaVersion != 3)
-			throw new IllegalArgumentException("Judgment schemaVersion must be 3");
 		Objects.requireNonNull(producerStatus, "producer status must not be null");
 		Objects.requireNonNull(reasoning, "reasoning must not be null");
 		checks = List.copyOf(Objects.requireNonNull(checks, "checks must not be null"));
@@ -142,9 +110,6 @@ public record Judgment(
 		if (producerStatus == JudgmentStatus.ERROR || producerStatus == JudgmentStatus.NOT_APPLICABLE) {
 			if (finding != null || confidence != null || probabilityDistribution != null) {
 				throw new IllegalArgumentException(producerStatus + " must not carry finding or support");
-			}
-			if (policyApplication != null) {
-				throw new IllegalArgumentException(producerStatus + " bypasses policy application");
 			}
 		}
 		if (confidence != null && (finding == null || !finding.has(confidence.target()))) {
@@ -202,7 +167,7 @@ public record Judgment(
 	public Judgment(JudgmentStatus status, @Nullable Double score, @Nullable String label,
 			@Nullable JudgmentReasonCode reasonCode, String reasoning, List<Check> checks,
 			Map<String, Object> metadata) {
-		this(status, normalizedFinding(score, label), null, null, reasonCode, reasoning, checks, null, null, metadata);
+		this(status, normalizedFinding(score, label), null, null, reasonCode, reasoning, checks, null, metadata);
 	}
 
 	private static @Nullable Finding normalizedFinding(@Nullable Double score, @Nullable String label) {
@@ -223,50 +188,11 @@ public record Judgment(
 	}
 
 	/**
-	 * Returns operational disposition derived from producer status and policy
-	 * application.
-	 * @return operational disposition derived from producer status and policy application
+	 * Returns the unchanged producer disposition.
+	 * @return producer disposition
 	 */
 	public JudgmentStatus status() {
-		if (policyApplication instanceof PolicyFailure) {
-			return JudgmentStatus.ERROR;
-		}
-		if (policyApplication instanceof AppliedPolicy applied && applied.action() != AcceptanceAction.RELY) {
-			return JudgmentStatus.ABSTAIN;
-		}
 		return producerStatus;
-	}
-
-	/**
-	 * Returns operational instrument/subject cause, never a retained subject code on
-	 * policy ERROR.
-	 * @return operational instrument/subject cause, never a retained subject code on
-	 * policy ERROR
-	 */
-	public @Nullable JudgmentReasonCode operationalReasonCode() {
-		if (policyApplication instanceof PolicyFailure failure) {
-			return failure.reasonCode();
-		}
-		if (policyApplication instanceof AppliedPolicy applied && applied.action() != AcceptanceAction.RELY) {
-			return null;
-		}
-		return reasonCode;
-	}
-
-	/**
-	 * Returns policy explanation on policy failure/withholding, otherwise producer
-	 * reasoning.
-	 * @return policy explanation on policy failure/withholding, otherwise producer
-	 * reasoning
-	 */
-	public String operationalReasoning() {
-		if (policyApplication instanceof PolicyFailure failure) {
-			return failure.reason();
-		}
-		if (policyApplication instanceof AppliedPolicy applied && applied.action() != AcceptanceAction.RELY) {
-			return applied.reason();
-		}
-		return reasoning;
 	}
 
 	/**
@@ -701,7 +627,6 @@ public record Judgment(
 		builder.confidence = this.confidence;
 		builder.probabilityDistribution = this.probabilityDistribution;
 		builder.provenance = this.provenance;
-		builder.policyApplication = this.policyApplication;
 		builder.reasonCode = this.reasonCode;
 		builder.reasoning = this.reasoning;
 		builder.checks = new ArrayList<>(this.checks);
@@ -1041,8 +966,6 @@ public record Judgment(
 
 		private @Nullable Provenance provenance;
 
-		private @Nullable PolicyApplication policyApplication;
-
 		private @Nullable JudgmentReasonCode reasonCode;
 
 		private String reasoning = "";
@@ -1214,7 +1137,7 @@ public record Judgment(
 			// message
 			// matches the one the compact constructor would otherwise raise.
 			return new Judgment(Objects.requireNonNull(status, "status must not be null"), finding, confidence,
-					probabilityDistribution, reasonCode, reasoning, checks, provenance, policyApplication, metadata);
+					probabilityDistribution, reasonCode, reasoning, checks, provenance, metadata);
 		}
 
 	}

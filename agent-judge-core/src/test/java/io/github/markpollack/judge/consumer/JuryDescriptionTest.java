@@ -42,16 +42,16 @@ import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.jury.CompositeAttempt;
 import io.github.markpollack.judge.jury.ConjunctiveStrategy;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
-import io.github.markpollack.judge.jury.ErrorPolicy;
+import io.github.markpollack.judge.jury.ErrorHandling;
 import io.github.markpollack.judge.jury.Juries;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.MedianVotingStrategy;
-import io.github.markpollack.judge.jury.NotApplicablePolicy;
+import io.github.markpollack.judge.jury.ExclusionHandling;
 import io.github.markpollack.judge.jury.NamedJury;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.TiePolicy;
-import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.jury.TieBreakRule;
+import io.github.markpollack.judge.jury.RoutingRule;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.jury.VotingStrategy;
 import io.github.markpollack.judge.jury.WeightedAverageStrategy;
@@ -95,7 +95,7 @@ class JuryDescriptionTest {
 				.judge(ctx -> Judgment.pass("unnamed lambda"))
 				.judge(Judges.named(ctx -> Judgment.fail("strict"), "strict", "a strict judge", JudgeType.LLM_POWERED),
 						0.5)
-				.votingStrategy(new WeightedAverageStrategy(0.6, ErrorPolicy.IGNORE))
+				.votingStrategy(new WeightedAverageStrategy(0.6, ErrorHandling.IGNORE))
 				.parallel(false)
 				.build();
 		}
@@ -111,7 +111,7 @@ class JuryDescriptionTest {
 						tuple(1, "Judge#2", KeySource.POSITIONAL, 1.0), tuple(2, "strict", KeySource.DECLARED, 0.5));
 			assertThat(description.strategy())
 				.isEqualTo(new StrategyDescription("weightedAverage", named(WeightedAverageStrategy.class),
-						ErrorPolicy.IGNORE, NotApplicablePolicy.REFUSE, 0.6, Map.of()));
+						ErrorHandling.IGNORE, ExclusionHandling.REFUSE, 0.6, Map.of()));
 		}
 
 		@Test
@@ -258,12 +258,12 @@ class JuryDescriptionTest {
 		private CascadedJury<CompletionEvidence> threeTierCascade() {
 			Jury<CompletionEvidence> gate = SimpleJury.<CompletionEvidence>builder()
 				.judge(Judges.named(new KeywordJudge("BUILD SUCCESS"), "build"))
-				.votingStrategy(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_FAIL))
+				.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL))
 				.parallel(false)
 				.build();
 			Jury<CompletionEvidence> style = SimpleJury.<CompletionEvidence>builder()
 				.judge(Judges.named(new KeywordJudge("style"), "style"))
-				.votingStrategy(new ConsensusStrategy(ErrorPolicy.TREAT_AS_ABSTAIN))
+				.votingStrategy(new ConsensusStrategy(ErrorHandling.TREAT_AS_ABSTAIN))
 				.parallel(false)
 				.build();
 			Jury<CompletionEvidence> docs = SimpleJury.<CompletionEvidence>builder()
@@ -275,13 +275,13 @@ class JuryDescriptionTest {
 					new NamedJury<CompletionEvidence>("style", style), new NamedJury<CompletionEvidence>("docs", docs));
 			Jury<CompletionEvidence> last = SimpleJury.<CompletionEvidence>builder()
 				.judge(Judges.named(new KeywordJudge("done"), "done"))
-				.votingStrategy(new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.IGNORE))
+				.votingStrategy(new MajorityVotingStrategy(TieBreakRule.ABSTAIN, ErrorHandling.IGNORE))
 				.parallel(false)
 				.build();
 			return CascadedJury.<CompletionEvidence>builder()
-				.tier("gate", gate, TierPolicy.REJECT_ON_ANY_FAIL)
-				.tier("review", review, TierPolicy.ACCEPT_ON_ALL_PASS)
-				.tier("final", last, TierPolicy.FINAL_TIER)
+				.tier("gate", gate, RoutingRule.REJECT_ON_ANY_FAIL)
+				.tier("review", review, RoutingRule.ACCEPT_ON_ALL_PASS)
+				.tier("final", last, RoutingRule.FINAL_TIER)
 				.build();
 		}
 
@@ -289,12 +289,12 @@ class JuryDescriptionTest {
 		void everyTierIsDescribedIncludingAMetaJuryTier() {
 			CascadedJuryDescription cascade = (CascadedJuryDescription) threeTierCascade().describe();
 
-			assertThat(cascade.tiers()).extracting(TierDescription::name, TierDescription::policy)
-				.containsExactly(tuple("gate", TierPolicy.REJECT_ON_ANY_FAIL),
-						tuple("review", TierPolicy.ACCEPT_ON_ALL_PASS), tuple("final", TierPolicy.FINAL_TIER));
+			assertThat(cascade.tiers()).extracting(TierDescription::name, TierDescription::routingRule)
+				.containsExactly(tuple("gate", RoutingRule.REJECT_ON_ANY_FAIL),
+						tuple("review", RoutingRule.ACCEPT_ON_ALL_PASS), tuple("final", RoutingRule.FINAL_TIER));
 
 			SimpleJuryDescription gate = (SimpleJuryDescription) cascade.tiers().get(0).jury();
-			assertThat(gate.strategy().errorPolicy()).isEqualTo(ErrorPolicy.TREAT_AS_FAIL);
+			assertThat(gate.strategy().errorHandling()).isEqualTo(ErrorHandling.TREAT_AS_FAIL);
 			assertThat(gate.strategy().threshold()).isNull();
 
 			MetaJuryDescription review = (MetaJuryDescription) cascade.tiers().get(1).jury();
@@ -306,7 +306,7 @@ class JuryDescriptionTest {
 			assertThat(docs.seats()).extracting(SeatDescription::verdictKey).containsExactly("docs");
 
 			SimpleJuryDescription last = (SimpleJuryDescription) cascade.tiers().get(2).jury();
-			assertThat(last.strategy().errorPolicy()).isEqualTo(ErrorPolicy.IGNORE);
+			assertThat(last.strategy().errorHandling()).isEqualTo(ErrorHandling.IGNORE);
 			assertThat(last.strategy().parameters()).containsExactly(Map.entry("tiePolicy", "ABSTAIN"));
 		}
 
@@ -363,8 +363,8 @@ class JuryDescriptionTest {
 				.judge(new KeywordJudge("b"), 3.0)
 				.votingStrategy(new WeightedAverageStrategy())
 				.build();
-			Jury<CompletionEvidence> meta = Juries.meta(new MajorityVotingStrategy(),
-					new NamedJury<CompletionEvidence>("first", first),
+			io.github.markpollack.judge.jury.VotingJury<CompletionEvidence> meta = Juries.meta(
+					new MajorityVotingStrategy(), new NamedJury<CompletionEvidence>("first", first),
 					new NamedJury<CompletionEvidence>("second", second));
 
 			assertThat(meta.getJudges()).as("a meta-jury's public roster").isEmpty();
@@ -372,7 +372,7 @@ class JuryDescriptionTest {
 			MetaJuryDescription description = (MetaJuryDescription) meta.describe();
 			assertThat(description.strategy())
 				.isEqualTo(new StrategyDescription("majority", named(MajorityVotingStrategy.class),
-						ErrorPolicy.PROPAGATE, NotApplicablePolicy.REFUSE, null, Map.of("tiePolicy", "FAIL")));
+						ErrorHandling.PROPAGATE, ExclusionHandling.REFUSE, null, Map.of("tiePolicy", "FAIL")));
 			assertThat(description.members()).extracting(MemberDescription::name).containsExactly("first", "second");
 			SimpleJuryDescription secondJury = (SimpleJuryDescription) description.members().get(1).jury();
 			assertThat(secondJury.seats()).singleElement().satisfies(seat -> {
@@ -480,7 +480,7 @@ class JuryDescriptionTest {
 		void aJuryThatDoesNotOverrideDescribeIsOpaqueButTruthful() {
 			Jury<CompletionEvidence> custom = new FirstVoteJury(
 					List.of(Judges.named(new KeywordJudge("a"), "a"), ctx -> Judgment.pass("b")),
-					new ConsensusStrategy(ErrorPolicy.IGNORE));
+					new ConsensusStrategy(ErrorHandling.IGNORE));
 
 			JuryDescription description = custom.describe();
 
@@ -488,7 +488,7 @@ class JuryDescriptionTest {
 			OpaqueJuryDescription opaque = (OpaqueJuryDescription) description;
 			assertThat(opaque.implementation()).isEqualTo(named(FirstVoteJury.class));
 			assertThat(opaque.strategy()).isNotNull();
-			assertThat(opaque.strategy().errorPolicy()).isEqualTo(ErrorPolicy.IGNORE);
+			assertThat(opaque.strategy().errorHandling()).isEqualTo(ErrorHandling.IGNORE);
 			assertThat(opaque.judges()).extracting(judge -> judge.implementation().form())
 				.containsExactly(Form.NAMED, Form.HIDDEN);
 			assertThat(opaque.judges().get(0).name()).isEqualTo("a");
@@ -531,8 +531,9 @@ class JuryDescriptionTest {
 
 		@Test
 		void aConsumerJuryCanDescribeItselfStructurally() {
-			Jury<CompletionEvidence> inner = Juries.fromJudges(new ConsensusStrategy(), new KeywordJudge("a"));
-			Jury<CompletionEvidence> wrapper = new Jury<CompletionEvidence>() {
+			io.github.markpollack.judge.jury.VotingJury<CompletionEvidence> inner = Juries
+				.fromJudges(new ConsensusStrategy(), new KeywordJudge("a"));
+			Jury<CompletionEvidence> wrapper = new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
 				@Override
 				public List<Judge<CompletionEvidence>> getJudges() {
 					return inner.getJudges();
@@ -551,7 +552,7 @@ class JuryDescriptionTest {
 				@Override
 				public JuryDescription describe() {
 					return new CascadedJuryDescription(
-							List.of(new TierDescription("only", TierPolicy.FINAL_TIER, inner.describe())));
+							List.of(new TierDescription("only", RoutingRule.FINAL_TIER, inner.describe())));
 				}
 			};
 
@@ -565,35 +566,35 @@ class JuryDescriptionTest {
 	@DisplayName("Built-in strategies")
 	class BuiltInStrategies {
 
-		private StrategyDescription declared(String name, Class<?> type, ErrorPolicy errorPolicy, Double threshold,
+		private StrategyDescription declared(String name, Class<?> type, ErrorHandling errorPolicy, Double threshold,
 				Map<String, Object> parameters) {
-			return new StrategyDescription(name, named(type), errorPolicy, NotApplicablePolicy.REFUSE, threshold,
+			return new StrategyDescription(name, named(type), errorPolicy, ExclusionHandling.REFUSE, threshold,
 					parameters);
 		}
 
 		@Test
-		void everyBuiltInDeclaresItsErrorPolicyThresholdAndTiePolicy() {
-			assertThat(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN).describe()).isEqualTo(
-					declared("allMustPass", AllMustPassStrategy.class, ErrorPolicy.TREAT_AS_ABSTAIN, null, Map.of()));
-			assertThat(new AverageVotingStrategy(0.25, ErrorPolicy.IGNORE).describe())
-				.isEqualTo(declared("average", AverageVotingStrategy.class, ErrorPolicy.IGNORE, 0.25, Map.of()));
-			assertThat(new MedianVotingStrategy(0.9, ErrorPolicy.TREAT_AS_FAIL).describe())
-				.isEqualTo(declared("median", MedianVotingStrategy.class, ErrorPolicy.TREAT_AS_FAIL, 0.9, Map.of()));
+		void everyBuiltInDeclaresItsErrorHandlingThresholdAndTieBreakRule() {
+			assertThat(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN).describe()).isEqualTo(
+					declared("allMustPass", AllMustPassStrategy.class, ErrorHandling.TREAT_AS_ABSTAIN, null, Map.of()));
+			assertThat(new AverageVotingStrategy(0.25, ErrorHandling.IGNORE).describe())
+				.isEqualTo(declared("average", AverageVotingStrategy.class, ErrorHandling.IGNORE, 0.25, Map.of()));
+			assertThat(new MedianVotingStrategy(0.9, ErrorHandling.TREAT_AS_FAIL).describe())
+				.isEqualTo(declared("median", MedianVotingStrategy.class, ErrorHandling.TREAT_AS_FAIL, 0.9, Map.of()));
 			assertThat(new WeightedAverageStrategy(0.3).describe()).isEqualTo(
-					declared("weightedAverage", WeightedAverageStrategy.class, ErrorPolicy.PROPAGATE, 0.3, Map.of()));
-			assertThat(new ConjunctiveStrategy(0.8, ErrorPolicy.IGNORE).describe())
-				.isEqualTo(declared("conjunctive", ConjunctiveStrategy.class, ErrorPolicy.IGNORE, 0.8, Map.of()));
-			assertThat(new ConsensusStrategy(ErrorPolicy.TREAT_AS_FAIL).describe())
-				.isEqualTo(declared("consensus", ConsensusStrategy.class, ErrorPolicy.TREAT_AS_FAIL, null, Map.of()));
-			assertThat(new MajorityVotingStrategy(TiePolicy.PASS, ErrorPolicy.TREAT_AS_ABSTAIN).describe())
-				.isEqualTo(declared("majority", MajorityVotingStrategy.class, ErrorPolicy.TREAT_AS_ABSTAIN, null,
+					declared("weightedAverage", WeightedAverageStrategy.class, ErrorHandling.PROPAGATE, 0.3, Map.of()));
+			assertThat(new ConjunctiveStrategy(0.8, ErrorHandling.IGNORE).describe())
+				.isEqualTo(declared("conjunctive", ConjunctiveStrategy.class, ErrorHandling.IGNORE, 0.8, Map.of()));
+			assertThat(new ConsensusStrategy(ErrorHandling.TREAT_AS_FAIL).describe())
+				.isEqualTo(declared("consensus", ConsensusStrategy.class, ErrorHandling.TREAT_AS_FAIL, null, Map.of()));
+			assertThat(new MajorityVotingStrategy(TieBreakRule.PASS, ErrorHandling.TREAT_AS_ABSTAIN).describe())
+				.isEqualTo(declared("majority", MajorityVotingStrategy.class, ErrorHandling.TREAT_AS_ABSTAIN, null,
 						Map.of("tiePolicy", "PASS")));
 		}
 
 		@Test
-		void portableValuesMergeErrorPolicyThresholdAndParametersInKeyOrder() throws Exception {
+		void portableValuesMergeErrorHandlingThresholdAndParametersInKeyOrder() throws Exception {
 			assertThat(JSON.writeValueAsString(
-					new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.IGNORE).describe().toPortable()))
+					new MajorityVotingStrategy(TieBreakRule.ABSTAIN, ErrorHandling.IGNORE).describe().toPortable()))
 				.isEqualTo(
 						"{\"descriptionVersion\":2,\"name\":\"majority\",\"implementation\":{\"form\":\"NAMED\",\"className\":"
 								+ "\"io.github.markpollack.judge.jury.MajorityVotingStrategy\"},\"parameters\":{\"declared\":true,"
@@ -719,11 +720,11 @@ class JuryDescriptionTest {
 		void aStrategyDescriptionRefusesInconsistentDeclarations() {
 			ImplementationIdentity identity = named(AverageVotingStrategy.class);
 
-			assertThatThrownBy(() -> new StrategyDescription("s", identity, ErrorPolicy.PROPAGATE, null, null, null))
+			assertThatThrownBy(() -> new StrategyDescription("s", identity, ErrorHandling.PROPAGATE, null, null, null))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("empty parameter map");
 			assertThatThrownBy(
-					() -> new StrategyDescription("s", identity, null, NotApplicablePolicy.EXCLUDE, null, null))
+					() -> new StrategyDescription("s", identity, null, ExclusionHandling.EXCLUDE, null, null))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("empty parameter map");
 			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, null, 0.5, null))
@@ -784,7 +785,7 @@ class JuryDescriptionTest {
 	 * A consumer jury that votes with its first judge only and does not override
 	 * describe().
 	 */
-	static final class FirstVoteJury implements Jury<CompletionEvidence> {
+	static final class FirstVoteJury implements io.github.markpollack.judge.jury.VotingJury<CompletionEvidence> {
 
 		private final List<Judge<CompletionEvidence>> judges;
 

@@ -127,7 +127,7 @@ class WeightedAverageOverflowTest {
 
 	@Test
 	void anErrorTreatedAsFailParticipatesWithItsOverflowingWeight() {
-		Judgment result = new WeightedAverageStrategy(ErrorPolicy.TREAT_AS_FAIL)
+		Judgment result = new WeightedAverageStrategy(ErrorHandling.TREAT_AS_FAIL)
 			.aggregate(List.of(Judgment.error("judge threw"), booleanPass("ok")), Map.of("0", MAX, "1", MAX));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);

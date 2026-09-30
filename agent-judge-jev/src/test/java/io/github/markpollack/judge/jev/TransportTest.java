@@ -120,7 +120,8 @@ class TransportTest {
 	void sdkDeadlineCancelsActualHttpFuture() {
 		try (var http = new PendingHttp()) {
 			long start = System.nanoTime();
-			Judgment j = judge(http, Duration.ofMillis(100)).judge(JevJudgeTest.input());
+			Judgment j = judge(http, Duration.ofMillis(100)).judge(JevJudgeTest.input().requirement(),
+					JevJudgeTest.input().evidence());
 			assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(http.calls).hasValue(1);
 			assertThat(http.actual).isCancelled();
@@ -159,7 +160,8 @@ class TransportTest {
 			AtomicReference<Judgment> result = new AtomicReference<>();
 			AtomicBoolean interrupted = new AtomicBoolean();
 			Thread thread = Thread.ofVirtual().start(() -> {
-				result.set(judge(http, Duration.ofSeconds(5)).judge(JevJudgeTest.input()));
+				result.set(judge(http, Duration.ofSeconds(5)).judge(JevJudgeTest.input().requirement(),
+						JevJudgeTest.input().evidence()));
 				interrupted.set(Thread.currentThread().isInterrupted());
 			});
 			assertThat(http.sent.await(2, TimeUnit.SECONDS)).isTrue();
@@ -177,8 +179,9 @@ class TransportTest {
 		try (var http = new PendingHttp()) {
 			Thread.currentThread().interrupt();
 			try {
-				assertThat(judge(http, Duration.ofSeconds(1)).judge(JevJudgeTest.input()).status())
-					.isEqualTo(JudgmentStatus.ERROR);
+				assertThat(judge(http, Duration.ofSeconds(1))
+					.judge(JevJudgeTest.input().requirement(), JevJudgeTest.input().evidence())
+					.status()).isEqualTo(JudgmentStatus.ERROR);
 				assertThat(Thread.currentThread().isInterrupted()).isTrue();
 				assertThat(http.calls).hasValue(0);
 			}
@@ -193,8 +196,10 @@ class TransportTest {
 		try (var http = new PendingHttp()) {
 			var judge = new JevJudge("fake-key", "jev-1.13.0", ENDPOINT, Duration.ofMillis(100), 6000, 8000,
 					JevJudgeTest.NOUL, http, TransportTest::capture);
-			assertThat(judge.judge(JevJudgeTest.input(JevJudgeTest.GOAL, "\n".repeat(5000), true)).status())
-				.isEqualTo(JudgmentStatus.ERROR);
+			assertThat(judge
+				.judge(JevJudgeTest.input().requirement(),
+						JevJudgeTest.input(JevJudgeTest.GOAL, "\n".repeat(5000), true).evidence())
+				.status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(http.calls).hasValue(0);
 		}
 	}
@@ -210,7 +215,7 @@ class TransportTest {
 			};
 			JevJudge evaluator = new JevJudge("fake-key", "jev-1.13.0", ENDPOINT, Duration.ofSeconds(1), 16000, 32000,
 					JevJudgeTest.NOUL, http, sink);
-			Judgment result = evaluator.judge(JevJudgeTest.input());
+			Judgment result = evaluator.judge(JevJudgeTest.input().requirement(), JevJudgeTest.input().evidence());
 			assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(result.reasoning()).doesNotContain("private transport");
 			assertThat(Checks.parse(bytes.get("request")).path("state").path("requirement").asText())
@@ -228,7 +233,8 @@ class TransportTest {
 			var evaluator = new JevJudge("fake-key", "typesafe-ai/jev",
 					URI.create("https://ai-gateway.vercel.sh/typesafe/v1/systemone"), Duration.ofSeconds(1), 16000,
 					32000, JevJudgeTest.choice(), http, TransportTest::capture);
-			assertThat(evaluator.judge(JevJudgeTest.input()).status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(evaluator.judge(JevJudgeTest.input().requirement(), JevJudgeTest.input().evidence()).status())
+				.isEqualTo(JudgmentStatus.ERROR);
 			assertThat(http.calls).hasValue(1);
 		}
 	}
@@ -244,7 +250,8 @@ class TransportTest {
 			var evaluator = new JevJudge("fake-key", "typesafe-ai/jev",
 					URI.create("https://ai-gateway.vercel.sh/typesafe/v1/systemone"), Duration.ofSeconds(1), 16000,
 					32000, JevJudgeTest.choice(), http, TransportTest::capture);
-			assertThat(evaluator.judge(JevJudgeTest.input()).status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(evaluator.judge(JevJudgeTest.input().requirement(), JevJudgeTest.input().evidence()).status())
+				.isEqualTo(JudgmentStatus.ERROR);
 			assertThat(http.calls).hasValue(0);
 		}
 	}

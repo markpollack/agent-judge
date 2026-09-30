@@ -101,7 +101,7 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 				declaredScore == null ? null : new NumericFinding(declaredScore, NumericKind.MEASUREMENT,
 						"normalized-quality:v1", 0, 1, List.of(), QualityDirection.INCREASING),
 				new CategoryFinding(normalized, categories()));
-		return new Judgment(status, finding, null, null, null, raw, List.of(), null, null, metadata);
+		return new Judgment(status, finding, null, null, null, raw, List.of(), null, metadata);
 	}
 
 	private static void addResponseMetadata(Map<String, Object> metadata, JudgeModelResponse response) {

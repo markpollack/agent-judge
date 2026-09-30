@@ -21,14 +21,14 @@ import io.github.markpollack.judge.jury.AverageVotingStrategy;
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.jury.ConjunctiveStrategy;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
-import io.github.markpollack.judge.jury.ErrorPolicy;
+import io.github.markpollack.judge.jury.ErrorHandling;
 import io.github.markpollack.judge.jury.Juries;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.NamedJury;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.TiePolicy;
-import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.jury.TieBreakRule;
+import io.github.markpollack.judge.jury.RoutingRule;
 import io.github.markpollack.judge.jury.WeightedAverageStrategy;
 import io.github.markpollack.judge.judgment.Judgment;
 
@@ -76,7 +76,7 @@ public final class DescriptionFixture {
 			.judge(lambda)
 			.judge(anonymous, 2.0)
 			.judge(Judges.allOf(lambda, anonymous), 0.5)
-			.votingStrategy(new WeightedAverageStrategy(0.5, ErrorPolicy.IGNORE))
+			.votingStrategy(new WeightedAverageStrategy(0.5, ErrorHandling.IGNORE))
 			.build();
 		Jury<CompletionEvidence> rubricJury = SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(new DeclaringJudge(rubric), "rubric", "declares its rubric", JudgeType.LLM_POWERED))
@@ -85,16 +85,16 @@ public final class DescriptionFixture {
 		Jury<CompletionEvidence> duplicates = Juries.fromJudges(new ConsensusStrategy(), Judges.named(lambda, "same"),
 				Judges.named(anonymous, "same"));
 		Jury<CompletionEvidence> review = Juries.meta(
-				new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.TREAT_AS_ABSTAIN),
+				new MajorityVotingStrategy(TieBreakRule.ABSTAIN, ErrorHandling.TREAT_AS_ABSTAIN),
 				new NamedJury<CompletionEvidence>("rubric", rubricJury),
 				new NamedJury<CompletionEvidence>("duplicates", duplicates));
 		Jury<CompletionEvidence> last = Juries.fromJudges(new ConjunctiveStrategy(0.6), new KeywordJudge("done"),
 				lambda);
 
 		return CascadedJury.<CompletionEvidence>builder()
-			.tier("gate", gate, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("review", review, TierPolicy.ACCEPT_ON_ALL_PASS)
-			.tier("final", last, TierPolicy.FINAL_TIER)
+			.tier("gate", gate, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("review", review, RoutingRule.ACCEPT_ON_ALL_PASS)
+			.tier("final", last, RoutingRule.FINAL_TIER)
 			.build();
 	}
 

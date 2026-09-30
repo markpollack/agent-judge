@@ -13,17 +13,17 @@ import java.util.Objects;
  * @param <E> evidence type
  * @param name human-readable tier name for diagnostics (e.g., "deterministic")
  * @param jury the jury implementation for this tier
- * @param policy cascade control flow policy
+ * @param routingRule cascade control flow routingRule
  * @author Mark Pollack
  * @since 0.9.0
  */
-public record TierConfig<E>(String name, Jury<E> jury, TierPolicy policy) {
+public record TierConfig<E>(String name, Jury<E> jury, RoutingRule routingRule) {
 
 	/** Validate all tier components. */
 	public TierConfig {
 		name = NamedJury.requireValidName(name);
 		Objects.requireNonNull(jury, "jury must not be null");
-		Objects.requireNonNull(policy, "policy must not be null");
+		Objects.requireNonNull(routingRule, "routingRule must not be null");
 	}
 
 }

@@ -40,8 +40,8 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("final", finalTier, TierPolicy.FINAL_TIER)
+			.tier("deterministic", tier1, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("final", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -74,8 +74,8 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("final", finalTier, TierPolicy.FINAL_TIER)
+			.tier("deterministic", tier1, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("final", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -101,8 +101,8 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
-			.tier("final", finalTier, TierPolicy.FINAL_TIER)
+			.tier("structural", tier2, RoutingRule.ACCEPT_ON_ALL_PASS)
+			.tier("final", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -126,8 +126,8 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
-			.tier("final", finalTier, TierPolicy.FINAL_TIER)
+			.tier("structural", tier2, RoutingRule.ACCEPT_ON_ALL_PASS)
+			.tier("final", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -164,8 +164,8 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("structural", splitTier, TierPolicy.ACCEPT_ON_ALL_PASS)
-			.tier("final", finalTier, TierPolicy.FINAL_TIER)
+			.tier("structural", splitTier, RoutingRule.ACCEPT_ON_ALL_PASS)
+			.tier("final", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -200,8 +200,8 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("deterministic", splitTier, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("final", finalTier, TierPolicy.FINAL_TIER)
+			.tier("deterministic", splitTier, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("final", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -221,7 +221,7 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("semantic", finalTier, TierPolicy.FINAL_TIER)
+			.tier("semantic", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -252,9 +252,9 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
-			.tier("semantic", finalTier, TierPolicy.FINAL_TIER)
+			.tier("deterministic", tier1, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("structural", tier2, RoutingRule.ACCEPT_ON_ALL_PASS)
+			.tier("semantic", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -284,9 +284,9 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
-			.tier("semantic", finalTier, TierPolicy.FINAL_TIER)
+			.tier("deterministic", tier1, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("structural", tier2, RoutingRule.ACCEPT_ON_ALL_PASS)
+			.tier("semantic", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -308,8 +308,8 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("broken", throwingTier, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("final", finalTier, TierPolicy.FINAL_TIER)
+			.tier("broken", throwingTier, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("final", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -326,7 +326,7 @@ class CascadedJuryTest {
 		Jury<CompletionEvidence> throwingFinal = new ThrowingJury();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("final", throwingFinal, TierPolicy.FINAL_TIER)
+			.tier("final", throwingFinal, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -351,7 +351,7 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("only", onlyTier, TierPolicy.FINAL_TIER)
+			.tier("only", onlyTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -376,8 +376,8 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("final", finalTier, TierPolicy.FINAL_TIER)
+			.tier("deterministic", tier1, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("final", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -402,8 +402,8 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("final", finalTier, TierPolicy.FINAL_TIER)
+			.tier("deterministic", tier1, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("final", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -427,8 +427,8 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
-			.tier("final", finalTier, TierPolicy.FINAL_TIER)
+			.tier("structural", tier2, RoutingRule.ACCEPT_ON_ALL_PASS)
+			.tier("final", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -454,7 +454,7 @@ class CascadedJuryTest {
 			.build();
 
 		assertThatThrownBy(() -> CascadedJury.<CompletionEvidence>builder()
-			.tier("only", jury, TierPolicy.REJECT_ON_ANY_FAIL)
+			.tier("only", jury, RoutingRule.REJECT_ON_ANY_FAIL)
 			.build()).isInstanceOf(IllegalStateException.class).hasMessageContaining("FINAL_TIER");
 	}
 
@@ -483,9 +483,9 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
-			.tier("semantic", tier3, TierPolicy.FINAL_TIER)
+			.tier("deterministic", tier1, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("structural", tier2, RoutingRule.ACCEPT_ON_ALL_PASS)
+			.tier("semantic", tier3, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -516,9 +516,9 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("deterministic", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("structural", tier2, TierPolicy.ACCEPT_ON_ALL_PASS)
-			.tier("semantic", tier3, TierPolicy.FINAL_TIER)
+			.tier("deterministic", tier1, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("structural", tier2, RoutingRule.ACCEPT_ON_ALL_PASS)
+			.tier("semantic", tier3, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -531,7 +531,7 @@ class CascadedJuryTest {
 	// ==================== getJudges / getVotingStrategy ====================
 
 	@Test
-	void getJudgesReturnsFlattenedJudgesFromAllTiers() {
+	void exposesConfiguredTiers() {
 		Jury<CompletionEvidence> tier1 = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("J1"))
 			.judge(alwaysPass("J2"))
@@ -544,25 +544,25 @@ class CascadedJuryTest {
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("t1", tier1, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("t2", tier2, TierPolicy.FINAL_TIER)
+			.tier("t1", tier1, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("t2", tier2, RoutingRule.FINAL_TIER)
 			.build();
 
-		assertThat(jury.getJudges()).hasSize(3);
+		assertThat(jury.tiers()).extracting(TierConfig::name).containsExactly("t1", "t2");
 	}
 
 	@Test
-	void getVotingStrategyReturnsNull() {
+	void cascadeDoesNotPretendToBeAVotingJury() {
 		Jury<CompletionEvidence> tier = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("J1"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("final", tier, TierPolicy.FINAL_TIER)
+			.tier("final", tier, RoutingRule.FINAL_TIER)
 			.build();
 
-		assertThat(jury.getVotingStrategy()).isNull();
+		assertThat(jury).isNotInstanceOf(VotingJury.class);
 	}
 
 	// ==================== Helper ====================
@@ -570,7 +570,7 @@ class CascadedJuryTest {
 	/**
 	 * A jury that throws an exception on vote().
 	 */
-	private static class ThrowingJury implements Jury<CompletionEvidence> {
+	private static class ThrowingJury implements VotingJury<CompletionEvidence> {
 
 		@Override
 		public java.util.List<io.github.markpollack.judge.Judge<CompletionEvidence>> getJudges() {
@@ -601,11 +601,11 @@ class CascadedJuryTest {
 			.judge(alwaysPass("Build"))
 			.judge(alwaysThrows("Coverage", new IllegalStateException("rate limited")))
 			.judge(alwaysPass("Style"))
-			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.votingStrategy(new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN))
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("scoring", scoring, TierPolicy.FINAL_TIER)
+			.tier("scoring", scoring, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);
@@ -628,11 +628,11 @@ class CascadedJuryTest {
 			.judge(nullMetadata(booleanPass("never kept")))
 			.judge(throwingMetadata(new IllegalStateException("registry offline"), booleanPass("never kept")))
 			.judge(alwaysPass("Style"))
-			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.votingStrategy(new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN))
 			.build();
 
 		CascadedJury<CompletionEvidence> jury = CascadedJury.<CompletionEvidence>builder()
-			.tier("scoring", scoring, TierPolicy.FINAL_TIER)
+			.tier("scoring", scoring, RoutingRule.FINAL_TIER)
 			.build();
 
 		Verdict verdict = jury.vote(context);

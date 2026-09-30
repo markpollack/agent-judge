@@ -12,7 +12,7 @@ lists.
 Jury jury = SimpleJury.builder()
     .judge(Judges.named(new BuildJudge(), "build"), 2.0)
     .judge(ctx -> Judgment.pass("smoke"))
-    .votingStrategy(new WeightedAverageStrategy(0.7, ErrorPolicy.IGNORE))
+    .votingStrategy(new WeightedAverageStrategy(0.7, ErrorHandling.IGNORE))
     .build();
 
 JuryDescription description = jury.describe();            // before any vote

@@ -53,7 +53,7 @@ public class CoveragePreservationJudge extends DeterministicJudge<CoverageCompar
 		CoverageMetrics current = JaCoCoReportParser.parse(evidence.workspace());
 		if (current.linesTotal() == 0 && current.summary().contains("not found")) {
 			// The required input to this evaluation is missing, so the judge could not
-			// complete. ERROR lets the jury's ErrorPolicy decide whether to propagate,
+			// complete. ERROR lets the jury's ErrorHandling decide whether to propagate,
 			// convert, or ignore the infrastructure failure.
 			return Judgment.error("No JaCoCo report found in workspace — coverage evaluation could not complete");
 		}

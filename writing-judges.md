@@ -207,7 +207,7 @@ this: an `ApiCompatibilityJudge` on a change that touches no public API has noth
 saying `FAIL` would be a lie.
 
 **Anything that can throw must be converted to a judgment at the point of invocation.** `[OURS]`
-`ErrorPolicy` governs judgments whose status is `ERROR`. It cannot govern an exception. A new
+`ErrorHandling` governs judgments whose status is `ERROR`. It cannot govern an exception. A new
 failure mode that is not turned into an `ERROR` judgment is, by construction, invisible to every
 policy this library offers. (`SimpleJury.invokeJudge` now does this conversion for you — a
 throwing judge becomes an `ERROR` judgment naming the judge and the cause, rather than escaping and
@@ -220,7 +220,7 @@ design. If you do not log at the catch site the diagnostic is gone.
 
 ### The trap: an errored judge and an abstaining judge render identically
 
-This is defect 1, and it is the most expensive one. Under `ErrorPolicy.TREAT_AS_ABSTAIN` — and under
+This is defect 1, and it is the most expensive one. Under `ErrorHandling.TREAT_AS_ABSTAIN` — and under
 several downstream reporting conventions — a judge that could not run and a judge with nothing to
 add produce the same visible output: nothing.
 
@@ -638,7 +638,7 @@ That test is three lines and it is the direct regression guard for defect 5.
 | Strategy | Reduces over | Reach for it when |
 |---|---|---|
 | `ConsensusStrategy` | statuses | Every applicable judge must agree. Mixed applicable PASS/FAIL yields `ABSTAIN` — a reported disagreement, not a silent negative |
-| `MajorityVotingStrategy` | statuses | Judges are noisy samples of one question; ties resolve by `TiePolicy` |
+| `MajorityVotingStrategy` | statuses | Judges are noisy samples of one question; ties resolve by `TieBreakRule` |
 | `AllMustPassStrategy` | statuses | Every applicable judge must `PASS`, and a mixed jury is a **rejection** — the gate `ConsensusStrategy` deliberately leaves to you. Carries no score, because its judges carry none |
 | `ConjunctiveStrategy` | `effectiveScore()` | Every applicable judge must clear a bar. Non-compensatory: the minimum decides, and the evidence names the judgment that bound it. The threshold is required, not defaulted |
 | `AverageVotingStrategy` / `MedianVotingStrategy` | `effectiveScore()` | The judges measure one quantity and you want its central tendency. Median if you expect outliers |
@@ -656,7 +656,7 @@ the aggregate — changing aggregation semantics does not change gate behavior.
 
 ### 6.1 Set the error policy on purpose
 
-`ErrorPolicy` defaults to `PROPAGATE`, and the default is right: a judge that could not evaluate
+`ErrorHandling` defaults to `PROPAGATE`, and the default is right: a judge that could not evaluate
 should not be silently converted into a negative finding it never made.
 
 | Policy | In the population? | Consequence |
@@ -682,7 +682,7 @@ identity**. This has three consequences you must design around. `[OURS]`
 back to `"Judge#" + (index + 1)` for anonymous lambdas. A named judge appears in
 `Verdict.individualByName()`; an anonymous one appears as a position that changes when you insert a
 judge above it. A `JudgeWithMetadata` whose `metadata()` returns `null` or throws is not run: its
-seat is keyed by position and records an `ERROR` naming the failure, for the `ErrorPolicy` to resolve.
+seat is keyed by position and records an `ERROR` naming the failure, for the `ErrorHandling` to resolve.
 
 ```java
 tier.judge(Judges.named(new DddReviewQualityJudge(), "dddQuality"));   // do this
@@ -728,7 +728,7 @@ is a hazard rather than a policy:
   library refuses to make.
 
 There is no test coverage for `ABSTAIN` or `ERROR` through any of the four combinators. `[OURS]`
-Until that changes, **compose abstaining judges with a jury and an explicit `ErrorPolicy`, not with
+Until that changes, **compose abstaining judges with a jury and an explicit `ErrorHandling`, not with
 these combinators** — a jury's aggregation is status-aware and publishes its evidence.
 
 ---
@@ -1205,7 +1205,7 @@ Before a judge is trusted:
 - [ ] A judgment carrying a failing check cannot be `PASS`, and a test says so
 - [ ] The binding criterion is reported alongside the verdict
 - [ ] Every judge is `Judges.named(...)`
-- [ ] `ErrorPolicy` is chosen per tier, and independent questions are not in a `PROPAGATE` tier
+- [ ] `ErrorHandling` is chosen per tier, and independent questions are not in a `PROPAGATE` tier
 - [ ] `Judges.allOf`/`anyOf` are not used where judges can abstain
 
 **The proof**

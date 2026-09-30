@@ -71,7 +71,7 @@ class AttemptDispositionAgreementTest {
 	}
 
 	private static CompositeAttempt attempt(AttemptDisposition disposition, DispositionReason reason, Verdict verdict) {
-		return new CompositeAttempt("rubric", CompositeRelation.CASCADE_TIER, TierPolicy.REJECT_ON_ANY_FAIL,
+		return new CompositeAttempt("rubric", CompositeRelation.CASCADE_TIER, RoutingRule.REJECT_ON_ANY_FAIL,
 				disposition, reason, verdict, null);
 	}
 
@@ -88,7 +88,7 @@ class AttemptDispositionAgreementTest {
 				.hasMessageContaining("CHILD_UNDECIDED");
 
 			assertThatThrownBy(() -> CompositeAttempt.stageFailed("rubric", CompositeRelation.CASCADE_TIER,
-					TierPolicy.REJECT_ON_ANY_FAIL, DispositionReason.CHILD_UNDECIDED, excluded()))
+					RoutingRule.REJECT_ON_ANY_FAIL, DispositionReason.CHILD_UNDECIDED, excluded()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("CHILD_UNDECIDED");
 		}
@@ -102,7 +102,7 @@ class AttemptDispositionAgreementTest {
 				.hasMessageContaining("UNDECLARED_NOT_APPLICABLE");
 
 			assertThatThrownBy(() -> CompositeAttempt.stageFailed("rubric", CompositeRelation.CASCADE_TIER,
-					TierPolicy.REJECT_ON_ANY_FAIL, DispositionReason.UNDECLARED_NOT_APPLICABLE, undecided()))
+					RoutingRule.REJECT_ON_ANY_FAIL, DispositionReason.UNDECLARED_NOT_APPLICABLE, undecided()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("UNDECLARED_NOT_APPLICABLE");
 		}
@@ -115,7 +115,7 @@ class AttemptDispositionAgreementTest {
 				.hasMessageContaining("USED");
 
 			assertThatThrownBy(() -> CompositeAttempt.used("rubric", CompositeRelation.CASCADE_TIER,
-					TierPolicy.REJECT_ON_ANY_FAIL, undecided()))
+					RoutingRule.REJECT_ON_ANY_FAIL, undecided()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("USED");
 		}
@@ -130,16 +130,16 @@ class AttemptDispositionAgreementTest {
 		@DisplayName("every honest combination is still accepted")
 		void honestCombinationsAreAccepted() {
 			assertThatCode(() -> CompositeAttempt.stageFailed("rubric", CompositeRelation.CASCADE_TIER,
-					TierPolicy.REJECT_ON_ANY_FAIL, DispositionReason.CHILD_UNDECIDED, undecided()))
+					RoutingRule.REJECT_ON_ANY_FAIL, DispositionReason.CHILD_UNDECIDED, undecided()))
 				.doesNotThrowAnyException();
 			assertThatCode(() -> CompositeAttempt.stageFailed("rubric", CompositeRelation.CASCADE_TIER,
-					TierPolicy.REJECT_ON_ANY_FAIL, DispositionReason.UNDECLARED_NOT_APPLICABLE, excluded()))
+					RoutingRule.REJECT_ON_ANY_FAIL, DispositionReason.UNDECLARED_NOT_APPLICABLE, excluded()))
 				.doesNotThrowAnyException();
 			assertThatCode(() -> CompositeAttempt.used("rubric", CompositeRelation.CASCADE_TIER,
-					TierPolicy.REJECT_ON_ANY_FAIL, decided()))
+					RoutingRule.REJECT_ON_ANY_FAIL, decided()))
 				.doesNotThrowAnyException();
 			assertThatCode(() -> CompositeAttempt.executionFailed("rubric", CompositeRelation.CASCADE_TIER,
-					TierPolicy.REJECT_ON_ANY_FAIL, new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED)))
+					RoutingRule.REJECT_ON_ANY_FAIL, new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED)))
 				.doesNotThrowAnyException();
 		}
 
@@ -147,8 +147,8 @@ class AttemptDispositionAgreementTest {
 		@DisplayName("a determined D1 child is a legitimate USED member, since it decided")
 		void aDeterminedRejectionIsUsable() {
 			Verdict rejecting = CascadedJury.<CompletionEvidence>builder()
-				.tier("rubric", ContainmentTest.returning(excluded()), TierPolicy.REJECT_ON_ANY_FAIL)
-				.tier("semantic", ContainmentTest.returning(decided()), TierPolicy.FINAL_TIER)
+				.tier("rubric", ContainmentTest.returning(excluded()), RoutingRule.REJECT_ON_ANY_FAIL)
+				.tier("semantic", ContainmentTest.returning(decided()), RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CompletionEvidence.builder().request("reject on an established violation").build());
 
@@ -168,7 +168,7 @@ class AttemptDispositionAgreementTest {
 		void aFalseReasonIsRefusedOnRead() throws Exception {
 			String honest = MAPPER
 				.writeValueAsString(CompositeAttempt.stageFailed("rubric", CompositeRelation.CASCADE_TIER,
-						TierPolicy.REJECT_ON_ANY_FAIL, DispositionReason.UNDECLARED_NOT_APPLICABLE, excluded()));
+						RoutingRule.REJECT_ON_ANY_FAIL, DispositionReason.UNDECLARED_NOT_APPLICABLE, excluded()));
 			String swapped = honest.replace("\"undeclared_not_applicable\"", "\"child_undecided\"");
 
 			assertThat(swapped).isNotEqualTo(honest);
@@ -181,7 +181,7 @@ class AttemptDispositionAgreementTest {
 		@DisplayName("an honest attempt still round-trips")
 		void anHonestAttemptRoundTrips() throws Exception {
 			CompositeAttempt honest = CompositeAttempt.stageFailed("rubric", CompositeRelation.CASCADE_TIER,
-					TierPolicy.REJECT_ON_ANY_FAIL, DispositionReason.UNDECLARED_NOT_APPLICABLE, excluded());
+					RoutingRule.REJECT_ON_ANY_FAIL, DispositionReason.UNDECLARED_NOT_APPLICABLE, excluded());
 
 			assertThat(MAPPER.readValue(MAPPER.writeValueAsString(honest), CompositeAttempt.class)).isEqualTo(honest);
 		}

@@ -18,11 +18,11 @@ import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.jury.AllMustPassStrategy;
-import io.github.markpollack.judge.jury.ErrorPolicy;
+import io.github.markpollack.judge.jury.ErrorHandling;
 import io.github.markpollack.judge.jury.Juries;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.NamedJury;
-import io.github.markpollack.judge.jury.NotApplicablePolicy;
+import io.github.markpollack.judge.jury.ExclusionHandling;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.VotingStrategy;
 import io.github.markpollack.judge.judgment.Judgment;
@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * <p>
  * {@code aggregateMayBeNotApplicable} was derived from the strategy
  * <em>description</em>'s not-applicable policy. A custom strategy is entitled to override
- * {@link VotingStrategy#notApplicablePolicy()} and to leave {@code describe()} at its
+ * {@link VotingStrategy#exclusionHandling()} and to leave {@code describe()} at its
  * supported default, and then that policy is absent from the description — so the
  * derivation read absent as {@code REFUSE} and published {@code false} for a jury that
  * reports {@code true} and can emit {@code NOT_APPLICABLE}.
@@ -81,8 +81,8 @@ class DescribedCapabilityTest {
 	 */
 	private static final class DelegatingExcluder implements VotingStrategy {
 
-		private final VotingStrategy delegate = new AllMustPassStrategy(ErrorPolicy.PROPAGATE,
-				NotApplicablePolicy.EXCLUDE);
+		private final VotingStrategy delegate = new AllMustPassStrategy(ErrorHandling.PROPAGATE,
+				ExclusionHandling.EXCLUDE);
 
 		@Override
 		public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
@@ -95,8 +95,8 @@ class DescribedCapabilityTest {
 		}
 
 		@Override
-		public NotApplicablePolicy notApplicablePolicy() {
-			return NotApplicablePolicy.EXCLUDE;
+		public ExclusionHandling exclusionHandling() {
+			return ExclusionHandling.EXCLUDE;
 		}
 
 	}
@@ -155,11 +155,11 @@ class DescribedCapabilityTest {
 		void builtInsAreUnchanged() {
 			SimpleJury<CompletionEvidence> excluding = SimpleJury.<CompletionEvidence>builder()
 				.judge(new Conditional("conditional"))
-				.votingStrategy(new AllMustPassStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
+				.votingStrategy(new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 				.build();
 			SimpleJury<CompletionEvidence> failing = SimpleJury.<CompletionEvidence>builder()
 				.judge(new Conditional("conditional"))
-				.votingStrategy(new AllMustPassStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.TREAT_AS_FAIL))
+				.votingStrategy(new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.TREAT_AS_FAIL))
 				.build();
 
 			assertThat(excluding.describe().aggregateMayBeNotApplicable()).isTrue();
@@ -172,8 +172,8 @@ class DescribedCapabilityTest {
 		@Test
 		@DisplayName("a description that contradicts a declared policy is refused, not stored")
 		void aContradictionIsRefused() {
-			StrategyDescription declaredExcluder = new AllMustPassStrategy(ErrorPolicy.PROPAGATE,
-					NotApplicablePolicy.EXCLUDE)
+			StrategyDescription declaredExcluder = new AllMustPassStrategy(ErrorHandling.PROPAGATE,
+					ExclusionHandling.EXCLUDE)
 				.describe();
 			List<SeatDescription> capableSeat = List.of(new SeatDescription(0, "conditional", KeySource.DECLARED, 1.0,
 					Judges.describe(new Conditional("conditional"))));

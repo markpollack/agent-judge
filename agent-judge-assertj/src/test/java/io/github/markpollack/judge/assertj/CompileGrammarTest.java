@@ -20,21 +20,96 @@ class CompileGrammarTest {
 	Path directory;
 
 	static final String PREFIX = """
-			        import static io.github.markpollack.judge.assertj.Assertions.assertThat;
-			        import static org.assertj.core.api.Assertions.assertThat;
-			        import io.github.markpollack.judge.*;
-			        import io.github.markpollack.judge.jury.*;
-			        import io.github.markpollack.judge.judgment.*;
-			import io.github.markpollack.judge.acceptance.AcceptanceAction;
-			import io.github.markpollack.judge.acceptance.AcceptanceDecision;
-			        import io.github.markpollack.judge.requirement.*;
-			        class Probe {
-			            Requirement<String> requirement = Requirement.text("r", "1", "ready");
-			            Judge<RequirementEvidence<String, String>> judge = input -> Judgment.pass("ready");
-			            Judge<String> general = input -> Judgment.pass(input);
-			            Judge<Integer> number = input -> Judgment.pass(input.toString());
-			            void probe() {
-			        """;
+			import static io.github.markpollack.judge.assertj.Assertions.assertThat;
+			import static io.github.markpollack.judge.assertj.Assertions.assertThatEvidence;
+			import static org.assertj.core.api.Assertions.assertThat;
+			import io.github.markpollack.judge.*;
+			import io.github.markpollack.judge.jury.*;
+			import io.github.markpollack.judge.judgment.*;
+			import io.github.markpollack.judge.policy.*;
+			import io.github.markpollack.judge.requirement.*;
+			import java.util.List;
+			class Probe {
+			  record Native(int limit) {}
+			  record Evidence(int count, String text) {}
+			  Requirement<String> requirement=Requirement.text("r","1","ready");
+			  Requirement<Native> nativeRequirement=new Requirement<>("n","1","native",new Native(0),requirement.source());
+			  Requirement<AllOf> parent=new Requirement<>("p","1","both",new AllOf(List.of(requirement,nativeRequirement)),requirement.source());
+			  RequirementJudge<String,String> judge=(r,e)->Judgment.pass("ready");
+			  RequirementJudge<Native,Integer> nativeJudge=(r,e)->Judgment.pass("native");
+			  RequirementJury<String,String> jury=RequirementJuries.voting(new ConsensusStrategy(),List.of(judge));
+			  Judge<String> general=input->Judgment.pass(input);
+			  Judge<Integer> number=input->Judgment.pass(input.toString());
+			  void probe() {
+			""";
+
+	@Test
+	void exactRootReadmeJavaBlocksCompileTogether() throws Exception {
+		Path root = Path.of(System.getProperty("user.dir")).toAbsolutePath();
+		while (!Files.exists(root.resolve("agent-judge-core")))
+			root = root.getParent();
+		String readme = Files.readString(root.resolve("README.md"));
+		var blocks = java.util.regex.Pattern.compile("(?s)```java\\s*\\n(.*?)```").matcher(readme);
+		var imports = new StringBuilder();
+		var body = new StringBuilder();
+		while (blocks.find())
+			for (String line : blocks.group(1).split("\\n")) {
+				if (line.startsWith("import "))
+					imports.append(line).append('\n');
+				else
+					body.append(line).append('\n');
+			}
+		String stub = "io.github.markpollack.judge.ai.model.JudgeModel judgeModel = request -> new io.github.markpollack.judge.ai.model.JudgeModelResponse(\"satisfied\",\"local\",null,java.util.Map.of());\n";
+		var source = directory.resolve("Readme.java");
+		Files.writeString(source, imports + "class Readme { void run() {\n" + stub + body + "\n}}\n");
+		var diagnostics = new DiagnosticCollector<JavaFileObject>();
+		var compiler = ToolProvider.getSystemJavaCompiler();
+		try (var files = compiler.getStandardFileManager(diagnostics, null, null)) {
+			boolean success = compiler.getTask(null, files, diagnostics, List.of("-proc:none", "-classpath",
+					System.getProperty("java.class.path"), "-d", directory.toString()), null,
+					files.getJavaFileObjects(source.toFile()))
+				.call();
+			assertThat(success).as("README Java examples: %s", diagnostics.getDiagnostics()).isTrue();
+		}
+	}
+
+	@org.junit.jupiter.params.ParameterizedTest
+	@org.junit.jupiter.params.provider.ValueSource(strings = { "agent-judge-assertions", "agent-judge-assertj" })
+	void exactModuleReadmeJavaBlocksCompile(String module) throws Exception {
+		Path root = Path.of(System.getProperty("user.dir")).toAbsolutePath();
+		while (!Files.exists(root.resolve("agent-judge-core")))
+			root = root.getParent();
+		var blocks = java.util.regex.Pattern.compile("(?s)```java\\s*\\n(.*?)```")
+			.matcher(Files.readString(root.resolve(module).resolve("README.md")));
+		var imports = new StringBuilder(
+				"import io.github.markpollack.judge.*;\n" + "import io.github.markpollack.judge.judgment.*;\n"
+						+ "import io.github.markpollack.judge.requirement.*;\n"
+						+ "import io.github.markpollack.judge.evaluation.*;\n"
+						+ "import io.github.markpollack.judge.assertions.*;\n");
+		var body = new StringBuilder();
+		int count = 0;
+		while (blocks.find()) {
+			count++;
+			for (String line : blocks.group(1).split("\\n")) {
+				if (line.startsWith("import "))
+					imports.append(line).append('\n');
+				else
+					body.append(line).append('\n');
+			}
+		}
+		assertThat(count).isPositive();
+		var source = directory.resolve("ModuleReadme.java");
+		Files.writeString(source, imports + "class ModuleReadme { void run() {\n" + body + "\n}}\n");
+		var diagnostics = new DiagnosticCollector<JavaFileObject>();
+		var compiler = ToolProvider.getSystemJavaCompiler();
+		try (var files = compiler.getStandardFileManager(diagnostics, null, null)) {
+			boolean success = compiler.getTask(null, files, diagnostics, List.of("-proc:none", "-classpath",
+					System.getProperty("java.class.path"), "-d", directory.toString()), null,
+					files.getJavaFileObjects(source.toFile()))
+				.call();
+			assertThat(success).as("%s README Java examples: %s", module, diagnostics.getDiagnostics()).isTrue();
+		}
+	}
 
 	void compile(String body, boolean expected) throws Exception {
 		var source = directory.resolve("Probe.java");
@@ -52,90 +127,129 @@ class CompileGrammarTest {
 	}
 
 	@Test
-	void validEvidenceAndOrdinaryAssertJCoexist() throws Exception {
-		compile("assertThat(requirement).judgedByRequirement(judge).withEvidence(\"READY\").isSatisfied(); assertThat(42).isEqualTo(42);",
+	void validRequirementAndOrdinaryAssertJCoexist() throws Exception {
+		compile("assertThat(requirement).judgedBy(judge).withEvidence(\"READY\").isSatisfied(); assertThat(42).isEqualTo(42);",
 				true);
 	}
 
 	@Test
-	void wrongEvidenceIsRejected() throws Exception {
-		compile("assertThat(requirement).judgedByRequirement(judge).withEvidence(42).isSatisfied();", false);
+	void ordinaryCheckNeedsNoRequirement() throws Exception {
+		compile("assertThatEvidence(\"READY\").judgedBy(general).isPassed();", true);
 	}
 
 	@Test
-	void ordinaryJudgeNeedsNoRequirementPlumbing() throws Exception {
-		compile("assertThat(requirement).judgedBy(general).withEvidence(\"READY\").isSatisfied();", true);
+	void wrongEvidence() throws Exception {
+		compile("assertThat(requirement).judgedBy(judge).withEvidence(42).isSatisfied();", false);
 	}
 
 	@Test
-	void prematureTerminalIsRejected() throws Exception {
-		compile("assertThat(requirement).judgedByRequirement(judge).isSatisfied();", false);
+	void ordinaryJudgeCannotDiscardRequirement() throws Exception {
+		compile("assertThat(requirement).judgedBy(general).withEvidence(\"READY\").isSatisfied();", false);
 	}
 
 	@Test
-	void juryCannotMixEvidenceTypes() throws Exception {
+	void prematureTerminal() throws Exception {
+		compile("assertThat(requirement).judgedBy(judge).isSatisfied();", false);
+	}
+
+	@Test
+	void juryCannotMixEvidence() throws Exception {
 		compile("SimpleJury.<String>builder().judge(general).judge(number).build();", false);
 	}
 
 	@Test
-	void juryFactoryCannotEraseEvidenceTypes() throws Exception {
-		compile("Juries.fromJudges(new ConsensusStrategy(), general, number);", false);
+	void factoryCannotEraseEvidence() throws Exception {
+		compile("Juries.fromJudges(new ConsensusStrategy(),general,number);", false);
 	}
 
 	@Test
-	void forgottenTerminalIsLegalJava() throws Exception {
-		compile("assertThat(requirement).judgedByRequirement(judge).withEvidence(\"READY\");", true);
+	void omittedTerminalIsLegalJava() throws Exception {
+		compile("assertThat(requirement).judgedBy(judge).withEvidence(\"READY\");", true);
 	}
 
 	@Test
-	void typedJuryUsesSameFluentGrammar() throws Exception {
-		compile("var jury = SimpleJury.<RequirementEvidence<String, String>>builder().judge(judge).build(); assertThat(requirement).judgedByRequirement(jury).withEvidence(\"READY\").isSatisfied();",
-				true);
+	void requirementJuryGrammar() throws Exception {
+		compile("assertThat(requirement).judgedBy(jury).withEvidence(\"READY\").isSatisfied();", true);
 	}
 
 	@Test
-	void ordinaryWrongEvidenceIsRejected() throws Exception {
-		compile("assertThat(requirement).judgedBy(general).withEvidence(42).isSatisfied();", false);
-	}
-
-	@Test
-	void ordinaryJuryUsesSameGrammar() throws Exception {
-		compile("var jury = SimpleJury.<String>builder().judge(general).build(); assertThat(requirement).judgedBy(jury).withEvidence(\"READY\").isSatisfied();",
-				true);
+	void ordinaryJuryCannotDiscardRequirement() throws Exception {
+		compile("assertThat(requirement).judgedBy(Juries.fromJudges(new ConsensusStrategy(),general)).withEvidence(\"READY\").isSatisfied();",
+				false);
 	}
 
 	@Test
 	void policyCannotPrecedeEvidence() throws Exception {
-		compile("assertThat(requirement).judgedBy(general).withAcceptancePolicy(j -> new AcceptanceDecision(AcceptanceAction.RELY, \"rely\"));",
+		compile("assertThat(requirement).judgedBy(judge).withPolicy(v->new PolicyDecision(PolicyAction.RELY,\"yes\"));",
 				false);
 	}
 
 	@Test
-	void policyLambdaAfterEvidenceNeedsNoIdentity() throws Exception {
-		compile("assertThat(requirement).judgedBy(general).withEvidence(\"READY\").withAcceptancePolicy(j -> new AcceptanceDecision(AcceptanceAction.RELY, \"rely\")).isSatisfied();",
+	void policyNeedsNoIdentity() throws Exception {
+		compile("assertThat(requirement).judgedBy(judge).withEvidence(\"READY\").withPolicy(v->new PolicyDecision(PolicyAction.RELY,\"yes\")).isSatisfied();",
 				true);
 	}
 
 	@Test
-	void requirementAwareJudgeCannotLoseSpecificationType() throws Exception {
-		compile("Requirement<Integer> numeric = new Requirement<>(\"n\", \"1\", \"number\", 4, null); assertThat(numeric).judgedByRequirement(judge);",
-				false);
+	void specificationMismatch() throws Exception {
+		compile("assertThat(nativeRequirement).judgedBy(judge);", false);
 	}
 
 	@Test
 	void pureRequirementCannotAttachPolicy() throws Exception {
-		compile("requirement.under(j -> new AcceptanceDecision(AcceptanceAction.RELY, \"rely\"));", false);
+		compile("requirement.under(v->new PolicyDecision(PolicyAction.RELY,\"yes\"));", false);
 	}
 
 	@Test
-	void ordinaryAndPairedJudgeOverloadsHaveTheSameErasure() throws Exception {
-		compile("class Alternatives { void judgedBy(Judge<String> j) {} void judgedBy(Judge<RequirementEvidence<String,String>> j) {} }",
-				false);
+	void excludedCannotCarryFinding() throws Exception {
+		compile("Judgment.builder().notApplicable().reasoning(\"outside\").label(\"no_java\").build();", false);
 	}
 
 	@Test
-	void excludedCriterionCannotCarryFinding() throws Exception {
-		compile("Judgment.builder().notApplicable().reasoning(\"outside domain\").label(\"no_java\").build();", false);
+	void completeMixedComposition() throws Exception {
+		compile("Assignments.<Evidence>forRequirement(parent).jury(requirement,Evidence::text,jury).judge(nativeRequirement,Evidence::count,nativeJudge).validate().vote(new Evidence(0,\"ready\"));",
+				true);
+	}
+
+	@Test
+	void incompleteMappingCompilesButRequiresRuntimeValidation() throws Exception {
+		compile("Assignments.<Evidence>forRequirement(parent).judge(nativeRequirement,Evidence::count,nativeJudge).validate();",
+				true);
+	}
+
+	@Test
+	void assignmentSpecificationMismatch() throws Exception {
+		compile("Assignments.<String>forRequirement(parent).judge(nativeRequirement,judge);", false);
+	}
+
+	@Test
+	void assignmentEvidenceMismatch() throws Exception {
+		compile("Assignments.<Integer>forRequirement(parent).judge(requirement,judge);", false);
+	}
+
+	@Test
+	void assignmentOrdinaryJudgeMisuse() throws Exception {
+		compile("Assignments.<String>forRequirement(parent).judge(requirement,general);", false);
+	}
+
+	@Test
+	void assignmentJuryAsJudge() throws Exception {
+		compile("Assignments.<String>forRequirement(parent).judge(requirement,jury);", false);
+	}
+
+	@Test
+	void judgeSelectorOutputMismatch() throws Exception {
+		compile("Assignments.<Evidence>forRequirement(parent).judge(requirement,Evidence::count,judge);", false);
+	}
+
+	@Test
+	void jurySelectorOutputMismatch() throws Exception {
+		compile("Assignments.<Evidence>forRequirement(parent).jury(requirement,Evidence::count,jury);", false);
+	}
+
+	@Test
+	void jurySpecMismatch() throws Exception {
+		compile("Assignments.<String>forRequirement(parent).jury(nativeRequirement,jury);", false);
 	}
 
 }

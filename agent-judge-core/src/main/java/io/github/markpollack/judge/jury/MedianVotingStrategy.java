@@ -23,8 +23,8 @@ import io.github.markpollack.judge.judgment.Judgment;
  * <p>
  * Abstentions leave the population entirely rather than participating as zero — under the
  * old behaviour two abstentions could drag the median to zero and flip the verdict.
- * Errors are governed by {@link ErrorPolicy} (default {@code PROPAGATE}) and exclusions
- * by {@link NotApplicablePolicy} (default {@code REFUSE}). If nothing is eligible the
+ * Errors are governed by {@link ErrorHandling} (default {@code PROPAGATE}) and exclusions
+ * by {@link ExclusionHandling} (default {@code REFUSE}). If nothing is eligible the
  * result is {@code ABSTAIN}, or {@code NOT_APPLICABLE} when every input was an honoured
  * exclusion.
  * </p>
@@ -62,15 +62,15 @@ public class MedianVotingStrategy implements VotingStrategy {
 
 	private final double threshold;
 
-	private final ErrorPolicy errorPolicy;
+	private final ErrorHandling errorPolicy;
 
-	private final NotApplicablePolicy notApplicablePolicy;
+	private final ExclusionHandling notApplicablePolicy;
 
 	/**
 	 * Create a median strategy with the default error policy.
 	 */
 	public MedianVotingStrategy() {
-		this(DEFAULT_THRESHOLD, ErrorPolicy.PROPAGATE);
+		this(DEFAULT_THRESHOLD, ErrorHandling.PROPAGATE);
 	}
 
 	/**
@@ -78,7 +78,7 @@ public class MedianVotingStrategy implements VotingStrategy {
 	 * @param errorPolicy policy for handling errors
 	 * @throws IllegalArgumentException if {@code errorPolicy} is null
 	 */
-	public MedianVotingStrategy(ErrorPolicy errorPolicy) {
+	public MedianVotingStrategy(ErrorHandling errorPolicy) {
 		this(DEFAULT_THRESHOLD, errorPolicy);
 	}
 
@@ -90,7 +90,7 @@ public class MedianVotingStrategy implements VotingStrategy {
 	 * @since 0.16.0
 	 */
 	public MedianVotingStrategy(double threshold) {
-		this(threshold, ErrorPolicy.PROPAGATE);
+		this(threshold, ErrorHandling.PROPAGATE);
 	}
 
 	/**
@@ -101,8 +101,8 @@ public class MedianVotingStrategy implements VotingStrategy {
 	 * {@code [0.0, 1.0]}, or if {@code errorPolicy} is null
 	 * @since 0.16.0
 	 */
-	public MedianVotingStrategy(double threshold, ErrorPolicy errorPolicy) {
-		this(threshold, errorPolicy, NotApplicablePolicy.REFUSE);
+	public MedianVotingStrategy(double threshold, ErrorHandling errorPolicy) {
+		this(threshold, errorPolicy, ExclusionHandling.REFUSE);
 	}
 
 	/**
@@ -114,7 +114,7 @@ public class MedianVotingStrategy implements VotingStrategy {
 	 * {@code [0.0, 1.0]}, or if either policy is null
 	 * @since 0.17.0
 	 */
-	public MedianVotingStrategy(double threshold, ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
+	public MedianVotingStrategy(double threshold, ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
 		if (notApplicablePolicy == null) {
 			throw new IllegalArgumentException("notApplicablePolicy must not be null");
 		}
@@ -189,7 +189,7 @@ public class MedianVotingStrategy implements VotingStrategy {
 
 	/** {@inheritDoc} */
 	@Override
-	public NotApplicablePolicy notApplicablePolicy() {
+	public ExclusionHandling exclusionHandling() {
 		return this.notApplicablePolicy;
 	}
 

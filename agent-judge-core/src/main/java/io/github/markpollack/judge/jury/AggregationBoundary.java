@@ -78,7 +78,7 @@ final class AggregationBoundary {
 	 * it happened
 	 * @return the strategy's aggregate, or the contained error that replaces it
 	 */
-	static Judgment aggregate(VotingStrategy strategy, List<Judgment> judgments, Map<String, Double> weights,
+	static Reduction aggregate(VotingStrategy strategy, List<Judgment> judgments, Map<String, Double> weights,
 			boolean mayBeNotApplicable, Logger logger) {
 		// Resolved before the call, so a strategy whose own getName() throws still has a
 		// name in
@@ -89,12 +89,20 @@ final class AggregationBoundary {
 			aggregate = strategy.aggregate(judgments, weights);
 		}
 		catch (Exception ex) {
+			SimpleJury.preserveCancellation(ex);
 			String cause = ex.getMessage();
-			return contained(logger, name,
-					"threw " + ex.getClass().getName() + ((cause == null || cause.isBlank()) ? "" : ": " + cause));
+			return new Reduction(
+					contained(logger, name,
+							"threw " + ex.getClass().getName()
+									+ ((cause == null || cause.isBlank()) ? "" : ": " + cause)),
+					new CompositeFailure(CompositeFailureCode.AGGREGATION_FAILED, ex));
 		}
 		String rejection = allowListRejection(aggregate, mayBeNotApplicable);
-		return rejection == null ? aggregate : contained(logger, name, rejection);
+		return rejection == null ? new Reduction(aggregate, null) : new Reduction(contained(logger, name, rejection),
+				new CompositeFailure(CompositeFailureCode.AGGREGATION_FAILED, new IllegalStateException(rejection)));
+	}
+
+	record Reduction(Judgment judgment, @Nullable CompositeFailure failure) {
 	}
 
 	/**
@@ -115,9 +123,8 @@ final class AggregationBoundary {
 			return "returned a NOT_APPLICABLE aggregate, but this jury never declared that its aggregate "
 					+ "may be excluded";
 		}
-		if (aggregate.status() == JudgmentStatus.ERROR
-				&& !ALLOWED_ERROR_CODES.contains(aggregate.operationalReasonCode())) {
-			return "returned an ERROR coded " + aggregate.operationalReasonCode()
+		if (aggregate.status() == JudgmentStatus.ERROR && !ALLOWED_ERROR_CODES.contains(aggregate.reasonCode())) {
+			return "returned an ERROR coded " + aggregate.reasonCode()
 					+ ", which names a cause outside the reduction it performed";
 		}
 		return null;
@@ -151,7 +158,7 @@ final class AggregationBoundary {
 	 * @return the provenance
 	 */
 	static VerdictProvenance decisionFor(Judgment judgment) {
-		JudgmentReasonCode code = judgment.operationalReasonCode();
+		JudgmentReasonCode code = judgment.reasonCode();
 		boolean undecided = judgment.status() == JudgmentStatus.ERROR && code != null
 				&& code.originFamily() == JudgmentReasonCode.OriginFamily.MACHINERY;
 		return undecided ? VerdictProvenance.undecided() : VerdictProvenance.own();

@@ -20,10 +20,10 @@ import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.description.SeatDescription;
 import io.github.markpollack.judge.description.SimpleJuryDescription;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
-import io.github.markpollack.judge.jury.ErrorPolicy;
+import io.github.markpollack.judge.jury.ErrorHandling;
 import io.github.markpollack.judge.jury.Juries;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.NotApplicablePolicy;
+import io.github.markpollack.judge.jury.ExclusionHandling;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.judgment.Judgment;
@@ -97,7 +97,7 @@ class ModelBackedJudgeCapabilityTests {
 
 		Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(conditional)
-			.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
+			.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 			.build();
 
 		assertThat(jury.aggregateMayBeNotApplicable()).isTrue();
@@ -114,7 +114,7 @@ class ModelBackedJudgeCapabilityTests {
 		Judge<CompletionEvidence> second = judge("rubric", CONDITION, "excluded");
 
 		Jury<CompletionEvidence> jury = Juries
-			.fromJudges(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE), first, second);
+			.fromJudges(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE), first, second);
 
 		SimpleJuryDescription description = (SimpleJuryDescription) jury.describe();
 		assertThat(description.seats())

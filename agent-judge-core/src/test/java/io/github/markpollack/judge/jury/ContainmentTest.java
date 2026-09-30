@@ -66,8 +66,8 @@ class ContainmentTest {
 		}
 
 		@Override
-		public NotApplicablePolicy notApplicablePolicy() {
-			return NotApplicablePolicy.EXCLUDE;
+		public ExclusionHandling exclusionHandling() {
+			return ExclusionHandling.EXCLUDE;
 		}
 
 	}
@@ -102,8 +102,9 @@ class ContainmentTest {
 			assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.undecided());
 			assertThat(verdict.individual()).containsExactly(PASS, FAIL);
 			assertThat(verdict.individualByName()).containsKeys("first", "second");
-			assertThat(verdict.seats()).containsExactly(new Seat(0, "first", KeySource.DECLARED),
-					new Seat(1, "second", KeySource.DECLARED));
+			assertThat(verdict.seats()).containsExactly(
+					new Seat(0, "first", KeySource.DECLARED).treated(Participation.NOT_REDUCED),
+					new Seat(1, "second", KeySource.DECLARED).treated(Participation.NOT_REDUCED));
 		}
 
 		@Test
@@ -228,7 +229,7 @@ class ContainmentTest {
 		@DisplayName("a member that throws is a failed stage, and the members that worked are kept")
 		void aThrowingMemberIsAStageFailure() {
 			Verdict verdict = Juries
-				.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+				.meta(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 						new NamedJury<CompletionEvidence>("first", returning(Verdict.single("a", PASS))),
 						new NamedJury<CompletionEvidence>("broken", throwing(new IllegalArgumentException("boom"))),
 						new NamedJury<CompletionEvidence>("last", returning(Verdict.single("b", PASS))))
@@ -254,7 +255,7 @@ class ContainmentTest {
 			Verdict undecided = undecidedVerdict();
 
 			Verdict verdict = Juries
-				.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+				.meta(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 						new NamedJury<CompletionEvidence>("broken", returning(undecided)),
 						new NamedJury<CompletionEvidence>("last", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
@@ -274,7 +275,7 @@ class ContainmentTest {
 				.build();
 
 			Verdict verdict = Juries
-				.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+				.meta(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 						new NamedJury<CompletionEvidence>("presumptuous", returning(excluded)),
 						new NamedJury<CompletionEvidence>("last", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
@@ -287,15 +288,15 @@ class ContainmentTest {
 		}
 
 		@ParameterizedTest
-		@EnumSource(ErrorPolicy.class)
+		@EnumSource(ErrorHandling.class)
 		@DisplayName("a member's own policy error is ordinary strategy input, governed by the origin rule")
-		void anOwnErrorIsStrategyInput(ErrorPolicy errorPolicy) {
+		void anOwnErrorIsStrategyInput(ErrorHandling errorPolicy) {
 			Judgment propagated = Judgment.propagatedError(Map.of(JudgmentReasonCode.JUDGE_REPORTED, 1L),
 					"1 of 1 judgments errored and the error policy is propagate");
 			Verdict member = Verdict.builder().judgment(propagated).provenance(VerdictProvenance.own()).build();
 
 			Verdict verdict = Juries
-				.meta(new ConsensusStrategy(errorPolicy, NotApplicablePolicy.EXCLUDE),
+				.meta(new ConsensusStrategy(errorPolicy, ExclusionHandling.EXCLUDE),
 						new NamedJury<CompletionEvidence>("propagating", returning(member)),
 						new NamedJury<CompletionEvidence>("healthy", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
@@ -306,16 +307,16 @@ class ContainmentTest {
 		}
 
 		@ParameterizedTest
-		@EnumSource(ErrorPolicy.class)
+		@EnumSource(ErrorHandling.class)
 		@DisplayName("a machinery error reaching a member's strategy is never charged to the subject")
-		void aMachineryErrorMemberIsNeverScored(ErrorPolicy errorPolicy) {
+		void aMachineryErrorMemberIsNeverScored(ErrorHandling errorPolicy) {
 			Verdict machinery = Verdict.builder()
 				.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
 				.provenance(VerdictProvenance.undecided())
 				.build();
 
 			Verdict verdict = Juries
-				.meta(new AllMustPassStrategy(errorPolicy, NotApplicablePolicy.EXCLUDE),
+				.meta(new AllMustPassStrategy(errorPolicy, ExclusionHandling.EXCLUDE),
 						new NamedJury<CompletionEvidence>("broken", returning(machinery)),
 						new NamedJury<CompletionEvidence>("healthy", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
@@ -328,11 +329,11 @@ class ContainmentTest {
 		@ParameterizedTest
 		@MethodSource("io.github.markpollack.judge.jury.ContainmentTest#stageFailureMatrix")
 		@DisplayName("every machinery cause, every stage-failure reason, every error policy: never a rejection")
-		void theWholeMatrix(ErrorPolicy errorPolicy, JudgmentReasonCode machineryCode, DispositionReason reason) {
+		void theWholeMatrix(ErrorHandling errorPolicy, JudgmentReasonCode machineryCode, DispositionReason reason) {
 			Jury<CompletionEvidence> member = memberFailing(reason, machineryCode);
 
 			Verdict verdict = Juries
-				.meta(new AllMustPassStrategy(errorPolicy, NotApplicablePolicy.EXCLUDE),
+				.meta(new AllMustPassStrategy(errorPolicy, ExclusionHandling.EXCLUDE),
 						new NamedJury<CompletionEvidence>("broken", member),
 						new NamedJury<CompletionEvidence>("healthy", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
@@ -370,10 +371,10 @@ class ContainmentTest {
 		@DisplayName("a nested meta-jury contains its child's failure rather than inheriting it")
 		void nestedMetaJuriesContainTheirChildren() {
 			Jury<CompletionEvidence> inner = Juries.meta(
-					new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+					new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 					new NamedJury<CompletionEvidence>("broken", throwing(new IllegalStateException("boom"))));
 			Jury<CompletionEvidence> outer = Juries.meta(
-					new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+					new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 					new NamedJury<CompletionEvidence>("inner", inner),
 					new NamedJury<CompletionEvidence>("healthy", returning(Verdict.single("b", PASS))));
 
@@ -402,7 +403,7 @@ class ContainmentTest {
 				JudgmentReasonCode.STAGE_FAILED, JudgmentReasonCode.NO_TIER_DECIDED,
 				JudgmentReasonCode.NOT_APPLICABLE_REFUSED);
 		java.util.List<org.junit.jupiter.params.provider.Arguments> arguments = new java.util.ArrayList<>();
-		for (ErrorPolicy errorPolicy : ErrorPolicy.values()) {
+		for (ErrorHandling errorPolicy : ErrorHandling.values()) {
 			for (JudgmentReasonCode code : machinery) {
 				for (DispositionReason reason : List.of(DispositionReason.EXECUTION_FAILED,
 						DispositionReason.CHILD_UNDECIDED, DispositionReason.UNDECLARED_NOT_APPLICABLE)) {
@@ -421,7 +422,7 @@ class ContainmentTest {
 	}
 
 	static Jury<CompletionEvidence> returning(Verdict verdict) {
-		return new Jury<CompletionEvidence>() {
+		return new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
 			@Override
 			public List<Judge<CompletionEvidence>> getJudges() {
 				return List.of();
@@ -440,7 +441,7 @@ class ContainmentTest {
 	}
 
 	static Jury<CompletionEvidence> throwing(RuntimeException failure) {
-		return new Jury<CompletionEvidence>() {
+		return new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
 			@Override
 			public List<Judge<CompletionEvidence>> getJudges() {
 				return List.of();

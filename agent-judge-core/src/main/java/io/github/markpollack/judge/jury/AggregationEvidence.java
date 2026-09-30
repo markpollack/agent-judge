@@ -16,7 +16,7 @@ import io.github.markpollack.judge.judgment.Judgment;
  *
  * <p>
  * The evidence answers "which judgments actually contributed, and why did the rest not?".
- * Without it, {@link ErrorPolicy#IGNORE} and {@link ErrorPolicy#TREAT_AS_ABSTAIN} are
+ * Without it, {@link ErrorHandling#IGNORE} and {@link ErrorHandling#TREAT_AS_ABSTAIN} are
  * observationally identical to a caller, which is how their implementations previously
  * collapsed into one.
  * </p>
@@ -69,7 +69,7 @@ public final class AggregationEvidence {
 	 * How many arrived with NOT_APPLICABLE — the judge's own exclusion.
 	 * <p>
 	 * Counted on the submitted originals under every policy, including
-	 * {@link NotApplicablePolicy#REFUSE}, so a reader can always say how much of a rubric
+	 * {@link ExclusionHandling#REFUSE}, so a reader can always say how much of a rubric
 	 * the instrument claimed did not apply. The <em>rate</em> is the reader's to derive;
 	 * a result stores counts.
 	 * </p>
@@ -91,8 +91,7 @@ public final class AggregationEvidence {
 	public static final String ERRORS_TREATED_AS_FAIL_COUNT = "errorsTreatedAsFailCount";
 
 	/**
-	 * Exclusions that participated as FAIL under
-	 * {@link NotApplicablePolicy#TREAT_AS_FAIL}.
+	 * Exclusions that participated as FAIL under {@link ExclusionHandling#TREAT_AS_FAIL}.
 	 *
 	 * @since 0.17.0
 	 */
@@ -197,7 +196,7 @@ public final class AggregationEvidence {
 		metadata.put(Judgment.AGGREGATION_KEY, block);
 		return new Judgment(judgment.producerStatus(), judgment.finding(), judgment.confidence(),
 				judgment.probabilityDistribution(), judgment.reasonCode(), judgment.reasoning(), judgment.checks(),
-				judgment.provenance(), judgment.policyApplication(), metadata);
+				judgment.provenance(), metadata);
 	}
 
 	/**

@@ -29,12 +29,9 @@ import io.github.markpollack.judge.judgment.JudgmentReasonCode;
  * members remain stage failures; one survivor among multiple declared members is not
  * identity.
  */
-class MetaJury<E> implements Jury<E> {
+class MetaJury<E> implements VotingJury<E> {
 
 	private static final Logger logger = LoggerFactory.getLogger(MetaJury.class);
-
-	private static final CompositeFailure EXECUTION_FAILURE = new CompositeFailure(
-			CompositeFailureCode.JURY_EXECUTION_FAILED);
 
 	private final List<NamedJury<E>> members;
 
@@ -47,7 +44,7 @@ class MetaJury<E> implements Jury<E> {
 	 */
 	@Override
 	public boolean aggregateMayBeNotApplicable() {
-		return (members.size() == 1 || metaStrategy.notApplicablePolicy() == NotApplicablePolicy.EXCLUDE)
+		return (members.size() == 1 || metaStrategy.exclusionHandling() == ExclusionHandling.EXCLUDE)
 				&& members.stream().anyMatch(member -> member.jury().aggregateMayBeNotApplicable());
 	}
 
@@ -69,13 +66,13 @@ class MetaJury<E> implements Jury<E> {
 		}
 		this.members = List.copyOf(members);
 		this.metaStrategy = metaStrategy;
-		if (metaStrategy.notApplicablePolicy() == NotApplicablePolicy.REFUSE) {
+		if (metaStrategy.exclusionHandling() == ExclusionHandling.REFUSE) {
 			for (NamedJury<E> member : this.members) {
 				if (member.jury().aggregateMayBeNotApplicable()) {
 					throw new IllegalArgumentException("member '" + member.name()
 							+ "' declares that its aggregate may be NOT_APPLICABLE, but strategy '"
 							+ metaStrategy.getName()
-							+ "' refuses exclusions; configure NotApplicablePolicy.EXCLUDE or TREAT_AS_FAIL, "
+							+ "' refuses exclusions; configure ExclusionHandling.EXCLUDE or TREAT_AS_FAIL, "
 							+ "or compose a member that does not exclude");
 				}
 			}
@@ -138,10 +135,11 @@ class MetaJury<E> implements Jury<E> {
 				throw ex;
 			}
 			catch (Exception ex) {
+				SimpleJury.preserveCancellation(ex);
 				logger.warn("Member '{}' did not produce a verdict ({}); recording a stage failure", member.name(),
 						ex.getClass().getName(), ex);
 				attempts.add(CompositeAttempt.executionFailed(member.name(), CompositeRelation.META_MEMBER, null,
-						EXECUTION_FAILURE));
+						new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED, ex)));
 				anyStageFailed = true;
 				continue;
 			}
@@ -179,6 +177,7 @@ class MetaJury<E> implements Jury<E> {
 			Judgment aggregate = Judgment.error(JudgmentReasonCode.STAGE_FAILED,
 					"One or more jury members did not produce a usable determination, so this jury reduced nothing."
 							+ NotApplicableGuard.refusedExclusionNote(attempts, "Member"));
+			seats.replaceAll(seat -> seat.treated(Participation.NOT_REDUCED));
 			return Verdict.builder()
 				.declaredCardinality(members.size())
 				.judgment(aggregate)
@@ -191,8 +190,13 @@ class MetaJury<E> implements Jury<E> {
 		}
 
 		boolean identity = members.size() == 1;
-		Judgment aggregate = identity ? successful.get(0) : aggregateWithinBoundary(successful);
+		var reduction = identity ? new AggregationBoundary.Reduction(successful.get(0), null)
+				: aggregateWithinBoundary(successful);
+		Judgment aggregate = reduction.judgment();
+		for (int i = 0; i < seats.size(); i++)
+			seats.set(i, seats.get(i).treated(Participation.forJudgment(successful.get(i), aggregate, identity)));
 		return Verdict.builder()
+			.reductionFailure(reduction.failure())
 			.declaredCardinality(members.size())
 			.judgment(aggregate)
 			.individual(successful)
@@ -208,7 +212,7 @@ class MetaJury<E> implements Jury<E> {
 	 * @param successful the aggregates of the members that were used
 	 * @return the strategy's aggregate, or the contained error that replaces it
 	 */
-	private Judgment aggregateWithinBoundary(List<Judgment> successful) {
+	private AggregationBoundary.Reduction aggregateWithinBoundary(List<Judgment> successful) {
 		return AggregationBoundary.aggregate(metaStrategy, successful, Map.of(), aggregateMayBeNotApplicable(), logger);
 	}
 

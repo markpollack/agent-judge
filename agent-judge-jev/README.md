@@ -1,6 +1,6 @@
 # Jev adapter
 
-`JevJudge` implements `Judge<RequirementEvidence<String, JevEvidence>>` with TypeSafe's System One API,
+`JevJudge` implements `RequirementJudge<String, JevEvidence>` with TypeSafe's System One API,
 using `io.github.gudcks0305:jev-typesafe:0.2.0`. It has no Spring or generative-model runtime.
 The caller supplies a model, credential, HTTP client, explicit question/projection,
 deadline, byte bounds and a protected `ArtifactCapture`. The HTTP client must disable
@@ -11,15 +11,9 @@ requires `typesafe-ai/jev`; an alias response leaves the underlying version unkn
 HTTP loopback endpoints with the corresponding paths are allowed for tests.
 No environment credentials are read.
 
-The direct typed adapter sends exactly the pair's String requirement specification as `state.requirement`
-and its `JevEvidence` text as `state.evidence`. For a native `Requirement<S>`,
-`jev.bind(requirement, renderer)` captures the provider rendering once and returns an ordinary
-`Judge<RequirementEvidence<S, JevEvidence>>`. Evaluation verifies the bound
-requirement's identity, revision, native specification and source before sending; a mismatch
-returns an instrument error. Requirements contain no application acceptance policy. Native requirement structure remains in the original envelope.
+The adapter receives `judge(Requirement<String>, JevEvidence)` and sends the actual String specification as `state.requirement` and selected evidence text as `state.evidence`. For native specifications, `jev.rendering(renderer)` returns `RequirementJudge<S, JevEvidence>`. It renders the specification supplied on each invocation exactly once; it captures no independently configured requirement. Requirement identity and native structure remain associated with the evaluation's Verdict. Stale evidence digests are refused before HTTP and are never rebound to new text.
 
-The adapter consumes typed pairs only. Workspace, agent output, execution-context metadata and
-the evidence manifest are not sent. Evidence
+Workspace, agent output, execution-context metadata and the evidence manifest are not sent. Evidence
 must carry its exact UTF-8 bundle digest, retained manifest reference, exact requirement
 SHA-256 and a caller-declared sufficiency flag. The declaration cannot transfer to a
 different requirement. The caller owns manifest contents, review and artifact availability;
@@ -40,7 +34,7 @@ quality values abstain; missing native answers are protocol errors.
 
 All native signal identities have `:v1` versions. The result's first-class Finding,
 Confidence, ProbabilityDistribution and source-backed `CalibrationClaim` pass through ordinary Jury
-and authoritative Interpretation. The TypeSafe claim is a provider declaration, not local
+and retained Verdict reporting. The TypeSafe claim is a provider declaration, not local
 empirical calibration. Requested/reported versions remain distinct in provenance revision
 (`jev-adapter:2;jev-java:0.2.0;requested=...;reported=...;route=...;underlyingModelVersion=...`) and the protected trace.
 The exact native response and serialized configuration are retained through artifact refs.

@@ -10,10 +10,10 @@ import java.util.concurrent.ForkJoinWorkerThread;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.completion.CompletionStatus;
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.jury.ErrorPolicy;
+import io.github.markpollack.judge.jury.ErrorHandling;
 import io.github.markpollack.judge.jury.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.TiePolicy;
+import io.github.markpollack.judge.jury.TieBreakRule;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
@@ -72,7 +72,7 @@ class CommonPoolTemplateRenderingTests {
 			.judge(renders)
 			.judge(renders)
 			.judge(context -> Judgment.pass("no template"))
-			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.votingStrategy(new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN))
 			.parallel(true)
 			.build();
 

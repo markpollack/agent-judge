@@ -6,6 +6,8 @@
 package io.github.markpollack.judge.jury;
 
 import java.util.ArrayList;
+import org.jspecify.annotations.Nullable;
+import io.github.markpollack.judge.requirement.Requirement;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -25,15 +27,15 @@ import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 /**
- * The Jury's complete conclusion: its collective Judgment, individual Judgments and
- * the composition history explaining how that conclusion was reached.
+ * The Jury's complete conclusion: its collective Judgment, individual Judgments and the
+ * composition history explaining how that conclusion was reached.
  *
  * <p>
- * The judgment and individual values describe the root result. {@code seats} records where each
- * judgment sat and under what key, so the ordered list and the keyed map can be joined
- * without guessing. {@code provenance} says how the collective Judgment was produced.
- * {@code compositeAttempts} contains the complete ordered evidence for each direct stage
- * entered by a composite jury; a leaf verdict has an empty attempt list.
+ * The judgment and individual values describe the root result. {@code seats} records
+ * where each judgment sat and under what key, so the ordered list and the keyed map can
+ * be joined without guessing. {@code provenance} says how the collective Judgment was
+ * produced. {@code compositeAttempts} contains the complete ordered evidence for each
+ * direct stage entered by a composite jury; a leaf verdict has an empty attempt list.
  * </p>
  *
  * <h2>Reading a composite verdict</h2>
@@ -44,11 +46,13 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * it names rather than counting the root as a reduction of its own.
  * </p>
  *
- * @param schemaVersion wire version, always 3
+ * @param requirement optional actual requirement for this node
+ * @param reductionFailure failed reduction code with original exception in memory, or
+ * null
  * @param declaredCardinality original configured population, before any failed or
  * excluded input
- * @param judgment the final judgment judgment
- * @param individual the ordered judgments judgment at this root
+ * @param judgment the final collective judgment
+ * @param individual the ordered judgments contributing at this root
  * @param individualByName those judgments keyed by configured identity in insertion order
  * @param weights the configured weights in insertion order, keyed by configured position
  * @param seats one seat per entry of {@code individual}, joining position to verdict key
@@ -59,15 +63,94 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  */
 @JsonPropertyOrder({ "schemaVersion", "declaredCardinality", "judgment", "individual", "individualByName", "weights",
 		"seats", "provenance", "compositeAttempts" })
-public record Verdict(
-		@JsonProperty(required = true) @JsonDeserialize(using = StrictIntegerDeserializer.class) int schemaVersion,
-		Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
+@com.fasterxml.jackson.databind.annotation.JsonSerialize(
+		using = io.github.markpollack.judge.serialization.ResultJson.VerdictWriter.class)
+@JsonDeserialize(using = io.github.markpollack.judge.serialization.ResultJson.VerdictReader.class)
+public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
 		Map<String, Double> weights, List<Seat> seats, VerdictProvenance provenance,
-		List<CompositeAttempt> compositeAttempts, @JsonProperty(required = true) @JsonDeserialize(
-				using = StrictIntegerDeserializer.class) int declaredCardinality) {
+		List<CompositeAttempt> compositeAttempts,
+		@JsonProperty(required = true) @JsonDeserialize(
+				using = StrictIntegerDeserializer.class) int declaredCardinality,
+		@Nullable Requirement<?> requirement, @Nullable CompositeFailure reductionFailure) {
+
+	/** The conclusion established by the retained judging/composition record. */
+	public enum Conclusion {
+
+		/** The check passed. */
+		PASS,
+		/** The check failed. */
+		FAIL,
+		/** Neither pass nor fail was established. */
+		INCONCLUSIVE,
+		/** The check does not apply. */
+		NOT_APPLICABLE
+
+	}
 
 	/**
-	 * Construct a version-3 verdict declaring exactly the supplied seat population.
+	 * Derive the conclusion using typed domain rules.
+	 * @return the conclusion
+	 * @throws IllegalArgumentException if the record is contradictory or its aggregation
+	 * semantics are unavailable
+	 */
+	public Conclusion conclusion() {
+		return VerdictSemantics.conclusion(this);
+	}
+
+	/**
+	 * Associate the actual supplied requirement with this node, preserving its complete
+	 * record.
+	 * @param supplied actual requirement
+	 * @return associated verdict
+	 * @throws IllegalArgumentException if this node already names another requirement
+	 */
+	public Verdict forRequirement(Requirement<?> supplied) {
+		Objects.requireNonNull(supplied, "requirement");
+		if (requirement != null && !requirement.equals(supplied))
+			throw new IllegalArgumentException("Verdict already belongs to another requirement");
+		return new Verdict(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts,
+				declaredCardinality, supplied, reductionFailure);
+	}
+
+	/**
+	 * Construct a record without a reduction failure.
+	 * @param judgment collective judgment
+	 * @param individual ordered producer judgments
+	 * @param individualByName named judgments
+	 * @param weights voting weights
+	 * @param seats seat facts
+	 * @param provenance collective origin
+	 * @param compositeAttempts entered children
+	 * @param declaredCardinality configured population
+	 * @param requirement actual requirement or null for ordinary checks
+	 */
+	public Verdict(Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
+			Map<String, Double> weights, List<Seat> seats, VerdictProvenance provenance,
+			List<CompositeAttempt> compositeAttempts, int declaredCardinality, @Nullable Requirement<?> requirement) {
+		this(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts, declaredCardinality,
+				requirement, null);
+	}
+
+	/**
+	 * Construct an evidence-only record with explicit cardinality.
+	 * @param judgment collective judgment
+	 * @param individual individual judgments
+	 * @param individualByName keyed judgments
+	 * @param weights configured weights
+	 * @param seats seat facts
+	 * @param provenance collective origin
+	 * @param compositeAttempts complete attempts
+	 * @param declaredCardinality configured population
+	 */
+	public Verdict(Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
+			Map<String, Double> weights, List<Seat> seats, VerdictProvenance provenance,
+			List<CompositeAttempt> compositeAttempts, int declaredCardinality) {
+		this(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts, declaredCardinality,
+				null);
+	}
+
+	/**
+	 * Construct a domain verdict declaring exactly the supplied seat population.
 	 * @param judgment aggregate
 	 * @param individual ordered inputs
 	 * @param individualByName named inputs
@@ -79,16 +162,18 @@ public record Verdict(
 	public Verdict(Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
 			Map<String, Double> weights, List<Seat> seats, VerdictProvenance provenance,
 			List<CompositeAttempt> compositeAttempts) {
-		this(3, judgment, individual, individualByName, weights, seats, provenance, compositeAttempts, seats.size());
+		this(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts, seats.size(), null);
 	}
 
 	/** Validate, bound, and defensively copy all verdict components. */
 	public Verdict {
-		if (schemaVersion != 3)
-			throw new IllegalArgumentException("Verdict schemaVersion must be 3");
 		if (declaredCardinality < 0)
 			throw new IllegalArgumentException("negative declaredCardinality");
 		Objects.requireNonNull(judgment, "aggregated judgment must not be null");
+		if (reductionFailure != null && (reductionFailure.code() != CompositeFailureCode.AGGREGATION_FAILED
+				|| judgment.reasonCode() != JudgmentReasonCode.AGGREGATION_FAILED
+				|| provenance.kind() != VerdictProvenanceKind.UNDECIDED))
+			throw new IllegalArgumentException("Reduction failure must accompany an undecided aggregation failure");
 		individual = List.copyOf(Objects.requireNonNull(individual, "individual must not be null"));
 		individualByName = immutableLinkedMap(
 				Objects.requireNonNull(individualByName, "individualByName must not be null"));
@@ -161,7 +246,7 @@ public record Verdict(
 			Map<String, Judgment> individualByName, Map<String, Double> weights, List<Seat> seats,
 			VerdictProvenance provenance, List<CompositeAttempt> attempts) {
 		if (provenance.kind() == VerdictProvenanceKind.UNDECIDED) {
-			JudgmentReasonCode code = judgment.operationalReasonCode();
+			JudgmentReasonCode code = judgment.reasonCode();
 			if (judgment.status() != JudgmentStatus.ERROR || code == null
 					|| code.originFamily() != JudgmentReasonCode.OriginFamily.MACHINERY) {
 				throw new IllegalArgumentException("an UNDECIDED verdict reports that the instrument reached no "
@@ -219,9 +304,9 @@ public record Verdict(
 					+ "CHILD_UNDECIDED or UNDECLARED_NOT_APPLICABLE, but was " + attempt.disposition() + " / "
 					+ reason);
 		}
-		if (attempt.policy() != TierPolicy.REJECT_ON_ANY_FAIL) {
+		if (attempt.routingRule() != RoutingRule.REJECT_ON_ANY_FAIL) {
 			throw new IllegalArgumentException("only REJECT_ON_ANY_FAIL stops on an individual rejection, but tier '"
-					+ name + "' uses " + attempt.policy());
+					+ name + "' uses " + attempt.routingRule());
 		}
 		if (tierVerdict.individual()
 			.stream()
@@ -241,9 +326,9 @@ public record Verdict(
 		// so the root cannot be a copy of it. The parent authors a machinery error
 		// instead, and
 		// the child's verdict stays unchanged on its attempt.
-		if (judgment.operationalReasonCode() != JudgmentReasonCode.STAGE_FAILED) {
+		if (judgment.reasonCode() != JudgmentReasonCode.STAGE_FAILED) {
 			throw new IllegalArgumentException("a rejection on a boundary-refused exclusion builds a parent-authored "
-					+ "ERROR stage_failed root, but tier '" + name + "' produced " + judgment.operationalReasonCode());
+					+ "ERROR stage_failed root, but tier '" + name + "' produced " + judgment.reasonCode());
 		}
 	}
 
@@ -296,7 +381,7 @@ public record Verdict(
 		return builder().judgment(judgment)
 			.individual(List.of(judgment))
 			.individualByName(Map.of(name, judgment))
-			.seats(List.of(new Seat(0, name, KeySource.DECLARED)))
+			.seats(List.of(new Seat(0, name, KeySource.DECLARED).treated(Participation.IDENTITY)))
 			.provenance(VerdictProvenance.own())
 			.build();
 	}
@@ -381,7 +466,11 @@ public record Verdict(
 	/** Builder for {@link Verdict}. */
 	public static class Builder {
 
+		private @Nullable CompositeFailure reductionFailure;
+
 		private Judgment judgment;
+
+		private @Nullable Requirement<?> requirement;
 
 		private List<Judgment> individual = new ArrayList<>();
 
@@ -397,13 +486,33 @@ public record Verdict(
 
 		private List<CompositeAttempt> compositeAttempts = new ArrayList<>();
 
+		/**
+		 * Retain a failed reduction separately from producer judgments.
+		 * @param failure reduction failure, or null when no reduction failed
+		 * @return this builder
+		 */
+		public Builder reductionFailure(@Nullable CompositeFailure failure) {
+			this.reductionFailure = failure;
+			return this;
+		}
+
+		/**
+		 * Set the actual requirement associated with this node.
+		 * @param requirement actual requirement
+		 * @return this builder
+		 */
+		public Builder requirement(Requirement<?> requirement) {
+			this.requirement = Objects.requireNonNull(requirement);
+			return this;
+		}
+
 		/** Create an empty verdict builder. */
 		public Builder() {
 		}
 
 		/**
-		 * Set the judgment judgment.
-		 * @param judgment judgment judgment
+		 * Set the collective judgment.
+		 * @param judgment collective judgment
 		 * @return this builder
 		 */
 		public Builder judgment(Judgment judgment) {
@@ -496,8 +605,8 @@ public record Verdict(
 				throw new IllegalStateException("a verdict must say what produced its aggregate; "
 						+ "set a decision (VerdictProvenance.own() for an ordinary reduction)");
 			}
-			return new Verdict(3, judgment, individual, individualByName, weights, seats, provenance, compositeAttempts,
-					declaredCardinality == null ? seats.size() : declaredCardinality);
+			return new Verdict(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts,
+					declaredCardinality == null ? seats.size() : declaredCardinality, requirement, reductionFailure);
 		}
 
 	}

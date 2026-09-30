@@ -59,8 +59,8 @@ import io.github.markpollack.judge.judgment.Judgment;
  * <h2>Population and evidence</h2>
  * <p>
  * Abstentions leave the population entirely, because "no assessment" is not the finding
- * zero; errors are governed by {@link ErrorPolicy} (default {@code PROPAGATE}) and
- * exclusions by {@link NotApplicablePolicy} (default {@code REFUSE}). If nothing is
+ * zero; errors are governed by {@link ErrorHandling} (default {@code PROPAGATE}) and
+ * exclusions by {@link ExclusionHandling} (default {@code REFUSE}). If nothing is
  * eligible the result is {@code ABSTAIN} rather than a manufactured failing score — an
  * empty conjunction is vacuously true, and reporting that as {@code PASS} is precisely
  * the "passed over nothing" defect this strategy is meant not to have.
@@ -82,9 +82,9 @@ public class ConjunctiveStrategy implements VotingStrategy {
 
 	private final double threshold;
 
-	private final ErrorPolicy errorPolicy;
+	private final ErrorHandling errorPolicy;
 
-	private final NotApplicablePolicy notApplicablePolicy;
+	private final ExclusionHandling notApplicablePolicy;
 
 	/**
 	 * Create a conjunctive strategy with the default error policy.
@@ -94,7 +94,7 @@ public class ConjunctiveStrategy implements VotingStrategy {
 	 * {@code [0.0, 1.0]}
 	 */
 	public ConjunctiveStrategy(double threshold) {
-		this(threshold, ErrorPolicy.PROPAGATE);
+		this(threshold, ErrorHandling.PROPAGATE);
 	}
 
 	/**
@@ -105,8 +105,8 @@ public class ConjunctiveStrategy implements VotingStrategy {
 	 * @throws IllegalArgumentException if the threshold is not a finite value in
 	 * {@code [0.0, 1.0]}, or if {@code errorPolicy} is null
 	 */
-	public ConjunctiveStrategy(double threshold, ErrorPolicy errorPolicy) {
-		this(threshold, errorPolicy, NotApplicablePolicy.REFUSE);
+	public ConjunctiveStrategy(double threshold, ErrorHandling errorPolicy) {
+		this(threshold, errorPolicy, ExclusionHandling.REFUSE);
 	}
 
 	/**
@@ -119,7 +119,7 @@ public class ConjunctiveStrategy implements VotingStrategy {
 	 * {@code [0.0, 1.0]}, or if either policy is null
 	 * @since 0.17.0
 	 */
-	public ConjunctiveStrategy(double threshold, ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
+	public ConjunctiveStrategy(double threshold, ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
 		if (notApplicablePolicy == null) {
 			throw new IllegalArgumentException("notApplicablePolicy must not be null");
 		}
@@ -205,7 +205,7 @@ public class ConjunctiveStrategy implements VotingStrategy {
 
 	/** {@inheritDoc} */
 	@Override
-	public NotApplicablePolicy notApplicablePolicy() {
+	public ExclusionHandling exclusionHandling() {
 		return this.notApplicablePolicy;
 	}
 

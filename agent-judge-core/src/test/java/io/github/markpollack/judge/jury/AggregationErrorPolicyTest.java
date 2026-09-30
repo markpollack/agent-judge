@@ -21,16 +21,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Cross-strategy contract tests for every {@link ErrorPolicy}.
+ * Cross-strategy contract tests for every {@link ErrorHandling}.
  *
  * @author Mark Pollack
  */
-class AggregationErrorPolicyTest {
+class AggregationErrorHandlingTest {
 
 	@ParameterizedTest(name = "{0} / {1}")
 	@MethodSource("strategyPolicyMatrix")
 	@DisplayName("all strategies account for mixed populations under every error policy")
-	void mixedPopulationMatrix(String strategyName, ErrorPolicy policy) {
+	void mixedPopulationMatrix(String strategyName, ErrorHandling policy) {
 		VotingStrategy strategy = strategy(strategyName, policy);
 		List<Judgment> judgments = List.of(Judgment.pass("ok"), Judgment.error("boom"),
 				Judgment.abstain("not applicable"));
@@ -40,7 +40,7 @@ class AggregationErrorPolicyTest {
 
 		// Under TREAT_AS_FAIL the surviving population is one PASS and one converted
 		// FAIL.
-		// Majority breaks that tie with TiePolicy.FAIL; consensus reports the split as
+		// Majority breaks that tie with TieBreakRule.FAIL; consensus reports the split as
 		// ABSTAIN; the numeric strategies average 1.0 and 0.0 to a passing 0.5.
 		JudgmentStatus expectedStatus = switch (policy) {
 			case PROPAGATE -> JudgmentStatus.ERROR;
@@ -64,17 +64,17 @@ class AggregationErrorPolicyTest {
 			.containsEntry(AggregationEvidence.ELIGIBLE_COUNT, expectedEligible)
 			.containsEntry(AggregationEvidence.EXPLICIT_ABSTAIN_COUNT, 1)
 			.containsEntry(AggregationEvidence.ERROR_COUNT, 1)
-			.containsEntry(AggregationEvidence.IGNORED_ERROR_COUNT, policy == ErrorPolicy.IGNORE ? 1 : 0)
+			.containsEntry(AggregationEvidence.IGNORED_ERROR_COUNT, policy == ErrorHandling.IGNORE ? 1 : 0)
 			.containsEntry(AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT,
-					policy == ErrorPolicy.TREAT_AS_ABSTAIN ? 1 : 0)
+					policy == ErrorHandling.TREAT_AS_ABSTAIN ? 1 : 0)
 			.containsEntry(AggregationEvidence.ERRORS_TREATED_AS_FAIL_COUNT,
-					policy == ErrorPolicy.TREAT_AS_FAIL ? 1 : 0);
+					policy == ErrorHandling.TREAT_AS_FAIL ? 1 : 0);
 	}
 
 	@ParameterizedTest(name = "{0} / {1}")
 	@MethodSource("strategyPolicyMatrix")
 	@DisplayName("all strategies handle all-error populations under every error policy")
-	void allErrorMatrix(String strategyName, ErrorPolicy policy) {
+	void allErrorMatrix(String strategyName, ErrorHandling policy) {
 		Judgment result = strategy(strategyName, policy)
 			.aggregate(List.of(Judgment.error("one"), Judgment.error("two")), Map.of());
 
@@ -94,7 +94,7 @@ class AggregationErrorPolicyTest {
 	@MethodSource("strategyNames")
 	@DisplayName("PROPAGATE evidence is invariant under input order")
 	void propagateEvidenceIsOrderIndependent(String strategyName) {
-		VotingStrategy strategy = strategy(strategyName, ErrorPolicy.PROPAGATE);
+		VotingStrategy strategy = strategy(strategyName, ErrorHandling.PROPAGATE);
 		Judgment errorThenAbstain = strategy
 			.aggregate(List.of(Judgment.error("boom"), Judgment.abstain("not applicable")), Map.of());
 		Judgment abstainThenError = strategy
@@ -118,16 +118,16 @@ class AggregationErrorPolicyTest {
 
 	private static Stream<Arguments> strategyPolicyMatrix() {
 		return strategyNames()
-			.flatMap(name -> Stream.of(ErrorPolicy.values()).map(policy -> Arguments.of(name, policy)));
+			.flatMap(name -> Stream.of(ErrorHandling.values()).map(policy -> Arguments.of(name, policy)));
 	}
 
 	private static Stream<String> strategyNames() {
 		return Stream.of("majority", "consensus", "average", "median", "weightedAverage");
 	}
 
-	private static VotingStrategy strategy(String name, ErrorPolicy policy) {
+	private static VotingStrategy strategy(String name, ErrorHandling policy) {
 		return switch (name) {
-			case "majority" -> new MajorityVotingStrategy(TiePolicy.FAIL, policy);
+			case "majority" -> new MajorityVotingStrategy(TieBreakRule.FAIL, policy);
 			case "consensus" -> new ConsensusStrategy(policy);
 			case "average" -> new AverageVotingStrategy(policy);
 			case "median" -> new MedianVotingStrategy(policy);

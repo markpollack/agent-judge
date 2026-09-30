@@ -31,7 +31,7 @@ import io.github.markpollack.judge.jury.DispositionReason;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.Seat;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.jury.RoutingRule;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.jury.VotingStrategy;
 import io.github.markpollack.judge.Judge;
@@ -107,8 +107,8 @@ class HistoricalBoundaryTest {
 				Map.of("strict", failing));
 
 		return CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", opaque(excluded), TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", passing(), TierPolicy.FINAL_TIER)
+			.tier("rubric", opaque(excluded), RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passing(), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 	}
@@ -345,7 +345,7 @@ class HistoricalBoundaryTest {
 	}
 
 	private static Jury<CompletionEvidence> opaque(Verdict verdict) {
-		return new Jury<CompletionEvidence>() {
+		return new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
 			@Override
 			public List<Judge<CompletionEvidence>> getJudges() {
 				return List.of();

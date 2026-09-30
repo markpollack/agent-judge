@@ -10,9 +10,13 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 /**
  * Identifies how a composite attempt is related to its parent verdict.
+ *
  * @since 0.14.0
  */
 public enum CompositeRelation {
+
+	/** A required child of an all-of specification. */
+	CONSTITUENT("CONSTITUENT"),
 
 	/** A tier entered by a {@link CascadedJury}. */
 	CASCADE_TIER("cascade_tier"),

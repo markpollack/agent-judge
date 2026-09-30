@@ -8,11 +8,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.net.httpserver.HttpServer;
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.jury.interpretation.Verdicts;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
 import io.github.markpollack.judge.judgment.ProbabilityMass;
-import io.github.markpollack.judge.acceptance.Policies;
+
 import io.github.markpollack.judge.provenance.ArtifactRef;
 import java.net.*;
 import java.net.http.*;
@@ -65,7 +64,7 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 		});
 		server.start();
 		http = HttpClient.newHttpClient();
-		facade = new RequirementAssertions(fixture.binding);
+
 		judge = fixture.bind(fixture.judge("FAKE-LOCAL-KEY",
 				URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/typesafe/v1/systemone"), http,
 				output));
@@ -102,8 +101,8 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 		Verdict restored = ConferenceFixture.JSON.readValue(ConferenceFixture.JSON.writeValueAsBytes(result.verdict()),
 				Verdict.class);
 		assertEquals(result.verdict(), restored);
-		assertEquals(result.interpretation(), Verdicts.interpret(restored));
-		assertEquals(Policies.referenceOf(fixture.binding), result.policy());
+		assertEquals(result.verdict().conclusion(), restored.conclusion());
+		assertInstanceOf(io.github.markpollack.judge.evaluation.PolicyResult.Decided.class, result.policyResult());
 		ConferenceFixture.save(result, output, "FAKE Vercel conference Choice " + label);
 	}
 
@@ -122,8 +121,7 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 		assertNull(j.finding());
 		assertNull(j.confidence());
 		assertNull(j.probabilityDistribution());
-		assertThrows(RequirementAssertionError.InstrumentFailure.class,
-				() -> RequirementAssertions.requireSatisfied(result));
+		assertThrows(RequirementAssertionError.class, () -> RequirementAssertions.requireSatisfied(result));
 		assertEquals(1, calls.get());
 		assertArrayEquals(lastResponse, Files.readAllBytes(output.resolve(j.provenance().response().id())));
 	}

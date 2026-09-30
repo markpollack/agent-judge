@@ -74,7 +74,7 @@ class SupersetDiffJudgeTest {
 		assertThat(judgment.checks()).filteredOn(c -> !c.judgment().pass())
 			.hasSize(1)
 			.first()
-			.satisfies(c -> assertThat(c.judgment().operationalReasoning()).contains("Missing file"));
+			.satisfies(c -> assertThat(c.judgment().reasoning()).contains("Missing file"));
 	}
 
 	@Test
@@ -89,7 +89,7 @@ class SupersetDiffJudgeTest {
 
 		assertThat(judgment.checks()).hasSize(1);
 		assertThat(judgment.checks().get(0).judgment().pass()).isFalse();
-		assertThat(judgment.checks().get(0).judgment().operationalReasoning()).contains("Content differs");
+		assertThat(judgment.checks().get(0).judgment().reasoning()).contains("Content differs");
 	}
 
 	@Test

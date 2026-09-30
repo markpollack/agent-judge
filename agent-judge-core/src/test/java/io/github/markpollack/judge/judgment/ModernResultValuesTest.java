@@ -4,11 +4,6 @@
  */
 package io.github.markpollack.judge.judgment;
 
-import io.github.markpollack.judge.acceptance.AcceptanceAction;
-import io.github.markpollack.judge.acceptance.AcceptanceDecision;
-import io.github.markpollack.judge.acceptance.AppliedPolicy;
-import io.github.markpollack.judge.acceptance.PolicyApplication;
-import io.github.markpollack.judge.acceptance.PolicyFailure;
 import io.github.markpollack.judge.provenance.ArtifactRef;
 import io.github.markpollack.judge.provenance.CalibrationClaim;
 import io.github.markpollack.judge.provenance.PolicyRef;
@@ -28,10 +23,8 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import io.github.markpollack.judge.jury.ConsensusStrategy;
-import io.github.markpollack.judge.jury.ErrorPolicy;
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.jury.interpretation.ReadingSupport;
-import io.github.markpollack.judge.jury.interpretation.Verdicts;
+import io.github.markpollack.judge.serialization.diagnostics.ReadingSupport;
+import io.github.markpollack.judge.serialization.diagnostics.StoredVerdicts;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -51,11 +44,11 @@ class ModernResultValuesTest {
 			new CategoryFinding("violated", List.of("satisfied", "violated", "unknown")));
 
 	private static Judgment raw(JudgmentStatus status, Finding finding, Confidence confidence,
-			ProbabilityDistribution probabilityDistribution, PolicyApplication policy) {
+			ProbabilityDistribution probabilityDistribution, Object unused) {
 		return new Judgment(status, finding, confidence, probabilityDistribution,
 				status == JudgmentStatus.ERROR ? JudgmentReasonCode.JUDGE_REPORTED
 						: status == JudgmentStatus.FAIL ? JudgmentReasonCode.SUBJECT_EMPTY : null,
-				"raw explanation", List.of(), null, policy, Map.of());
+				"raw explanation", List.of(), null, Map.of());
 	}
 
 	@ParameterizedTest
@@ -84,60 +77,12 @@ class ModernResultValuesTest {
 	}
 
 	@ParameterizedTest
-	@EnumSource(AcceptanceAction.class)
-	void usingNegativeAssessmentNeverMakesItPass(AcceptanceAction action) throws Exception {
-		Judgment result = raw(JudgmentStatus.FAIL, PRODUCT, null, null,
-				new AppliedPolicy(POLICY, action, "policy explanation"));
-		assertThat(result.status())
-			.isEqualTo(action == AcceptanceAction.RELY ? JudgmentStatus.FAIL : JudgmentStatus.ABSTAIN);
-		assertThat(result.producerStatus()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(result.reasonCode()).isEqualTo(JudgmentReasonCode.SUBJECT_EMPTY);
-		assertThat(result.finding()).isSameAs(PRODUCT);
-		assertThat(result.reasoning()).isEqualTo("raw explanation");
-		assertThat(result.operationalReasoning())
-			.isEqualTo(action == AcceptanceAction.RELY ? "raw explanation" : "policy explanation");
-		assertThat(result.operationalReasonCode())
-			.isEqualTo(action == AcceptanceAction.RELY ? JudgmentReasonCode.SUBJECT_EMPTY : null);
-		if (action != AcceptanceAction.RELY) {
-			assertThat(result.effectiveScore()).isEmpty();
-		}
-		assertThat(JSON.readValue(JSON.writeValueAsBytes(result), Judgment.class)).isEqualTo(result);
-	}
-
-	@ParameterizedTest
-	@EnumSource(AcceptanceAction.class)
-	void policyCannotPromoteRawAbstention(AcceptanceAction action) {
-		assertThat(
-				raw(JudgmentStatus.ABSTAIN, PRODUCT, null, null, new AppliedPolicy(POLICY, action, "policy")).status())
-			.isEqualTo(JudgmentStatus.ABSTAIN);
-	}
-
-	@Test
-	void policyFailureRetainsRawFailButCountsAsMachinery() throws Exception {
-		Judgment result = raw(JudgmentStatus.FAIL, PRODUCT, null, null,
-				new PolicyFailure(POLICY, JudgmentReasonCode.POLICY_FAILED, "threshold configuration unreadable"));
-		assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(result.reasonCode()).isEqualTo(JudgmentReasonCode.SUBJECT_EMPTY);
-		assertThat(result.operationalReasonCode()).isEqualTo(JudgmentReasonCode.POLICY_FAILED);
-		assertThat(result.operationalReasoning()).isEqualTo("threshold configuration unreadable");
-		assertThat(result.finding()).isSameAs(PRODUCT);
-		assertThat(result.effectiveScore()).isEmpty();
-		Judgment aggregate = new ConsensusStrategy(ErrorPolicy.TREAT_AS_FAIL)
-			.aggregate(List.of(result, Judgment.pass("ok")), Map.of());
-		assertThat(aggregate.status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(aggregate.metadata().toString()).contains("policy_failed=1").doesNotContain("subject_empty");
-		assertThat(JSON.readValue(JSON.writeValueAsBytes(result), Judgment.class)).isEqualTo(result);
-	}
-
-	@ParameterizedTest
 	@EnumSource(value = JudgmentStatus.class, names = { "ERROR", "NOT_APPLICABLE" })
 	void unevaluatedProducerForbidsAssessmentSupportAndPolicy(JudgmentStatus status) {
 		assertThatThrownBy(() -> raw(status, PRODUCT, null, null, null)).isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> raw(status, null, reported(FindingTarget.BOOLEAN), null, null))
 			.isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> raw(status, null, null, propositionDistribution(), null))
-			.isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> raw(status, null, null, null, new AppliedPolicy(POLICY, AcceptanceAction.RELY, "use")))
 			.isInstanceOf(IllegalArgumentException.class);
 	}
 
@@ -322,7 +267,7 @@ class ModernResultValuesTest {
 		for (JudgmentStatus status : JudgmentStatus.values()) {
 			source.add(new Check(status.name(), raw(status, null, null, null, null)));
 		}
-		Judgment parent = new Judgment(JudgmentStatus.ABSTAIN, null, null, null, null, "incomplete", source, null, null,
+		Judgment parent = new Judgment(JudgmentStatus.ABSTAIN, null, null, null, null, "incomplete", source, null,
 				Map.of());
 		source.clear();
 		assertThat(parent.checks()).extracting(check -> check.judgment().status())
@@ -358,8 +303,7 @@ class ModernResultValuesTest {
 		evidence.clear();
 		assertThat(provenance.evidence()).containsExactly(bundle, manifest);
 		Judgment result = new Judgment(JudgmentStatus.PASS, PRODUCT, reported(FindingTarget.BOOLEAN),
-				propositionDistribution(), null, "", List.of(), provenance,
-				new AppliedPolicy(POLICY, AcceptanceAction.ESCALATE, "insufficient validation"), Map.of());
+				propositionDistribution(), null, "", List.of(), provenance, Map.of());
 		Judgment restored = JSON.readValue(JSON.writeValueAsBytes(result), Judgment.class);
 		assertThat(restored).isEqualTo(result);
 		assertThat(restored.provenance().calibrationClaims()).containsExactly(claim);
@@ -402,28 +346,11 @@ class ModernResultValuesTest {
 		assertThatThrownBy(() -> new CategoryFinding("absent", List.of("present")))
 			.isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> new CategoryFinding(null, List.of(" "))).isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> new AppliedPolicy(POLICY, AcceptanceAction.ABSTAIN, " "))
-			.isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> new PolicyFailure(POLICY, JudgmentReasonCode.SUBJECT_EMPTY, "bad"))
-			.isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> new PolicyFailure(POLICY, JudgmentReasonCode.JUDGE_FAILED, "bad"))
-			.isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> new PolicyFailure(POLICY, JudgmentReasonCode.ERRORS_PROPAGATED, "bad"))
-			.isInstanceOf(IllegalArgumentException.class);
-		assertThat(new AcceptanceDecision(AcceptanceAction.ESCALATE, "review").reason()).isEqualTo("review");
-		assertThatThrownBy(() -> new AcceptanceDecision(null, "review")).isInstanceOf(NullPointerException.class);
-	}
-
-	@Test
-	void versionTwoRetainsModernPolicyFailureFacts() {
-		Judgment result = raw(JudgmentStatus.FAIL, PRODUCT, reported(FindingTarget.BOOLEAN), propositionDistribution(),
-				new PolicyFailure(POLICY, JudgmentReasonCode.POLICY_FAILED, "policy unavailable"));
-		var reading = Verdicts.interpret(Verdict.single("judge", result));
-		assertThat(reading.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
-		assertThat(reading.root().reasonCode()).isEqualTo("policy_failed");
-		assertThat(reading.root().judgment().policyApplication()).isEqualTo(result.policyApplication());
-		assertThat(reading.root().judgment().finding()).isEqualTo(PRODUCT);
-		assertThat(reading.defects()).isEmpty();
+		assertThat(new io.github.markpollack.judge.policy.PolicyDecision(
+				io.github.markpollack.judge.policy.PolicyAction.ESCALATE, "review")
+			.reason()).isEqualTo("review");
+		assertThatThrownBy(() -> new io.github.markpollack.judge.policy.PolicyDecision(null, "review"))
+			.isInstanceOf(NullPointerException.class);
 	}
 
 	@Test
@@ -444,7 +371,7 @@ class ModernResultValuesTest {
 				.judge(context -> Judgment.pass("other"))
 				.votingStrategy(new ConsensusStrategy())
 				.build();
-			var reading = Verdicts
+			var reading = StoredVerdicts
 				.interpret(jury.vote(io.github.markpollack.judge.completion.CompletionEvidence.builder()
 					.request("bridge test")
 					.build()));
@@ -490,9 +417,9 @@ class ModernResultValuesTest {
 	void temporaryBridgeDoesNotRecurseIntoAnUnboundedHistoricalMap() {
 		Map<String, Object> cyclic = new java.util.LinkedHashMap<>();
 		cyclic.put("unrecognized", cyclic);
-		assertThat(Verdicts.interpret(cyclic).readingSupport()).isEqualTo(ReadingSupport.UNDETERMINED);
+		assertThat(StoredVerdicts.interpret(cyclic).readingSupport()).isEqualTo(ReadingSupport.UNDETERMINED);
 		cyclic.put("producerStatus", "pass");
-		assertThat(Verdicts.interpret(cyclic).readingSupport()).isEqualTo(ReadingSupport.UNDETERMINED);
+		assertThat(StoredVerdicts.interpret(cyclic).readingSupport()).isEqualTo(ReadingSupport.UNDETERMINED);
 	}
 
 }

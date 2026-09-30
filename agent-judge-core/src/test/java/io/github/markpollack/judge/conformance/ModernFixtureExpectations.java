@@ -35,20 +35,26 @@ public final class ModernFixtureExpectations {
 				object.remove("label");
 			}
 			object.set("producerStatus", object.remove("status"));
-			object.put("schemaVersion", 3);
+			object.put("schemaVersion", 4);
 		}
 		if (node.isObject() && node.has("aggregated")) {
 			ObjectNode object = (ObjectNode) node;
 			object.set("judgment", object.remove("aggregated"));
 			if (object.has("decision"))
 				object.set("provenance", object.remove("decision"));
-			object.put("schemaVersion", 3);
+			object.put("schemaVersion", 4);
 			boolean meta = node.path("compositeAttempts").size() > 0
 					&& node.path("compositeAttempts").get(0).path("relation").asText().equals("meta_member");
 			object.put("declaredCardinality", meta ? node.path("compositeAttempts").size() : node.path("seats").size());
 		}
 		if (node.isObject() && node.has("verdictKey"))
 			((ObjectNode) node).put("execution", "RETURNED");
+		if (node.isObject() && node.has("relation") && node.has("policy")) {
+			ObjectNode attempt = (ObjectNode) node;
+			attempt.set("routingRule", attempt.remove("policy"));
+		}
+		if (node.isObject() && node.has("verdictKey"))
+			((ObjectNode) node).put("participation", "NOT_RECORDED");
 		node.elements().forEachRemaining(ModernFixtureExpectations::rewrite);
 	}
 

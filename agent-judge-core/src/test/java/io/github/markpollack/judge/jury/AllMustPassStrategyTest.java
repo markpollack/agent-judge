@@ -85,9 +85,9 @@ class AllMustPassStrategyTest {
 		List<Judgment> withError = List.of(Judgment.pass("build succeeded"), Judgment.error("judge model unavailable"));
 
 		assertThat(strategy.aggregate(withError, Map.of()).status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_FAIL).aggregate(withError, Map.of()).status())
+		assertThat(new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL).aggregate(withError, Map.of()).status())
 			.isEqualTo(JudgmentStatus.FAIL);
-		assertThat(new AllMustPassStrategy(ErrorPolicy.IGNORE).aggregate(withError, Map.of()).status())
+		assertThat(new AllMustPassStrategy(ErrorHandling.IGNORE).aggregate(withError, Map.of()).status())
 			.isEqualTo(JudgmentStatus.PASS);
 	}
 

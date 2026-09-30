@@ -69,7 +69,7 @@ class SeatNameValidityTest {
 		return SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> Judgment.pass("the build succeeded"), "healthy"))
 			.judge(blankNamed)
-			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.votingStrategy(new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN))
 			.parallel(parallel)
 			.build();
 	}
@@ -162,13 +162,13 @@ class SeatNameValidityTest {
 			Jury<CompletionEvidence> tier = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
 
 			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("gate", tier, TierPolicy.REJECT_ON_ANY_FAIL)
+				.tier("gate", tier, RoutingRule.REJECT_ON_ANY_FAIL)
 				.tier("final",
 						SimpleJury.<CompletionEvidence>builder()
 							.judge(Judges.named(context -> Judgment.pass("also fine"), "backstop"))
-							.votingStrategy(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN))
+							.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN))
 							.build(),
-						TierPolicy.FINAL_TIER)
+						RoutingRule.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 

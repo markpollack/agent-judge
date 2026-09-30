@@ -12,9 +12,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.jury.interpretation.Verdicts;
-import io.github.markpollack.judge.acceptance.AcceptanceAction;
-import io.github.markpollack.judge.acceptance.AppliedPolicy;
 import io.github.markpollack.judge.provenance.ArtifactRef;
 import io.github.markpollack.judge.judgment.Finding;
 import io.github.markpollack.judge.judgment.FindingTarget;
@@ -29,8 +26,6 @@ import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
 import io.github.markpollack.judge.judgment.NumericFinding;
 import io.github.markpollack.judge.judgment.NumericKind;
-import io.github.markpollack.judge.acceptance.PolicyApplication;
-import io.github.markpollack.judge.acceptance.PolicyFailure;
 import io.github.markpollack.judge.provenance.PolicyRef;
 import io.github.markpollack.judge.judgment.ProbabilityMass;
 import io.github.markpollack.judge.judgment.BooleanFinding;
@@ -53,7 +48,7 @@ class ModernProducerMigrationTest {
 
 	private static final PolicyRef POLICY = new PolicyRef("application", "1", ARTIFACT.sha256());
 
-	private static Judgment rich(PolicyApplication policy) {
+	private static Judgment rich() {
 		Finding finding = new Finding(new BooleanFinding(false), new NumericFinding(0.3, NumericKind.MEASUREMENT,
 				"quality:v1", 0, 1, List.of(), QualityDirection.INCREASING),
 				new CategoryFinding("bad", List.of("good", "bad")));
@@ -66,14 +61,13 @@ class ModernProducerMigrationTest {
 						"provider declaration", List.of("provider-support:v1"), List.of(ARTIFACT))));
 		return new Judgment(JudgmentStatus.FAIL, finding, confidence, probabilityDistribution,
 				JudgmentReasonCode.SUBJECT_EMPTY, "raw subject rejection",
-				List.of(new Check("child", Judgment.abstain("child lacks evidence"))), provenance, policy,
+				List.of(new Check("child", Judgment.abstain("child lacks evidence"))), provenance,
 				Map.of("elapsedMillis", 7));
 	}
 
 	@Test
 	void enrichmentCopiesEveryFactAndOnlyChangesItsOwnMetadata() {
-		Judgment original = rich(
-				new AppliedPolicy(POLICY, AcceptanceAction.ESCALATE, "escalate for independent review"));
+		Judgment original = rich();
 		Judgment enriched = original.toBuilder().metadata("trace", List.of("a", "b")).build();
 		Judgment attached = AggregationEvidence.attach(original, Map.of("strategy", "explicit-reduction"));
 		for (Judgment copy : List.of(enriched, attached)) {
@@ -83,7 +77,7 @@ class ModernProducerMigrationTest {
 			actual.remove("metadata");
 			assertThat(actual).isEqualTo(expected);
 			assertThat(copy.metadata()).containsEntry("elapsedMillis", 7);
-			assertThat(copy.status()).isEqualTo(JudgmentStatus.ABSTAIN);
+			assertThat(copy.status()).isEqualTo(JudgmentStatus.FAIL);
 		}
 		assertThat(original.metadata()).containsOnlyKeys("elapsedMillis");
 		assertThat(enriched.metadata()).containsEntry("trace", List.of("a", "b"));
@@ -93,7 +87,7 @@ class ModernProducerMigrationTest {
 
 	@Test
 	void multiSeatAggregationRetainsCompleteInputsWithoutInheritingNativeSupport() {
-		Judgment original = rich(new AppliedPolicy(POLICY, AcceptanceAction.RELY, "use assessment"));
+		Judgment original = rich();
 		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> original, "negative"))
 			.judge(Judges.named(context -> Judgment.pass("other"), "positive"))
@@ -105,35 +99,6 @@ class ModernProducerMigrationTest {
 		assertThat(verdict.judgment().confidence()).isNull();
 		assertThat(verdict.judgment().probabilityDistribution()).isNull();
 		assertThat(verdict.judgment().provenance()).isNull();
-		assertThat(verdict.judgment().policyApplication()).isNull();
-	}
-
-	@Test
-	void policyErrorIsReportedAndCountedAsMachineryRatherThanRawSubjectFailure() {
-		Judgment original = rich(
-				new PolicyFailure(POLICY, JudgmentReasonCode.POLICY_FAILED, "policy configuration unavailable"));
-		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> original, "policy"))
-			.judge(Judges.named(context -> Judgment.pass("other"), "positive"))
-			.votingStrategy(new ConsensusStrategy(ErrorPolicy.TREAT_AS_FAIL))
-			.build()
-			.vote(CONTEXT);
-		assertThat(verdict.individual().get(0)).isSameAs(original);
-		assertThat(original.reasonCode()).isEqualTo(JudgmentReasonCode.SUBJECT_EMPTY);
-		assertThat(original.reasoning()).isEqualTo("raw subject rejection");
-		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(verdict.judgment().metadata().toString()).contains("policy_failed=1", "errorsTreatedAsFailCount=0")
-			.doesNotContain("subject_empty");
-		var interpretation = Verdicts.interpret(verdict);
-		var policySeat = interpretation.root()
-			.judges()
-			.stream()
-			.filter(seat -> seat.name().equals("policy"))
-			.findFirst()
-			.orElseThrow();
-		assertThat(policySeat.reasonCode()).isEqualTo("policy_failed");
-		assertThat(policySeat.reasoning()).isEqualTo("policy configuration unavailable");
-		assertThat(interpretation.summary()).contains("rawReason=raw subject rejection");
 	}
 
 }

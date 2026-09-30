@@ -11,32 +11,33 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import io.github.markpollack.judge.jury.NotApplicablePolicy;
+import io.github.markpollack.judge.jury.ExclusionHandling;
 
 /**
  * A meta-jury as configured: the strategy that aggregates its members' verdicts, and its
  * named members in execution order.
  *
  * <p>
- * Compare each member here with the {@link io.github.markpollack.judge.jury.CompositeAttempt}
- * of the same name. A member that failed to execute is recorded as an attempt with a failure
- * and makes the meta-jury's aggregate a bare error judgment that carries no aggregation
- * evidence, so the member count must come from this description, not from the evidence.
+ * Compare each member here with the
+ * {@link io.github.markpollack.judge.jury.CompositeAttempt} of the same name. A member
+ * that failed to execute is recorded as an attempt with a failure and makes the
+ * meta-jury's aggregate a bare error judgment that carries no aggregation evidence, so
+ * the member count must come from this description, not from the evidence.
  * </p>
  *
- * <h2>Portable form</h2>
- * <pre>
+ * <h2>Portable form</h2> <pre>
  * {"descriptionVersion": 2, "kind": "META", "aggregateMayBeNotApplicable": false,
  *  "strategy": {...}, "members": [{...}, ...]}
  * </pre>
  *
  * <h2>Why the capability is carried rather than derived</h2>
  * <p>
- * One declared usable member retains its complete aggregate, including N/A. For reductions,
- * exactly as in {@link SimpleJuryDescription}, the strategy's not-applicable policy is only
- * derivable from a description that declared it, and reading its absence as {@code REFUSE}
- * publishes a confident {@code false} for a meta-jury that can in fact return an exclusion. The
- * jury states what it is, and a declared policy is cross-checked against it.
+ * One declared usable member retains its complete aggregate, including N/A. For
+ * reductions, exactly as in {@link SimpleJuryDescription}, the strategy's not-applicable
+ * policy is only derivable from a description that declared it, and reading its absence
+ * as {@code REFUSE} publishes a confident {@code false} for a meta-jury that can in fact
+ * return an exclusion. The jury states what it is, and a declared policy is cross-checked
+ * against it.
  * </p>
  *
  * @param strategy the strategy over member aggregates
@@ -51,17 +52,18 @@ public record MetaJuryDescription(StrategyDescription strategy, List<MemberDescr
 		boolean aggregateMayBeNotApplicable) implements JuryDescription {
 
 	/**
-	 * Validate and copy the members, and check the stated capability against what is derivable.
-	 * @throws IllegalArgumentException if the strategy declared a not-applicable policy that
-	 * contradicts the stated capability
+	 * Validate and copy the members, and check the stated capability against what is
+	 * derivable.
+	 * @throws IllegalArgumentException if the strategy declared a not-applicable policy
+	 * that contradicts the stated capability
 	 */
 	public MetaJuryDescription {
 		Objects.requireNonNull(strategy, "strategy must not be null");
 		members = List.copyOf(Objects.requireNonNull(members, "members must not be null"));
-		NotApplicablePolicy declared = strategy.notApplicablePolicy();
+		ExclusionHandling declared = strategy.exclusionHandling();
 		if (declared != null) {
-			boolean derived = (declared == NotApplicablePolicy.EXCLUDE
-					|| (members.size() == 1 && declared == NotApplicablePolicy.TREAT_AS_FAIL))
+			boolean derived = (declared == ExclusionHandling.EXCLUDE
+					|| (members.size() == 1 && declared == ExclusionHandling.TREAT_AS_FAIL))
 					&& members.stream().anyMatch(member -> member.jury().aggregateMayBeNotApplicable());
 			if (derived != aggregateMayBeNotApplicable) {
 				throw new IllegalArgumentException("strategy '" + strategy.name() + "' declares notApplicablePolicy "

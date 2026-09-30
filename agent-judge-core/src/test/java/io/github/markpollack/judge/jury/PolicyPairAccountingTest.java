@@ -57,11 +57,11 @@ class PolicyPairAccountingTest {
 	 */
 	private static final List<Judgment> MIXED = List.of(PASS, FAIL, EXCLUDED, JUDGE_ERROR);
 
-	private static VotingStrategy strategy(ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
+	private static VotingStrategy strategy(ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
 		return new ConsensusStrategy(errorPolicy, notApplicablePolicy);
 	}
 
-	private static Judgment aggregate(ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy,
+	private static Judgment aggregate(ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy,
 			List<Judgment> judgments) {
 		return strategy(errorPolicy, notApplicablePolicy).aggregate(judgments, Map.of());
 	}
@@ -78,8 +78,8 @@ class PolicyPairAccountingTest {
 		return (Map<String, Object>) evidenceOf(judgment).get(AggregationEvidence.ERROR_CODE_COUNTS);
 	}
 
-	private static List<ErrorPolicy> errorPolicies() {
-		return List.of(ErrorPolicy.values());
+	private static List<ErrorHandling> errorPolicies() {
+		return List.of(ErrorHandling.values());
 	}
 
 	@Nested
@@ -89,8 +89,8 @@ class PolicyPairAccountingTest {
 		@ParameterizedTest
 		@MethodSource("io.github.markpollack.judge.jury.PolicyPairAccountingTest#errorPolicies")
 		@DisplayName("a single exclusion decides the aggregate, whatever the error policy")
-		void refuseWins(ErrorPolicy errorPolicy) {
-			Judgment aggregate = aggregate(errorPolicy, NotApplicablePolicy.REFUSE, MIXED);
+		void refuseWins(ErrorHandling errorPolicy) {
+			Judgment aggregate = aggregate(errorPolicy, ExclusionHandling.REFUSE, MIXED);
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(aggregate.reasonCode()).isEqualTo(JudgmentReasonCode.NOT_APPLICABLE_REFUSED);
@@ -100,8 +100,8 @@ class PolicyPairAccountingTest {
 		@ParameterizedTest
 		@MethodSource("io.github.markpollack.judge.jury.PolicyPairAccountingTest#errorPolicies")
 		@DisplayName("a policy exit reduces nothing, so every treatment counter is zero")
-		void policyExitPerformsNoTreatment(ErrorPolicy errorPolicy) {
-			Map<String, Object> evidence = evidenceOf(aggregate(errorPolicy, NotApplicablePolicy.REFUSE, MIXED));
+		void policyExitPerformsNoTreatment(ErrorHandling errorPolicy) {
+			Map<String, Object> evidence = evidenceOf(aggregate(errorPolicy, ExclusionHandling.REFUSE, MIXED));
 
 			assertThat(evidence).containsEntry(AggregationEvidence.INPUT_COUNT, 4)
 				.containsEntry(AggregationEvidence.ELIGIBLE_COUNT, 0)
@@ -117,7 +117,7 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("with no exclusion submitted, REFUSE changes nothing")
 		void refuseIsInertWithoutAnExclusion() {
-			Judgment aggregate = aggregate(ErrorPolicy.IGNORE, NotApplicablePolicy.REFUSE, List.of(PASS, PASS));
+			Judgment aggregate = aggregate(ErrorHandling.IGNORE, ExclusionHandling.REFUSE, List.of(PASS, PASS));
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.PASS);
 		}
@@ -129,10 +129,10 @@ class PolicyPairAccountingTest {
 	class Propagate {
 
 		@ParameterizedTest
-		@EnumSource(value = NotApplicablePolicy.class, names = { "EXCLUDE", "TREAT_AS_FAIL" })
+		@EnumSource(value = ExclusionHandling.class, names = { "EXCLUDE", "TREAT_AS_FAIL" })
 		@DisplayName("an errored input propagates, carrying the terminal causes it stands for")
-		void propagatesWithOrigin(NotApplicablePolicy notApplicablePolicy) {
-			Judgment aggregate = aggregate(ErrorPolicy.PROPAGATE, notApplicablePolicy, MIXED);
+		void propagatesWithOrigin(ExclusionHandling notApplicablePolicy) {
+			Judgment aggregate = aggregate(ErrorHandling.PROPAGATE, notApplicablePolicy, MIXED);
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(aggregate.reasonCode()).isEqualTo(JudgmentReasonCode.ERRORS_PROPAGATED);
@@ -150,7 +150,7 @@ class PolicyPairAccountingTest {
 		void treatErrorsAsFail() {
 			// A gate rather than consensus, so the failing contribution is visible in the
 			// aggregate rather than absorbed into a "the judges disagree" abstention.
-			Judgment aggregate = new AllMustPassStrategy(ErrorPolicy.TREAT_AS_FAIL, NotApplicablePolicy.EXCLUDE)
+			Judgment aggregate = new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE)
 				.aggregate(MIXED, Map.of());
 			Map<String, Object> evidence = evidenceOf(aggregate);
 
@@ -165,7 +165,7 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("TREAT_AS_ABSTAIN: the exclusion leaves, the error casts no vote")
 		void treatErrorsAsAbstain() {
-			Judgment aggregate = aggregate(ErrorPolicy.TREAT_AS_ABSTAIN, NotApplicablePolicy.EXCLUDE, MIXED);
+			Judgment aggregate = aggregate(ErrorHandling.TREAT_AS_ABSTAIN, ExclusionHandling.EXCLUDE, MIXED);
 			Map<String, Object> evidence = evidenceOf(aggregate);
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.ABSTAIN);
@@ -177,7 +177,7 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("IGNORE: the exclusion leaves, the error is removed with its weight")
 		void ignoreErrors() {
-			Judgment aggregate = aggregate(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE, MIXED);
+			Judgment aggregate = aggregate(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE, MIXED);
 			Map<String, Object> evidence = evidenceOf(aggregate);
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.ABSTAIN);
@@ -189,7 +189,7 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("TREAT_AS_ABSTAIN with nothing left is an abstention, not an exclusion")
 		void emptyUnderTreatAsAbstain() {
-			Judgment aggregate = aggregate(ErrorPolicy.TREAT_AS_ABSTAIN, NotApplicablePolicy.EXCLUDE,
+			Judgment aggregate = aggregate(ErrorHandling.TREAT_AS_ABSTAIN, ExclusionHandling.EXCLUDE,
 					List.of(EXCLUDED, JUDGE_ERROR));
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.ABSTAIN);
@@ -201,7 +201,7 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("IGNORE with nothing left is an abstention, not an exclusion")
 		void emptyUnderIgnore() {
-			Judgment aggregate = aggregate(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE,
+			Judgment aggregate = aggregate(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE,
 					List.of(EXCLUDED, JUDGE_ERROR));
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.ABSTAIN);
@@ -216,10 +216,10 @@ class PolicyPairAccountingTest {
 	class ExclusionsAsFailures {
 
 		@ParameterizedTest
-		@EnumSource(value = ErrorPolicy.class, names = { "TREAT_AS_FAIL", "TREAT_AS_ABSTAIN", "IGNORE" })
+		@EnumSource(value = ErrorHandling.class, names = { "TREAT_AS_FAIL", "TREAT_AS_ABSTAIN", "IGNORE" })
 		@DisplayName("the exclusion is counted both as submitted and as treated")
-		void countedTwiceOverDifferentQuestions(ErrorPolicy errorPolicy) {
-			Map<String, Object> evidence = evidenceOf(aggregate(errorPolicy, NotApplicablePolicy.TREAT_AS_FAIL, MIXED));
+		void countedTwiceOverDifferentQuestions(ErrorHandling errorPolicy) {
+			Map<String, Object> evidence = evidenceOf(aggregate(errorPolicy, ExclusionHandling.TREAT_AS_FAIL, MIXED));
 
 			assertThat(evidence).containsEntry(AggregationEvidence.NOT_APPLICABLE_COUNT, 1)
 				.containsEntry(AggregationEvidence.NOT_APPLICABLE_TREATED_AS_FAIL_COUNT, 1);
@@ -228,7 +228,7 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("the original judgment is never given a score by the treatment")
 		void originalJudgmentIsUntouched() {
-			aggregate(ErrorPolicy.IGNORE, NotApplicablePolicy.TREAT_AS_FAIL, MIXED);
+			aggregate(ErrorHandling.IGNORE, ExclusionHandling.TREAT_AS_FAIL, MIXED);
 
 			assertThat(EXCLUDED.score()).isNull();
 			assertThat(EXCLUDED.status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
@@ -240,8 +240,8 @@ class PolicyPairAccountingTest {
 			// Position 0 is excluded and weighted 3.0; position 1 passes and is weighted
 			// 1.0.
 			// Treating the exclusion as a failure at its own weight gives 1/4, not 1/2.
-			Judgment aggregate = new WeightedAverageStrategy(0.5, ErrorPolicy.PROPAGATE,
-					NotApplicablePolicy.TREAT_AS_FAIL)
+			Judgment aggregate = new WeightedAverageStrategy(0.5, ErrorHandling.PROPAGATE,
+					ExclusionHandling.TREAT_AS_FAIL)
 				.aggregate(List.of(EXCLUDED, PASS), Map.of("0", 3.0, "1", 1.0));
 
 			assertThat(aggregate.score()).isEqualTo(0.25);
@@ -257,7 +257,7 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("under EXCLUDE it is itself not applicable, never an abstention")
 		void allExcludedIsNotApplicable() {
-			Judgment aggregate = aggregate(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE,
+			Judgment aggregate = aggregate(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE,
 					List.of(EXCLUDED, EXCLUDED));
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
@@ -268,7 +268,7 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("one abstention among the exclusions makes it an abstention: the jury did have a question")
 		void oneAbstentionIsEnough() {
-			Judgment aggregate = aggregate(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE,
+			Judgment aggregate = aggregate(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE,
 					List.of(EXCLUDED, Judgment.abstain("could not decide")));
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.ABSTAIN);
@@ -277,7 +277,7 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("under TREAT_AS_FAIL it fails rather than disappearing")
 		void allExcludedUnderTreatAsFail() {
-			Judgment aggregate = aggregate(ErrorPolicy.PROPAGATE, NotApplicablePolicy.TREAT_AS_FAIL,
+			Judgment aggregate = aggregate(ErrorHandling.PROPAGATE, ExclusionHandling.TREAT_AS_FAIL,
 					List.of(EXCLUDED, EXCLUDED));
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.FAIL);
@@ -297,7 +297,7 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("under TREAT_AS_FAIL they propagate instead of becoming a failing contribution")
 		void treatAsFailDoesNotApplyToMachinery() {
-			Judgment aggregate = aggregate(ErrorPolicy.TREAT_AS_FAIL, NotApplicablePolicy.EXCLUDE,
+			Judgment aggregate = aggregate(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE,
 					List.of(FAIL, MACHINERY_ERROR));
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.ERROR);
@@ -308,12 +308,12 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("the reasoning names machinery, and does not claim propagate was configured")
 		void reasoningIsHonestAboutTheConfiguredPolicy() {
-			Judgment aggregate = aggregate(ErrorPolicy.TREAT_AS_FAIL, NotApplicablePolicy.EXCLUDE,
+			Judgment aggregate = aggregate(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE,
 					List.of(FAIL, MACHINERY_ERROR));
 
 			assertThat(aggregate.reasoning()).contains("machinery").doesNotContain("the error policy is propagate");
 			assertThat(evidenceOf(aggregate)).containsEntry(AggregationEvidence.ERROR_POLICY,
-					ErrorPolicy.TREAT_AS_FAIL.token());
+					ErrorHandling.TREAT_AS_FAIL.token());
 		}
 
 		@Test
@@ -322,7 +322,7 @@ class PolicyPairAccountingTest {
 			Judgment wrapped = Judgment.propagatedError(Map.of(JudgmentReasonCode.STAGE_FAILED, 1L),
 					"a member stage failed and the error policy is propagate");
 
-			Judgment aggregate = aggregate(ErrorPolicy.TREAT_AS_FAIL, NotApplicablePolicy.EXCLUDE,
+			Judgment aggregate = aggregate(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE,
 					List.of(FAIL, wrapped));
 
 			assertThat(aggregate.reasonCode()).isEqualTo(JudgmentReasonCode.ERRORS_PROPAGATED);
@@ -334,18 +334,18 @@ class PolicyPairAccountingTest {
 		@DisplayName("under TREAT_AS_ABSTAIN and IGNORE the configured policy applies as written")
 		void otherPoliciesApplyAsConfigured() {
 			assertThat(
-					aggregate(ErrorPolicy.TREAT_AS_ABSTAIN, NotApplicablePolicy.EXCLUDE, List.of(FAIL, MACHINERY_ERROR))
+					aggregate(ErrorHandling.TREAT_AS_ABSTAIN, ExclusionHandling.EXCLUDE, List.of(FAIL, MACHINERY_ERROR))
 						.status())
 				.isEqualTo(JudgmentStatus.FAIL);
 			assertThat(
-					aggregate(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE, List.of(FAIL, MACHINERY_ERROR)).status())
+					aggregate(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE, List.of(FAIL, MACHINERY_ERROR)).status())
 				.isEqualTo(JudgmentStatus.FAIL);
 		}
 
 		@Test
 		@DisplayName("a judge-origin error still becomes a failing contribution under TREAT_AS_FAIL")
 		void judgeOriginIsStillGoverned() {
-			Judgment aggregate = new AllMustPassStrategy(ErrorPolicy.TREAT_AS_FAIL, NotApplicablePolicy.EXCLUDE)
+			Judgment aggregate = new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE)
 				.aggregate(List.of(PASS, JUDGE_ERROR), Map.of());
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.FAIL);
@@ -365,7 +365,7 @@ class PolicyPairAccountingTest {
 					Map.of(JudgmentReasonCode.JUDGE_FAILED, 2L, JudgmentReasonCode.JUDGE_REPORTED, 1L),
 					"3 of 3 judgments errored and the error policy is propagate");
 
-			Judgment aggregate = aggregate(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE, List.of(PASS, wrapped));
+			Judgment aggregate = aggregate(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE, List.of(PASS, wrapped));
 
 			assertThat(evidenceOf(aggregate)).containsEntry(AggregationEvidence.ERROR_COUNT, 1);
 			assertThat(originOf(aggregate)).containsOnly(Map.entry("judge_failed", 2), Map.entry("judge_reported", 1));
@@ -374,7 +374,7 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("the block is universal: it is present, and empty, when nothing errored")
 		void alwaysPresent() {
-			Judgment aggregate = aggregate(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE, List.of(PASS, PASS));
+			Judgment aggregate = aggregate(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE, List.of(PASS, PASS));
 
 			assertThat(evidenceOf(aggregate)).containsKey(AggregationEvidence.ERROR_CODE_COUNTS);
 			assertThat(originOf(aggregate)).isEmpty();
@@ -386,21 +386,21 @@ class PolicyPairAccountingTest {
 	@DisplayName("every built-in strategy applies both policies and writes the universal keys")
 	void everyStrategyAccountsTheSameWay() {
 		List<VotingStrategy> strategies = new ArrayList<>(
-				List.of(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-						new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-						new AllMustPassStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-						new AverageVotingStrategy(0.5, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-						new MedianVotingStrategy(0.5, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-						new WeightedAverageStrategy(0.5, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-						new ConjunctiveStrategy(0.5, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE)));
+				List.of(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
+						new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
+						new AllMustPassStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
+						new AverageVotingStrategy(0.5, ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
+						new MedianVotingStrategy(0.5, ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
+						new WeightedAverageStrategy(0.5, ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
+						new ConjunctiveStrategy(0.5, ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE)));
 
 		for (VotingStrategy strategy : strategies) {
-			assertThat(strategy.notApplicablePolicy()).as("%s declares its policy", strategy.getName())
-				.isEqualTo(NotApplicablePolicy.EXCLUDE);
+			assertThat(strategy.exclusionHandling()).as("%s declares its policy", strategy.getName())
+				.isEqualTo(ExclusionHandling.EXCLUDE);
 
 			Map<String, Object> evidence = evidenceOf(strategy.aggregate(MIXED, Map.of()));
 			assertThat(evidence).as("%s writes the universal keys", strategy.getName())
-				.containsEntry(AggregationEvidence.NOT_APPLICABLE_POLICY, NotApplicablePolicy.EXCLUDE.token())
+				.containsEntry(AggregationEvidence.NOT_APPLICABLE_POLICY, ExclusionHandling.EXCLUDE.token())
 				.containsEntry(AggregationEvidence.NOT_APPLICABLE_COUNT, 1)
 				.containsEntry(AggregationEvidence.NOT_APPLICABLE_TREATED_AS_FAIL_COUNT, 0)
 				.containsKey(AggregationEvidence.ERROR_CODE_COUNTS);
@@ -422,7 +422,7 @@ class PolicyPairAccountingTest {
 			}
 		};
 
-		assertThat(silent.notApplicablePolicy()).isEqualTo(NotApplicablePolicy.REFUSE);
+		assertThat(silent.exclusionHandling()).isEqualTo(ExclusionHandling.REFUSE);
 	}
 
 }

@@ -310,7 +310,7 @@ class ConsensusStrategyTest {
 	@ParameterizedTest(name = "{0} under {1}")
 	@MethodSource("errorFreeTruthTable")
 	@DisplayName("the consensus truth table holds under every error policy")
-	void consensusTruthTableHoldsUnderEveryErrorPolicy(String row, ErrorPolicy policy, List<Judgment> judgments,
+	void consensusTruthTableHoldsUnderEveryErrorHandling(String row, ErrorHandling policy, List<Judgment> judgments,
 			JudgmentStatus expected) {
 		Judgment result = new ConsensusStrategy(policy).aggregate(judgments, Map.of());
 
@@ -318,7 +318,7 @@ class ConsensusStrategyTest {
 	}
 
 	private static Stream<Arguments> errorFreeTruthTable() {
-		return Stream.of(ErrorPolicy.values())
+		return Stream.of(ErrorHandling.values())
 			.flatMap(policy -> Stream.of(
 					Arguments.of("all PASS", policy, List.of(booleanPass("Judge 1"), booleanPass("Judge 2")),
 							JudgmentStatus.PASS),
@@ -340,9 +340,9 @@ class ConsensusStrategyTest {
 	 * ABSTAIN by the same rule as any other split panel.
 	 */
 	@ParameterizedTest
-	@EnumSource(ErrorPolicy.class)
+	@EnumSource(ErrorHandling.class)
 	@DisplayName("an errored judge follows the error policy, then the same consensus rule")
-	void errorRowFollowsTheErrorPolicy(ErrorPolicy policy) {
+	void errorRowFollowsTheErrorHandling(ErrorHandling policy) {
 		ConsensusStrategy strategy = new ConsensusStrategy(policy);
 
 		Judgment passPlusError = strategy.aggregate(List.of(booleanPass("Judge 1"), Judgment.error("boom")), Map.of());
@@ -376,7 +376,7 @@ class ConsensusStrategyTest {
 	 */
 	@Test
 	void errorTreatedAsFailCanProduceDisagreement() {
-		Judgment result = new ConsensusStrategy(ErrorPolicy.TREAT_AS_FAIL)
+		Judgment result = new ConsensusStrategy(ErrorHandling.TREAT_AS_FAIL)
 			.aggregate(List.of(booleanPass("Judge 1"), Judgment.error("boom")), Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);

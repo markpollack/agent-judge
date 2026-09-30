@@ -41,14 +41,18 @@ import io.github.markpollack.judge.description.KeySource;
  * @param verdictKey the key this judgment is stored under in
  * {@link Verdict#individualByName()}
  * @param execution recorded invocation outcome
+ * @param participation parent treatment, separate from producer outcome
+ * @param cause original invocation exception, memory only; excluded from portable
+ * equality
  * @param keySource where the verdict key came from
  * @author Mark Pollack
  * @since 0.17.0
  */
-@JsonPropertyOrder({ "position", "verdictKey", "keySource", "execution" })
+@JsonPropertyOrder({ "position", "verdictKey", "keySource", "execution", "participation" })
 public record Seat(
 		@JsonProperty(required = true) @JsonDeserialize(using = StrictIntegerDeserializer.class) int position,
-		String verdictKey, KeySource keySource, SeatExecution execution) {
+		String verdictKey, KeySource keySource, SeatExecution execution, Participation participation,
+		@com.fasterxml.jackson.annotation.JsonIgnore @org.jspecify.annotations.Nullable Throwable cause) {
 
 	/**
 	 * Construct a seat explicitly asserting a valid returned judgment.
@@ -61,12 +65,40 @@ public record Seat(
 	}
 
 	/**
+	 * Record a seat without claiming a reduction treatment.
+	 * @param position configured position
+	 * @param verdictKey result key
+	 * @param keySource origin of the key
+	 * @param execution invocation outcome
+	 */
+	public Seat(int position, String verdictKey, KeySource keySource, SeatExecution execution) {
+		this(position, verdictKey, keySource, execution, Participation.NOT_RECORDED, null);
+	}
+
+	Seat treated(Participation treatment) {
+		return new Seat(position, verdictKey, keySource, execution, treatment, cause);
+	}
+
+	/** Equality concerns portable seat facts; a live Throwable is diagnostic context. */
+	@Override
+	public boolean equals(Object other) {
+		return other instanceof Seat seat && position == seat.position && verdictKey.equals(seat.verdictKey)
+				&& keySource == seat.keySource && execution == seat.execution && participation == seat.participation;
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(position, verdictKey, keySource, execution, participation);
+	}
+
+	/**
 	 * Validate the seat.
 	 * @throws IllegalArgumentException if the position is negative or the verdict key is
 	 * blank
 	 */
 	public Seat {
 		Objects.requireNonNull(execution, "execution must be explicit");
+		Objects.requireNonNull(participation, "participation must be explicit");
 		if (position < 0) {
 			throw new IllegalArgumentException("position must not be negative, but was " + position);
 		}

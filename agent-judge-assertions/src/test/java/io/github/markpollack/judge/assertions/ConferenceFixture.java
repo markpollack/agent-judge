@@ -4,25 +4,18 @@
  */
 package io.github.markpollack.judge.assertions;
 
-import io.github.markpollack.judge.acceptance.Policies;
-
 import io.github.markpollack.judge.requirement.Requirement;
-import io.github.markpollack.judge.acceptance.AcceptancePolicy;
 
 import com.fasterxml.jackson.databind.*;
-import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.requirement.RequirementEvidence;
+import io.github.markpollack.judge.RequirementJudge;
+import io.github.markpollack.judge.evaluation.*;
+import io.github.markpollack.judge.policy.*;
+import io.github.markpollack.judge.serialization.VerdictCodec;
 import io.github.markpollack.judge.jev.JevEvidence;
 import io.github.markpollack.judge.jev.JevJudge;
 import io.github.markpollack.judge.jev.JevQuestion;
 import io.github.markpollack.judge.judgment.Judgment;
-import io.github.markpollack.judge.judgment.JudgmentReasonCode;
-import io.github.markpollack.judge.acceptance.AcceptanceAction;
-import io.github.markpollack.judge.acceptance.AcceptanceDecision;
-import io.github.markpollack.judge.acceptance.AcceptancePolicy;
-import io.github.markpollack.judge.acceptance.Policies;
 import io.github.markpollack.judge.provenance.ArtifactRef;
-import io.github.markpollack.judge.provenance.PolicyRef;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
@@ -47,7 +40,7 @@ final class ConferenceFixture {
 
 	final JsonNode routing;
 
-	final AcceptancePolicy binding;
+	final Policy binding;
 
 	final JevQuestion.Choice question;
 
@@ -75,11 +68,8 @@ final class ConferenceFixture {
 				.equals(routing.path("composedConfigurationSha256").asText()))
 				throw new IllegalStateException("Changed composed configuration");
 		}
-		binding = Policies.recorded(
-				new PolicyRef(policy.path("id").asText(), policy.path("revision").asText(),
-						sha(resource("assertions/v1/policy.json"))),
-				j -> new AcceptanceDecision(historicalAction(policy.path("action").asText()),
-						policy.path("reason").asText()));
+		binding = verdict -> new PolicyDecision(historicalAction(policy.path("action").asText()),
+				policy.path("reason").asText());
 		Map<String, Object> criteria = new LinkedHashMap<>();
 		configuration.path("criteria").fields().forEachRemaining(e -> criteria.put(e.getKey(), e.getValue().asText()));
 		Map<String, JevQuestion.Meaning> meanings = new LinkedHashMap<>();
@@ -92,8 +82,8 @@ final class ConferenceFixture {
 
 	// The reviewed fixture bytes remain frozen. Translate their historical policy
 	// vocabulary only here; the production V3 reader does not accept V2 actions.
-	private static AcceptanceAction historicalAction(String action) {
-		return "USE_ASSESSMENT".equals(action) ? AcceptanceAction.RELY : AcceptanceAction.valueOf(action);
+	private static PolicyAction historicalAction(String action) {
+		return "USE_ASSESSMENT".equals(action) ? PolicyAction.RELY : PolicyAction.valueOf(action);
 	}
 
 	private static JsonNode reviewedRouting() throws Exception {
@@ -143,17 +133,13 @@ final class ConferenceFixture {
 				b.path("textSha256").asText(), true);
 	}
 
-	Judge<RequirementEvidence<String, JevEvidence>> bind(JevJudge judge) {
-		var first = judge.bind(requirement(0), java.util.function.Function.identity());
-		var second = judge.bind(requirement(1), java.util.function.Function.identity());
-		return pair -> {
-			// Select the reviewed native binding; the production binder validates its
-			// revision, native specification and source before sending any request.
-			if (pair.requirement().id().equals(requirement(0).id()))
-				return first.judge(pair);
-			if (pair.requirement().id().equals(requirement(1).id()))
-				return second.judge(pair);
-			return Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "Requirement has no reviewed binding");
+	RequirementJudge<String, JevEvidence> bind(JevJudge judge) {
+		return (actual, evidence) -> {
+			// This frozen experiment admits only its reviewed roster. The production
+			// evaluator receives this actual requirement; it has no second binding.
+			if (!List.of(requirement(0), requirement(1)).contains(actual))
+				return Judgment.error("Requirement is outside this reviewed fixture roster");
+			return judge.judge(actual, evidence);
 		};
 	}
 
@@ -174,21 +160,12 @@ final class ConferenceFixture {
 				});
 	}
 
-	static void save(AssertionResult result, Path output, String origin) throws Exception {
+	static void save(EvaluationResult result, Path output, String origin) throws Exception {
 		Files.createDirectories(output);
-		var req = result.requirement();
-		JSON.writerWithDefaultPrettyPrinter()
-			.writeValue(output.resolve("resolution.json").toFile(),
-					Map.of("origin", origin, "requirement",
-							Map.of("id", req.id(), "revision", req.revision(), "text", req.text()),
-							"acceptanceExecution", result.acceptanceExecution()));
-		JSON.writerWithDefaultPrettyPrinter()
-			.writeValue(output.resolve("judgment.json").toFile(), result.verdict().judgment());
-		JSON.writerWithDefaultPrettyPrinter().writeValue(output.resolve("verdict.json").toFile(), result.verdict());
-		JSON.writerWithDefaultPrettyPrinter()
-			.writeValue(output.resolve("interpretation.json").toFile(), result.interpretation());
-		System.out.println(origin + ": " + req.id() + " => " + result.interpretation().readingSupport() + " "
-				+ result.interpretation().outcome());
+		Files.writeString(output.resolve("evaluation.json"), new VerdictCodec().write(result));
+		Files.writeString(output.resolve("verdict.json"), new VerdictCodec().write(result.verdict()));
+		Files.writeString(output.resolve("report.txt"),
+				origin + "\n" + io.github.markpollack.judge.reporting.VerdictReport.of(result.verdict()).summary());
 	}
 
 	static byte[] resource(String path) throws Exception {

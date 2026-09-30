@@ -10,12 +10,15 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 /**
  * Stable portable code describing why a composite stage produced no verdict.
+ *
  * @since 0.14.0
  */
 public enum CompositeFailureCode {
 
 	/** The configured jury threw an {@link Exception} while executing. */
-	JURY_EXECUTION_FAILED("jury_execution_failed");
+	JURY_EXECUTION_FAILED("jury_execution_failed"),
+	/** The configured voting strategy threw or violated its return contract. */
+	AGGREGATION_FAILED("aggregation_failed");
 
 	private final String wireName;
 

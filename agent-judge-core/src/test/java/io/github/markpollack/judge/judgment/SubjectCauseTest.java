@@ -18,11 +18,11 @@ import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
 import io.github.markpollack.judge.jury.VerdictProvenance;
 import io.github.markpollack.judge.jury.VerdictProvenanceBasis;
-import io.github.markpollack.judge.jury.ErrorPolicy;
+import io.github.markpollack.judge.jury.ErrorHandling;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.NotApplicablePolicy;
+import io.github.markpollack.judge.jury.ExclusionHandling;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.jury.RoutingRule;
 import io.github.markpollack.judge.jury.Verdict;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -96,8 +96,8 @@ class SubjectCauseTest {
 			.build();
 
 		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("gate", tier, TierPolicy.REJECT_ON_ANY_FAIL)
-			.tier("semantic", passing(), TierPolicy.FINAL_TIER)
+			.tier("gate", tier, RoutingRule.REJECT_ON_ANY_FAIL)
+			.tier("semantic", passing(), RoutingRule.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
@@ -140,7 +140,7 @@ class SubjectCauseTest {
 	@Test
 	@DisplayName("an exclusion treated as a failure produces an uncoded rejection, not a manufactured cause")
 	void exclusionsTreatedAsFailuresAreUncoded() {
-		Judgment aggregate = new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.TREAT_AS_FAIL)
+		Judgment aggregate = new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.TREAT_AS_FAIL)
 			.aggregate(List.of(Judgment.notApplicable("the repository contains no Java")), Map.of());
 
 		assertThat(aggregate.status()).isEqualTo(JudgmentStatus.FAIL);

@@ -319,17 +319,17 @@ class SimpleJuryTest {
 	// ==================== A failing judge still votes ====================
 	//
 	// Regression guards for the defect where a throwing judge escaped SimpleJury
-	// entirely, bypassing ErrorPolicy and discarding every other judge's result in the
+	// entirely, bypassing ErrorHandling and discarding every other judge's result in the
 	// same jury. Before the fix each of these tests failed by propagating the judge's
 	// exception out of vote().
 
 	@Test
-	void throwingJudgeBecomesAnErrorJudgmentTheErrorPolicyResolves() {
+	void throwingJudgeBecomesAnErrorJudgmentTheErrorHandlingResolves() {
 		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(withScore("Scorer", 0.9))
 			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
 			.judge(alwaysPass("Checker"))
-			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.votingStrategy(new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN))
 			.parallel(true)
 			.build();
 
@@ -358,7 +358,7 @@ class SimpleJuryTest {
 		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
 			.judge(alwaysPass("Checker"))
-			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.votingStrategy(new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN))
 			.parallel(false)
 			.build();
 
@@ -392,7 +392,7 @@ class SimpleJuryTest {
 		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(returnsNothing("Silent"))
 			.judge(alwaysPass("Checker"))
-			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.votingStrategy(new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN))
 			.build();
 
 		Verdict verdict = jury.vote(simpleContext("Test goal"));
@@ -409,7 +409,7 @@ class SimpleJuryTest {
 			.judge(alwaysPass("Checker"))
 			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
 			.judge(alwaysPass("Reviewer"))
-			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.votingStrategy(new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN))
 			.build();
 
 		Verdict verdict = jury.vote(simpleContext("Test goal"));
@@ -447,7 +447,7 @@ class SimpleJuryTest {
 			.judge(withScore("Scorer", 0.9))
 			.judge(throwingMetadata(new IllegalStateException("registry offline"),
 					Judgment.pass("a judgment the jury must not keep")))
-			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
+			.votingStrategy(new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN))
 			.parallel(parallel)
 			.build();
 	}
