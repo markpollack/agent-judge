@@ -60,9 +60,8 @@ class VotingStrategyCharacterizationTest {
 			case PASS -> Judgment.builder().pass().label(label).reasoning("classified " + label).build();
 			case FAIL -> Judgment.builder().fail().label(label).reasoning("classified " + label).build();
 			case ABSTAIN -> Judgment.builder().abstain().reasoning("classified " + label).label(label).build();
-			case NOT_APPLICABLE ->
-				Judgment.builder().notApplicable().reasoning("classified " + label).label(label).build();
-			case ERROR -> throw new IllegalArgumentException("ERROR cannot carry a classification label");
+			case NOT_APPLICABLE, ERROR ->
+				throw new IllegalArgumentException(status + " cannot carry a classification label");
 		};
 	}
 

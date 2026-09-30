@@ -124,7 +124,7 @@ public class SupersetDiffJudge extends DeterministicJudge<DirectoryComparison> {
 			return Judgment.abstain("No files in reference directory");
 		}
 
-		int passed = (int) checks.stream().filter(Check::passed).count();
+		int passed = (int) checks.stream().filter(check -> check.judgment().pass()).count();
 		int total = checks.size();
 		double score = (double) passed / total;
 		boolean allMatch = passed == total;

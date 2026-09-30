@@ -2,6 +2,7 @@ package io.github.markpollack.judge.agentclient;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 
 import io.github.markpollack.agents.client.AgentClientResponse;
 import io.github.markpollack.agents.model.AgentGeneration;
@@ -15,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class AgentClientEvidenceTest {
 
@@ -43,7 +46,7 @@ class AgentClientEvidenceTest {
 	}
 
 	@Test
-	void shouldBuildContextFromSuccessfulResponse() {
+	void shouldCaptureSuccessfulResponse() {
 		AgentClientResponse response = successResponse();
 		Path workspace = Path.of("/tmp/project");
 
@@ -54,6 +57,7 @@ class AgentClientEvidenceTest {
 		assertThat(context.completion().status()).isEqualTo(CompletionStatus.SUCCESS);
 		assertThat(context.completion().response()).isEqualTo("Fixed the build error in Main.java");
 		assertThat(context.completion().elapsedTime()).isEqualTo(Duration.ofSeconds(45));
+		assertThat(context.completion().startedAt()).isNull();
 		assertThat(context.completion().metadata()).containsEntry(AgentClientMetadataKeys.MODEL, "claude-code");
 		assertThat(context.completion().metadata()).containsEntry(AgentClientMetadataKeys.SESSION_ID, "sess-abc-123");
 		assertThat(context.completion().metadata()).containsEntry(AgentClientMetadataKeys.FINISH_REASON, "SUCCESS");
@@ -73,7 +77,7 @@ class AgentClientEvidenceTest {
 	}
 
 	@Test
-	void shouldBuildContextFromFailedResponse() {
+	void shouldCaptureFailedResponse() {
 		AgentClientResponse response = failureResponse();
 
 		AgentExecutionEvidence context = AgentClientEvidence.from(response, "Impossible task", Path.of("/tmp/project"));
@@ -107,6 +111,8 @@ class AgentClientEvidenceTest {
 		AgentExecutionEvidence context = AgentClientEvidence.from(null, "Test", Path.of("/tmp"));
 
 		assertThat(context.completion().status()).isEqualTo(CompletionStatus.UNKNOWN);
+		assertThat(context.completion().startedAt()).isNull();
+		assertThat(context.completion().elapsedTime()).isNull();
 		assertThat(context.completion().response()).isNull();
 	}
 
@@ -120,6 +126,35 @@ class AgentClientEvidenceTest {
 		assertThat(context.completion().metadata()).containsEntry("run.id", "exp-42");
 		assertThat(context.completion().metadata()).containsEntry("dataset.row", 7);
 		assertThat(context.completion().metadata()).containsEntry(AgentClientMetadataKeys.MODEL, "claude-code");
+	}
+
+	@Test
+	void precomputedResponseDoesNotInventTiming() {
+		var completion = AgentClientEvidence.from(responseWithoutMetadata(), "Test", Path.of("/tmp")).completion();
+		assertThat(completion.startedAt()).isNull();
+		assertThat(completion.elapsedTime()).isNull();
+	}
+
+	@Test
+	void executionMeasuresMissingTimingAndPreservesReportedZeroDuration() {
+		Instant before = Instant.now();
+		var measured = AgentClientEvidence.execute("Test", Path.of("/tmp"), () -> responseWithoutMetadata())
+			.completion();
+		Instant after = Instant.now();
+		assertThat(measured.startedAt()).isBetween(before, after);
+		assertThat(measured.elapsedTime()).isGreaterThanOrEqualTo(Duration.ZERO);
+		var zeroResponse = new AgentClientResponse(
+				new AgentResponse(List.of(new AgentGeneration("done", new AgentGenerationMetadata("SUCCESS", null))),
+						AgentResponseMetadata.builder().duration(Duration.ZERO).build()));
+		var reported = AgentClientEvidence.execute("Test", Path.of("/tmp"), () -> zeroResponse).completion();
+		assertThat(reported.elapsedTime()).isEqualTo(Duration.ZERO);
+	}
+
+	private AgentClientResponse responseWithoutMetadata() {
+		var response = mock(AgentClientResponse.class);
+		when(response.getResult()).thenReturn("done");
+		when(response.isSuccessful()).thenReturn(true);
+		return response;
 	}
 
 }

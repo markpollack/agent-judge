@@ -54,13 +54,12 @@ public final class Summaries {
 		sentences.add(decidedBySentence(interpretation));
 		sentences.add(readingSentence(interpretation.outcome()));
 		sentences.add(supportSentence(interpretation.readingSupport()));
-		sentences
-			.add(interpretation.sourceVersion() == 2 ? "Source: explicit version-2 semantic results (sourceVersion 2)."
-					: interpretation.sourceVersion() < 0 || interpretation.sourceVersion() > 2
-							? "Source: unsupported version " + interpretation.sourceVersion() + "."
-							: interpretation.sourceVersion() == 1
-									? "Source: the seven-component form 0.17 writes (sourceVersion 1)."
-									: "Source: an unstamped record written before 0.17 (sourceVersion 0).");
+		sentences.add(switch (interpretation.sourceVersion()) {
+			case 3 -> "Source: explicit version-3 semantic results (sourceVersion 3).";
+			case 1 -> "Source: the seven-component form 0.17 writes (sourceVersion 1).";
+			case 0 -> "Source: an unstamped record written before 0.17 (sourceVersion 0).";
+			default -> "Source: unsupported version " + interpretation.sourceVersion() + ".";
+		});
 		sentences.add(defectsSentence(interpretation.defects()));
 		return String.join(" ", sentences);
 	}

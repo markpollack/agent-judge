@@ -15,7 +15,7 @@
     <packaging>jar</packaging>
 
     <name>Agent Judge Koog</name>
-    <description>JetBrains Koog agent integration for Agent Judge - bridge from Koog agent execution to JudgmentContext</description>
+    <description>JetBrains Koog agent integration for Agent Judge - bridge from Koog agent execution to CompletionEvidence</description>
 
     <dependencies>
         <!-- Core Judge API -->

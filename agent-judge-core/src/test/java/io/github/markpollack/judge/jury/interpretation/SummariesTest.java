@@ -45,6 +45,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("Summaries")
 class SummariesTest {
 
+	@Test
+	void versionSummaryDistinguishesCurrentFromUnsupportedSchemas() {
+		var current = Verdicts
+			.interpret(Verdict.single("known", io.github.markpollack.judge.judgment.Judgment.pass("known")));
+		assertThat(current.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
+		assertThat(current.summary()).contains("Source: explicit version-3").doesNotContain("unsupported version");
+		for (int version : List.of(2, 4, 99)) {
+			var unsupported = Verdicts.interpret(Map.of("schemaVersion", version));
+			assertThat(unsupported.readingSupport()).isEqualTo(ReadingSupport.UNDETERMINED);
+			assertThat(unsupported.summary()).contains("Source: unsupported version " + version + ".");
+		}
+	}
+
 	private static final Pattern QUOTED = Pattern.compile("'([^']*)'");
 
 	/**

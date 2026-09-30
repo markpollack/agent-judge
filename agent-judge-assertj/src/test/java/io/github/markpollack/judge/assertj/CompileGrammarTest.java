@@ -127,9 +127,15 @@ class CompileGrammarTest {
 		compile("requirement.under(j -> new AcceptanceDecision(AcceptanceAction.RELY, \"rely\"));", false);
 	}
 
-    @Test
-    void ordinaryAndPairedJudgeOverloadsHaveTheSameErasure() throws Exception {
-        compile("class Alternatives { void judgedBy(Judge<String> j) {} void judgedBy(Judge<RequirementEvidence<String,String>> j) {} }", false);
-    }
+	@Test
+	void ordinaryAndPairedJudgeOverloadsHaveTheSameErasure() throws Exception {
+		compile("class Alternatives { void judgedBy(Judge<String> j) {} void judgedBy(Judge<RequirementEvidence<String,String>> j) {} }",
+				false);
+	}
+
+	@Test
+	void excludedCriterionCannotCarryFinding() throws Exception {
+		compile("Judgment.builder().notApplicable().reasoning(\"outside domain\").label(\"no_java\").build();", false);
+	}
 
 }

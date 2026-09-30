@@ -22,36 +22,36 @@ class CheckTest {
 	void shouldCreatePassCheck() {
 		Check check = Check.pass("Test passed");
 
-		assertThat(check.name()).isEqualTo("Test passed");
-		assertThat(check.passed()).isTrue();
-		assertThat(check.message()).isEmpty();
+		assertThat(check.id()).isEqualTo("Test passed");
+		assertThat(check.judgment().pass()).isTrue();
+		assertThat(check.judgment().operationalReasoning()).isEmpty();
 	}
 
 	@Test
 	void shouldCreatePassCheckWithMessage() {
 		Check check = Check.pass("Test passed", "All assertions succeeded");
 
-		assertThat(check.name()).isEqualTo("Test passed");
-		assertThat(check.passed()).isTrue();
-		assertThat(check.message()).isEqualTo("All assertions succeeded");
+		assertThat(check.id()).isEqualTo("Test passed");
+		assertThat(check.judgment().pass()).isTrue();
+		assertThat(check.judgment().operationalReasoning()).isEqualTo("All assertions succeeded");
 	}
 
 	@Test
 	void shouldCreateFailCheck() {
 		Check check = Check.fail("Test failed", "Expected 5 but was 3");
 
-		assertThat(check.name()).isEqualTo("Test failed");
-		assertThat(check.passed()).isFalse();
-		assertThat(check.message()).isEqualTo("Expected 5 but was 3");
+		assertThat(check.id()).isEqualTo("Test failed");
+		assertThat(check.judgment().pass()).isFalse();
+		assertThat(check.judgment().operationalReasoning()).isEqualTo("Expected 5 but was 3");
 	}
 
 	@Test
 	void shouldCreateCheckWithConstructor() {
-		Check check = new Check("Custom check", true, "Custom message");
+		Check check = new Check("Custom check", Judgment.pass("Custom message"));
 
-		assertThat(check.name()).isEqualTo("Custom check");
-		assertThat(check.passed()).isTrue();
-		assertThat(check.message()).isEqualTo("Custom message");
+		assertThat(check.id()).isEqualTo("Custom check");
+		assertThat(check.judgment().pass()).isTrue();
+		assertThat(check.judgment().operationalReasoning()).isEqualTo("Custom message");
 	}
 
 	// ==================== Record Tests ====================
@@ -92,24 +92,25 @@ class CheckTest {
 		Check testCheck = Check.pass("Tests ran");
 		Check coverageCheck = Check.fail("Coverage", "Only 70%, expected 80%");
 
-		assertThat(compilationCheck.passed()).isTrue();
-		assertThat(testCheck.passed()).isTrue();
-		assertThat(coverageCheck.passed()).isFalse();
-		assertThat(coverageCheck.message()).contains("70%");
+		assertThat(compilationCheck.judgment().pass()).isTrue();
+		assertThat(testCheck.judgment().pass()).isTrue();
+		assertThat(coverageCheck.judgment().pass()).isFalse();
+		assertThat(coverageCheck.judgment().operationalReasoning()).contains("70%");
 	}
 
 	@Test
 	void shouldHandleEmptyMessage() {
-		Check check = new Check("Test", true, "");
+		Check check = Check.pass("Test");
 
-		assertThat(check.message()).isEmpty();
+		assertThat(check.judgment().operationalReasoning()).isEmpty();
 	}
 
 	@Test
 	void shouldRejectInvalidRecordComponents() {
-		assertThatThrownBy(() -> new Check(null, true, "message")).isInstanceOf(NullPointerException.class);
-		assertThatThrownBy(() -> new Check("  ", true, "message")).isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> new Check("name", true, null)).isInstanceOf(NullPointerException.class);
+		assertThatThrownBy(() -> new Check(null, Judgment.pass("message"))).isInstanceOf(NullPointerException.class);
+		assertThatThrownBy(() -> new Check("  ", Judgment.pass("message")))
+			.isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> new Check("name", null)).isInstanceOf(NullPointerException.class);
 	}
 
 }

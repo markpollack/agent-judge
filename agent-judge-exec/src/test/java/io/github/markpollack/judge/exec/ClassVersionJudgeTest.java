@@ -40,7 +40,7 @@ class ClassVersionJudgeTest {
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.checks()).hasSize(1);
-		assertThat(judgment.checks().get(0).passed()).isTrue();
+		assertThat(judgment.checks().get(0).judgment().pass()).isTrue();
 	}
 
 	@Test
@@ -52,7 +52,7 @@ class ClassVersionJudgeTest {
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.reasoning()).contains("55").contains("61");
 		assertThat(judgment.checks()).hasSize(1);
-		assertThat(judgment.checks().get(0).passed()).isFalse();
+		assertThat(judgment.checks().get(0).judgment().pass()).isFalse();
 	}
 
 	@Test

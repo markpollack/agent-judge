@@ -33,7 +33,7 @@ class FileContentJudgeTest {
 		assertThat(judgment.pass()).isTrue();
 		assertThat(judgment.reasoning()).contains("exact").contains("matches");
 		assertThat(judgment.checks()).hasSize(3);
-		assertThat(judgment.checks()).allMatch(check -> check.passed());
+		assertThat(judgment.checks()).allMatch(check -> check.judgment().pass());
 	}
 
 	@Test
@@ -46,8 +46,8 @@ class FileContentJudgeTest {
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.checks()).hasSize(3);
-		assertThat(judgment.checks().get(2).passed()).isFalse();
-		assertThat(judgment.checks().get(2).name()).isEqualTo("content_match");
+		assertThat(judgment.checks().get(2).judgment().pass()).isFalse();
+		assertThat(judgment.checks().get(2).id()).isEqualTo("content_match");
 	}
 
 	@Test
@@ -59,9 +59,9 @@ class FileContentJudgeTest {
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).contains("Failed to read file");
-		assertThat(judgment.checks()).extracting("name").containsExactly("file_exists", "file_readable");
-		assertThat(judgment.checks().get(0).passed()).isTrue();
-		assertThat(judgment.checks().get(1).passed()).isFalse();
+		assertThat(judgment.checks()).extracting("id").containsExactly("file_exists", "file_readable");
+		assertThat(judgment.checks().get(0).judgment().pass()).isTrue();
+		assertThat(judgment.checks().get(1).judgment().pass()).isFalse();
 	}
 
 	@Test
@@ -118,8 +118,8 @@ class FileContentJudgeTest {
 		assertThat(judgment.pass()).isFalse();
 		assertThat(judgment.reasoning()).contains("not found");
 		assertThat(judgment.checks()).hasSize(1);
-		assertThat(judgment.checks().get(0).name()).isEqualTo("file_exists");
-		assertThat(judgment.checks().get(0).passed()).isFalse();
+		assertThat(judgment.checks().get(0).id()).isEqualTo("file_exists");
+		assertThat(judgment.checks().get(0).judgment().pass()).isFalse();
 	}
 
 	@Test

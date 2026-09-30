@@ -26,8 +26,8 @@ import io.github.markpollack.judge.judgment.Judgment;
  *
  * <p>
  * Walks {@code target/classes/} recursively, reads bytes 6-7 of each {@code .class} file
- * (the major version per JVM spec §4.1), and compares against the expected version from
- * {@code metadata("targetClassVersion")}.
+ * (the major version per JVM spec §4.1), and compares against the expected version
+ * supplied to the constructor.
  * </p>
  *
  * <p>

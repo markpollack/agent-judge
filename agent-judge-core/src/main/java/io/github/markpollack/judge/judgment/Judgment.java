@@ -188,8 +188,9 @@ public record Judgment(
 	}
 
 	/**
-	 * Compatibility constructor mapping declared normalized scores and categories into
-	 * finding.
+	 * Construct a Judgment with optional normalized quality and a selected category. The
+	 * score uses the increasing [0, 1] normalized-quality metric; the category declares a
+	 * one-label domain. Use the full Finding form for other metrics or domains.
 	 * @param status producer disposition
 	 * @param score normalized quality score, or null
 	 * @param label declared selected category, or null
@@ -201,10 +202,10 @@ public record Judgment(
 	public Judgment(JudgmentStatus status, @Nullable Double score, @Nullable String label,
 			@Nullable JudgmentReasonCode reasonCode, String reasoning, List<Check> checks,
 			Map<String, Object> metadata) {
-		this(status, legacyAssessment(score, label), null, null, reasonCode, reasoning, checks, null, null, metadata);
+		this(status, normalizedFinding(score, label), null, null, reasonCode, reasoning, checks, null, null, metadata);
 	}
 
-	private static @Nullable Finding legacyAssessment(@Nullable Double score, @Nullable String label) {
+	private static @Nullable Finding normalizedFinding(@Nullable Double score, @Nullable String label) {
 		if (score == null && label == null) {
 			return null;
 		}
@@ -945,8 +946,8 @@ public record Judgment(
 	/**
 	 * Builder for a reasoned NOT_APPLICABLE outcome.
 	 * <p>
-	 * Finding is forbidden: the criterion was not evaluated. The legacy label method
-	 * remains only for source compatibility and rejects construction when used.
+	 * Finding is forbidden: the criterion was not evaluated. Record the reason for
+	 * exclusion without attaching a classification.
 	 * </p>
 	 *
 	 * @since 0.17.0
@@ -959,14 +960,6 @@ public record Judgment(
 		 * @return this builder
 		 */
 		NotApplicableBuilder reasoning(String reasoning);
-
-		/**
-		 * Legacy source bridge. Supplying a label is rejected at construction because
-		 * NOT_APPLICABLE forbids finding; retain the exclusion in reasoning.
-		 * @param label completed classification
-		 * @return this builder
-		 */
-		NotApplicableBuilder label(String label);
 
 		/** {@inheritDoc} */
 		@Override

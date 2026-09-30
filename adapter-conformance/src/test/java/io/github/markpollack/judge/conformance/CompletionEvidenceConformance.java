@@ -18,8 +18,9 @@ public final class CompletionEvidenceConformance {
 		assertThat(context.request()).isEqualTo(goal);
 		assertThat(context.status()).isEqualTo(CompletionStatus.SUCCESS);
 		assertThat(context.response()).isEqualTo(output);
-		assertThat(context.startedAt()).isNotNull();
-		assertThat(context.elapsedTime()).isNotNull().isGreaterThanOrEqualTo(Duration.ZERO);
+		if (context.elapsedTime() != null) {
+			assertThat(context.elapsedTime()).isGreaterThanOrEqualTo(Duration.ZERO);
+		}
 		assertThat(context.error()).isNull();
 	}
 

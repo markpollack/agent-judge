@@ -53,7 +53,7 @@ class Rfc2119JudgeTests {
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.reasoning()).isEqualTo("2 of 3 hold, 1 violated");
-		assertThat(check(judgment, "RULE-2").message()).contains("returns the entity directly");
+		assertThat(check(judgment, "RULE-2").judgment().operationalReasoning()).contains("returns the entity directly");
 	}
 
 	@Test
@@ -102,7 +102,7 @@ class Rfc2119JudgeTests {
 				""");
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(judgment.checks().stream().map(Check::name).toList()).containsExactly("RULE-1", "RULE-2", "RULE-3");
+		assertThat(judgment.checks().stream().map(Check::id).toList()).containsExactly("RULE-1", "RULE-2", "RULE-3");
 	}
 
 	@Test
@@ -184,7 +184,7 @@ class Rfc2119JudgeTests {
 	}
 
 	private static Check check(Judgment judgment, String name) {
-		return judgment.checks().stream().filter(c -> c.name().equals(name)).findFirst().orElseThrow();
+		return judgment.checks().stream().filter(c -> c.id().equals(name)).findFirst().orElseThrow();
 	}
 
 	private static Judgment judge(String answers) {

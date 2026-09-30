@@ -38,7 +38,7 @@ class FileExistsJudgeTest {
 		assertThat(judgment.effectiveScore()).hasValue(1.0);
 		assertThat(judgment.reasoning()).contains("File exists");
 		assertThat(judgment.checks()).hasSize(1);
-		assertThat(judgment.checks().get(0).passed()).isTrue();
+		assertThat(judgment.checks().get(0).judgment().pass()).isTrue();
 	}
 
 	@Test
@@ -53,7 +53,7 @@ class FileExistsJudgeTest {
 		assertThat(judgment.effectiveScore()).hasValue(0.0);
 		assertThat(judgment.reasoning()).contains("File not found");
 		assertThat(judgment.checks()).hasSize(1);
-		assertThat(judgment.checks().get(0).passed()).isFalse();
+		assertThat(judgment.checks().get(0).judgment().pass()).isFalse();
 	}
 
 	@Test

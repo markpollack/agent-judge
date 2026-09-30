@@ -16,47 +16,11 @@ import java.util.Objects;
 public record Check(String id, Judgment judgment) {
 	/** Validate and freeze this value. */
 	public Check {
-		ValueRequirements.text(id, "name/id");
+		ValueRequirements.text(id, "id");
 		Objects.requireNonNull(judgment, "judgment");
 		if (!judgment.checks().isEmpty()) {
 			throw new IllegalArgumentException("nested checks are forbidden");
 		}
-	}
-
-	/**
-	 * Compatibility constructor for declared Boolean checks.
-	 * @param name check ID
-	 * @param passed declared Boolean result
-	 * @param message explanation
-	 */
-	public Check(String name, boolean passed, String message) {
-		this(name, Judgment.verdict(passed).reasoning(Objects.requireNonNull(message, "message")).build());
-	}
-
-	/**
-	 * Returns check ID (compatibility view).
-	 * @return check ID (compatibility view)
-	 */
-	public String name() {
-		return id;
-	}
-
-	/**
-	 * Returns whether the child operationally passed; false includes inconclusive
-	 * outcomes.
-	 * @return whether the child operationally passed; false includes inconclusive
-	 * outcomes
-	 */
-	public boolean passed() {
-		return judgment.pass();
-	}
-
-	/**
-	 * Returns child operational explanation (compatibility view).
-	 * @return child operational explanation (compatibility view)
-	 */
-	public String message() {
-		return judgment.operationalReasoning();
 	}
 
 	/**
@@ -65,7 +29,7 @@ public record Check(String id, Judgment judgment) {
 	 * @return a passing check
 	 */
 	public static Check pass(String name) {
-		return new Check(name, true, "");
+		return new Check(name, Judgment.pass(""));
 	}
 
 	/**
@@ -75,7 +39,7 @@ public record Check(String id, Judgment judgment) {
 	 * @return a passing check
 	 */
 	public static Check pass(String name, String message) {
-		return new Check(name, true, message);
+		return new Check(name, Judgment.pass(message));
 	}
 
 	/**
@@ -85,7 +49,7 @@ public record Check(String id, Judgment judgment) {
 	 * @return a failing check
 	 */
 	public static Check fail(String name, String message) {
-		return new Check(name, false, message);
+		return new Check(name, Judgment.fail(message));
 	}
 
 }

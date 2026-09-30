@@ -56,8 +56,9 @@ class EarsJudgeTests {
 				""");
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(check(judgment, "UC1-AC2").passed()).isFalse();
-		assertThat(check(judgment, "UC1-AC2").message()).as("the binding item's evidence survives")
+		assertThat(check(judgment, "UC1-AC2").judgment().pass()).isFalse();
+		assertThat(check(judgment, "UC1-AC2").judgment().operationalReasoning())
+			.as("the binding item's evidence survives")
 			.contains("compares the wrong way round");
 	}
 
@@ -141,7 +142,7 @@ class EarsJudgeTests {
 				""");
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(judgment.checks().stream().map(Check::name).toList())
+		assertThat(judgment.checks().stream().map(Check::id).toList())
 			.as("reported in the document's order, not the agent's")
 			.containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
 	}
@@ -228,7 +229,7 @@ class EarsJudgeTests {
 		Judgment judgment = judge(WITH_OBSERVATION);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(judgment.checks()).allMatch(Check::passed);
+		assertThat(judgment.checks()).allMatch(check -> check.judgment().pass());
 		assertThat(judgment.reasoning()).isEqualTo("all 3 requirements established");
 	}
 
@@ -255,7 +256,7 @@ class EarsJudgeTests {
 
 		assertThat(judgment.checks()).hasSize(3);
 		assertThat(judgment.metadata()).containsEntry("criteriaTotal", 3);
-		assertThat(judgment.checks()).noneMatch(c -> c.name().startsWith("OBSERVATION"));
+		assertThat(judgment.checks()).noneMatch(c -> c.id().startsWith("OBSERVATION"));
 	}
 
 	@Test
@@ -316,7 +317,7 @@ class EarsJudgeTests {
 	}
 
 	private static Check check(Judgment judgment, String name) {
-		return judgment.checks().stream().filter(c -> c.name().equals(name)).findFirst().orElseThrow();
+		return judgment.checks().stream().filter(c -> c.id().equals(name)).findFirst().orElseThrow();
 	}
 
 	private static Judgment judge(String answers) {

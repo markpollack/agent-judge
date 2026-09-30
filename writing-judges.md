@@ -618,7 +618,7 @@ three failing `Check`s and the constructor will not object. Checks are evidence,
 
 ```java
 // Conjunction over the checks you just recorded — the structural judge pattern
-boolean allPass = checks.stream().allMatch(Check::passed);
+boolean allPass = checks.stream().allMatch(check -> check.judgment().pass());
 return Judgment.verdict(allPass)
     .reasoning(allPass ? "Structure valid"
         : checks.stream().filter(c -> !c.passed()).count() + " violation(s)")

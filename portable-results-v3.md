@@ -222,7 +222,7 @@ Modern supported operational PASS/FAIL/ABSTAIN/N/A/ERROR read respectively SATIS
 VIOLATED, UNRESOLVED, NOT_APPLICABLE and NOT_ASSESSED, except the recorded individual
 rejection precedence described above. A consumer must check readingSupport before
 using a subject determination. Interpretation does not choose application rates,
-acceptance denominators, or an unconfidence threshold.
+acceptance denominators, or an uncertainty threshold.
 
 Summaries are deterministic functions of Interpretation fields. They report raw
 and operational facts separately, native product/support, policy, provenance/claims,
@@ -241,7 +241,7 @@ uses stable finite-range normalization and rejects raw out-of-bounds values.
 A historical check is `{name, legacyPassed, detail, judgment: null}` in Interpretation.
 Both true and false leave finer status explicitly absent. In particular, false
 cannot be reclassified as a verified FAIL: historical producers also used it for
-unconfidence. Historical labels are retained as `legacyLabel`, scores as legacyScore
+uncertainty. Historical labels are retained as `legacyLabel`, scores as legacyScore
 and the existing normalized seat score/recorded scale. No category domain, confidence,
 policy, provenance, execution or original cardinality is invented. Old result bytes
 are never rewritten into modern data by the reader.
@@ -272,8 +272,9 @@ that a requirement is satisfied.
 
 PolicyApplication is a retained internal execution envelope: AppliedPolicy records the
 action and reason, PolicyFailure records the failure cause and reason. Their `policy`
-reference is optional; ordinary policy lambdas are serializable through the retained
-result without acquiring invented identities. A provided PolicyRef records id, revision
+reference is optional; results of ordinary policy lambdas are portable through the
+retained execution without inventing identities. Executable policy functions are not
+serialized. A provided PolicyRef records id, revision
 and configurationDigest. `Policies.recorded` attaches that recording information to
 behavior without adding methods to AcceptancePolicy.
 

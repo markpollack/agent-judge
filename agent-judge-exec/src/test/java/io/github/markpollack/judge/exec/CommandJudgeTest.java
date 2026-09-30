@@ -34,8 +34,8 @@ class CommandJudgeTest {
 		assertThat(judgment.pass()).isTrue();
 		assertThat(judgment.reasoning()).contains("succeeded").contains("exit code 0");
 		assertThat(judgment.checks()).hasSize(1);
-		assertThat(judgment.checks().get(0).passed()).isTrue();
-		assertThat(judgment.checks().get(0).name()).isEqualTo("command_execution");
+		assertThat(judgment.checks().get(0).judgment().pass()).isTrue();
+		assertThat(judgment.checks().get(0).id()).isEqualTo("command_execution");
 
 		// Verify metadata
 		assertThat(judgment.metadata()).containsEntry("command", "ls test.txt").containsEntry("exitCode", 0);
@@ -63,7 +63,7 @@ class CommandJudgeTest {
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).contains("sandbox unavailable");
 		assertThat(judgment.checks()).singleElement().satisfies(check -> {
-			assertThat(check.name()).isEqualTo("command_execution");
+			assertThat(check.id()).isEqualTo("command_execution");
 			assertThat(check.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(check.judgment().finding()).isNull();
 		});

@@ -17,7 +17,7 @@ import io.github.markpollack.judge.jury.Verdict;
  * Authoritative interpretation of live and stored results.
  *
  * <p>
- * Both entry points read the same portable shape. Explicit version-2 Judgment and Verdict
+ * Both entry points read the same portable shape. Explicit version-3 Judgment and Verdict
  * roots retain product finding, native support, checks, provenance, policy, raw reasons
  * and derived operational values. Nested results must use the same version. Unknown or
  * malformed modern records have no usable subject reading and report UNDETERMINED support
@@ -27,7 +27,7 @@ import io.github.markpollack.judge.jury.Verdict;
  * Unversioned 0.13–0.17 maps use their own tolerant historical rules, retaining missing
  * facts and legacy boolean checks without inventing modern outcomes. Direct
  * deserialization into live result types is not a historical migration reader. The public
- * portable-results-v2 contract specifies version selection, identity, execution evidence
+ * portable-results-v3 contract specifies version selection, identity, execution evidence
  * and reduction/routing validation.
  */
 public final class Verdicts {
@@ -41,7 +41,7 @@ public final class Verdicts {
 	}
 
 	/**
-	 * Interpret a live version-2 verdict through its ordinary portable JSON projection. A
+	 * Interpret a live version-3 verdict through its ordinary portable JSON projection. A
 	 * valid one-seat {@link Verdict#single} has supported whole-value identity without
 	 * new aggregation evidence. Actual reductions and composite decisions require
 	 * coherent retained inputs and execution facts. Malformed custom results are

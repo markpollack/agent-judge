@@ -16,7 +16,7 @@
  * {@link io.github.markpollack.judge.jury.interpretation.Verdicts#interpret(java.util.Map)}
  * reads a stored one of any age — the 0.13 {@code subVerdicts} form, the 0.14–0.16
  * {@code compositeAttempts} form without decisions, the unversioned 0.17 form, and
- * explicit version-2 semantic results. Historical absence remains distinct from malformed
+ * explicit version-3 semantic results. Historical absence remains distinct from malformed
  * modern data; modern unknown/mixed versions cannot supply a usable subject
  * determination. Complete modern views retain raw facts separately from derived policy
  * outcomes.

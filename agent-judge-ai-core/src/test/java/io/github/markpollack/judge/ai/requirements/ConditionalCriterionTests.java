@@ -76,7 +76,7 @@ class ConditionalCriterionTests {
 					UC1-AC3: PASS - Baz.java:30 does it
 					""");
 
-			assertThat(judgment.checks()).extracting(Check::name).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
+			assertThat(judgment.checks()).extracting(Check::id).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
 		}
 
 		@Test
@@ -164,7 +164,7 @@ class ConditionalCriterionTests {
 					UC1-AC3: FAIL - Baz.java:30 does the opposite
 					""");
 
-			assertThat(judgment.checks()).extracting(Check::name).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
+			assertThat(judgment.checks()).extracting(Check::id).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
 			assertThat(judgment.metadata()).containsEntry("criteriaTotal", 3).containsEntry("established", 1L);
 		}
 

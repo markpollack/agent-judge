@@ -62,7 +62,7 @@ class RosterErrorEvidenceTests {
 			assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(judgment.reasonCode()).isEqualTo(JudgmentReasonCode.JUDGE_REPORTED);
 			assertThat(judgment.reasoning()).contains("UC1-AC2");
-			assertThat(judgment.checks()).extracting(Check::name).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
+			assertThat(judgment.checks()).extracting(Check::id).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
 			assertThat(judgment.checks()).extracting(check -> check.judgment().status())
 				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.ERROR, JudgmentStatus.FAIL);
 			assertThat(judgment.metadata()).containsEntry("criteriaTotal", 3).containsEntry("established", 1L);
@@ -89,7 +89,7 @@ class RosterErrorEvidenceTests {
 					UC1-AC1: PASS - Foo.java:10 does it
 					""");
 
-			assertThat(judgment.checks()).extracting(Check::name).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
+			assertThat(judgment.checks()).extracting(Check::id).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
 			assertThat(judgment.checks()).extracting(check -> check.judgment().status())
 				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.ERROR, JudgmentStatus.ERROR);
 			assertThat(judgment.metadata()).containsEntry("notApplicableCount", 0);
@@ -126,7 +126,7 @@ class RosterErrorEvidenceTests {
 			assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(judgment.reasonCode()).isEqualTo(JudgmentReasonCode.JUDGE_REPORTED);
 			assertThat(judgment.reasoning()).contains("RULE-2");
-			assertThat(judgment.checks()).extracting(Check::name).containsExactly("RULE-1", "RULE-2", "RULE-3");
+			assertThat(judgment.checks()).extracting(Check::id).containsExactly("RULE-1", "RULE-2", "RULE-3");
 			assertThat(judgment.checks()).extracting(check -> check.judgment().status())
 				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.ERROR, JudgmentStatus.FAIL);
 			assertThat(judgment.metadata()).containsEntry("constraintsTotal", 3).containsEntry("established", 1L);
@@ -153,7 +153,7 @@ class RosterErrorEvidenceTests {
 					RULE-1: PASS - Tx.java:10 does it
 					""");
 
-			assertThat(judgment.checks()).extracting(Check::name).containsExactly("RULE-1", "RULE-2", "RULE-3");
+			assertThat(judgment.checks()).extracting(Check::id).containsExactly("RULE-1", "RULE-2", "RULE-3");
 			assertThat(judgment.checks()).extracting(check -> check.judgment().status())
 				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.ERROR, JudgmentStatus.ERROR);
 			assertThat(judgment.metadata()).containsEntry("notApplicableCount", 0);

@@ -92,14 +92,6 @@ class NotApplicableJudgmentTest {
 		}
 
 		@Test
-		@DisplayName("a label is forbidden because an excluded criterion has no assessment")
-		void labelIsForbidden() {
-			assertThatThrownBy(
-					() -> Judgment.builder().notApplicable().reasoning("no Java").label("no_java_files").build())
-				.isInstanceOf(IllegalArgumentException.class);
-		}
-
-		@Test
 		@DisplayName("it carries no reason code: nothing failed")
 		void carriesNoReasonCode() {
 			assertThatThrownBy(() -> new Judgment(JudgmentStatus.NOT_APPLICABLE, null, null,

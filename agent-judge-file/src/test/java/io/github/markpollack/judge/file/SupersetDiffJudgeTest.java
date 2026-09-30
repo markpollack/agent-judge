@@ -39,7 +39,7 @@ class SupersetDiffJudgeTest {
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.checks()).hasSize(2);
-		assertThat(judgment.checks()).allMatch(c -> c.passed());
+		assertThat(judgment.checks()).allMatch(c -> c.judgment().pass());
 		assertThat(judgment.reasoning()).contains("All 2 reference files matched");
 		assertScore(judgment, 1.0);
 	}
@@ -71,10 +71,10 @@ class SupersetDiffJudgeTest {
 		assertScore(judgment, 0.5);
 
 		assertThat(judgment.checks()).hasSize(2);
-		assertThat(judgment.checks()).filteredOn(c -> !c.passed())
+		assertThat(judgment.checks()).filteredOn(c -> !c.judgment().pass())
 			.hasSize(1)
 			.first()
-			.satisfies(c -> assertThat(c.message()).contains("Missing file"));
+			.satisfies(c -> assertThat(c.judgment().operationalReasoning()).contains("Missing file"));
 	}
 
 	@Test
@@ -88,8 +88,8 @@ class SupersetDiffJudgeTest {
 		assertScore(judgment, 0.0);
 
 		assertThat(judgment.checks()).hasSize(1);
-		assertThat(judgment.checks().get(0).passed()).isFalse();
-		assertThat(judgment.checks().get(0).message()).contains("Content differs");
+		assertThat(judgment.checks().get(0).judgment().pass()).isFalse();
+		assertThat(judgment.checks().get(0).judgment().operationalReasoning()).contains("Content differs");
 	}
 
 	@Test
