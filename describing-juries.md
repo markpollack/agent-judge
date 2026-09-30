@@ -107,7 +107,7 @@ a `JudgeModel` does not say which model it will call. The model a call actually 
 ## Declaring a judge's configuration
 
 ```java
-public final class RubricJudge implements ConfiguredJudge {
+public final class RubricJudge implements ConfiguredJudge<String> {
 
     @Override
     public Map<String, Object> configuration() {
@@ -115,7 +115,7 @@ public final class RubricJudge implements ConfiguredJudge {
     }
 
     @Override
-    public Judgment judge(JudgmentContext context) { ... }
+    public Judgment judge(String response) { ... }
 }
 ```
 

@@ -8,8 +8,7 @@ package io.github.markpollack.judge.llm;
 import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.JudgeWithMetadata;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 import org.springframework.ai.chat.client.ChatClient;
 
 /**
@@ -22,28 +21,30 @@ import org.springframework.ai.chat.client.ChatClient;
  * </p>
  *
  * <p>
- * <strong>Template Method Pattern:</strong> The {@link #judge(JudgmentContext)} method
+ * <strong>Template Method Pattern:</strong> The {@link #judge(Object)} method
  * orchestrates the evaluation flow: build prompt → call LLM → parse response. Subclasses
- * implement {@link #buildPrompt(JudgmentContext)} and
- * {@link #parseResponse(String, JudgmentContext)} to customize behavior.
+ * implement {@link #buildPrompt(Object)} and {@link #parseResponse(String, Object)} to
+ * customize behavior.
  * </p>
  *
  * <p>
  * <strong>Design Rationale:</strong> LLM judges complement deterministic judges by
  * providing nuanced evaluation that's difficult to express in rules. Examples: code
- * quality assessment, semantic correctness, creativity evaluation. While slower and more
+ * quality finding, semantic correctness, creativity evaluation. While slower and more
  * expensive than deterministic judges, they excel at subjective or complex criteria.
  * </p>
  *
  * <p>
  * Example usage:
  * </p>
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
+ * @param <E> evidence type
  * @author Mark Pollack
  * @since 0.1.0
  */
-public abstract class LLMJudge implements JudgeWithMetadata<JudgmentContext> {
+public abstract class LLMJudge<E> implements JudgeWithMetadata<E> {
 
 	private final JudgeMetadata metadata;
 
@@ -58,7 +59,8 @@ public abstract class LLMJudge implements JudgeWithMetadata<JudgmentContext> {
 	 * testing)
 	 */
 	protected LLMJudge(String name, String description, ChatClient.Builder chatClientBuilder) {
-		// No exclusion capability: this judge always answers its question, or errors trying.
+		// No exclusion capability: this judge always answers its question, or errors
+		// trying.
 		this.metadata = new JudgeMetadata(name, description, JudgeType.LLM_POWERED);
 		this.chatClient = chatClientBuilder != null ? chatClientBuilder.build() : null;
 	}
@@ -73,7 +75,7 @@ public abstract class LLMJudge implements JudgeWithMetadata<JudgmentContext> {
 	 * @param context the judgment context
 	 * @return the prompt string
 	 */
-	protected abstract String buildPrompt(JudgmentContext context);
+	protected abstract String buildPrompt(E context);
 
 	/**
 	 * Parse the LLM response into a judgment.
@@ -86,7 +88,7 @@ public abstract class LLMJudge implements JudgeWithMetadata<JudgmentContext> {
 	 * @param context the original judgment context
 	 * @return the parsed judgment
 	 */
-	protected abstract Judgment parseResponse(String response, JudgmentContext context);
+	protected abstract Judgment parseResponse(String response, E context);
 
 	/**
 	 * Evaluate the agent execution using the LLM.
@@ -98,7 +100,7 @@ public abstract class LLMJudge implements JudgeWithMetadata<JudgmentContext> {
 	 * @return the judgment from the LLM
 	 */
 	@Override
-	public Judgment judge(JudgmentContext context) {
+	public Judgment judge(E context) {
 		String prompt = buildPrompt(context);
 		String response = this.chatClient.prompt().user(prompt).call().content();
 		return parseResponse(response, context);

@@ -16,16 +16,16 @@ import java.util.Objects;
  * evaluation order.
  *
  * <p>
- * ⚠️ <b>Count a cascade per tier, never also by its aggregate.</b> A cascade's verdict copies
- * {@code aggregated}, {@code individual} and {@code weights} from the tier that stopped it.
- * Compare each tier here with the {@link io.github.markpollack.judge.jury.CompositeAttempt}
- * of the same name in {@code Verdict.compositeAttempts()}. Counting the top-level verdict as
- * well counts the stopping tier twice. A tier that was never entered appears here and has no
- * attempt, which is how an early stop shows.
+ * ⚠️ <b>Count a cascade per tier, never also by its aggregate.</b> A cascade's verdict
+ * copies {@code judgment}, {@code individual} and {@code weights} from the tier that
+ * stopped it. Compare each tier here with the
+ * {@link io.github.markpollack.judge.jury.CompositeAttempt} of the same name in
+ * {@code Verdict.compositeAttempts()}. Counting the top-level verdict as well counts the
+ * stopping tier twice. A tier that was never entered appears here and has no attempt,
+ * which is how an early stop shows.
  * </p>
  *
- * <h2>Portable form</h2>
- * <pre>
+ * <h2>Portable form</h2> <pre>
  * {"descriptionVersion": 2, "kind": "CASCADED", "aggregateMayBeNotApplicable": false,
  *  "tiers": [{...}, ...]}
  * </pre>
@@ -45,9 +45,9 @@ public record CascadedJuryDescription(List<TierDescription> tiers) implements Ju
 	/**
 	 * Some tier's aggregate may be excluded.
 	 * <p>
-	 * A cascade has no strategy of its own: it adopts a tier's verdict, so its bound is the
-	 * union of its tiers'. A cascade that stops on an individual rejection builds a machinery
-	 * error rather than an exclusion, so that path never widens this bound.
+	 * A cascade has no strategy of its own: it adopts a tier's verdict, so its bound is
+	 * the union of its tiers'. A cascade that stops on an individual rejection builds a
+	 * machinery error rather than an exclusion, so that path never widens this bound.
 	 * </p>
 	 * @return true when the aggregate may be not applicable
 	 */

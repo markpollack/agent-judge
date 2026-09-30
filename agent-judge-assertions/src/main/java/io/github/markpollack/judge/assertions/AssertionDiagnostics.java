@@ -11,13 +11,13 @@ import java.util.List;
 
 import org.jspecify.annotations.Nullable;
 
-import io.github.markpollack.judge.result.AppliedPolicy;
-import io.github.markpollack.judge.result.Assessment;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.result.PolicyFailure;
-import io.github.markpollack.judge.result.PolicyRef;
-import io.github.markpollack.judge.result.PolicyApplication;
+import io.github.markpollack.judge.acceptance.AppliedPolicy;
+import io.github.markpollack.judge.judgment.Finding;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
+import io.github.markpollack.judge.acceptance.PolicyFailure;
+import io.github.markpollack.judge.provenance.PolicyRef;
+import io.github.markpollack.judge.acceptance.PolicyApplication;
 
 /**
  * Renders a bounded explanation; the error's structured result remains the full record.
@@ -27,25 +27,27 @@ final class AssertionDiagnostics {
 	private AssertionDiagnostics() {
 	}
 
-	static String message(AssertionResult result, SemanticAssertionError.Category category) {
+	static String message(AssertionResult result, RequirementAssertionError.FailureKind category) {
 		var requirement = result.requirement();
-		var root = result.verdict().aggregated();
+		var root = result.verdict().judgment();
 		var interpretation = result.interpretation();
 		var lines = new ArrayList<String>();
-		lines.add("Semantic assertion did not pass: " + category);
+		lines.add("Requirement assertion did not pass: " + category);
 		lines.add("Requirement: " + text(requirement.id(), 80) + "@" + text(requirement.revision(), 40) + " — "
 				+ text(requirement.text(), 240));
-		lines.add("Assessment (root): producer=" + root.producerStatus() + "; " + assessment(root.assessment()));
+		lines.add("Finding (root): producer=" + root.producerStatus() + "; " + finding(root.finding()));
 		lines.add("Support: " + support(root));
-		var finalDecision = result.applicationDecision();
+		var finalDecision = result.acceptanceExecution();
 		lines.add("Final application policy: " + reference(result.policy()) + " (resolved " + result.policySource()
-				+ "); " + (finalDecision.application() == null ? "no application (bypassed: " + finalDecision.bypass() + ")"
+				+ "); "
+				+ (finalDecision.application() == null ? "no application (bypassed: " + finalDecision.bypass() + ")"
 						: policy(finalDecision.application())));
 		if (root.policyApplication() != null) {
-			lines.add("Internal aggregate policy: " + reference(root.policyApplication().policy()) + "; " + policy(root));
+			lines.add(
+					"Internal aggregate policy: " + reference(root.policyApplication().policy()) + "; " + policy(root));
 		}
 		lines.add("Operational result: " + root.status() + "; Interpretation: "
-				+ (interpretation.reading() == null ? "unavailable" : interpretation.reading()) + "; reading support="
+				+ (interpretation.outcome() == null ? "unavailable" : interpretation.outcome()) + "; reading support="
 				+ interpretation.readingSupport() + " (structural, not model confidence)");
 		if (!root.reasoning().isBlank()) {
 			lines.add("Producer reason: " + text(root.reasoning(), 180));
@@ -61,24 +63,24 @@ final class AssertionDiagnostics {
 					+ text(defect.field(), 40) + "; " + text(defect.note(), 120) + " ("
 					+ interpretation.defects().size() + " retained)");
 		}
-		lines.add("Full details: SemanticAssertionError.result()");
+		lines.add("Full details: RequirementAssertionError.result()");
 		return String.join("\n", lines);
 	}
 
-	private static String assessment(@Nullable Assessment assessment) {
-		if (assessment == null) {
-			return "no assessment";
+	private static String finding(@Nullable Finding finding) {
+		if (finding == null) {
+			return "no finding";
 		}
 		var components = new ArrayList<String>();
-		var proposition = assessment.proposition();
-		if (proposition != null) {
-			components.add("proposition=" + proposition.value());
+		var booleanFinding = finding.booleanFinding();
+		if (booleanFinding != null) {
+			components.add("boolean=" + booleanFinding.value());
 		}
-		var category = assessment.category();
+		var category = finding.category();
 		if (category != null) {
 			components.add("category=" + text(category.selected(), 100));
 		}
-		var numeric = assessment.numeric();
+		var numeric = finding.numeric();
 		if (numeric != null) {
 			components.add("numeric=" + numeric.value() + " on " + text(numeric.scaleId(), 80));
 		}
@@ -91,29 +93,30 @@ final class AssertionDiagnostics {
 			return "none (producer " + judgment.producerStatus() + ")";
 		}
 		var parts = new ArrayList<String>();
-		var certainty = judgment.certainty();
-		if (certainty != null) {
-			parts.add(text(certainty.metricId(), 100) + "=" + certainty.value() + " (" + certainty.origin() + ", "
-					+ certainty.target() + ")");
+		var confidence = judgment.confidence();
+		if (confidence != null) {
+			parts.add(text(confidence.metricId(), 100) + "=" + confidence.value() + " (" + confidence.origin() + ", "
+					+ confidence.target() + ")");
 		}
-		var distribution = judgment.distribution();
-		if (distribution != null) {
+		var probabilityDistribution = judgment.probabilityDistribution();
+		if (probabilityDistribution != null) {
 			var masses = new ArrayList<String>();
-			for (int i = 0; i < Math.min(3, distribution.masses().size()); i++) {
-				var mass = distribution.masses().get(i);
+			for (int i = 0; i < Math.min(3, probabilityDistribution.masses().size()); i++) {
+				var mass = probabilityDistribution.masses().get(i);
 				masses.add("p(" + text(mass.alternative(), 40) + ")=" + mass.probability());
 			}
-			if (distribution.masses().size() > 3) {
-				masses.add("… " + distribution.masses().size() + " masses retained");
+			if (probabilityDistribution.masses().size() > 3) {
+				masses.add("… " + probabilityDistribution.masses().size() + " masses retained");
 			}
-			parts.add(text(distribution.domainId(), 100) + " [" + String.join(", ", masses) + "]");
+			parts.add(text(probabilityDistribution.domainId(), 100) + " [" + String.join(", ", masses) + "]");
 		}
 		return parts.isEmpty() ? "none retained" : String.join("; ", parts);
 	}
 
 	private static String policy(Judgment judgment) {
 		var application = judgment.policyApplication();
-		if (application != null) return policy(application);
+		if (application != null)
+			return policy(application);
 		if (judgment.producerStatus() == JudgmentStatus.ERROR
 				|| judgment.producerStatus() == JudgmentStatus.NOT_APPLICABLE) {
 			return "no application (producer " + judgment.producerStatus() + " bypasses policy)";
@@ -124,14 +127,14 @@ final class AssertionDiagnostics {
 	private static String policy(PolicyApplication application) {
 		if (application instanceof AppliedPolicy applied) {
 			String consequence = switch (applied.action()) {
-				case USE_ASSESSMENT -> "use original assessment";
-				case ABSTAIN -> "withheld; original assessment unchanged";
-				case ESCALATE -> "escalation requested; original assessment unchanged; caller must act";
+				case RELY -> "rely on original judgment";
+				case ABSTAIN -> "withheld; original judgment unchanged";
+				case ESCALATE -> "escalation requested; original judgment unchanged; caller must act";
 			};
 			return applied.action() + " — " + consequence + "; " + text(applied.reason(), 160);
 		}
 		if (application instanceof PolicyFailure failure) {
-			return "FAILED; producer assessment retained; " + text(failure.reason(), 160);
+			return "FAILED; producer judgment retained; " + text(failure.reason(), 160);
 		}
 		throw new IllegalArgumentException("Unknown policy application");
 	}
@@ -163,7 +166,9 @@ final class AssertionDiagnostics {
 		}
 	}
 
-	private static String reference(PolicyRef policy) {
+	private static String reference(@Nullable PolicyRef policy) {
+		if (policy == null)
+			return "unrecorded";
 		return text(policy.id(), 80) + "@" + text(policy.revision(), 40) + "#"
 				+ policy.configurationDigest().substring(0, 12);
 	}

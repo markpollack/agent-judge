@@ -8,11 +8,9 @@ import java.util.Map;
 
 import io.github.markpollack.judge.ai.model.JudgeModel;
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -24,20 +22,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * A requirements judge with no requirements does not pass; it refuses to run.
  *
- * <p>This is the shape of the defect. A roster is a denominator, and an empty denominator makes
- * every conjunctive rollup vacuously true: no criterion failed, none was unestablished, so the
- * implementation "satisfies the specification". The result is a green judgment that was computed
- * over nothing and is indistinguishable, in every stored field, from one computed over a
- * specification that was genuinely met. In 0.16.0 that is exactly what happened.
+ * <p>
+ * This is the shape of the defect. A roster is a denominator, and an empty denominator
+ * makes every conjunctive rollup vacuously true: no criterion failed, none was
+ * unestablished, so the implementation "satisfies the specification". The result is a
+ * green judgment that was computed over nothing and is indistinguishable, in every stored
+ * field, from one computed over a specification that was genuinely met. In 0.16.0 that is
+ * exactly what happened.
  *
- * <p>It is refused twice, deliberately. At construction, because a jury assembled around an empty
- * roster is a configuration mistake and should never reach a model; and in the rollup, because a
- * roster arriving empty by some other path must still not become a PASS. The second guard costs
- * nothing and is the one that holds if the first is ever bypassed.
+ * <p>
+ * It is refused twice, deliberately. At construction, because a jury assembled around an
+ * empty roster is a configuration mistake and should never reach a model; and in the
+ * rollup, because a roster arriving empty by some other path must still not become a
+ * PASS. The second guard costs nothing and is the one that holds if the first is ever
+ * bypassed.
  *
- * <p>Parsing is untouched. A document that matches nothing legitimately yields an empty list —
- * that is a fact about the document, and the parser's job is to report it, not to refuse it. The
- * judge is what refuses.
+ * <p>
+ * Parsing is untouched. A document that matches nothing legitimately yields an empty list
+ * — that is a fact about the document, and the parser's job is to report it, not to
+ * refuse it. The judge is what refuses.
  */
 @DisplayName("An empty requirement roster")
 class EmptyRosterTests {
@@ -136,8 +139,8 @@ class EmptyRosterTests {
 	}
 
 	@SuppressWarnings("unused")
-	private static JudgmentContext context() {
-		return JudgmentContext.builder().goal("audit").status(ExecutionStatus.SUCCESS).build();
+	private static Path context() {
+		return Path.of("/tmp/implementation");
 	}
 
 }

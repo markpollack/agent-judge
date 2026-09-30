@@ -51,13 +51,13 @@ public final class ConferenceAssertionRun {
 				Path caseOutput = output.resolve(i == 0 ? "rule-4" : "uc6-ac8");
 				var assertions = new RequirementAssertions(fixture.binding);
 				var judge = fixture.bind(fixture.judge(apiKey, endpoint, http, caseOutput));
-				var result = assertions.evaluate(fixture.requirement(i), judge, evidence.get(i), null);
+				var result = assertions.evaluateRequirement(fixture.requirement(i), judge, evidence.get(i), null);
 				ConferenceFixture.save(result, caseOutput, "LIVE explicitly invoked; inspect actual outcome");
 				String outcome = "PASSED";
 				try {
-					SemanticAssertions.requireSatisfied(result);
+					RequirementAssertions.requireSatisfied(result);
 				}
-				catch (SemanticAssertionError error) {
+				catch (RequirementAssertionError error) {
 					outcome = error.category().name();
 				}
 				Files.writeString(caseOutput.resolve("assertion-outcome.txt"), outcome + "\n");

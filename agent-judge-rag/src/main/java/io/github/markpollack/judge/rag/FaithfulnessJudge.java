@@ -2,10 +2,9 @@ package io.github.markpollack.judge.rag;
 
 import java.util.Optional;
 
-import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.llm.LLMJudge;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.springframework.ai.chat.client.ChatClient;
 
 /**
@@ -15,16 +14,16 @@ import org.springframework.ai.chat.client.ChatClient;
  * retrieved context. An answer that is factually correct but not supported by the given
  * context is considered unfaithful.
  * <p>
- * Works against any (question, context, answer) triple regardless of how the context
- * was retrieved — vector store, tool call, agentic CLI browsing, or manual curation.
+ * Works against any (question, context, answer) triple regardless of how the context was
+ * retrieved — vector store, tool call, agentic CLI browsing, or manual curation.
  * <p>
- * Returns {@link JudgmentStatus#ABSTAIN} when context or answer is empty, or when
- * the LLM response cannot be parsed.
+ * Returns {@link JudgmentStatus#ABSTAIN} when context or answer is empty, or when the LLM
+ * response cannot be parsed.
  *
  * @author Mark Pollack
  * @since 0.10.0
  */
-public class FaithfulnessJudge extends LLMJudge {
+public class FaithfulnessJudge extends LLMJudge<RagEvidence> {
 
 	private static final java.util.regex.Pattern ANSWER_PATTERN = java.util.regex.Pattern
 		.compile("(?mi)^\\s*Answer:\\s*(YES|NO)");
@@ -34,14 +33,13 @@ public class FaithfulnessJudge extends LLMJudge {
 	 * @param chatClientBuilder Spring AI client used for judging
 	 */
 	public FaithfulnessJudge(ChatClient.Builder chatClientBuilder) {
-		super("Faithfulness", "Evaluates whether the answer is grounded in the provided context",
-				chatClientBuilder);
+		super("Faithfulness", "Evaluates whether the answer is grounded in the provided context", chatClientBuilder);
 	}
 
 	@Override
-	public Judgment judge(JudgmentContext context) {
-		Optional<String> ctx = RagContext.context(context);
-		Optional<String> ans = RagContext.answer(context);
+	public Judgment judge(RagEvidence context) {
+		Optional<String> ctx = java.util.Optional.of(context.retrievedContext()).filter(value -> !value.isBlank());
+		Optional<String> ans = java.util.Optional.of(context.answer()).filter(value -> !value.isBlank());
 		if (ctx.isEmpty()) {
 			return Judgment.abstain("No context provided — cannot evaluate faithfulness");
 		}
@@ -52,10 +50,12 @@ public class FaithfulnessJudge extends LLMJudge {
 	}
 
 	@Override
-	protected String buildPrompt(JudgmentContext context) {
-		String question = RagContext.question(context);
-		String retrievedContext = RagContext.context(context).orElse("");
-		String answer = RagContext.answer(context).orElse("");
+	protected String buildPrompt(RagEvidence context) {
+		String question = context.question();
+		String retrievedContext = java.util.Optional.of(context.retrievedContext())
+			.filter(value -> !value.isBlank())
+			.orElse("");
+		String answer = java.util.Optional.of(context.answer()).filter(value -> !value.isBlank()).orElse("");
 
 		return String.format("""
 				Begin your response with the line "Answer: YES" or "Answer: NO".
@@ -80,7 +80,7 @@ public class FaithfulnessJudge extends LLMJudge {
 	}
 
 	@Override
-	protected Judgment parseResponse(String response, JudgmentContext context) {
+	protected Judgment parseResponse(String response, RagEvidence context) {
 		var matcher = ANSWER_PATTERN.matcher(response);
 		if (!matcher.find()) {
 			return Judgment.abstain("Could not parse LLM response: " + response);

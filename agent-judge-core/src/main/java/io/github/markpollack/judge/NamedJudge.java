@@ -5,8 +5,7 @@
 
 package io.github.markpollack.judge;
 
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * Wrapper that adds metadata to a Judge through composition.
@@ -26,7 +25,8 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * Example usage:
  * </p>
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
  * @param <E> evidence type
  * @author Mark Pollack
@@ -69,8 +69,8 @@ public final class NamedJudge<E> implements JudgeWithMetadata<E> {
 	 * The judge this wrapper delegates to.
 	 * <p>
 	 * A wrapper's metadata names the judge in a verdict, but it says nothing about what
-	 * actually judges. {@link Judges#describe(Judge)} reads through this accessor to describe
-	 * the wrapped judge as well.
+	 * actually judges. {@link Judges#describe(Judge)} reads through this accessor to
+	 * describe the wrapped judge as well.
 	 * </p>
 	 * @return the wrapped judge
 	 * @since 0.17.0

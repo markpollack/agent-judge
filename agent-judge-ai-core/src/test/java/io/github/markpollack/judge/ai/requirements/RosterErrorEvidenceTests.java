@@ -4,10 +4,10 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -17,17 +17,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * An incomplete audit is an instrument failure that keeps the evidence it did produce.
  *
- * <p>The roster error and the protocol error are the same kind of event: the audit broke the
- * contract on part of the roster, and the rest of the roster was still established. A protocol
- * error already kept its sibling checks and totals; the roster error returned before any of that
- * was collected, so an ERROR came back with no checks, no {@code criteriaTotal}, and no exclusion
- * count — the instrument's mistake costing far more than it should, and a reader left unable to
- * say how much of the specification had actually been audited.
+ * <p>
+ * The roster error and the protocol error are the same kind of event: the audit broke the
+ * contract on part of the roster, and the rest of the roster was still established. A
+ * protocol error already kept its sibling checks and totals; the roster error returned
+ * before any of that was collected, so an ERROR came back with no checks, no
+ * {@code criteriaTotal}, and no exclusion count — the instrument's mistake costing far
+ * more than it should, and a reader left unable to say how much of the specification had
+ * actually been audited.
  *
- * <p>The one thing the retained evidence must never do is launder the gap. A criterion nobody
- * answered was not assessed, so its check records ERROR; and it was certainly not excluded, so it is
- * never counted as an authorized exclusion. Those two are what separate "we audited two of three"
- * from "one criterion did not apply".
+ * <p>
+ * The one thing the retained evidence must never do is launder the gap. A criterion
+ * nobody answered was not assessed, so its check records ERROR; and it was certainly not
+ * excluded, so it is never counted as an authorized exclusion. Those two are what
+ * separate "we audited two of three" from "one criterion did not apply".
  */
 @DisplayName("A roster error keeps its evidence")
 class RosterErrorEvidenceTests {
@@ -45,7 +48,7 @@ class RosterErrorEvidenceTests {
 			new Rfc2119Constraint("RULE-3", "MUST", "log every rejection", "auditability"));
 
 	@Nested
-	@DisplayName("Acceptance criteria")
+	@DisplayName("AcceptanceDecision criteria")
 	class Criteria {
 
 		@Test

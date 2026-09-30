@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -38,7 +38,8 @@ class AggregationErrorPolicyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 		Map<String, Object> evidence = evidence(result);
 
-		// Under TREAT_AS_FAIL the surviving population is one PASS and one converted FAIL.
+		// Under TREAT_AS_FAIL the surviving population is one PASS and one converted
+		// FAIL.
 		// Majority breaks that tie with TiePolicy.FAIL; consensus reports the split as
 		// ABSTAIN; the numeric strategies average 1.0 and 0.0 to a passing 0.5.
 		JudgmentStatus expectedStatus = switch (policy) {
@@ -116,7 +117,8 @@ class AggregationErrorPolicyTest {
 	}
 
 	private static Stream<Arguments> strategyPolicyMatrix() {
-		return strategyNames().flatMap(name -> Stream.of(ErrorPolicy.values()).map(policy -> Arguments.of(name, policy)));
+		return strategyNames()
+			.flatMap(name -> Stream.of(ErrorPolicy.values()).map(policy -> Arguments.of(name, policy)));
 	}
 
 	private static Stream<String> strategyNames() {

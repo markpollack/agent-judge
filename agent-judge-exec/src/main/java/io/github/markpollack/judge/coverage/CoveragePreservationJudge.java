@@ -6,10 +6,9 @@
 package io.github.markpollack.judge.coverage;
 
 import io.github.markpollack.judge.DeterministicJudge;
-import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.coverage.JaCoCoReportParser.CoverageMetrics;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * Judge that verifies test coverage has not dropped beyond a threshold compared to a
@@ -17,14 +16,14 @@ import io.github.markpollack.judge.result.Judgment;
  *
  * <p>
  * Parses the JaCoCo XML report from the workspace and compares line coverage against a
- * baseline from {@code metadata("baselineCoverage")}. The default threshold is 5
- * percentage points (from FreshBrew research — structural anti-gaming threshold).
+ * typed baseline. The default threshold is 5 percentage points (from FreshBrew research —
+ * structural anti-gaming threshold).
  * </p>
  *
  * @author Mark Pollack
  * @since 0.9.0
  */
-public class CoveragePreservationJudge extends DeterministicJudge {
+public class CoveragePreservationJudge extends DeterministicJudge<CoverageComparison> {
 
 	private static final double DEFAULT_THRESHOLD = 5.0;
 
@@ -48,26 +47,10 @@ public class CoveragePreservationJudge extends DeterministicJudge {
 	}
 
 	@Override
-	public Judgment judge(JudgmentContext context) {
-		Object baselineObj = context.metadata().get("baselineCoverage");
-		if (baselineObj == null) {
-			return Judgment.abstain("No baselineCoverage in metadata");
-		}
+	public Judgment judge(CoverageComparison evidence) {
+		double baselineLineCoverage = evidence.baselineLineCoverage();
 
-		double baselineLineCoverage;
-		if (baselineObj instanceof CoverageMetrics baseline) {
-			baselineLineCoverage = baseline.lineCoverage();
-		}
-		else {
-			try {
-				baselineLineCoverage = Double.parseDouble(baselineObj.toString());
-			}
-			catch (NumberFormatException e) {
-				return Judgment.abstain("Invalid baselineCoverage value: " + baselineObj);
-			}
-		}
-
-		CoverageMetrics current = JaCoCoReportParser.parse(context.workspace());
+		CoverageMetrics current = JaCoCoReportParser.parse(evidence.workspace());
 		if (current.linesTotal() == 0 && current.summary().contains("not found")) {
 			// The required input to this evaluation is missing, so the judge could not
 			// complete. ERROR lets the jury's ErrorPolicy decide whether to propagate,
@@ -90,8 +73,7 @@ public class CoveragePreservationJudge extends DeterministicJudge {
 				: Check.fail("line_coverage_preserved",
 						String.format("Drop %.1f%% > %.1f%% threshold", drop, threshold));
 
-		return (pass ? Judgment.builder().pass() : Judgment.builder().fail())
-			.reasoning(reasoning)
+		return (pass ? Judgment.builder().pass() : Judgment.builder().fail()).reasoning(reasoning)
 			.checks(java.util.List.of(coverageCheck))
 			.metadata("baselineLineCoverage", baselineLineCoverage)
 			.metadata("currentLineCoverage", current.lineCoverage())

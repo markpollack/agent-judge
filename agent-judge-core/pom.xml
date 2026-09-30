@@ -31,7 +31,7 @@
         </dependency>
 
         <!--
-            Nullness declarations for io.github.markpollack.judge.result,
+            Nullness declarations for the judgment, acceptance and provenance packages,
             io.github.markpollack.judge.description and io.github.markpollack.judge.jury.interpretation.
             Normal compile scope:
             these type-use annotations are part of the published API contract and must remain
@@ -82,7 +82,7 @@
         <plugins>
             <!--
                 NullAway enforces the @NullMarked declarations in
-                io.github.markpollack.judge.result, io.github.markpollack.judge.description and
+                the judgment, acceptance and provenance packages, io.github.markpollack.judge.description and
                 io.github.markpollack.judge.jury.interpretation.
                 JSpecify ships annotations only, so without a checker the contract would be
                 prose the build never verifies.

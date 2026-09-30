@@ -2,9 +2,9 @@ package io.github.markpollack.judge.koog;
 
 import ai.koog.agents.core.agent.AIAgent;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -12,8 +12,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Demo test showing the end-to-end Koog evaluation flow.
- * This is the CI-runnable version of the samples/koog-evaluation/ README.
+ * Demo test showing the end-to-end Koog evaluation flow. This is the CI-runnable version
+ * of the samples/koog-evaluation/ README.
  */
 class KoogEvaluationDemoTest {
 
@@ -28,8 +28,8 @@ class KoogEvaluationDemoTest {
 		when(agent.getId()).thenReturn("docs-assistant");
 
 		// A simple judge that checks whether the output mentions the key concept
-		Judge<JudgmentContext> containsKeyConceptJudge = (JudgmentContext ctx) -> {
-			String output = ctx.agentOutput().orElse("");
+		Judge<CompletionEvidence> containsKeyConceptJudge = (CompletionEvidence ctx) -> {
+			String output = java.util.Optional.ofNullable(ctx.response()).orElse("");
 			boolean mentionsDI = output.toLowerCase().contains("dependencies")
 					&& output.toLowerCase().contains("external");
 			return (mentionsDI ? Judgment.builder().pass() : Judgment.builder().fail())

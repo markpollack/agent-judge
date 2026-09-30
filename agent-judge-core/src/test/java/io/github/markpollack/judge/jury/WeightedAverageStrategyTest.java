@@ -6,8 +6,8 @@
 package io.github.markpollack.judge.jury;
 
 import org.junit.jupiter.api.Test;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import java.util.List;
 import java.util.Map;
@@ -38,7 +38,7 @@ class WeightedAverageStrategyTest {
 
 		// (0.8 * 0.3 + 0.6 * 0.7) / (0.3 + 0.7) = (0.24 + 0.42) / 1.0 = 0.66
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-				double score = result.score();
+		double score = result.score();
 		assertThat(score).isCloseTo(0.66, org.assertj.core.data.Offset.offset(0.01));
 	}
 
@@ -213,8 +213,7 @@ class WeightedAverageStrategyTest {
 		// against NaN is false, yielding a FAIL whose reasoning read "NaN". A weight map
 		// in which no judge can influence the result is a caller error, so it now fails
 		// loudly at the call rather than producing a garbage score.
-		assertThatThrownBy(() -> strategy.aggregate(judgments, weights))
-			.isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> strategy.aggregate(judgments, weights)).isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("All weights are zero");
 	}
 
@@ -249,7 +248,6 @@ class WeightedAverageStrategyTest {
 		assertThat(evidence(strategy.aggregate(List.of(passJudgment(0.8)), Map.of())))
 			.containsEntry(AggregationEvidence.STRATEGY, "weightedAverage");
 	}
-
 
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> evidence(Judgment judgment) {

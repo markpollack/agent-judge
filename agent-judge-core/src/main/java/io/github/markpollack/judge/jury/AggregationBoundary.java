@@ -12,27 +12,27 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 /**
  * The single boundary every jury puts around its strategy.
  *
  * <p>
- * A strategy is caller code, even when the caller is this library. It can throw, return null, or
- * return an aggregate it was not entitled to produce, and before containment each of those took
- * the whole jury with it — inside a cascade, the enclosing tier too. A run in which nine judges
- * succeeded and one strategy threw reported nothing at all.
+ * A strategy is caller code, even when the caller is this library. It can throw, return
+ * null, or return an aggregate it was not entitled to produce, and before containment
+ * each of those took the whole jury with it — inside a cascade, the enclosing tier too. A
+ * run in which nine judges succeeded and one strategy threw reported nothing at all.
  * </p>
  *
  * <p>
- * So the call is wrapped once, here, and both juries use this rather than two copies that could
- * drift. A contained failure becomes an {@code ERROR aggregation_failed}: loud, countable,
- * excluded from the subject's denominator, and carrying no evidence block, because there is no
- * reduction to describe. Every judge's own result survives in {@link Verdict#individual()}.
- * {@link Error} is deliberately not caught — a {@code StackOverflowError} is not a judgment any
- * jury can report on.
+ * So the call is wrapped once, here, and both juries use this rather than two copies that
+ * could drift. A contained failure becomes an {@code ERROR aggregation_failed}: loud,
+ * countable, excluded from the subject's denominator, and carrying no evidence block,
+ * because there is no reduction to describe. Every judge's own result survives in
+ * {@link Verdict#individual()}. {@link Error} is deliberately not caught — a
+ * {@code StackOverflowError} is not a judgment any jury can report on.
  * </p>
  *
  * @author Mark Pollack
@@ -43,9 +43,10 @@ final class AggregationBoundary {
 	/**
 	 * The statuses a strategy's aggregate may carry.
 	 * <p>
-	 * An allow-list rather than a deny-list, so a status added later is refused by a jury that
-	 * predates it instead of flowing through whichever branch happens to catch it. A contained
-	 * error is loud and countable; a verdict whose meaning nobody has decided is not.
+	 * An allow-list rather than a deny-list, so a status added later is refused by a jury
+	 * that predates it instead of flowing through whichever branch happens to catch it. A
+	 * contained error is loud and countable; a verdict whose meaning nobody has decided
+	 * is not.
 	 * </p>
 	 */
 	private static final Set<JudgmentStatus> ALLOWED_STATUSES = Set.of(JudgmentStatus.PASS, JudgmentStatus.FAIL,
@@ -54,10 +55,11 @@ final class AggregationBoundary {
 	/**
 	 * The reason codes a strategy's ERROR aggregate may carry.
 	 * <p>
-	 * A strategy reports two kinds of error: it propagated its inputs' errors, or it refused an
-	 * exclusion it was configured to refuse. Every other instrument code belongs to something
-	 * else — a judge, or the jury's own machinery — and a strategy emitting one would put a leaf
-	 * cause, or a containment code, where a reader counts reductions.
+	 * A strategy reports two kinds of error: it propagated its inputs' errors, or it
+	 * refused an exclusion it was configured to refuse. Every other instrument code
+	 * belongs to something else — a judge, or the jury's own machinery — and a strategy
+	 * emitting one would put a leaf cause, or a containment code, where a reader counts
+	 * reductions.
 	 * </p>
 	 */
 	private static final Set<JudgmentReasonCode> ALLOWED_ERROR_CODES = Set.of(JudgmentReasonCode.ERRORS_PROPAGATED,
@@ -72,13 +74,14 @@ final class AggregationBoundary {
 	 * @param judgments the judgments to reduce
 	 * @param weights the configured weights
 	 * @param mayBeNotApplicable whether this jury is entitled to an excluded aggregate
-	 * @param logger the calling jury's logger, so a contained failure is reported where it
-	 * happened
+	 * @param logger the calling jury's logger, so a contained failure is reported where
+	 * it happened
 	 * @return the strategy's aggregate, or the contained error that replaces it
 	 */
 	static Judgment aggregate(VotingStrategy strategy, List<Judgment> judgments, Map<String, Double> weights,
 			boolean mayBeNotApplicable, Logger logger) {
-		// Resolved before the call, so a strategy whose own getName() throws still has a name in
+		// Resolved before the call, so a strategy whose own getName() throws still has a
+		// name in
 		// the diagnostic that reports it.
 		String name = safeName(strategy);
 		Judgment aggregate;
@@ -112,7 +115,8 @@ final class AggregationBoundary {
 			return "returned a NOT_APPLICABLE aggregate, but this jury never declared that its aggregate "
 					+ "may be excluded";
 		}
-		if (aggregate.status() == JudgmentStatus.ERROR && !ALLOWED_ERROR_CODES.contains(aggregate.operationalReasonCode())) {
+		if (aggregate.status() == JudgmentStatus.ERROR
+				&& !ALLOWED_ERROR_CODES.contains(aggregate.operationalReasonCode())) {
 			return "returned an ERROR coded " + aggregate.operationalReasonCode()
 					+ ", which names a cause outside the reduction it performed";
 		}
@@ -140,16 +144,17 @@ final class AggregationBoundary {
 	 * What produced a verdict's aggregate.
 	 * <p>
 	 * A machinery error means nothing determined an outcome; anything else — including a
-	 * propagated error, which is the jury's own policy outcome — is the jury's own decision.
+	 * propagated error, which is the jury's own policy outcome — is the jury's own
+	 * provenance.
 	 * </p>
-	 * @param aggregated the aggregate
-	 * @return the decision
+	 * @param judgment the aggregate
+	 * @return the provenance
 	 */
-	static Decision decisionFor(Judgment aggregated) {
-		JudgmentReasonCode code = aggregated.operationalReasonCode();
-		boolean undecided = aggregated.status() == JudgmentStatus.ERROR && code != null
+	static VerdictProvenance decisionFor(Judgment judgment) {
+		JudgmentReasonCode code = judgment.operationalReasonCode();
+		boolean undecided = judgment.status() == JudgmentStatus.ERROR && code != null
 				&& code.originFamily() == JudgmentReasonCode.OriginFamily.MACHINERY;
-		return undecided ? Decision.undecided() : Decision.own();
+		return undecided ? VerdictProvenance.undecided() : VerdictProvenance.own();
 	}
 
 }

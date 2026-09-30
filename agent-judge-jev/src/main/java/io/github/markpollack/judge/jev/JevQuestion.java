@@ -5,7 +5,8 @@
 
 package io.github.markpollack.judge.jev;
 
-import io.github.markpollack.judge.result.*;
+import io.github.markpollack.judge.judgment.QualityDirection;
+import io.github.markpollack.judge.provenance.ArtifactRef;
 import java.util.*;
 import org.jspecify.annotations.Nullable;
 

@@ -1,3 +1,5 @@
+> Historical V2 contract. The current source implements [V3](portable-results-v3.md) and rejects stamped V2 data.
+
 # Agent Eval portable results, version 2
 
 This is the normative producer and authoritative-reading contract for version-2

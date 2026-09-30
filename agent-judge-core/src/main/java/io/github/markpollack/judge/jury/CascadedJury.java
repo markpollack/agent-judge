@@ -5,7 +5,6 @@
 
 package io.github.markpollack.judge.jury;
 
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -15,15 +14,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.description.CascadedJuryDescription;
 import io.github.markpollack.judge.description.JuryDescription;
 import io.github.markpollack.judge.description.TierDescription;
-import io.github.markpollack.judge.result.AcceptanceAction;
-import io.github.markpollack.judge.result.AppliedPolicy;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.acceptance.AcceptanceAction;
+import io.github.markpollack.judge.acceptance.AppliedPolicy;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 /**
  * A jury that evaluates named tiers sequentially with explicit stop and escalation
@@ -40,8 +38,8 @@ public class CascadedJury<E> implements Jury<E> {
 
 	private static final Logger logger = LoggerFactory.getLogger(CascadedJury.class);
 
-	private static final CompositeFailure EXECUTION_FAILURE =
-			new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED);
+	private static final CompositeFailure EXECUTION_FAILURE = new CompositeFailure(
+			CompositeFailureCode.JURY_EXECUTION_FAILED);
 
 	private final List<TierConfig<E>> tiers;
 
@@ -55,9 +53,8 @@ public class CascadedJury<E> implements Jury<E> {
 			}
 		}
 		this.tiers = List.copyOf(tiers);
-		this.assessmentCascade = tiers.stream().anyMatch(tier -> tier.policy() == TierPolicy.STOP_ON_USABLE_ASSESSMENT);
+		this.assessmentCascade = tiers.stream().anyMatch(tier -> tier.policy() == TierPolicy.STOP_ON_RELIED_JUDGMENT);
 	}
-
 
 	@Override
 	public List<Judge<E>> getJudges() {
@@ -72,10 +69,10 @@ public class CascadedJury<E> implements Jury<E> {
 	/**
 	 * Some tier's aggregate may be excluded.
 	 * <p>
-	 * A cascade has no strategy of its own — it adopts a tier's verdict — so its bound is the
-	 * union of its tiers', computed recursively through whatever those tiers are made of. The
-	 * one path that does not widen it is a stop on an individual rejection, whose root the
-	 * cascade builds itself as a machinery error rather than an exclusion.
+	 * A cascade has no strategy of its own — it adopts a tier's verdict — so its bound is
+	 * the union of its tiers', computed recursively through whatever those tiers are made
+	 * of. The one path that does not widen it is a stop on an individual rejection, whose
+	 * root the cascade builds itself as a machinery error rather than an exclusion.
 	 * </p>
 	 * @return true when this jury's aggregate may be NOT_APPLICABLE
 	 * @since 0.17.0
@@ -88,13 +85,13 @@ public class CascadedJury<E> implements Jury<E> {
 	/**
 	 * Describe this cascade's tiers in evaluation order, each with its policy and jury.
 	 * <p>
-	 * A cascade's verdict copies its aggregate and individual judgments from the tier that
-	 * stopped it. Count per tier against {@code Verdict.compositeAttempts()}, never also the
-	 * top-level aggregate; see {@link CascadedJuryDescription}.
+	 * A cascade's verdict copies its aggregate and individual judgments from the tier
+	 * that stopped it. Count per tier against {@code Verdict.compositeAttempts()}, never
+	 * also the top-level aggregate; see {@link CascadedJuryDescription}.
 	 * </p>
 	 * @return a cascaded jury description
-	 * @throws IllegalArgumentException if a tier cannot be described; the message names the
-	 * tier
+	 * @throws IllegalArgumentException if a tier cannot be described; the message names
+	 * the tier
 	 * @since 0.17.0
 	 */
 	@Override
@@ -120,27 +117,27 @@ public class CascadedJury<E> implements Jury<E> {
 	 * The single rule, applied to each tier in order.
 	 *
 	 * <p>
-	 * Legacy policies retain the failed-stage behavior described below. Assessment routing
-	 * instead requires a valid one-seat SimpleJury identity and stops on any invocation or
-	 * contract failure; its final tier has the same bound. Only an explicit ESCALATE action
-	 * continues it, and final escalation remains a retained ABSTAIN.
+	 * Legacy policies retain the failed-stage behavior described below. Finding routing
+	 * instead requires a valid one-seat SimpleJury identity and stops on any invocation
+	 * or contract failure; its final tier has the same bound. Only an explicit ESCALATE
+	 * action continues it, and final escalation remains a retained ABSTAIN.
 	 *
-	 * <p>There are only three things a tier can do. It can throw; it can return a verdict the
-	 * cascade cannot use; or it can return one the cascade can. The interesting case is the
-	 * middle one, and the rule there is deliberately asymmetric: a tier that did not finish may
-	 * still have established a genuine rejection on the way, and one established violation is
-	 * enough to reject. It is never enough to accept. A broken reduction cannot demonstrate that
-	 * a subject is fine, so {@code ACCEPT_ON_ALL_PASS} never stops on a failed stage and simply
-	 * escalates.
+	 * <p>
+	 * There are only three things a tier can do. It can throw; it can return a verdict
+	 * the cascade cannot use; or it can return one the cascade can. The interesting case
+	 * is the middle one, and the rule there is deliberately asymmetric: a tier that did
+	 * not finish may still have established a genuine rejection on the way, and one
+	 * established violation is enough to reject. It is never enough to accept. A broken
+	 * reduction cannot demonstrate that a subject is fine, so {@code ACCEPT_ON_ALL_PASS}
+	 * never stops on a failed stage and simply escalates.
 	 * </p>
-	 *
 	 * @param context the judgment context
 	 * @return the cascade's verdict
 	 */
 	private Verdict execute(E context) {
 		List<CompositeAttempt> attempts = new ArrayList<>();
 		for (TierConfig<E> tier : tiers) {
-			boolean bounded = tier.policy() == TierPolicy.STOP_ON_USABLE_ASSESSMENT
+			boolean bounded = tier.policy() == TierPolicy.STOP_ON_RELIED_JUDGMENT
 					|| (assessmentCascade && tier.policy() == TierPolicy.FINAL_TIER);
 			boolean[] identity = { false };
 			Verdict tierVerdict;
@@ -150,7 +147,7 @@ public class CascadedJury<E> implements Jury<E> {
 						return tier.jury().vote(context);
 					}
 					if (!(tier.jury() instanceof SimpleJury<E> simple) || simple.getJudges().size() != 1) {
-						throw new IllegalStateException("Assessment tier requires one declared SimpleJury seat");
+						throw new IllegalStateException("Finding tier requires one declared SimpleJury seat");
 					}
 					SimpleJury.CompositionVote result = simple.voteForComposition(context);
 					identity[0] = result.identity();
@@ -186,8 +183,10 @@ public class CascadedJury<E> implements Jury<E> {
 
 			DispositionReason reason = NotApplicableGuard.stageFailure(tier.jury(), tierVerdict);
 			if (reason != null) {
-				// The tier ran but did not produce a determination this cascade may use. Its
-				// verdict is kept unchanged on the attempt; what changes is the parent's record
+				// The tier ran but did not produce a determination this cascade may use.
+				// Its
+				// verdict is kept unchanged on the attempt; what changes is the parent's
+				// record
 				// of whether it could be used.
 				attempts.add(CompositeAttempt.stageFailed(tier.name(), CompositeRelation.CASCADE_TIER, tier.policy(),
 						reason, tierVerdict));
@@ -200,26 +199,28 @@ public class CascadedJury<E> implements Jury<E> {
 				continue;
 			}
 
-			attempts.add(CompositeAttempt.used(tier.name(), CompositeRelation.CASCADE_TIER, tier.policy(),
-					tierVerdict));
+			attempts
+				.add(CompositeAttempt.used(tier.name(), CompositeRelation.CASCADE_TIER, tier.policy(), tierVerdict));
 			if (shouldStop(tier, tierVerdict)) {
 				return tierOutcome(tier.name(), tierVerdict, attempts);
 			}
 		}
-		// The builder requires a FINAL_TIER last, and every path through a final tier returns,
-		// so this is unreachable; it exists so a future policy cannot fall out of the loop with
+		// The builder requires a FINAL_TIER last, and every path through a final tier
+		// returns,
+		// so this is unreachable; it exists so a future policy cannot fall out of the
+		// loop with
 		// no verdict at all.
 		return noTierDecided(attempts, "No cascade tier produced a determination.");
 	}
 
 	private static <E> String assessmentTierDefect(TierConfig<E> tier, Verdict verdict, boolean identity) {
-		if (!identity || verdict.decision().kind() != DecisionKind.OWN
+		if (!identity || verdict.provenance().kind() != VerdictProvenanceKind.OWN
 				|| !verdict.compositeAttempts().isEmpty() || verdict.individual().size() != 1
 				|| verdict.seats().size() != 1 || verdict.seats().get(0).position() != 0) {
 			return "The assessment tier did not return a valid one-seat OWN identity result.";
 		}
 		Judgment seat = verdict.individual().get(0);
-		if (!seat.equals(verdict.aggregated())
+		if (!seat.equals(verdict.judgment())
 				|| !seat.equals(verdict.individualByName().get(verdict.seats().get(0).verdictKey()))) {
 			return "The assessment tier aggregate or named result differs from its sole seat.";
 		}
@@ -235,8 +236,8 @@ public class CascadedJury<E> implements Jury<E> {
 
 	private Verdict assessmentTierFailed(TierConfig<E> tier, List<CompositeAttempt> attempts, String explanation) {
 		return Verdict.builder()
-			.aggregated(Judgment.error(JudgmentReasonCode.STAGE_FAILED, "Tier '" + tier.name() + "': " + explanation))
-			.decision(Decision.undecided())
+			.judgment(Judgment.error(JudgmentReasonCode.STAGE_FAILED, "Tier '" + tier.name() + "': " + explanation))
+			.provenance(VerdictProvenance.undecided())
 			.compositeAttempts(attempts)
 			.build();
 	}
@@ -245,7 +246,7 @@ public class CascadedJury<E> implements Jury<E> {
 		return switch (tier.policy()) {
 			case REJECT_ON_ANY_FAIL -> hasAnyFail(verdict);
 			case ACCEPT_ON_ALL_PASS -> allPassed(verdict);
-			case STOP_ON_USABLE_ASSESSMENT -> !(verdict.individual().get(0).status() == JudgmentStatus.ABSTAIN
+			case STOP_ON_RELIED_JUDGMENT -> !(verdict.individual().get(0).status() == JudgmentStatus.ABSTAIN
 					&& verdict.individual().get(0).policyApplication() instanceof AppliedPolicy applied
 					&& applied.action() == AcceptanceAction.ESCALATE);
 			case FINAL_TIER -> true;
@@ -255,10 +256,10 @@ public class CascadedJury<E> implements Jury<E> {
 	/**
 	 * Whether the tier established a genuine individual rejection.
 	 * <p>
-	 * A FAIL in a tier's {@code individual} is either a leaf judge's own finding or a member
-	 * jury's completed reduction, including one a configured {@code TREAT_AS_FAIL} produced.
-	 * Both are real. What is never here is a machinery error: an error is not a FAIL, and the
-	 * library's own failure never becomes rejection evidence.
+	 * A FAIL in a tier's {@code individual} is either a leaf judge's own finding or a
+	 * member jury's completed reduction, including one a configured {@code TREAT_AS_FAIL}
+	 * produced. Both are real. What is never here is a machinery error: an error is not a
+	 * FAIL, and the library's own failure never becomes rejection evidence.
 	 * </p>
 	 * @param verdict the tier's verdict
 	 * @return true when at least one individual judgment failed
@@ -274,13 +275,13 @@ public class CascadedJury<E> implements Jury<E> {
 	/** The cascade adopted a tier's own determination. */
 	private Verdict tierOutcome(String name, Verdict stoppingVerdict, List<CompositeAttempt> attempts) {
 		return Verdict.builder()
-			.aggregated(stoppingVerdict.aggregated())
+			.judgment(stoppingVerdict.judgment())
 			.individual(stoppingVerdict.individual())
 			.individualByName(stoppingVerdict.individualByName())
 			.weights(stoppingVerdict.weights())
 			.seats(stoppingVerdict.seats())
 			.declaredCardinality(stoppingVerdict.declaredCardinality())
-			.decision(Decision.tier(name, DecisionBasis.TIER_OUTCOME))
+			.provenance(VerdictProvenance.tier(name, VerdictProvenanceBasis.TIER_OUTCOME))
 			.compositeAttempts(attempts)
 			.build();
 	}
@@ -288,10 +289,10 @@ public class CascadedJury<E> implements Jury<E> {
 	/**
 	 * The cascade stopped on a rejection a failed tier had already established.
 	 * <p>
-	 * No FAIL and no score is manufactured. The rejection is carried by the decision, and the
-	 * root aggregate stays an instrument failure, so a reader counts one machinery failure and
-	 * classifies the item as non-pass — rather than reading an error as though the subject had
-	 * been assessed and found wanting.
+	 * No FAIL and no score is manufactured. The rejection is carried by the provenance,
+	 * and the root aggregate stays an instrument failure, so a reader counts one
+	 * machinery failure and classifies the item as non-pass — rather than reading an
+	 * error as though the subject had been assessed and found wanting.
 	 * </p>
 	 * @param tier the tier that failed
 	 * @param tierVerdict the verdict it returned
@@ -301,19 +302,19 @@ public class CascadedJury<E> implements Jury<E> {
 	 */
 	private Verdict individualRejection(TierConfig<E> tier, Verdict tierVerdict, DispositionReason reason,
 			List<CompositeAttempt> attempts) {
-		Judgment root = reason == DispositionReason.CHILD_UNDECIDED ? tierVerdict.aggregated()
+		Judgment root = reason == DispositionReason.CHILD_UNDECIDED ? tierVerdict.judgment()
 				: Judgment.error(JudgmentReasonCode.STAGE_FAILED, "Tier '" + tier.name()
 						+ "' returned NOT_APPLICABLE without declaring that its aggregate may be excluded, so its "
 						+ "reduction is a stage failure; the cascade stopped because a genuine individual FAIL in "
 						+ "that tier established the rejection.");
 		return Verdict.builder()
-			.aggregated(root)
+			.judgment(root)
 			.individual(tierVerdict.individual())
 			.individualByName(tierVerdict.individualByName())
 			.weights(tierVerdict.weights())
 			.seats(tierVerdict.seats())
 			.declaredCardinality(tierVerdict.declaredCardinality())
-			.decision(Decision.tier(tier.name(), DecisionBasis.INDIVIDUAL_REJECTION))
+			.provenance(VerdictProvenance.tier(tier.name(), VerdictProvenanceBasis.INDIVIDUAL_REJECTION))
 			.compositeAttempts(attempts)
 			.build();
 	}
@@ -321,11 +322,11 @@ public class CascadedJury<E> implements Jury<E> {
 	/**
 	 * Nothing decided: an empty root, complete attempts, and a machinery error.
 	 * <p>
-	 * Any exclusion this cascade refused along the way is named here, because no later tier's
-	 * reasoning survives to explain the outcome and the disposition enum alone leaves a reader
-	 * unable to tell a refused exclusion from a tier that simply broke. R-E's enum-only allowance
-	 * is scoped to the case where a later selected tier supplies the root, which never reaches
-	 * this method.
+	 * Any exclusion this cascade refused along the way is named here, because no later
+	 * tier's reasoning survives to explain the outcome and the disposition enum alone
+	 * leaves a reader unable to tell a refused exclusion from a tier that simply broke.
+	 * R-E's enum-only allowance is scoped to the case where a later selected tier
+	 * supplies the root, which never reaches this method.
 	 * </p>
 	 * @param attempts the attempts recorded so far
 	 * @param reasoning why no tier decided
@@ -333,9 +334,9 @@ public class CascadedJury<E> implements Jury<E> {
 	 */
 	private Verdict noTierDecided(List<CompositeAttempt> attempts, String reasoning) {
 		return Verdict.builder()
-			.aggregated(Judgment.error(JudgmentReasonCode.NO_TIER_DECIDED,
+			.judgment(Judgment.error(JudgmentReasonCode.NO_TIER_DECIDED,
 					reasoning + NotApplicableGuard.refusedExclusionNote(attempts, "Tier")))
-			.decision(Decision.undecided())
+			.provenance(VerdictProvenance.undecided())
 			.compositeAttempts(attempts)
 			.build();
 	}
@@ -351,6 +352,7 @@ public class CascadedJury<E> implements Jury<E> {
 
 	/**
 	 * {@code Builder<E>} for {@link CascadedJury}.
+	 *
 	 * @param <E> evidence type
 	 */
 	public static class Builder<E> {

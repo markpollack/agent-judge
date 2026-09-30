@@ -2,13 +2,12 @@ package io.github.markpollack.judge.file;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,11 +33,7 @@ class FileComparisonJudgeTest {
 		Files.writeString(expected.resolve("pom.xml"), pom);
 		Files.writeString(actual.resolve("pom.xml"), pom);
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test")
-			.workspace(actual)
-			.metadata(Map.of("expectedDir", expected))
-			.build();
+		DirectoryComparison context = new DirectoryComparison(expected, actual);
 
 		Judgment result = judge.judge(context);
 		assertThat(result.pass()).isTrue();
@@ -68,11 +63,7 @@ class FileComparisonJudgeTest {
 				</project>
 				""");
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test")
-			.workspace(actual)
-			.metadata(Map.of("expectedDir", expected))
-			.build();
+		DirectoryComparison context = new DirectoryComparison(expected, actual);
 
 		Judgment result = judge.judge(context);
 		assertThat(result.pass()).isFalse();
@@ -88,11 +79,7 @@ class FileComparisonJudgeTest {
 		Files.writeString(expected.resolve("pom.xml"), "<project/>");
 		// No pom.xml in actual
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test")
-			.workspace(actual)
-			.metadata(Map.of("expectedDir", expected))
-			.build();
+		DirectoryComparison context = new DirectoryComparison(expected, actual);
 
 		Judgment result = judge.judge(context);
 		assertThat(result.pass()).isFalse();
@@ -125,11 +112,7 @@ class FileComparisonJudgeTest {
 				</extensions>
 				""");
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test")
-			.workspace(actual)
-			.metadata(Map.of("expectedDir", expected))
-			.build();
+		DirectoryComparison context = new DirectoryComparison(expected, actual);
 
 		Judgment result = judge.judge(context);
 		assertThat(result.pass()).isTrue();
@@ -145,14 +128,34 @@ class FileComparisonJudgeTest {
 		Files.writeString(expected.resolve("README.txt"), "hello  world\n");
 		Files.writeString(actual.resolve("README.txt"), "hello world\n");
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test")
-			.workspace(actual)
-			.metadata(Map.of("expectedDir", expected))
-			.build();
+		DirectoryComparison context = new DirectoryComparison(expected, actual);
 
 		Judgment result = judge.judge(context);
 		assertThat(result.pass()).isTrue();
+	}
+
+	@Test
+	void unreadableFileOutranksKnownMismatchAndRetainsBoth(@TempDir Path tempDir) throws Exception {
+		Path expected = tempDir.resolve("expected-broken");
+		Path actual = tempDir.resolve("actual-broken");
+		Files.createDirectories(expected);
+		Files.createDirectories(actual);
+		Files.writeString(expected.resolve("bad.xml"), "<root/>");
+		Files.createDirectory(actual.resolve("bad.xml"));
+		Files.writeString(expected.resolve("text.txt"), "expected");
+		Files.writeString(actual.resolve("text.txt"), "different");
+		var result = new FileComparisonJudge().judge(new DirectoryComparison(expected, actual));
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(result.checks()).extracting(check -> check.judgment().status())
+			.contains(JudgmentStatus.ERROR, JudgmentStatus.FAIL);
+	}
+
+	@Test
+	void emptyDirectoryHasNoEstablishedComparison(@TempDir Path tempDir) throws Exception {
+		Path expected = Files.createDirectories(tempDir.resolve("empty-expected"));
+		Path actual = Files.createDirectories(tempDir.resolve("empty-actual"));
+		assertThat(new FileComparisonJudge().judge(new DirectoryComparison(expected, actual)).status())
+			.isEqualTo(JudgmentStatus.ABSTAIN);
 	}
 
 }

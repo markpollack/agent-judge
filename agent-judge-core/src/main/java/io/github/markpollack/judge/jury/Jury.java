@@ -16,20 +16,21 @@ import java.util.List;
  * <p>
  * A Jury is a separate abstraction from Judge that aggregates judgments from multiple
  * judges using a voting strategy. Unlike Judge which returns a Judgment, Jury returns a
- * Verdict containing both the aggregated result and all individual judgments.
+ * Verdict containing both the judgment result and all individual judgments.
  * </p>
  *
  * <p>
  * The jury executes all its constituent judges (potentially in parallel) and aggregates
  * their judgments using a {@link VotingStrategy}. The final verdict includes identity
-	 * preservation via judge names and complete named {@link CompositeAttempt} evidence for
-	 * composite implementations.
+ * preservation via judge names and complete named {@link CompositeAttempt} evidence for
+ * composite implementations.
  * </p>
  *
  * <p>
  * Example usage:
  * </p>
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
  * @param <E> evidence accepted by every participating judge
  * @author Mark Pollack
@@ -55,18 +56,18 @@ public interface Jury<E> {
 	/**
 	 * Execute all judges and aggregate their judgments into a verdict.
 	 * @param context typed evidence for this evaluation
-	 * @return verdict with aggregated and individual judgments
+	 * @return verdict with judgment and individual judgments
 	 */
 	Verdict vote(E context);
 
 	/**
 	 * Describe this jury's configured structure, available before any vote.
 	 * <p>
-	 * The default describes the jury as {@linkplain JuryDescription#opaque(Jury) opaque}: its
-	 * implementation, its strategy and its flattened judges, without claiming to know how it
-	 * seats, keys or weights them. The library's juries override it with a structural
-	 * description. A jury that composes other juries should override it as well, so that its
-	 * members are described by their own {@code describe()}.
+	 * The default describes the jury as {@linkplain JuryDescription#opaque(Jury) opaque}:
+	 * its implementation, its strategy and its flattened judges, without claiming to know
+	 * how it seats, keys or weights them. The library's juries override it with a
+	 * structural description. A jury that composes other juries should override it as
+	 * well, so that its members are described by their own {@code describe()}.
 	 * </p>
 	 * @return the jury's description
 	 * @throws IllegalArgumentException if a judge declares a configuration that is not
@@ -79,18 +80,19 @@ public interface Jury<E> {
 
 	/**
 	 * Whether this jury's aggregate may be
-	 * {@link io.github.markpollack.judge.result.JudgmentStatus#NOT_APPLICABLE}.
+	 * {@link io.github.markpollack.judge.judgment.JudgmentStatus#NOT_APPLICABLE}.
 	 * <p>
 	 * A conservative bound, declared before any vote. True means the jury is permitted to
-	 * exclude the subject; false means a built-in parent that receives an excluded aggregate
-	 * from it will treat that as a stage failure rather than honour it.
+	 * exclude the subject; false means a built-in parent that receives an excluded
+	 * aggregate from it will treat that as a stage failure rather than honour it.
 	 * </p>
 	 * <p>
-	 * The default is {@code false}, which is the safe direction and the honest one: a jury this
-	 * library cannot inspect has made no pre-spend guarantee about its own denominator, so it is
-	 * checked at runtime wherever a built-in parent receives its output. Override it only if the
-	 * jury really can return an excluded aggregate — and then it must, because otherwise its
-	 * legitimate exclusions will be contained as errors.
+	 * The default is {@code false}, which is the safe direction and the honest one: a
+	 * jury this library cannot inspect has made no pre-spend guarantee about its own
+	 * denominator, so it is checked at runtime wherever a built-in parent receives its
+	 * output. Override it only if the jury really can return an excluded aggregate — and
+	 * then it must, because otherwise its legitimate exclusions will be contained as
+	 * errors.
 	 * </p>
 	 * @return true when the aggregate may be not applicable; false by default
 	 * @since 0.17.0

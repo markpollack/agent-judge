@@ -5,20 +5,19 @@
 
 package io.github.markpollack.judge;
 
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.description.KeySource;
-import io.github.markpollack.judge.jury.Decision;
+import io.github.markpollack.judge.jury.VerdictProvenance;
 import io.github.markpollack.judge.jury.Seat;
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +46,7 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return always-pass judge
 	 */
-	public static Judge<JudgmentContext> alwaysPass(String name) {
+	public static Judge<CompletionEvidence> alwaysPass(String name) {
 		return Judges.named(ctx -> Judgment.pass("Always passes"), name, null, JudgeType.DETERMINISTIC);
 	}
 
@@ -56,7 +55,7 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return always-fail judge
 	 */
-	public static Judge<JudgmentContext> alwaysFail(String name) {
+	public static Judge<CompletionEvidence> alwaysFail(String name) {
 		return Judges.named(ctx -> Judgment.fail("Always fails"), name, null, JudgeType.DETERMINISTIC);
 	}
 
@@ -65,7 +64,7 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return always-abstain judge
 	 */
-	public static Judge<JudgmentContext> alwaysAbstain(String name) {
+	public static Judge<CompletionEvidence> alwaysAbstain(String name) {
 		return Judges.named(ctx -> Judgment.abstain("Cannot evaluate"), name, null, JudgeType.DETERMINISTIC);
 	}
 
@@ -74,9 +73,8 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return always-error judge
 	 */
-	public static Judge<JudgmentContext> alwaysError(String name) {
-		return Judges.named(ctx -> Judgment.error("Evaluation error"), name, null,
-				JudgeType.DETERMINISTIC);
+	public static Judge<CompletionEvidence> alwaysError(String name) {
+		return Judges.named(ctx -> Judgment.error("Evaluation error"), name, null, JudgeType.DETERMINISTIC);
 	}
 
 	/**
@@ -85,7 +83,7 @@ public final class JudgeTestFixtures {
 	 * @param failure the exception the judge throws
 	 * @return always-throwing judge
 	 */
-	public static Judge<JudgmentContext> alwaysThrows(String name, RuntimeException failure) {
+	public static Judge<CompletionEvidence> alwaysThrows(String name, RuntimeException failure) {
 		return Judges.named(ctx -> {
 			throw failure;
 		}, name, null, JudgeType.DETERMINISTIC);
@@ -96,7 +94,7 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return judge returning null
 	 */
-	public static Judge<JudgmentContext> returnsNothing(String name) {
+	public static Judge<CompletionEvidence> returnsNothing(String name) {
 		return Judges.named(ctx -> null, name, null, JudgeType.DETERMINISTIC);
 	}
 
@@ -106,10 +104,10 @@ public final class JudgeTestFixtures {
 	 * @param result judgment the judge would return if asked
 	 * @return judge whose {@code metadata()} returns null
 	 */
-	public static Judge<JudgmentContext> nullMetadata(Judgment result) {
-		return new JudgeWithMetadata<JudgmentContext>() {
+	public static Judge<CompletionEvidence> nullMetadata(Judgment result) {
+		return new JudgeWithMetadata<CompletionEvidence>() {
 			@Override
-			public Judgment judge(JudgmentContext context) {
+			public Judgment judge(CompletionEvidence context) {
 				return result;
 			}
 
@@ -126,10 +124,10 @@ public final class JudgeTestFixtures {
 	 * @param result judgment the judge would return if asked
 	 * @return judge whose metadata cannot be read
 	 */
-	public static Judge<JudgmentContext> throwingMetadata(RuntimeException failure, Judgment result) {
-		return new JudgeWithMetadata<JudgmentContext>() {
+	public static Judge<CompletionEvidence> throwingMetadata(RuntimeException failure, Judgment result) {
+		return new JudgeWithMetadata<CompletionEvidence>() {
 			@Override
-			public Judgment judge(JudgmentContext context) {
+			public Judgment judge(CompletionEvidence context) {
 				return result;
 			}
 
@@ -146,9 +144,8 @@ public final class JudgeTestFixtures {
 	 * @param score numerical score value
 	 * @return score-based judge
 	 */
-	public static Judge<JudgmentContext> withScore(String name, double score) {
-		return Judges.named(ctx -> (score >= 0.5 ? Judgment.builder().pass() : Judgment.builder().fail())
-			.score(score)
+	public static Judge<CompletionEvidence> withScore(String name, double score) {
+		return Judges.named(ctx -> (score >= 0.5 ? Judgment.builder().pass() : Judgment.builder().fail()).score(score)
 			.reasoning("Score: " + score)
 			.build(), name, null, JudgeType.DETERMINISTIC);
 	}
@@ -170,7 +167,7 @@ public final class JudgeTestFixtures {
 	 * @param result judgment to return
 	 * @return slow judge
 	 */
-	public static Judge<JudgmentContext> slow(String name, long delayMillis, Judgment result) {
+	public static Judge<CompletionEvidence> slow(String name, long delayMillis, Judgment result) {
 		return Judges.named(ctx -> {
 			try {
 				Thread.sleep(delayMillis);
@@ -190,13 +187,13 @@ public final class JudgeTestFixtures {
 	 * @param goal the goal text
 	 * @return judgment context
 	 */
-	public static JudgmentContext simpleContext(String goal) {
-		return JudgmentContext.builder()
-			.goal(goal)
-			.agentOutput("Sample output")
-			.status(ExecutionStatus.SUCCESS)
+	public static CompletionEvidence simpleContext(String goal) {
+		return CompletionEvidence.builder()
+			.request(goal)
+			.response("Sample output")
+			.status(CompletionStatus.SUCCESS)
 			.startedAt(Instant.now())
-			.executionTime(Duration.ofSeconds(1))
+			.elapsedTime(Duration.ofSeconds(1))
 			.build();
 	}
 
@@ -206,14 +203,13 @@ public final class JudgeTestFixtures {
 	 * @param workspace workspace path
 	 * @return judgment context
 	 */
-	public static JudgmentContext withWorkspace(String goal, Path workspace) {
-		return JudgmentContext.builder()
-			.goal(goal)
-			.workspace(workspace)
-			.agentOutput("Sample output")
-			.status(ExecutionStatus.SUCCESS)
+	public static CompletionEvidence withWorkspace(String goal, Path workspace) {
+		return CompletionEvidence.builder()
+			.request(goal)
+			.response("Sample output")
+			.status(CompletionStatus.SUCCESS)
 			.startedAt(Instant.now())
-			.executionTime(Duration.ofSeconds(1))
+			.elapsedTime(Duration.ofSeconds(1))
 			.build();
 	}
 
@@ -222,13 +218,13 @@ public final class JudgeTestFixtures {
 	 * @param goal the goal text
 	 * @return judgment context with failed status
 	 */
-	public static JudgmentContext failedContext(String goal) {
-		return JudgmentContext.builder()
-			.goal(goal)
-			.agentOutput("Error occurred")
-			.status(ExecutionStatus.FAILED)
+	public static CompletionEvidence failedContext(String goal) {
+		return CompletionEvidence.builder()
+			.request(goal)
+			.response("Error occurred")
+			.status(CompletionStatus.FAILED)
 			.startedAt(Instant.now())
-			.executionTime(Duration.ofMillis(100))
+			.elapsedTime(Duration.ofMillis(100))
 			.build();
 	}
 
@@ -240,10 +236,7 @@ public final class JudgeTestFixtures {
 	 * @return passing judgment
 	 */
 	public static Judgment passJudgment(double score) {
-		return Judgment.builder().pass()
-			.score(score)
-			.reasoning("Test passed with score " + score)
-			.build();
+		return Judgment.builder().pass().score(score).reasoning("Test passed with score " + score).build();
 	}
 
 	/**
@@ -252,10 +245,7 @@ public final class JudgeTestFixtures {
 	 * @return failing judgment
 	 */
 	public static Judgment failJudgment(double score) {
-		return Judgment.builder().fail()
-			.score(score)
-			.reasoning("Test failed with score " + score)
-			.build();
+		return Judgment.builder().fail().score(score).reasoning("Test failed with score " + score).build();
 	}
 
 	/**
@@ -294,19 +284,19 @@ public final class JudgeTestFixtures {
 		}
 
 		return Verdict.builder()
-			.aggregated(booleanPass("Unanimous pass"))
+			.judgment(booleanPass("Unanimous pass"))
 			.individual(individual)
 			.individualByName(byName)
 			.seats(positionalSeats(byName.keySet()))
-			.decision(Decision.own())
+			.provenance(VerdictProvenance.own())
 			.build();
 	}
 
 	/**
 	 * Seats for a fixture verdict, one per key, in the order the map holds them.
 	 * <p>
-	 * {@code POSITIONAL} because these are manufactured {@code Judge#N} keys: a fixture should
-	 * not claim an identity a judge never declared.
+	 * {@code POSITIONAL} because these are manufactured {@code Judge#N} keys: a fixture
+	 * should not claim an identity a judge never declared.
 	 * </p>
 	 * @param verdictKeys the verdict keys in order
 	 * @return the seats
@@ -343,14 +333,14 @@ public final class JudgeTestFixtures {
 		}
 
 		boolean majorityPass = passCount > failCount;
-		Judgment aggregated = majorityPass ? booleanPass("Majority passed") : booleanFail("Majority failed");
+		Judgment judgment = majorityPass ? booleanPass("Majority passed") : booleanFail("Majority failed");
 
 		return Verdict.builder()
-			.aggregated(aggregated)
+			.judgment(judgment)
 			.individual(individual)
 			.individualByName(byName)
 			.seats(positionalSeats(byName.keySet()))
-			.decision(Decision.own())
+			.provenance(VerdictProvenance.own())
 			.build();
 	}
 
@@ -370,11 +360,11 @@ public final class JudgeTestFixtures {
 		}
 
 		return Verdict.builder()
-			.aggregated(Judgment.abstain("All judges abstained"))
+			.judgment(Judgment.abstain("All judges abstained"))
 			.individual(individual)
 			.individualByName(byName)
 			.seats(positionalSeats(byName.keySet()))
-			.decision(Decision.own())
+			.provenance(VerdictProvenance.own())
 			.build();
 	}
 
@@ -383,13 +373,13 @@ public final class JudgeTestFixtures {
 	/**
 	 * Judge that records all invocations for verification.
 	 */
-	public static class RecordingJudge implements Judge<JudgmentContext>, JudgeWithMetadata<JudgmentContext> {
+	public static class RecordingJudge implements Judge<CompletionEvidence>, JudgeWithMetadata<CompletionEvidence> {
 
 		private final JudgeMetadata metadata;
 
 		private final Judgment result;
 
-		private final List<JudgmentContext> invocations = new ArrayList<>();
+		private final List<CompletionEvidence> invocations = new ArrayList<>();
 
 		public RecordingJudge(String name, Judgment result) {
 			this.metadata = new JudgeMetadata(name, "Recording judge", JudgeType.DETERMINISTIC);
@@ -397,7 +387,7 @@ public final class JudgeTestFixtures {
 		}
 
 		@Override
-		public Judgment judge(JudgmentContext context) {
+		public Judgment judge(CompletionEvidence context) {
 			invocations.add(context);
 			return result;
 		}
@@ -407,7 +397,7 @@ public final class JudgeTestFixtures {
 			return metadata;
 		}
 
-		public List<JudgmentContext> getInvocations() {
+		public List<CompletionEvidence> getInvocations() {
 			return List.copyOf(invocations);
 		}
 
@@ -415,7 +405,7 @@ public final class JudgeTestFixtures {
 			return invocations.size();
 		}
 
-		public JudgmentContext getLastInvocation() {
+		public CompletionEvidence getLastInvocation() {
 			return invocations.isEmpty() ? null : invocations.get(invocations.size() - 1);
 		}
 

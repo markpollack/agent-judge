@@ -10,8 +10,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -48,10 +48,11 @@ class AllMustPassStrategyTest {
 
 	@Test
 	void anEmptyGateAbstainsRatherThanPassingVacuously() {
-		// allMatch over an empty stream is true; a gate that lost its requirements must not
+		// allMatch over an empty stream is true; a gate that lost its requirements must
+		// not
 		// report that everything is done.
-		Judgment result = strategy.aggregate(List.of(Judgment.abstain("not applicable"),
-				Judgment.abstain("not applicable")), Map.of());
+		Judgment result = strategy
+			.aggregate(List.of(Judgment.abstain("not applicable"), Judgment.abstain("not applicable")), Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.status()).isNotEqualTo(JudgmentStatus.PASS);
@@ -60,7 +61,7 @@ class AllMustPassStrategyTest {
 
 	@Test
 	void carriesNoScore_becauseTheJudgesCarriedNone() {
-		// The whole point: a Boolean gate must not be aggregated through effectiveScore().
+		// The whole point: a Boolean gate must not be judgment through effectiveScore().
 		Judgment result = strategy.aggregate(List.of(Judgment.pass("a"), Judgment.pass("b")), Map.of());
 
 		assertThat(result.score()).isNull();
@@ -93,8 +94,7 @@ class AllMustPassStrategyTest {
 	@Test
 	void reasoningCountsTheFailuresAgainstTheApplicableTotal() {
 		Judgment result = strategy.aggregate(
-				List.of(Judgment.pass("a"), Judgment.fail("b"), Judgment.fail("c"), Judgment.abstain("n/a")),
-				Map.of());
+				List.of(Judgment.pass("a"), Judgment.fail("b"), Judgment.fail("c"), Judgment.abstain("n/a")), Map.of());
 
 		assertThat(result.reasoning()).isEqualTo("2 of 3 applicable requirement(s) failed");
 		assertThat(aggregation(result)).containsEntry(AggregationEvidence.STRATEGY, "allMustPass");

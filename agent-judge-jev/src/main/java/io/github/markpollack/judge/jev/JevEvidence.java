@@ -5,7 +5,7 @@
 
 package io.github.markpollack.judge.jev;
 
-import io.github.markpollack.judge.result.ArtifactRef;
+import io.github.markpollack.judge.provenance.ArtifactRef;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
@@ -35,6 +35,6 @@ public record JevEvidence(String text, ArtifactRef bundle, ArtifactRef manifest,
 			.equals(bundle.sha256()))
 			throw new IllegalArgumentException("Evidence digest mismatch");
 		// Portable text validation also rejects unpaired UTF-16 surrogates.
-		io.github.markpollack.judge.result.Judgment.pass("").toBuilder().metadata("text", text).build();
+		io.github.markpollack.judge.judgment.Judgment.pass("").toBuilder().metadata("text", text).build();
 	}
 }

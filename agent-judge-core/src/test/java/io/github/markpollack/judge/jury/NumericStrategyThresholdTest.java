@@ -10,8 +10,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static io.github.markpollack.judge.JudgeTestFixtures.passJudgment;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,11 +21,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * The acceptance bar on the three numeric strategies is the caller's to state.
  *
  * <p>
- * Each of these previously carried {@code private static final double THRESHOLD = 0.5} with
- * no constructor taking one, so a jury's PASS/FAIL was decided by a number the caller never
- * chose, on a normalized scale whose meaning is the caller's. The value itself is the
- * ecosystem convention and is retained as {@code DEFAULT_THRESHOLD}; what was missing was
- * the affordance to override it.
+ * Each of these previously carried {@code private static final double THRESHOLD = 0.5}
+ * with no constructor taking one, so a jury's PASS/FAIL was decided by a number the
+ * caller never chose, on a normalized scale whose meaning is the caller's. The value
+ * itself is the ecosystem convention and is retained as {@code DEFAULT_THRESHOLD}; what
+ * was missing was the affordance to override it.
  * </p>
  *
  * @author Mark Pollack
@@ -73,8 +73,7 @@ class NumericStrategyThresholdTest {
 
 	@Test
 	void reasoningNamesTheBarThatWasApplied() {
-		assertThat(new AverageVotingStrategy(0.8).aggregate(SCORES, Map.of()).reasoning())
-			.contains("threshold: 0.80");
+		assertThat(new AverageVotingStrategy(0.8).aggregate(SCORES, Map.of()).reasoning()).contains("threshold: 0.80");
 	}
 
 	@Test

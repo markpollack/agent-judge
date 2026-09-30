@@ -14,13 +14,13 @@ import java.util.Objects;
 
 import org.jspecify.annotations.Nullable;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 /**
- * The set of judgments a strategy actually reduces over, after exclusions, abstentions and the
- * two policies have been applied.
+ * The set of judgments a strategy actually reduces over, after exclusions, abstentions
+ * and the two policies have been applied.
  *
  * <p>
  * Every voting strategy resolves its population the same way, so the rules live here once
@@ -29,15 +29,15 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  *
  * <h2>One complete scan</h2>
  * <p>
- * The submitted judgments are counted <em>as submitted</em>, in one pass, before any policy is
- * applied. That ordering is the whole point: a count taken after filtering can only describe
- * the survivors, and the question a reader asks of a rubric — how much of it applied, how much
- * errored — is a question about what arrived.
+ * The submitted judgments are counted <em>as submitted</em>, in one pass, before any
+ * policy is applied. That ordering is the whole point: a count taken after filtering can
+ * only describe the survivors, and the question a reader asks of a rubric — how much of
+ * it applied, how much errored — is a question about what arrived.
  * </p>
  * <ol>
  * <li><b>Count the originals.</b> {@code inputCount}, {@code explicitAbstainCount},
- * {@code notApplicableCount}, {@code errorCount}, and {@code errorCodeCounts} flattened through
- * propagating wrappers.</li>
+ * {@code notApplicableCount}, {@code errorCount}, and {@code errorCodeCounts} flattened
+ * through propagating wrappers.</li>
  * <li><b>Policy exits</b>, in precedence, each building an ERROR aggregate and reducing
  * nothing. Every treatment counter is then zero, because no treatment was performed.</li>
  * <li><b>Contributions</b> at the original indices, with counters recording the treatment
@@ -51,22 +51,22 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  *
  * <h2>Origin decides what an error may become</h2>
  * <p>
- * An error that came from a configured judge is the error policy's business. An error that
- * came from the library's own machinery is not: converting a broken reduction into a FAIL
- * would charge the library's failure to the subject, and a rejection that nobody can
- * distinguish from a real one is worse than no rejection at all. So a machinery-origin error
- * is never a failing contribution, <em>even under</em> {@link ErrorPolicy#TREAT_AS_FAIL}; that
- * combination propagates instead.
+ * An error that came from a configured judge is the error policy's business. An error
+ * that came from the library's own machinery is not: converting a broken reduction into a
+ * FAIL would charge the library's failure to the subject, and a rejection that nobody can
+ * distinguish from a real one is worse than no rejection at all. So a machinery-origin
+ * error is never a failing contribution, <em>even under</em>
+ * {@link ErrorPolicy#TREAT_AS_FAIL}; that combination propagates instead.
  * </p>
  *
  * @author Mark Pollack
  * @since 0.14.0
  */
 record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndices, int inputCount,
-		int explicitAbstainCount, int notApplicableCount, int errorCount,
-		Map<JudgmentReasonCode, Long> errorCodeCounts, int ignoredErrorCount, int errorsTreatedAsAbstainCount,
-		int errorsTreatedAsFailCount, int notApplicableTreatedAsFailCount, ErrorPolicy errorPolicy,
-		NotApplicablePolicy notApplicablePolicy, @Nullable PolicyExit policyExit) {
+		int explicitAbstainCount, int notApplicableCount, int errorCount, Map<JudgmentReasonCode, Long> errorCodeCounts,
+		int ignoredErrorCount, int errorsTreatedAsAbstainCount, int errorsTreatedAsFailCount,
+		int notApplicableTreatedAsFailCount, ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy,
+		@Nullable PolicyExit policyExit) {
 
 	/**
 	 * A policy that decided the aggregate before anything was reduced.
@@ -123,8 +123,10 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 				flattenOrigin(judgment, errorCodeCounts);
 			}
 			else {
-				// Unreachable today. It exists so that adding a status is a loud failure the
-				// containment boundary records, rather than a judgment silently treated as a
+				// Unreachable today. It exists so that adding a status is a loud failure
+				// the
+				// containment boundary records, rather than a judgment silently treated
+				// as a
 				// vote by whichever branch happened to catch it.
 				throw new IllegalStateException("Unrecognized judgment status: " + status);
 			}
@@ -155,13 +157,15 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 					eligibleIndices.add(index);
 				}
 				case ABSTAIN -> {
-					// A judge that reached no decision casts no vote.
+					// A judge that reached no provenance casts no vote.
 				}
 				case NOT_APPLICABLE -> {
 					if (notApplicablePolicy == NotApplicablePolicy.TREAT_AS_FAIL) {
-						// The contribution fails; the original judgment is untouched and still
+						// The contribution fails; the original judgment is untouched and
+						// still
 						// carries no score.
-						eligible.add(Judgment.fail("Not applicable treated as failure: " + judgment.operationalReasoning()));
+						eligible.add(
+								Judgment.fail("Not applicable treated as failure: " + judgment.operationalReasoning()));
 						eligibleIndices.add(index);
 						notApplicableTreatedAsFailCount++;
 					}
@@ -169,8 +173,10 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 				case ERROR -> {
 					switch (errorPolicy) {
 						case TREAT_AS_FAIL -> {
-							// Step 2 already exited if any error was machinery-origin, so every
-							// error reaching here is a judge's own and the policy governs it.
+							// Step 2 already exited if any error was machinery-origin, so
+							// every
+							// error reaching here is a judge's own and the policy governs
+							// it.
 							eligible.add(Judgment.fail("Error treated as failure: " + judgment.operationalReasoning()));
 							eligibleIndices.add(index);
 							errorsTreatedAsFailCount++;
@@ -212,11 +218,12 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 				.format("%d of %d judgments errored and the error policy is propagate", errorCount, inputCount));
 		}
 		if (errorPolicy == ErrorPolicy.TREAT_AS_FAIL && machineryOriginErrorCount > 0) {
-			return new PolicyExit(JudgmentReasonCode.ERRORS_PROPAGATED, String.format(
-					"%d of %d judgments errored, and %d originated in jury machinery rather than in a judge; "
-							+ "a machinery failure is never scored, so it is propagated rather than counted "
-							+ "against the subject",
-					errorCount, inputCount, machineryOriginErrorCount));
+			return new PolicyExit(JudgmentReasonCode.ERRORS_PROPAGATED,
+					String.format(
+							"%d of %d judgments errored, and %d originated in jury machinery rather than in a judge; "
+									+ "a machinery failure is never scored, so it is propagated rather than counted "
+									+ "against the subject",
+							errorCount, inputCount, machineryOriginErrorCount));
 		}
 		return null;
 	}
@@ -224,11 +231,12 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	/**
 	 * Whether an errored judgment's cause lies in jury machinery rather than in a judge.
 	 * <p>
-	 * True when the error's own code is a machinery code, and also when it propagates one: a
-	 * wrapper stands for the causes beneath it, so a broken reduction wrapped in a propagated
-	 * error is still a broken reduction. A wrapper whose origin is missing or unreadable — which
-	 * only historical data can be — counts as machinery too, because the one thing that must
-	 * never happen is charging an unattributable failure to the subject.
+	 * True when the error's own code is a machinery code, and also when it propagates
+	 * one: a wrapper stands for the causes beneath it, so a broken reduction wrapped in a
+	 * propagated error is still a broken reduction. A wrapper whose origin is missing or
+	 * unreadable — which only historical data can be — counts as machinery too, because
+	 * the one thing that must never happen is charging an unattributable failure to the
+	 * subject.
 	 * </p>
 	 * @param judgment an errored judgment
 	 * @return true when the error came from machinery
@@ -257,17 +265,17 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	/**
 	 * Add an errored judgment's terminal causes to a running total.
 	 * <p>
-	 * A propagating wrapper contributes the origins it carries, never itself: counting the
-	 * wrapper would record "something propagated" as though it were a cause, and the real
-	 * causes would disappear one level up. Totals may therefore exceed the number of errored
-	 * inputs, which is correct — one wrapper can stand for several failures.
+	 * A propagating wrapper contributes the origins it carries, never itself: counting
+	 * the wrapper would record "something propagated" as though it were a cause, and the
+	 * real causes would disappear one level up. Totals may therefore exceed the number of
+	 * errored inputs, which is correct — one wrapper can stand for several failures.
 	 * </p>
 	 * <p>
-	 * The accumulator is the same {@code long} domain the counts were validated in, so a count
-	 * cannot be narrowed on its way through a reduction. A total that would leave the domain
-	 * cannot be recorded, and {@link Judgment}'s portable-value validation refuses it by name
-	 * when the aggregate is built — loudly, rather than as a smaller number that reads exactly
-	 * like a real one.
+	 * The accumulator is the same {@code long} domain the counts were validated in, so a
+	 * count cannot be narrowed on its way through a reduction. A total that would leave
+	 * the domain cannot be recorded, and {@link Judgment}'s portable-value validation
+	 * refuses it by name when the aggregate is built — loudly, rather than as a smaller
+	 * number that reads exactly like a real one.
 	 * </p>
 	 * @param judgment an errored judgment
 	 * @param totals the running total, keyed by terminal code
@@ -289,7 +297,8 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 		}
 		origin.forEach((key, value) -> {
 			// The wrapper's own construction validated every count as a positive portable
-			// integer, so the long view is the exact value rather than a conversion of it.
+			// integer, so the long view is the exact value rather than a conversion of
+			// it.
 			if (value instanceof Number count) {
 				totals.merge(JudgmentReasonCode.fromWire(String.valueOf(key)), count.longValue(),
 						AggregationPopulation::addCounts);
@@ -316,7 +325,8 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 		return this.eligible.isEmpty();
 	}
 
-	/** @return true when a policy decided the aggregate before anything was reduced */
+	/**
+	 * @return true when a policy decided the aggregate before anything was reduced */
 	boolean hasPolicyExit() {
 		return this.policyExit != null;
 	}
@@ -343,9 +353,11 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 			.put(AggregationEvidence.ERROR_CODE_COUNTS, portableErrorCodeCounts());
 	}
 
-	/** @return the flattened origin totals as portable wire-name keys */
+	/**
+	 * @return the flattened origin totals as portable wire-name keys */
 	private Map<String, Object> portableErrorCodeCounts() {
-		// Projected by the type that owns the origin invariant, so the evidence block and the
+		// Projected by the type that owns the origin invariant, so the evidence block and
+		// the
 		// block a propagating aggregate carries are the same block built the same way.
 		return Judgment.portableOriginCounts(this.errorCodeCounts);
 	}
@@ -353,9 +365,9 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	/**
 	 * Build the ERROR aggregate for a policy that decided before anything was reduced.
 	 * <p>
-	 * A propagating aggregate is built atomically with its origin rather than assembled from a
-	 * bare error: there is no instant at which a judgment claims to propagate causes it cannot
-	 * name.
+	 * A propagating aggregate is built atomically with its origin rather than assembled
+	 * from a bare error: there is no instant at which a judgment claims to propagate
+	 * causes it cannot name.
 	 * </p>
 	 * @param strategyToken the strategy's stable identifier
 	 * @return an error judgment carrying the evidence
@@ -371,10 +383,10 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	/**
 	 * Build the no-result aggregate for the case where nothing was eligible.
 	 * <p>
-	 * A population every one of whose members was excluded is itself excluded, and says so:
-	 * reporting that as an abstention would claim the jury tried and could not decide, when in
-	 * fact nothing here was ever this jury's question. Every other empty population is an
-	 * abstention.
+	 * A population every one of whose members was excluded is itself excluded, and says
+	 * so: reporting that as an abstention would claim the jury tried and could not
+	 * decide, when in fact nothing here was ever this jury's question. Every other empty
+	 * population is an abstention.
 	 * </p>
 	 * @param strategyToken the strategy's stable identifier
 	 * @param extraEvidence additional strategy-specific evidence, may be empty
@@ -394,19 +406,19 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 			}
 		});
 
-		Judgment aggregate = allExcluded()
-				? Judgment.notApplicable(String.format("All %d judgment(s) were not applicable to this subject",
-						this.notApplicableCount))
+		Judgment aggregate = allExcluded() ? Judgment.notApplicable(
+				String.format("All %d judgment(s) were not applicable to this subject", this.notApplicableCount))
 				: Judgment.builder().abstain().reasoning(noResultReasoning()).build();
 		return AggregationEvidence.attach(aggregate, evidence.build());
 	}
 
 	/**
-	 * Whether every submitted judgment was an exclusion this jury was configured to honour.
+	 * Whether every submitted judgment was an exclusion this jury was configured to
+	 * honour.
 	 * <p>
-	 * "All not applicable" means a non-empty population in which nothing else arrived. One
-	 * abstention among the exclusions is an abstention: the jury did have a question here, and
-	 * did not answer it.
+	 * "All not applicable" means a non-empty population in which nothing else arrived.
+	 * One abstention among the exclusions is an abstention: the jury did have a question
+	 * here, and did not answer it.
 	 * </p>
 	 * @return true when the aggregate is itself not applicable
 	 */
@@ -417,7 +429,8 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 
 	private String noResultReasoning() {
 		// IGNORE and TREAT_AS_ABSTAIN can both empty the population; say which one did,
-		// so the two policies stay distinguishable in the reasoning as well as the counts.
+		// so the two policies stay distinguishable in the reasoning as well as the
+		// counts.
 		if (this.errorCount > 0 && this.errorPolicy == ErrorPolicy.IGNORE) {
 			return String.format("No eligible judgments; %d error(s) ignored", this.errorCount);
 		}

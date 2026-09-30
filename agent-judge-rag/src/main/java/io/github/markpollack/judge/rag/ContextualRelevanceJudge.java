@@ -2,10 +2,9 @@ package io.github.markpollack.judge.rag;
 
 import java.util.Optional;
 
-import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.llm.LLMJudge;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.springframework.ai.chat.client.ChatClient;
 
 /**
@@ -14,8 +13,8 @@ import org.springframework.ai.chat.client.ChatClient;
  * <p>
  * Contextual relevance measures whether the retrieval step returned useful information.
  * If the context is irrelevant, any answer derived from it cannot be meaningfully
- * evaluated for faithfulness or hallucination — making this a natural first-tier judge
- * in a CascadedJury.
+ * evaluated for faithfulness or hallucination — making this a natural first-tier judge in
+ * a CascadedJury.
  * <p>
  * Returns {@link JudgmentStatus#ABSTAIN} when context is empty or when the LLM response
  * cannot be parsed.
@@ -23,7 +22,7 @@ import org.springframework.ai.chat.client.ChatClient;
  * @author Mark Pollack
  * @since 0.10.0
  */
-public class ContextualRelevanceJudge extends LLMJudge {
+public class ContextualRelevanceJudge extends LLMJudge<RagEvidence> {
 
 	private static final java.util.regex.Pattern ANSWER_PATTERN = java.util.regex.Pattern
 		.compile("(?mi)^\\s*Answer:\\s*(YES|NO)");
@@ -38,8 +37,8 @@ public class ContextualRelevanceJudge extends LLMJudge {
 	}
 
 	@Override
-	public Judgment judge(JudgmentContext context) {
-		Optional<String> ctx = RagContext.context(context);
+	public Judgment judge(RagEvidence context) {
+		Optional<String> ctx = java.util.Optional.of(context.retrievedContext()).filter(value -> !value.isBlank());
 		if (ctx.isEmpty()) {
 			return Judgment.abstain("No context provided — cannot evaluate relevance");
 		}
@@ -47,9 +46,11 @@ public class ContextualRelevanceJudge extends LLMJudge {
 	}
 
 	@Override
-	protected String buildPrompt(JudgmentContext context) {
-		String question = RagContext.question(context);
-		String retrievedContext = RagContext.context(context).orElse("");
+	protected String buildPrompt(RagEvidence context) {
+		String question = context.question();
+		String retrievedContext = java.util.Optional.of(context.retrievedContext())
+			.filter(value -> !value.isBlank())
+			.orElse("");
 
 		return String.format("""
 				Begin your response with the line "Answer: YES" or "Answer: NO".
@@ -72,7 +73,7 @@ public class ContextualRelevanceJudge extends LLMJudge {
 	}
 
 	@Override
-	protected Judgment parseResponse(String response, JudgmentContext context) {
+	protected Judgment parseResponse(String response, RagEvidence context) {
 		var matcher = ANSWER_PATTERN.matcher(response);
 		if (!matcher.find()) {
 			return Judgment.abstain("Could not parse LLM response: " + response);

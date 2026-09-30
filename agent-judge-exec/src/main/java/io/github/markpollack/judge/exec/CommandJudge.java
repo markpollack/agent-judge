@@ -9,15 +9,14 @@ import io.github.markpollack.judge.DeterministicJudge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
+import java.nio.file.Path;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.sandbox.ExecResult;
 import io.github.markpollack.sandbox.ExecSpec;
 import io.github.markpollack.sandbox.LocalSandbox;
 import io.github.markpollack.sandbox.Sandbox;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -41,12 +40,13 @@ import java.util.function.Function;
  * Example usage:
  * </p>
  *
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
  * <p>
  * The judgment records the command, merged stdout/stderr, expected and actual exit codes,
- * and elapsed time under {@link Judgment#ELAPSED_MILLIS_KEY} in result metadata. Every one
- * of those is a portable value; {@link Judgment#elapsed()} gives the Java view of the
+ * and elapsed time under {@link Judgment#ELAPSED_MILLIS_KEY} in result metadata. Every
+ * one of those is a portable value; {@link Judgment#elapsed()} gives the Java view of the
  * timing.
  * </p>
  *
@@ -55,7 +55,7 @@ import java.util.function.Function;
  * @see Sandbox
  * @see LocalSandbox
  */
-public class CommandJudge extends DeterministicJudge {
+public class CommandJudge extends DeterministicJudge<Path> {
 
 	private static final Logger logger = LoggerFactory.getLogger(CommandJudge.class);
 
@@ -112,8 +112,8 @@ public class CommandJudge extends DeterministicJudge {
 	}
 
 	@Override
-	public Judgment judge(JudgmentContext context) {
-		try (Sandbox sandbox = sandboxFactory.apply(context.workspace())) {
+	public Judgment judge(Path workspace) {
+		try (Sandbox sandbox = sandboxFactory.apply(workspace)) {
 			ExecSpec spec = ExecSpec.builder().shellCommand(command).timeout(timeout).build();
 
 			ExecResult result = sandbox.exec(spec);
@@ -134,17 +134,18 @@ public class CommandJudge extends DeterministicJudge {
 				.format("Command failed. Expected exit code %d but got %d", expectedExitCode, result.exitCode());
 
 			// The command ran; a disallowed exit code is a completed negative finding.
-			return (pass ? Judgment.builder().pass() : Judgment.builder().fail())
-				.reasoning(reasoning)
+			return (pass ? Judgment.builder().pass() : Judgment.builder().fail()).reasoning(reasoning)
 				.check(pass ? Check.pass("command_execution", "Command executed successfully")
 						: Check.fail("command_execution", "Command execution failed"))
 				.metadata(metadata)
 				.build();
 		}
 		catch (Exception ex) {
-			// The command could not be run at all, so the judge reached no finding: ERROR.
+			// The command could not be run at all, so the judge reached no finding:
+			// ERROR.
 			logger.error("Command execution failed: {}", command, ex);
-			return Judgment.builder().error()
+			return Judgment.builder()
+				.error()
 				.reasoning("Command execution failed: " + ex.getMessage())
 				.check(new Check("command_execution", Judgment.error("Execution error: " + ex.getMessage())))
 				.build();

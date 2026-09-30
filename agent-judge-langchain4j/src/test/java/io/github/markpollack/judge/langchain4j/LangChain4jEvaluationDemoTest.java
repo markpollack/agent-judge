@@ -9,24 +9,25 @@ import dev.langchain4j.service.Result;
 import dev.langchain4j.service.tool.ToolExecution;
 import dev.langchain4j.service.tool.ToolExecutionResult;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Demo test showing the end-to-end LangChain4j evaluation flow.
- * This is the CI-runnable version of the samples/langchain4j-evaluation/ README.
+ * Demo test showing the end-to-end LangChain4j evaluation flow. This is the CI-runnable
+ * version of the samples/langchain4j-evaluation/ README.
  */
 class LangChain4jEvaluationDemoTest {
 
 	@Test
 	void langchain4jResultEvaluatedWithJudge() {
-		// A simple judge that checks the answer is non-empty and mentions the question topic
-		Judge<JudgmentContext> relevanceCheck = (JudgmentContext ctx) -> {
-			String output = ctx.agentOutput().orElse("");
+		// A simple judge that checks the answer is non-empty and mentions the question
+		// topic
+		Judge<CompletionEvidence> relevanceCheck = (CompletionEvidence ctx) -> {
+			String output = java.util.Optional.ofNullable(ctx.response()).orElse("");
 			boolean relevant = !output.isEmpty() && output.toLowerCase().contains("spring boot");
 			return (relevant ? Judgment.builder().pass() : Judgment.builder().fail())
 				.reasoning(relevant ? "Answer addresses Spring Boot" : "Answer does not address Spring Boot")
@@ -47,7 +48,7 @@ class LangChain4jEvaluationDemoTest {
 
 	@Test
 	void langchain4jResultWithToolExecutionsPreservesMetadata() {
-		Judge<JudgmentContext> anyJudge = (JudgmentContext ctx) -> {
+		Judge<CompletionEvidence> anyJudge = (CompletionEvidence ctx) -> {
 			// Verify tool executions are accessible in metadata
 			@SuppressWarnings("unchecked")
 			List<ToolExecution> tools = (List<ToolExecution>) ctx.metadata().get("langchain4j.toolExecutions");

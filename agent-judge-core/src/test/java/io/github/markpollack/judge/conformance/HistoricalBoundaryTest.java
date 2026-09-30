@@ -18,15 +18,15 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.description.KeySource;
 import io.github.markpollack.judge.jury.AllMustPassStrategy;
 import io.github.markpollack.judge.jury.AttemptDisposition;
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.jury.CompositeAttempt;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
-import io.github.markpollack.judge.jury.Decision;
-import io.github.markpollack.judge.jury.DecisionBasis;
+import io.github.markpollack.judge.jury.VerdictProvenance;
+import io.github.markpollack.judge.jury.VerdictProvenanceBasis;
 import io.github.markpollack.judge.jury.DispositionReason;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.Seat;
@@ -35,16 +35,16 @@ import io.github.markpollack.judge.jury.TierPolicy;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.jury.VotingStrategy;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * New construction is strict, and reading old data is a separate decision.
+ * New construction is strict, and reading old data is a separate provenance.
  *
  * <p>
  * The two must not be the same code path. A reader that is lenient enough to load a 0.14
@@ -58,7 +58,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <p>
  * The goldens below pin what a 0.17 result looks like on the wire. They exist so that a
- * change to the format is a decision somebody makes rather than a diff somebody notices
+ * change to the format is a provenance somebody makes rather than a diff somebody notices
  * later.
  * </p>
  */
@@ -71,7 +71,9 @@ class HistoricalBoundaryTest {
 
 	private static final String BOUNDARY_GOLDEN = "/conformance/boundary-rejection-0.17.json";
 
-	private static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("pin the result format").build();
+	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder()
+		.request("pin the result format")
+		.build();
 
 	// ==================== The new vocabulary ====================
 
@@ -104,7 +106,7 @@ class HistoricalBoundaryTest {
 		Verdict excluded = Verdict.of(Judgment.notApplicable("nothing in this rubric applies"),
 				Map.of("strict", failing));
 
-		return CascadedJury.<JudgmentContext>builder()
+		return CascadedJury.<CompletionEvidence>builder()
 			.tier("rubric", opaque(excluded), TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic", passing(), TierPolicy.FINAL_TIER)
 			.build()
@@ -163,12 +165,12 @@ class HistoricalBoundaryTest {
 		void theBoundaryRejectionRoundTrips() throws Exception {
 			Verdict parsed = MAPPER.readValue(writeBoundaryRejection(), Verdict.class);
 
-			assertThat(parsed.decision().basis()).isEqualTo(DecisionBasis.INDIVIDUAL_REJECTION);
-			assertThat(parsed.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+			assertThat(parsed.provenance().basis()).isEqualTo(VerdictProvenanceBasis.INDIVIDUAL_REJECTION);
+			assertThat(parsed.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
 			CompositeAttempt refused = parsed.compositeAttempts().get(0);
 			assertThat(refused.disposition()).isEqualTo(AttemptDisposition.STAGE_FAILED);
 			assertThat(refused.dispositionReason()).isEqualTo(DispositionReason.UNDECLARED_NOT_APPLICABLE);
-			assertThat(refused.verdict().aggregated().status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
+			assertThat(refused.verdict().judgment().status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
 			assertThat(parsed.seats()).containsExactly(new Seat(0, "strict", KeySource.DECLARED));
 		}
 
@@ -181,9 +183,9 @@ class HistoricalBoundaryTest {
 		@Test
 		@DisplayName("a verdict with no decision cannot be read as one")
 		void aMissingDecisionIsRefused() {
-			assertThatThrownBy(() -> MAPPER.readValue(without(boundaryRejection(), "decision"), Verdict.class))
+			assertThatThrownBy(() -> MAPPER.readValue(without(boundaryRejection(), "provenance"), Verdict.class))
 				.hasRootCauseInstanceOf(NullPointerException.class)
-				.hasMessageContaining("decision");
+				.hasMessageContaining("provenance");
 		}
 
 		@Test
@@ -193,8 +195,8 @@ class HistoricalBoundaryTest {
 				.hasRootCauseInstanceOf(NullPointerException.class)
 				.hasMessageContaining("seats");
 			assertThatCode(() -> Verdict.builder()
-				.aggregated(Judgment.error(JudgmentReasonCode.NO_TIER_DECIDED, "no tier decided"))
-				.decision(Decision.undecided())
+				.judgment(Judgment.error(JudgmentReasonCode.NO_TIER_DECIDED, "no tier decided"))
+				.provenance(VerdictProvenance.undecided())
 				.build()).as("a recorded empty seat list is legal, and says something different")
 				.doesNotThrowAnyException();
 		}
@@ -335,17 +337,17 @@ class HistoricalBoundaryTest {
 		}
 	}
 
-	private static Jury<JudgmentContext> passing() {
-		return SimpleJury.<JudgmentContext>builder()
+	private static Jury<CompletionEvidence> passing() {
+		return SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> Judgment.pass("the semantic tier accepted it"), "semantic"))
 			.votingStrategy(new ConsensusStrategy())
 			.build();
 	}
 
-	private static Jury<JudgmentContext> opaque(Verdict verdict) {
-		return new Jury<JudgmentContext>() {
+	private static Jury<CompletionEvidence> opaque(Verdict verdict) {
+		return new Jury<CompletionEvidence>() {
 			@Override
-			public List<Judge<JudgmentContext>> getJudges() {
+			public List<Judge<CompletionEvidence>> getJudges() {
 				return List.of();
 			}
 
@@ -355,7 +357,7 @@ class HistoricalBoundaryTest {
 			}
 
 			@Override
-			public Verdict vote(JudgmentContext context) {
+			public Verdict vote(CompletionEvidence context) {
 				return verdict;
 			}
 		};

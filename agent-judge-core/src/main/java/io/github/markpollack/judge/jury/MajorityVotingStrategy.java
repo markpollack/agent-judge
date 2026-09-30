@@ -10,8 +10,8 @@ import java.util.Locale;
 import java.util.Map;
 
 import io.github.markpollack.judge.description.StrategyDescription;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 /**
  * Majority voting strategy: the outcome held by most applicable judges wins.
@@ -28,7 +28,7 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * <ul>
  * <li>Ties: resolved by {@link TiePolicy} (default {@code FAIL}).</li>
  * <li>Errors: resolved by {@link ErrorPolicy} (default {@code PROPAGATE}).</li>
- * <li>Abstentions: excluded — a judge that reached no decision casts no vote.</li>
+ * <li>Abstentions: excluded — a judge that reached no provenance casts no vote.</li>
  * <li>Exclusions: resolved by {@link NotApplicablePolicy} (default {@code REFUSE}).</li>
  * <li>Nothing eligible: {@code ABSTAIN}, with evidence naming the cause.</li>
  * </ul>
@@ -36,13 +36,14 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * <p>
  * The aggregate carries no score. A majority verdict's meaning is its outcome; the vote
  * counts are evidence and live in the {@link AggregationEvidence} block, not in a
- * manufactured number a threshold could mistake for a quality assessment.
+ * manufactured number a threshold could mistake for a quality finding.
  * </p>
  *
  * <p>
  * Example usage:
  * </p>
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0
@@ -66,8 +67,8 @@ public class MajorityVotingStrategy implements VotingStrategy {
 	 * Create majority voting strategy with custom policies.
 	 * @param tiePolicy policy for handling ties
 	 * @param errorPolicy policy for handling errors
-	 * @throws IllegalArgumentException if {@code tiePolicy} or {@code errorPolicy} is null;
-	 * a null tie policy is refused here rather than at the first tie
+	 * @throws IllegalArgumentException if {@code tiePolicy} or {@code errorPolicy} is
+	 * null; a null tie policy is refused here rather than at the first tie
 	 */
 	public MajorityVotingStrategy(TiePolicy tiePolicy, ErrorPolicy errorPolicy) {
 		this(tiePolicy, errorPolicy, NotApplicablePolicy.REFUSE);
@@ -78,8 +79,8 @@ public class MajorityVotingStrategy implements VotingStrategy {
 	 * @param tiePolicy policy for handling ties
 	 * @param errorPolicy policy for handling errors
 	 * @param notApplicablePolicy policy for handling excluded judgments
-	 * @throws IllegalArgumentException if any policy is null; a null tie policy is refused here
-	 * rather than at the first tie
+	 * @throws IllegalArgumentException if any policy is null; a null tie policy is
+	 * refused here rather than at the first tie
 	 * @since 0.17.0
 	 */
 	public MajorityVotingStrategy(TiePolicy tiePolicy, ErrorPolicy errorPolicy,
@@ -138,10 +139,11 @@ public class MajorityVotingStrategy implements VotingStrategy {
 			case NOT_APPLICABLE, ERROR ->
 				throw new IllegalStateException("Majority cannot produce " + status + " after population resolution");
 		};
-		return AggregationEvidence.attach(aggregate, population.evidence(getName())
-				.put(AggregationEvidence.PASS_COUNT, passCount)
-				.put(AggregationEvidence.FAIL_COUNT, failCount)
-				.build());
+		return AggregationEvidence.attach(aggregate,
+				population.evidence(getName())
+					.put(AggregationEvidence.PASS_COUNT, passCount)
+					.put(AggregationEvidence.FAIL_COUNT, failCount)
+					.build());
 	}
 
 	@Override
@@ -166,6 +168,5 @@ public class MajorityVotingStrategy implements VotingStrategy {
 	public NotApplicablePolicy notApplicablePolicy() {
 		return this.notApplicablePolicy;
 	}
-
 
 }

@@ -15,8 +15,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import io.github.markpollack.judge.description.KeySource;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 
 import static io.github.markpollack.judge.JudgeTestFixtures.booleanFail;
 import static io.github.markpollack.judge.JudgeTestFixtures.booleanPass;
@@ -30,11 +30,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * What a verdict must record, and what it refuses to record.
  *
  * <p>
- * A verdict is read long after the run that produced it, by something that cannot ask the jury
- * any questions. Two facts it used to leave implicit are the ones that make it readable on its
- * own: which judge each judgment came from, and what produced the aggregate. Both are now
- * required, and both are checked against the rest of the verdict — a marker that can be wrong
- * is worse than one that is absent, because a reader trusts it either way.
+ * A verdict is read long after the run that produced it, by something that cannot ask the
+ * jury any questions. Two facts it used to leave implicit are the ones that make it
+ * readable on its own: which judge each judgment came from, and what produced the
+ * aggregate. Both are now required, and both are checked against the rest of the verdict
+ * — a marker that can be wrong is worse than one that is absent, because a reader trusts
+ * it either way.
  * </p>
  *
  * @author Mark Pollack
@@ -51,13 +52,13 @@ class VerdictTest {
 		return seats;
 	}
 
-	private static Verdict.Builder leaf(Judgment aggregated, Map<String, Judgment> byName) {
+	private static Verdict.Builder leaf(Judgment judgment, Map<String, Judgment> byName) {
 		return Verdict.builder()
-			.aggregated(aggregated)
+			.judgment(judgment)
 			.individual(List.copyOf(byName.values()))
 			.individualByName(byName)
 			.seats(declaredSeats(byName.keySet().toArray(new String[0])))
-			.decision(Decision.own());
+			.provenance(VerdictProvenance.own());
 	}
 
 	private static Map<String, Judgment> named(String first, Judgment firstJudgment, String second,
@@ -85,32 +86,31 @@ class VerdictTest {
 			assertThat(verdict.weights()).containsEntry("0", 0.3).containsEntry("1", 0.7);
 			assertThat(verdict.seats()).containsExactly(new Seat(0, "first", KeySource.DECLARED),
 					new Seat(1, "second", KeySource.DECLARED));
-			assertThat(verdict.decision()).isEqualTo(Decision.own());
+			assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.own());
 			assertThat(verdict.compositeAttempts()).isEmpty();
 		}
 
 		@Test
 		@DisplayName("a verdict must say what produced its aggregate; no default would be true")
 		void aDecisionIsRequired() {
-			assertThatThrownBy(() -> Verdict.builder().aggregated(booleanPass("ok")).build())
+			assertThatThrownBy(() -> Verdict.builder().judgment(booleanPass("ok")).build())
 				.isInstanceOf(IllegalStateException.class)
 				.hasMessageContaining("what produced its aggregate");
 		}
 
 		@Test
 		void rejectsMissingAggregatedJudgment() {
-			assertThatThrownBy(() -> Verdict.builder().decision(Decision.own()).build())
+			assertThatThrownBy(() -> Verdict.builder().provenance(VerdictProvenance.own()).build())
 				.isInstanceOf(NullPointerException.class)
 				.hasMessageContaining("aggregated judgment");
-			assertThatThrownBy(() -> Verdict.builder().aggregated(null))
-				.isInstanceOf(NullPointerException.class)
+			assertThatThrownBy(() -> Verdict.builder().judgment(null)).isInstanceOf(NullPointerException.class)
 				.hasMessageContaining("aggregated judgment");
 		}
 
 		@Test
 		void rejectsNullCompositeAttemptsOnTheCanonicalConstructor() {
 			assertThatThrownBy(() -> new Verdict(booleanPass("Aggregated"), List.of(), Map.of(), Map.of(), List.of(),
-					Decision.own(), null))
+					VerdictProvenance.own(), null))
 				.isInstanceOf(NullPointerException.class)
 				.hasMessageContaining("compositeAttempts");
 		}
@@ -118,8 +118,8 @@ class VerdictTest {
 		@Test
 		void anEmptyVerdictIsLegalWhenNothingWasReduced() {
 			Verdict verdict = Verdict.builder()
-				.aggregated(Judgment.error(JudgmentReasonCode.NO_TIER_DECIDED, "no tier decided"))
-				.decision(Decision.undecided())
+				.judgment(Judgment.error(JudgmentReasonCode.NO_TIER_DECIDED, "no tier decided"))
+				.provenance(VerdictProvenance.undecided())
 				.build();
 
 			assertThat(verdict.individual()).isEmpty();
@@ -137,11 +137,11 @@ class VerdictTest {
 			List<Seat> seats = new ArrayList<>(declaredSeats("first"));
 
 			Verdict verdict = Verdict.builder()
-				.aggregated(booleanPass("Aggregated"))
+				.judgment(booleanPass("Aggregated"))
 				.individual(individual)
 				.individualByName(byName)
 				.seats(seats)
-				.decision(Decision.own())
+				.provenance(VerdictProvenance.own())
 				.build();
 
 			individual.add(booleanPass("Judge 2"));
@@ -159,7 +159,7 @@ class VerdictTest {
 			Verdict second = leaf(booleanPass("agg"), named("a", booleanPass("J1"), "b", booleanPass("J2"))).build();
 
 			assertThat(first).isEqualTo(second).hasSameHashCodeAs(second);
-			assertThat(first.toString()).contains("Verdict").contains("seats").contains("decision");
+			assertThat(first.toString()).contains("Verdict").contains("seats").contains("provenance");
 		}
 
 	}
@@ -172,11 +172,11 @@ class VerdictTest {
 		@DisplayName("one seat per judgment, or the join is a guess")
 		void oneSeatPerJudgment() {
 			assertThatThrownBy(() -> Verdict.builder()
-				.aggregated(booleanPass("agg"))
+				.judgment(booleanPass("agg"))
 				.individual(List.of(booleanPass("J1"), booleanPass("J2")))
 				.individualByName(Map.of("a", booleanPass("J1")))
 				.seats(declaredSeats("a"))
-				.decision(Decision.own())
+				.provenance(VerdictProvenance.own())
 				.build()).isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("one entry per individual judgment");
 		}
@@ -185,13 +185,12 @@ class VerdictTest {
 		@DisplayName("positions are unique and strictly increasing")
 		void positionsAreOrdered() {
 			assertThatThrownBy(() -> Verdict.builder()
-				.aggregated(booleanPass("agg"))
+				.judgment(booleanPass("agg"))
 				.individual(List.of(booleanPass("J1"), booleanPass("J2")))
 				.individualByName(named("a", booleanPass("J1"), "b", booleanPass("J2")))
 				.seats(List.of(new Seat(1, "a", KeySource.DECLARED), new Seat(0, "b", KeySource.DECLARED)))
-				.decision(Decision.own())
-				.build()).isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("strictly increasing");
+				.provenance(VerdictProvenance.own())
+				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("strictly increasing");
 			assertThatThrownBy(() -> new Seat(-1, "a", KeySource.DECLARED))
 				.isInstanceOf(IllegalArgumentException.class);
 		}
@@ -200,11 +199,11 @@ class VerdictTest {
 		@DisplayName("a seat key that is not in the map would attribute a judgment to nothing")
 		void seatKeysMustExist() {
 			assertThatThrownBy(() -> Verdict.builder()
-				.aggregated(booleanPass("agg"))
+				.judgment(booleanPass("agg"))
 				.individual(List.of(booleanPass("J1")))
 				.individualByName(Map.of("a", booleanPass("J1")))
 				.seats(declaredSeats("b"))
-				.decision(Decision.own())
+				.provenance(VerdictProvenance.own())
 				.build()).isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("not a key of individualByName");
 		}
@@ -216,11 +215,11 @@ class VerdictTest {
 			Judgment second = booleanFail("J2");
 
 			Verdict verdict = Verdict.builder()
-				.aggregated(booleanFail("agg"))
+				.judgment(booleanFail("agg"))
 				.individual(List.of(first, second))
 				.individualByName(Map.of("same", second))
 				.seats(List.of(new Seat(0, "same", KeySource.DECLARED), new Seat(1, "same", KeySource.DECLARED)))
-				.decision(Decision.own())
+				.provenance(VerdictProvenance.own())
 				.build();
 
 			assertThat(verdict.individual()).hasSize(2);
@@ -235,11 +234,11 @@ class VerdictTest {
 			Judgment third = booleanPass("third");
 
 			Verdict verdict = Verdict.builder()
-				.aggregated(booleanPass("agg"))
+				.judgment(booleanPass("agg"))
 				.individual(List.of(first, third))
 				.individualByName(named("first", first, "third", third))
 				.seats(List.of(new Seat(0, "first", KeySource.DECLARED), new Seat(2, "third", KeySource.DECLARED)))
-				.decision(Decision.own())
+				.provenance(VerdictProvenance.own())
 				.build();
 
 			assertThat(verdict.seats()).extracting(Seat::position).containsExactly(0, 2);
@@ -251,11 +250,11 @@ class VerdictTest {
 			Judgment judgment = booleanPass("File exists");
 			Verdict verdict = Verdict.single("file-exists", judgment);
 
-			assertThat(verdict.aggregated()).isSameAs(judgment);
+			assertThat(verdict.judgment()).isSameAs(judgment);
 			assertThat(verdict.individual()).containsExactly(judgment);
 			assertThat(verdict.individualByName()).containsExactlyEntriesOf(Map.of("file-exists", judgment));
 			assertThat(verdict.seats()).containsExactly(new Seat(0, "file-exists", KeySource.DECLARED));
-			assertThat(verdict.decision()).isEqualTo(Decision.own());
+			assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.own());
 			assertThatThrownBy(() -> Verdict.single(" ", booleanPass("x")))
 				.isInstanceOf(IllegalArgumentException.class);
 			assertThatThrownBy(() -> Verdict.single("judge", null)).isInstanceOf(NullPointerException.class);
@@ -277,12 +276,13 @@ class VerdictTest {
 	 * The ordinary hand-built verdict, in one call.
 	 *
 	 * <p>
-	 * {@link Verdict#of} is shorthand and nothing else, so the claim it has to earn is that it
-	 * produces <em>exactly</em> what the long form produces — not that its parts look plausible.
-	 * Each equivalence case below therefore writes the builder call out in full, by hand, and
-	 * compares the whole record; a shorthand compared against a shorthand would agree with itself
-	 * however wrong it was. The assertions that follow name the individual derivations, because a
-	 * whole-record comparison says the two agree without saying what they agree on.
+	 * {@link Verdict#of} is shorthand and nothing else, so the claim it has to earn is
+	 * that it produces <em>exactly</em> what the long form produces — not that its parts
+	 * look plausible. Each equivalence case below therefore writes the builder call out
+	 * in full, by hand, and compares the whole record; a shorthand compared against a
+	 * shorthand would agree with itself however wrong it was. The assertions that follow
+	 * name the individual derivations, because a whole-record comparison says the two
+	 * agree without saying what they agree on.
 	 * </p>
 	 */
 	@Nested
@@ -298,11 +298,11 @@ class VerdictTest {
 
 			Verdict shorthand = Verdict.of(booleanFail("one judge was not satisfied"), byName);
 			Verdict longhand = Verdict.builder()
-				.aggregated(booleanFail("one judge was not satisfied"))
+				.judgment(booleanFail("one judge was not satisfied"))
 				.individual(List.of(style, coverage))
 				.individualByName(byName)
 				.seats(List.of(new Seat(0, "style", KeySource.DECLARED), new Seat(1, "coverage", KeySource.DECLARED)))
-				.decision(Decision.own())
+				.provenance(VerdictProvenance.own())
 				.build();
 
 			assertThat(shorthand).isEqualTo(longhand).hasSameHashCodeAs(longhand);
@@ -323,16 +323,16 @@ class VerdictTest {
 
 			Verdict shorthand = Verdict.of(booleanFail("one judge of three was not satisfied"), byName);
 			Verdict longhand = Verdict.builder()
-				.aggregated(booleanFail("one judge of three was not satisfied"))
+				.judgment(booleanFail("one judge of three was not satisfied"))
 				.individual(List.of(style, coverage, licence))
 				.individualByName(byName)
 				.seats(List.of(new Seat(0, "style", KeySource.DECLARED), new Seat(1, "coverage", KeySource.DECLARED),
 						new Seat(2, "licence", KeySource.DECLARED)))
-				.decision(Decision.own())
+				.provenance(VerdictProvenance.own())
 				.build();
 
 			assertThat(shorthand).isEqualTo(longhand).hasSameHashCodeAs(longhand);
-			assertThat(shorthand.decision()).isEqualTo(Decision.own());
+			assertThat(shorthand.provenance()).isEqualTo(VerdictProvenance.own());
 		}
 
 		@Test
@@ -369,8 +369,10 @@ class VerdictTest {
 				.containsExactly(zulu, alpha, mike);
 			assertThat(verdict.seats()).containsExactly(new Seat(0, "zulu", KeySource.DECLARED),
 					new Seat(1, "alpha", KeySource.DECLARED), new Seat(2, "mike", KeySource.DECLARED));
-			// The point of the seats is the join, so assert the join itself rather than the two
-			// orders separately: seat i must lead from position i back to the judgment that sat there.
+			// The point of the seats is the join, so assert the join itself rather than
+			// the two
+			// orders separately: seat i must lead from position i back to the judgment
+			// that sat there.
 			for (Seat seat : verdict.seats()) {
 				assertThat(verdict.individualByName().get(seat.verdictKey()))
 					.as("seat %d is keyed '%s'", seat.position(), seat.verdictKey())
@@ -402,8 +404,7 @@ class VerdictTest {
 
 			Map<String, Judgment> nullKey = new LinkedHashMap<>();
 			nullKey.put(null, booleanPass("ok"));
-			assertThatThrownBy(() -> Verdict.of(booleanPass("agg"), nullKey))
-				.isInstanceOf(NullPointerException.class);
+			assertThatThrownBy(() -> Verdict.of(booleanPass("agg"), nullKey)).isInstanceOf(NullPointerException.class);
 
 			Map<String, Judgment> nullJudgment = new LinkedHashMap<>();
 			nullJudgment.put("style", null);
@@ -436,33 +437,34 @@ class VerdictTest {
 		@DisplayName("an UNDECIDED verdict must actually carry a machinery failure")
 		void undecidedRequiresAMachineryError() {
 			assertThatThrownBy(() -> Verdict.builder()
-				.aggregated(booleanPass("ok"))
-				.decision(Decision.undecided())
-				.build()).isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("machinery reason code");
+				.judgment(booleanPass("ok"))
+				.provenance(VerdictProvenance.undecided())
+				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("machinery reason code");
 			assertThatThrownBy(() -> Verdict.builder()
-				.aggregated(Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "a judge failed"))
-				.decision(Decision.undecided())
+				.judgment(Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "a judge failed"))
+				.provenance(VerdictProvenance.undecided())
 				.build(), "a judge's failure is not the instrument reaching no outcome")
 				.isInstanceOf(IllegalArgumentException.class);
 			assertThatCode(() -> Verdict.builder()
-				.aggregated(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
-				.decision(Decision.undecided())
+				.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
+				.provenance(VerdictProvenance.undecided())
 				.build()).doesNotThrowAnyException();
 		}
 
 		@Test
 		@DisplayName("only a TIER decision names a tier, and it must name one")
 		void tierNamesAreRequiredAndForbidden() {
-			assertThatThrownBy(() -> new Decision(DecisionKind.TIER, null, DecisionBasis.TIER_OUTCOME))
+			assertThatThrownBy(
+					() -> new VerdictProvenance(VerdictProvenanceKind.TIER, null, VerdictProvenanceBasis.TIER_OUTCOME))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("requires both");
-			assertThatThrownBy(() -> new Decision(DecisionKind.TIER, "fast", null))
+			assertThatThrownBy(() -> new VerdictProvenance(VerdictProvenanceKind.TIER, "fast", null))
 				.isInstanceOf(IllegalArgumentException.class);
-			assertThatThrownBy(() -> new Decision(DecisionKind.OWN, "fast", null))
+			assertThatThrownBy(() -> new VerdictProvenance(VerdictProvenanceKind.OWN, "fast", null))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("names no tier");
-			assertThatThrownBy(() -> new Decision(DecisionKind.UNDECIDED, null, DecisionBasis.TIER_OUTCOME))
+			assertThatThrownBy(() -> new VerdictProvenance(VerdictProvenanceKind.UNDECIDED, null,
+					VerdictProvenanceBasis.TIER_OUTCOME))
 				.isInstanceOf(IllegalArgumentException.class);
 		}
 
@@ -470,10 +472,9 @@ class VerdictTest {
 		@DisplayName("names are local: a decision must name a direct tier of this verdict")
 		void tierNamesAreLocal() {
 			assertThatThrownBy(() -> Verdict.builder()
-				.aggregated(booleanPass("ok"))
-				.decision(Decision.tier("elsewhere", DecisionBasis.TIER_OUTCOME))
-				.build()).isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("tier names are local");
+				.judgment(booleanPass("ok"))
+				.provenance(VerdictProvenance.tier("elsewhere", VerdictProvenanceBasis.TIER_OUTCOME))
+				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("tier names are local");
 		}
 
 		@Test
@@ -483,41 +484,42 @@ class VerdictTest {
 					TierPolicy.REJECT_ON_ANY_FAIL, new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED));
 
 			assertThatThrownBy(() -> Verdict.builder()
-				.aggregated(booleanPass("ok"))
-				.decision(Decision.tier("gate", DecisionBasis.TIER_OUTCOME))
+				.judgment(booleanPass("ok"))
+				.provenance(VerdictProvenance.tier("gate", VerdictProvenanceBasis.TIER_OUTCOME))
 				.compositeAttempts(List.of(threw))
-				.build()).isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("returned no verdict");
+				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("returned no verdict");
 		}
 
 		@Test
 		@DisplayName("wire names round-trip exactly")
 		void wireNames() {
-			assertThat(DecisionKind.fromWire("undecided")).isEqualTo(DecisionKind.UNDECIDED);
-			assertThat(DecisionBasis.fromWire("individual_rejection")).isEqualTo(DecisionBasis.INDIVIDUAL_REJECTION);
+			assertThat(VerdictProvenanceKind.fromWire("undecided")).isEqualTo(VerdictProvenanceKind.UNDECIDED);
+			assertThat(VerdictProvenanceBasis.fromWire("individual_rejection"))
+				.isEqualTo(VerdictProvenanceBasis.INDIVIDUAL_REJECTION);
 			assertThat(AttemptDisposition.fromWire("stage_failed")).isEqualTo(AttemptDisposition.STAGE_FAILED);
 			assertThat(DispositionReason.fromWire("child_undecided")).isEqualTo(DispositionReason.CHILD_UNDECIDED);
-			assertThatThrownBy(() -> DecisionKind.fromWire("OWN")).isInstanceOf(IllegalArgumentException.class);
+			assertThatThrownBy(() -> VerdictProvenanceKind.fromWire("OWN"))
+				.isInstanceOf(IllegalArgumentException.class);
 			assertThatThrownBy(() -> DispositionReason.fromWire("nope")).isInstanceOf(IllegalArgumentException.class);
 		}
 
 	}
 
 	/**
-	 * The cross-checks a {@code TIER} decision owes the verdict that carries it.
+	 * The cross-checks a {@code TIER} provenance owes the verdict that carries it.
 	 *
 	 * <p>
-	 * A cascade's root is a copy: its aggregate, individuals, map, weights and seats come from
-	 * the tier the decision names, and a reader counts on that without being able to re-derive
-	 * it. Each rule in §7.2 is therefore checked here against the attempt the verdict itself
-	 * carries — including R-D's amendment, where the one root that is <em>not</em> a copy must
-	 * be a parent-authored {@code ERROR stage_failed}.
+	 * A cascade's root is a copy: its aggregate, individuals, map, weights and seats come
+	 * from the tier the provenance names, and a reader counts on that without being able
+	 * to re-derive it. Each rule in §7.2 is therefore checked here against the attempt
+	 * the verdict itself carries — including R-D's amendment, where the one root that is
+	 * <em>not</em> a copy must be a parent-authored {@code ERROR stage_failed}.
 	 * </p>
 	 *
 	 * <p>
-	 * These are negative tests by necessity. Every cascade the library builds satisfies the
-	 * rules, so an assertion about a cascade's output cannot tell an enforced invariant from an
-	 * unenforced one; only a verdict deliberately built wrong can.
+	 * These are negative tests by necessity. Every cascade the library builds satisfies
+	 * the rules, so an assertion about a cascade's output cannot tell an enforced
+	 * invariant from an unenforced one; only a verdict deliberately built wrong can.
 	 * </p>
 	 */
 	@Nested
@@ -528,31 +530,34 @@ class VerdictTest {
 
 		private static final Judgment FAILED = booleanFail("the second judge was not");
 
-		private static final Judgment BROKEN =
-				Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw");
+		private static final Judgment BROKEN = Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED,
+				"the strategy threw");
 
 		private static Map<String, Judgment> individuals(Judgment second) {
 			return named("first", PASSED, "second", second);
 		}
 
-		/** A tier holding a genuine FAIL, with the aggregate and decision a caller chooses. */
-		private static Verdict tier(Judgment aggregate, Decision decision, Judgment second) {
+		/**
+		 * A tier holding a genuine FAIL, with the aggregate and provenance a caller
+		 * chooses.
+		 */
+		private static Verdict tier(Judgment aggregate, VerdictProvenance provenance, Judgment second) {
 			Map<String, Judgment> byName = individuals(second);
 			return Verdict.builder()
-				.aggregated(aggregate)
+				.judgment(aggregate)
 				.individual(List.copyOf(byName.values()))
 				.individualByName(byName)
 				.seats(declaredSeats("first", "second"))
-				.decision(decision)
+				.provenance(provenance)
 				.build();
 		}
 
 		private static Verdict undecidedTier() {
-			return tier(BROKEN, Decision.undecided(), FAILED);
+			return tier(BROKEN, VerdictProvenance.undecided(), FAILED);
 		}
 
 		private static Verdict excludedTier() {
-			return tier(Judgment.notApplicable("no Java sources"), Decision.own(), FAILED);
+			return tier(Judgment.notApplicable("no Java sources"), VerdictProvenance.own(), FAILED);
 		}
 
 		private static CompositeAttempt used(Verdict verdict) {
@@ -561,21 +566,23 @@ class VerdictTest {
 		}
 
 		private static CompositeAttempt refused(Verdict verdict, TierPolicy policy) {
-			DispositionReason reason = verdict.decision().kind() == DecisionKind.UNDECIDED
+			DispositionReason reason = verdict.provenance().kind() == VerdictProvenanceKind.UNDECIDED
 					? DispositionReason.CHILD_UNDECIDED : DispositionReason.UNDECLARED_NOT_APPLICABLE;
 			return CompositeAttempt.stageFailed("gate", CompositeRelation.CASCADE_TIER, policy, reason, verdict);
 		}
 
-		/** A root that copies everything the named tier holds, with a chosen aggregate. */
+		/**
+		 * A root that copies everything the named tier holds, with a chosen aggregate.
+		 */
 		private static Verdict.Builder root(Judgment aggregate, Verdict tier, CompositeAttempt attempt,
-				DecisionBasis basis) {
+				VerdictProvenanceBasis basis) {
 			return Verdict.builder()
-				.aggregated(aggregate)
+				.judgment(aggregate)
 				.individual(tier.individual())
 				.individualByName(tier.individualByName())
 				.weights(tier.weights())
 				.seats(tier.seats())
-				.decision(Decision.tier("gate", basis))
+				.provenance(VerdictProvenance.tier("gate", basis))
 				.compositeAttempts(List.of(attempt));
 		}
 
@@ -585,28 +592,29 @@ class VerdictTest {
 			Verdict tier = undecidedTier();
 
 			assertThatThrownBy(() -> root(BROKEN, tier, refused(tier, TierPolicy.REJECT_ON_ANY_FAIL),
-					DecisionBasis.TIER_OUTCOME).build()).isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("must be USED");
+					VerdictProvenanceBasis.TIER_OUTCOME)
+				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must be USED");
 		}
 
 		@Test
 		@DisplayName("TIER_OUTCOME copies the tier's aggregate exactly; a near copy is not a copy")
 		void tierOutcomeCopiesTheAggregate() {
-			Verdict tier = tier(booleanPass("the tier was satisfied"), Decision.own(), PASSED);
+			Verdict tier = tier(booleanPass("the tier was satisfied"), VerdictProvenance.own(), PASSED);
 
 			assertThatThrownBy(() -> root(booleanPass("a sentence of the parent's own"), tier, used(tier),
-					DecisionBasis.TIER_OUTCOME).build()).isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("the aggregate differs");
-			assertThatCode(() -> root(tier.aggregated(), tier, used(tier), DecisionBasis.TIER_OUTCOME).build())
+					VerdictProvenanceBasis.TIER_OUTCOME)
+				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("the aggregate differs");
+			assertThatCode(() -> root(tier.judgment(), tier, used(tier), VerdictProvenanceBasis.TIER_OUTCOME).build())
 				.doesNotThrowAnyException();
 		}
 
 		@Test
 		@DisplayName("INDIVIDUAL_REJECTION is a stop on a tier the cascade could not use")
 		void rejectionRequiresAFailedStage() {
-			Verdict tier = tier(booleanFail("the tier rejected the subject"), Decision.own(), FAILED);
+			Verdict tier = tier(booleanFail("the tier rejected the subject"), VerdictProvenance.own(), FAILED);
 
-			assertThatThrownBy(() -> root(BROKEN, tier, used(tier), DecisionBasis.INDIVIDUAL_REJECTION).build())
+			assertThatThrownBy(
+					() -> root(BROKEN, tier, used(tier), VerdictProvenanceBasis.INDIVIDUAL_REJECTION).build())
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("must be STAGE_FAILED");
 		}
@@ -617,24 +625,27 @@ class VerdictTest {
 			Verdict tier = undecidedTier();
 
 			assertThatThrownBy(() -> root(BROKEN, tier, refused(tier, TierPolicy.ACCEPT_ON_ALL_PASS),
-					DecisionBasis.INDIVIDUAL_REJECTION).build()).isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("only REJECT_ON_ANY_FAIL");
+					VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
+				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("only REJECT_ON_ANY_FAIL");
 		}
 
 		@Test
 		@DisplayName("a rejection needs a genuine FAIL: neither a pass nor a machinery error is one")
 		void rejectionRequiresAGenuineFail() {
-			Verdict allPassed = tier(BROKEN, Decision.undecided(), PASSED);
+			Verdict allPassed = tier(BROKEN, VerdictProvenance.undecided(), PASSED);
 			assertThatThrownBy(() -> root(BROKEN, allPassed, refused(allPassed, TierPolicy.REJECT_ON_ANY_FAIL),
-					DecisionBasis.INDIVIDUAL_REJECTION).build()).isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("requires a genuine FAIL");
+					VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
+				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("requires a genuine FAIL");
 
-			// The claim D4 rests on: the library's own failure is not rejection evidence, so a
-			// tier whose individuals are machinery errors has established nothing to stop on.
-			Verdict machineryOnly = tier(BROKEN, Decision.undecided(),
+			// The claim D4 rests on: the library's own failure is not rejection evidence,
+			// so a
+			// tier whose individuals are machinery errors has established nothing to stop
+			// on.
+			Verdict machineryOnly = tier(BROKEN, VerdictProvenance.undecided(),
 					Judgment.error(JudgmentReasonCode.STAGE_FAILED, "a member did not produce a determination"));
 			assertThatThrownBy(() -> root(BROKEN, machineryOnly, refused(machineryOnly, TierPolicy.REJECT_ON_ANY_FAIL),
-					DecisionBasis.INDIVIDUAL_REJECTION).build()).isInstanceOf(IllegalArgumentException.class)
+					VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
+				.build()).isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("a broken stage on its own justifies nothing");
 		}
 
@@ -645,10 +656,11 @@ class VerdictTest {
 			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
 
 			assertThatThrownBy(() -> root(Judgment.error(JudgmentReasonCode.STAGE_FAILED, "a root of the parent's own"),
-					tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build())
-				.isInstanceOf(IllegalArgumentException.class)
+					tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
+				.build()).isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("keeps the child's own machinery error");
-			assertThatCode(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build())
+			assertThatCode(
+					() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION).build())
 				.doesNotThrowAnyException();
 		}
 
@@ -658,17 +670,20 @@ class VerdictTest {
 			Verdict tier = excludedTier();
 			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
 
-			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build(),
+			assertThatThrownBy(
+					() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION).build(),
 					"copying the exclusion the cascade just refused would adopt the claim it rejected")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("parent-authored");
-			assertThatThrownBy(() -> root(BROKEN, tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build(),
+			assertThatThrownBy(() -> root(BROKEN, tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION).build(),
 					"and any other machinery code would name a cause the parent did not observe")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("parent-authored");
-			assertThatCode(() -> root(Judgment.error(JudgmentReasonCode.STAGE_FAILED,
-					"tier 'gate' returned NOT_APPLICABLE without declaring that its aggregate may be excluded"), tier,
-					attempt, DecisionBasis.INDIVIDUAL_REJECTION).build()).doesNotThrowAnyException();
+			assertThatCode(() -> root(
+					Judgment.error(JudgmentReasonCode.STAGE_FAILED,
+							"tier 'gate' returned NOT_APPLICABLE without declaring that its aggregate may be excluded"),
+					tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
+				.build()).doesNotThrowAnyException();
 		}
 
 		@Test
@@ -677,19 +692,17 @@ class VerdictTest {
 			Verdict tier = undecidedTier();
 			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
 
-			assertThatThrownBy(
-					() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
-						.individual(List.of(FAILED))
-						.individualByName(Map.of("second", FAILED))
-						.seats(List.of(new Seat(0, "second", KeySource.DECLARED)))
-						.build(),
-					"a root that keeps only the failing individual has rewritten the tier's evidence")
+			assertThatThrownBy(() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
+				.individual(List.of(FAILED))
+				.individualByName(Map.of("second", FAILED))
+				.seats(List.of(new Seat(0, "second", KeySource.DECLARED)))
+				.build(), "a root that keeps only the failing individual has rewritten the tier's evidence")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("copies its individuals, map, weights and seats");
 
-			Verdict decided = tier(booleanPass("the tier was satisfied"), Decision.own(), PASSED);
+			Verdict decided = tier(booleanPass("the tier was satisfied"), VerdictProvenance.own(), PASSED);
 			assertThatThrownBy(
-					() -> root(decided.aggregated(), decided, used(decided), DecisionBasis.TIER_OUTCOME)
+					() -> root(decided.judgment(), decided, used(decided), VerdictProvenanceBasis.TIER_OUTCOME)
 						.weights(Map.of("0", 2.0))
 						.build(),
 					"the weights are part of the copy, because they are the join to the seats")
@@ -698,12 +711,12 @@ class VerdictTest {
 		}
 
 		/*
-		 * The copy rule is four independent equalities, and the case above changes three of
-		 * them at once. A guard that only ever sees several fields wrong together cannot tell
-		 * which equality caught it, so any one of them could be removed without turning
-		 * anything red. Each case below changes exactly one field and leaves the rest of the
-		 * verdict a faithful, self-coherent copy, so it can only be rejected by the equality
-		 * it names.
+		 * The copy rule is four independent equalities, and the case above changes three
+		 * of them at once. A guard that only ever sees several fields wrong together
+		 * cannot tell which equality caught it, so any one of them could be removed
+		 * without turning anything red. Each case below changes exactly one field and
+		 * leaves the rest of the verdict a faithful, self-coherent copy, so it can only
+		 * be rejected by the equality it names.
 		 */
 
 		@Test
@@ -712,13 +725,13 @@ class VerdictTest {
 			Verdict tier = undecidedTier();
 			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
 
-			assertThatCode(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION).build())
+			assertThatCode(
+					() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION).build())
 				.as("the faithful copy that each of these counterexamples changes exactly one field of")
 				.doesNotThrowAnyException();
-			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
+			assertThatThrownBy(() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
 				.individual(List.of(FAILED, PASSED))
-				.build(),
-					"reordering the copy attributes seat 0's judgment to the judge who did not make it")
+				.build(), "reordering the copy attributes seat 0's judgment to the judge who did not make it")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("copies its individuals, map, weights and seats");
 		}
@@ -729,9 +742,10 @@ class VerdictTest {
 			Verdict tier = undecidedTier();
 			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
 
-			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
-				.individualByName(named("first", FAILED, "second", PASSED))
-				.build(),
+			assertThatThrownBy(
+					() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
+						.individualByName(named("first", FAILED, "second", PASSED))
+						.build(),
 					"the same keys and seats over swapped judgments say the wrong judge rejected the subject")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("copies its individuals, map, weights and seats");
@@ -743,9 +757,11 @@ class VerdictTest {
 			Verdict tier = undecidedTier();
 			CompositeAttempt attempt = refused(tier, TierPolicy.REJECT_ON_ANY_FAIL);
 
-			assertThatThrownBy(() -> root(tier.aggregated(), tier, attempt, DecisionBasis.INDIVIDUAL_REJECTION)
-				.seats(List.of(new Seat(2, "first", KeySource.DECLARED), new Seat(3, "second", KeySource.DECLARED)))
-				.build(),
+			assertThatThrownBy(
+					() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
+						.seats(List.of(new Seat(2, "first", KeySource.DECLARED),
+								new Seat(3, "second", KeySource.DECLARED)))
+						.build(),
 					"positions are what the weights join to, so moving them reports a configuration nobody set")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("copies its individuals, map, weights and seats");
@@ -763,14 +779,13 @@ class VerdictTest {
 			Verdict second = split(1, 1);
 
 			Verdict meta = Verdict.builder()
-				.aggregated(booleanPass("Meta-jury passed"))
-				.individual(List.of(first.aggregated(), second.aggregated()))
-				.individualByName(named("first", first.aggregated(), "second", second.aggregated()))
+				.judgment(booleanPass("Meta-jury passed"))
+				.individual(List.of(first.judgment(), second.judgment()))
+				.individualByName(named("first", first.judgment(), "second", second.judgment()))
 				.seats(declaredSeats("first", "second"))
-				.decision(Decision.own())
-				.compositeAttempts(
-						List.of(CompositeAttempt.used("first", CompositeRelation.META_MEMBER, null, first),
-								CompositeAttempt.used("second", CompositeRelation.META_MEMBER, null, second)))
+				.provenance(VerdictProvenance.own())
+				.compositeAttempts(List.of(CompositeAttempt.used("first", CompositeRelation.META_MEMBER, null, first),
+						CompositeAttempt.used("second", CompositeRelation.META_MEMBER, null, second)))
 				.build();
 
 			assertThat(meta.compositeAttempts()).extracting(CompositeAttempt::disposition)
@@ -804,9 +819,12 @@ class VerdictTest {
 					AttemptDisposition.STAGE_FAILED, DispositionReason.EXECUTION_FAILED, child, null))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("EXECUTION_FAILED");
-			// Both reasons describe a verdict the stage returned, and the rule is one claim per
-			// reason rather than one claim about the pair. Asserting only CHILD_UNDECIDED would
-			// leave the other reason free to lose its verdict with nothing turning red, so each
+			// Both reasons describe a verdict the stage returned, and the rule is one
+			// claim per
+			// reason rather than one claim about the pair. Asserting only CHILD_UNDECIDED
+			// would
+			// leave the other reason free to lose its verdict with nothing turning red,
+			// so each
 			// is witnessed on its own and named in what it is asserted to report.
 			assertThatThrownBy(() -> new CompositeAttempt("m", CompositeRelation.META_MEMBER, null,
 					AttemptDisposition.STAGE_FAILED, DispositionReason.CHILD_UNDECIDED, null, failure))
@@ -826,8 +844,8 @@ class VerdictTest {
 		@DisplayName("a stage-failed attempt keeps the child's actual verdict, unchanged")
 		void stageFailedKeepsTheChildVerdict() {
 			Verdict undecided = Verdict.builder()
-				.aggregated(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
-				.decision(Decision.undecided())
+				.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
+				.provenance(VerdictProvenance.undecided())
 				.build();
 
 			CompositeAttempt attempt = CompositeAttempt.stageFailed("member", CompositeRelation.META_MEMBER, null,

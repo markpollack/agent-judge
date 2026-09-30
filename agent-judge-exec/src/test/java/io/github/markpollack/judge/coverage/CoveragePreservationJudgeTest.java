@@ -7,18 +7,13 @@ package io.github.markpollack.judge.coverage;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.coverage.JaCoCoReportParser.CoverageMetrics;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -95,23 +90,13 @@ class CoveragePreservationJudgeTest {
 	}
 
 	@Test
-	void stringBaselineIsAccepted() throws IOException {
+	void typedBaselineIsAccepted() throws IOException {
 		writeJacocoReport(80, 20); // 80% coverage
-		JudgmentContext context = contextWithMetadata(Map.of("baselineCoverage", "82.0"));
+		CoverageComparison context = new CoverageComparison(workspace, 82.0);
 
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
-	}
-
-	@Test
-	void noBaselineReturnsAbstain() throws IOException {
-		writeJacocoReport(80, 20);
-
-		Judgment judgment = judge.judge(contextWithMetadata(Map.of()));
-
-		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
-		assertThat(judgment.reasoning()).contains("No baselineCoverage");
 	}
 
 	@Test
@@ -151,20 +136,8 @@ class CoveragePreservationJudgeTest {
 
 	// ==================== Helpers ====================
 
-	private JudgmentContext contextWithBaseline(CoverageMetrics baseline) {
-		return contextWithMetadata(Map.of("baselineCoverage", baseline));
-	}
-
-	private JudgmentContext contextWithMetadata(Map<String, Object> metadata) {
-		return JudgmentContext.builder()
-			.goal("Test migration")
-			.workspace(workspace)
-			.agentOutput("output")
-			.status(ExecutionStatus.SUCCESS)
-			.startedAt(Instant.now())
-			.executionTime(Duration.ofSeconds(1))
-			.metadata(metadata)
-			.build();
+	private CoverageComparison contextWithBaseline(CoverageMetrics baseline) {
+		return new CoverageComparison(workspace, baseline.lineCoverage());
 	}
 
 	/**
@@ -182,6 +155,14 @@ class CoveragePreservationJudgeTest {
 				</report>
 				""".formatted(linesCovered, linesMissed);
 		Files.writeString(reportDir.resolve("jacoco.xml"), xml);
+	}
+
+	@Test
+	void impossibleBaselinesCannotBecomeSuccessfulComparisons() {
+		for (double baseline : new double[] { Double.NaN, Double.POSITIVE_INFINITY, -1, 101 }) {
+			org.assertj.core.api.Assertions.assertThatThrownBy(() -> new CoverageComparison(workspace, baseline))
+				.isInstanceOf(IllegalArgumentException.class);
+		}
 	}
 
 }

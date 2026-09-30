@@ -7,7 +7,7 @@ package io.github.markpollack.judge;
 
 import java.util.concurrent.CompletableFuture;
 
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * Asynchronous interface for judging typed evidence.
@@ -33,7 +33,8 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * Example usage:
  * </p>
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
  * @param <E> evidence accepted by this evaluator
  * @author Mark Pollack

@@ -11,31 +11,31 @@ import java.util.Map;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.jury.interpretation.Verdicts;
-import io.github.markpollack.judge.result.AcceptanceAction;
-import io.github.markpollack.judge.result.AppliedPolicy;
-import io.github.markpollack.judge.result.ArtifactRef;
-import io.github.markpollack.judge.result.Assessment;
-import io.github.markpollack.judge.result.AssessmentTarget;
-import io.github.markpollack.judge.result.CalibrationClaim;
-import io.github.markpollack.judge.result.Category;
-import io.github.markpollack.judge.result.Certainty;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Distribution;
-import io.github.markpollack.judge.result.EvaluationProvenance;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.result.NumericAssessment;
-import io.github.markpollack.judge.result.NumericKind;
-import io.github.markpollack.judge.result.PolicyApplication;
-import io.github.markpollack.judge.result.PolicyFailure;
-import io.github.markpollack.judge.result.PolicyRef;
-import io.github.markpollack.judge.result.ProbabilityMass;
-import io.github.markpollack.judge.result.Proposition;
-import io.github.markpollack.judge.result.QualityDirection;
-import io.github.markpollack.judge.result.SupportOrigin;
+import io.github.markpollack.judge.acceptance.AcceptanceAction;
+import io.github.markpollack.judge.acceptance.AppliedPolicy;
+import io.github.markpollack.judge.provenance.ArtifactRef;
+import io.github.markpollack.judge.judgment.Finding;
+import io.github.markpollack.judge.judgment.FindingTarget;
+import io.github.markpollack.judge.provenance.CalibrationClaim;
+import io.github.markpollack.judge.judgment.CategoryFinding;
+import io.github.markpollack.judge.judgment.Confidence;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.ProbabilityDistribution;
+import io.github.markpollack.judge.provenance.Provenance;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
+import io.github.markpollack.judge.judgment.NumericFinding;
+import io.github.markpollack.judge.judgment.NumericKind;
+import io.github.markpollack.judge.acceptance.PolicyApplication;
+import io.github.markpollack.judge.acceptance.PolicyFailure;
+import io.github.markpollack.judge.provenance.PolicyRef;
+import io.github.markpollack.judge.judgment.ProbabilityMass;
+import io.github.markpollack.judge.judgment.BooleanFinding;
+import io.github.markpollack.judge.judgment.QualityDirection;
+import io.github.markpollack.judge.judgment.SupportOrigin;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,7 +44,9 @@ class ModernProducerMigrationTest {
 
 	private static final ObjectMapper JSON = new ObjectMapper();
 
-	private static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("migration fidelity").build();
+	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder()
+		.request("migration fidelity")
+		.build();
 
 	private static final ArtifactRef ARTIFACT = ArtifactRef.ofBytes("retained",
 			"exact bytes".getBytes(StandardCharsets.UTF_8), null);
@@ -52,20 +54,20 @@ class ModernProducerMigrationTest {
 	private static final PolicyRef POLICY = new PolicyRef("application", "1", ARTIFACT.sha256());
 
 	private static Judgment rich(PolicyApplication policy) {
-		Assessment assessment = new Assessment(new Proposition(false), new NumericAssessment(0.3,
-				NumericKind.MEASUREMENT, "quality:v1", 0, 1, List.of(), QualityDirection.INCREASING),
-				new Category("bad", List.of("good", "bad")));
-		Certainty certainty = new Certainty(0.9, "provider-support:v1", SupportOrigin.REPORTED,
-				AssessmentTarget.PROPOSITION, null);
-		Distribution distribution = new Distribution(AssessmentTarget.PROPOSITION, "truth:v1",
+		Finding finding = new Finding(new BooleanFinding(false), new NumericFinding(0.3, NumericKind.MEASUREMENT,
+				"quality:v1", 0, 1, List.of(), QualityDirection.INCREASING),
+				new CategoryFinding("bad", List.of("good", "bad")));
+		Confidence confidence = new Confidence(0.9, "provider-support:v1", SupportOrigin.REPORTED,
+				FindingTarget.BOOLEAN, null);
+		ProbabilityDistribution probabilityDistribution = new ProbabilityDistribution(FindingTarget.BOOLEAN, "truth:v1",
 				List.of(new ProbabilityMass("false", 0.9), new ProbabilityMass("true", 0.1)));
-		EvaluationProvenance provenance = new EvaluationProvenance("provider", "revision", ARTIFACT.sha256(),
-				List.of(ARTIFACT), ARTIFACT,
+		Provenance provenance = new Provenance("provider", "revision", ARTIFACT.sha256(), List.of(ARTIFACT), ARTIFACT,
 				List.of(new CalibrationClaim("declared-calibration:v1", "provider", "declared population",
 						"provider declaration", List.of("provider-support:v1"), List.of(ARTIFACT))));
-		return new Judgment(JudgmentStatus.FAIL, assessment, certainty, distribution, JudgmentReasonCode.SUBJECT_EMPTY,
-				"raw subject rejection", List.of(new Check("child", Judgment.abstain("child lacks evidence"))),
-				provenance, policy, Map.of("elapsedMillis", 7));
+		return new Judgment(JudgmentStatus.FAIL, finding, confidence, probabilityDistribution,
+				JudgmentReasonCode.SUBJECT_EMPTY, "raw subject rejection",
+				List.of(new Check("child", Judgment.abstain("child lacks evidence"))), provenance, policy,
+				Map.of("elapsedMillis", 7));
 	}
 
 	@Test
@@ -91,8 +93,8 @@ class ModernProducerMigrationTest {
 
 	@Test
 	void multiSeatAggregationRetainsCompleteInputsWithoutInheritingNativeSupport() {
-		Judgment original = rich(new AppliedPolicy(POLICY, AcceptanceAction.USE_ASSESSMENT, "use assessment"));
-		Verdict verdict = SimpleJury.<JudgmentContext>builder()
+		Judgment original = rich(new AppliedPolicy(POLICY, AcceptanceAction.RELY, "use assessment"));
+		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> original, "negative"))
 			.judge(Judges.named(context -> Judgment.pass("other"), "positive"))
 			.votingStrategy(new ConsensusStrategy())
@@ -100,17 +102,17 @@ class ModernProducerMigrationTest {
 			.vote(CONTEXT);
 		assertThat(verdict.individual().get(0)).isSameAs(original);
 		assertThat(verdict.individualByName().get("negative")).isSameAs(original);
-		assertThat(verdict.aggregated().certainty()).isNull();
-		assertThat(verdict.aggregated().distribution()).isNull();
-		assertThat(verdict.aggregated().provenance()).isNull();
-		assertThat(verdict.aggregated().policyApplication()).isNull();
+		assertThat(verdict.judgment().confidence()).isNull();
+		assertThat(verdict.judgment().probabilityDistribution()).isNull();
+		assertThat(verdict.judgment().provenance()).isNull();
+		assertThat(verdict.judgment().policyApplication()).isNull();
 	}
 
 	@Test
 	void policyErrorIsReportedAndCountedAsMachineryRatherThanRawSubjectFailure() {
 		Judgment original = rich(
 				new PolicyFailure(POLICY, JudgmentReasonCode.POLICY_FAILED, "policy configuration unavailable"));
-		Verdict verdict = SimpleJury.<JudgmentContext>builder()
+		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> original, "policy"))
 			.judge(Judges.named(context -> Judgment.pass("other"), "positive"))
 			.votingStrategy(new ConsensusStrategy(ErrorPolicy.TREAT_AS_FAIL))
@@ -119,8 +121,8 @@ class ModernProducerMigrationTest {
 		assertThat(verdict.individual().get(0)).isSameAs(original);
 		assertThat(original.reasonCode()).isEqualTo(JudgmentReasonCode.SUBJECT_EMPTY);
 		assertThat(original.reasoning()).isEqualTo("raw subject rejection");
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(verdict.aggregated().metadata().toString()).contains("policy_failed=1", "errorsTreatedAsFailCount=0")
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(verdict.judgment().metadata().toString()).contains("policy_failed=1", "errorsTreatedAsFailCount=0")
 			.doesNotContain("subject_empty");
 		var interpretation = Verdicts.interpret(verdict);
 		var policySeat = interpretation.root()

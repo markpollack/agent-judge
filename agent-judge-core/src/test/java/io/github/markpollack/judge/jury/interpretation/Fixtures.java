@@ -21,13 +21,13 @@ import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.jury.VotingStrategy;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,7 +39,7 @@ final class Fixtures {
 	static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {
 	};
 
-	static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("interpret").build();
+	static final CompletionEvidence CONTEXT = CompletionEvidence.builder().request("interpret").build();
 
 	/** The condition a capable judge declares. */
 	static final String EXCLUSION = "the change set contains no Java sources";
@@ -157,18 +157,18 @@ final class Fixtures {
 
 	// ==================== Live juries ====================
 
-	static Jury<JudgmentContext> passingTier(String name, String reasoning) {
-		return SimpleJury.<JudgmentContext>builder()
+	static Jury<CompletionEvidence> passingTier(String name, String reasoning) {
+		return SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> Judgment.pass(reasoning), name))
 			.votingStrategy(new ConsensusStrategy())
 			.build();
 	}
 
 	/** An opaque jury that returns a fixed verdict and declares no capability. */
-	static Jury<JudgmentContext> returning(Verdict verdict) {
-		return new Jury<JudgmentContext>() {
+	static Jury<CompletionEvidence> returning(Verdict verdict) {
+		return new Jury<CompletionEvidence>() {
 			@Override
-			public List<Judge<JudgmentContext>> getJudges() {
+			public List<Judge<CompletionEvidence>> getJudges() {
 				return List.of();
 			}
 
@@ -178,16 +178,16 @@ final class Fixtures {
 			}
 
 			@Override
-			public Verdict vote(JudgmentContext context) {
+			public Verdict vote(CompletionEvidence context) {
 				return verdict;
 			}
 		};
 	}
 
-	static Jury<JudgmentContext> throwing(RuntimeException failure) {
-		return new Jury<JudgmentContext>() {
+	static Jury<CompletionEvidence> throwing(RuntimeException failure) {
+		return new Jury<CompletionEvidence>() {
 			@Override
-			public List<Judge<JudgmentContext>> getJudges() {
+			public List<Judge<CompletionEvidence>> getJudges() {
 				return List.of();
 			}
 
@@ -197,25 +197,26 @@ final class Fixtures {
 			}
 
 			@Override
-			public Verdict vote(JudgmentContext context) {
+			public Verdict vote(CompletionEvidence context) {
 				throw failure;
 			}
 		};
 	}
 
 	/** A leaf jury whose reduction throws, so the tier returns an undecided verdict. */
-	static Jury<JudgmentContext> undecidedTier(Judgment... judgments) {
-		SimpleJury.Builder<JudgmentContext> builder = SimpleJury.<JudgmentContext>builder().votingStrategy(new VotingStrategy() {
-			@Override
-			public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
-				throw new IllegalStateException("the reduction broke");
-			}
+	static Jury<CompletionEvidence> undecidedTier(Judgment... judgments) {
+		SimpleJury.Builder<CompletionEvidence> builder = SimpleJury.<CompletionEvidence>builder()
+			.votingStrategy(new VotingStrategy() {
+				@Override
+				public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
+					throw new IllegalStateException("the reduction broke");
+				}
 
-			@Override
-			public String getName() {
-				return "broken";
-			}
-		});
+				@Override
+				public String getName() {
+					return "broken";
+				}
+			});
 		for (int index = 0; index < judgments.length; index++) {
 			Judgment judgment = judgments[index];
 			builder.judge(Judges.named(context -> judgment, "judge-" + (index + 1)));
@@ -226,7 +227,7 @@ final class Fixtures {
 	/**
 	 * An opaque tier that excludes over real individuals while declaring no capability.
 	 */
-	static Jury<JudgmentContext> opaqueExcludingTier(Judgment... individuals) {
+	static Jury<CompletionEvidence> opaqueExcludingTier(Judgment... individuals) {
 		Map<String, Judgment> byName = new LinkedHashMap<>();
 		for (int index = 0; index < individuals.length; index++) {
 			byName.put("judge-" + (index + 1), individuals[index]);
@@ -235,10 +236,10 @@ final class Fixtures {
 	}
 
 	/** A judge that declares it may exclude, so a jury built on it is capable. */
-	record Conditional(String name, Judgment result) implements JudgeWithMetadata<JudgmentContext> {
+	record Conditional(String name, Judgment result) implements JudgeWithMetadata<CompletionEvidence> {
 
 		@Override
-		public Judgment judge(JudgmentContext context) {
+		public Judgment judge(CompletionEvidence context) {
 			return this.result;
 		}
 

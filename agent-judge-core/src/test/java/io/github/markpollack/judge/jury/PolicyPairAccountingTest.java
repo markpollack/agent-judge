@@ -16,9 +16,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,16 +26,18 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Part D: the complete population scan, pinned cell by cell.
  *
  * <p>
- * Two policies, four error values and three exclusion values make twelve combinations, and the
- * interesting ones are not the diagonal. A jury that excludes a criterion and a jury that
- * refuses to is the difference between a rate over what applied and a rate over what was asked,
- * and both look like a number. Every cell below is pinned with its aggregate <em>and</em> its
- * counters, because the counters are what a reader derives the rate from.
+ * Two policies, four error values and three exclusion values make twelve combinations,
+ * and the interesting ones are not the diagonal. A jury that excludes a criterion and a
+ * jury that refuses to is the difference between a rate over what applied and a rate over
+ * what was asked, and both look like a number. Every cell below is pinned with its
+ * aggregate <em>and</em> its counters, because the counters are what a reader derives the
+ * rate from.
  * </p>
  *
  * <p>
- * The counts are taken on the submitted originals, before any policy runs. That ordering is the
- * claim being pinned: a count taken after filtering can only describe the survivors.
+ * The counts are taken on the submitted originals, before any policy runs. That ordering
+ * is the claim being pinned: a count taken after filtering can only describe the
+ * survivors.
  * </p>
  */
 @DisplayName("The policy-pair table")
@@ -49,7 +51,10 @@ class PolicyPairAccountingTest {
 
 	private static final Judgment JUDGE_ERROR = Judgment.error("the index was unreachable");
 
-	/** One of each status, in a fixed order, so every cell reduces over the same population. */
+	/**
+	 * One of each status, in a fixed order, so every cell reduces over the same
+	 * population.
+	 */
 	private static final List<Judgment> MIXED = List.of(PASS, FAIL, EXCLUDED, JUDGE_ERROR);
 
 	private static VotingStrategy strategy(ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
@@ -214,8 +219,7 @@ class PolicyPairAccountingTest {
 		@EnumSource(value = ErrorPolicy.class, names = { "TREAT_AS_FAIL", "TREAT_AS_ABSTAIN", "IGNORE" })
 		@DisplayName("the exclusion is counted both as submitted and as treated")
 		void countedTwiceOverDifferentQuestions(ErrorPolicy errorPolicy) {
-			Map<String, Object> evidence = evidenceOf(
-					aggregate(errorPolicy, NotApplicablePolicy.TREAT_AS_FAIL, MIXED));
+			Map<String, Object> evidence = evidenceOf(aggregate(errorPolicy, NotApplicablePolicy.TREAT_AS_FAIL, MIXED));
 
 			assertThat(evidence).containsEntry(AggregationEvidence.NOT_APPLICABLE_COUNT, 1)
 				.containsEntry(AggregationEvidence.NOT_APPLICABLE_TREATED_AS_FAIL_COUNT, 1);
@@ -233,7 +237,8 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("the failing contribution keeps the exclusion's configured weight")
 		void weightIsPreserved() {
-			// Position 0 is excluded and weighted 3.0; position 1 passes and is weighted 1.0.
+			// Position 0 is excluded and weighted 3.0; position 1 passes and is weighted
+			// 1.0.
 			// Treating the exclusion as a failure at its own weight gives 1/4, not 1/2.
 			Judgment aggregate = new WeightedAverageStrategy(0.5, ErrorPolicy.PROPAGATE,
 					NotApplicablePolicy.TREAT_AS_FAIL)
@@ -276,7 +281,8 @@ class PolicyPairAccountingTest {
 					List.of(EXCLUDED, EXCLUDED));
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.FAIL);
-			assertThat(evidenceOf(aggregate)).containsEntry(AggregationEvidence.NOT_APPLICABLE_TREATED_AS_FAIL_COUNT, 2);
+			assertThat(evidenceOf(aggregate)).containsEntry(AggregationEvidence.NOT_APPLICABLE_TREATED_AS_FAIL_COUNT,
+					2);
 		}
 
 	}
@@ -327,11 +333,13 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("under TREAT_AS_ABSTAIN and IGNORE the configured policy applies as written")
 		void otherPoliciesApplyAsConfigured() {
-			assertThat(aggregate(ErrorPolicy.TREAT_AS_ABSTAIN, NotApplicablePolicy.EXCLUDE,
-					List.of(FAIL, MACHINERY_ERROR)).status())
+			assertThat(
+					aggregate(ErrorPolicy.TREAT_AS_ABSTAIN, NotApplicablePolicy.EXCLUDE, List.of(FAIL, MACHINERY_ERROR))
+						.status())
 				.isEqualTo(JudgmentStatus.FAIL);
-			assertThat(aggregate(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE, List.of(FAIL, MACHINERY_ERROR))
-				.status()).isEqualTo(JudgmentStatus.FAIL);
+			assertThat(
+					aggregate(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE, List.of(FAIL, MACHINERY_ERROR)).status())
+				.isEqualTo(JudgmentStatus.FAIL);
 		}
 
 		@Test
@@ -360,8 +368,7 @@ class PolicyPairAccountingTest {
 			Judgment aggregate = aggregate(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE, List.of(PASS, wrapped));
 
 			assertThat(evidenceOf(aggregate)).containsEntry(AggregationEvidence.ERROR_COUNT, 1);
-			assertThat(originOf(aggregate)).containsOnly(Map.entry("judge_failed", 2),
-					Map.entry("judge_reported", 1));
+			assertThat(originOf(aggregate)).containsOnly(Map.entry("judge_failed", 2), Map.entry("judge_reported", 1));
 		}
 
 		@Test
@@ -378,14 +385,14 @@ class PolicyPairAccountingTest {
 	@Test
 	@DisplayName("every built-in strategy applies both policies and writes the universal keys")
 	void everyStrategyAccountsTheSameWay() {
-		List<VotingStrategy> strategies = new ArrayList<>(List.of(
-				new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-				new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-				new AllMustPassStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-				new AverageVotingStrategy(0.5, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-				new MedianVotingStrategy(0.5, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-				new WeightedAverageStrategy(0.5, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-				new ConjunctiveStrategy(0.5, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE)));
+		List<VotingStrategy> strategies = new ArrayList<>(
+				List.of(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+						new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+						new AllMustPassStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+						new AverageVotingStrategy(0.5, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+						new MedianVotingStrategy(0.5, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+						new WeightedAverageStrategy(0.5, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+						new ConjunctiveStrategy(0.5, ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE)));
 
 		for (VotingStrategy strategy : strategies) {
 			assertThat(strategy.notApplicablePolicy()).as("%s declares its policy", strategy.getName())

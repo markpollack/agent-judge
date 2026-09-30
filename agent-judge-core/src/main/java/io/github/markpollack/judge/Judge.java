@@ -5,7 +5,7 @@
 
 package io.github.markpollack.judge;
 
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * Functional interface for judging typed evidence. A requirement is optional to this
@@ -27,7 +27,8 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * Example usage:
  * </p>
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
  * <p>
  * <strong>Design Inspiration:</strong> This interface draws from the "judges" framework's
@@ -48,7 +49,8 @@ public interface Judge<E> {
 	/**
 	 * Evaluate the supplied evidence. Implementations may call an external provider.
 	 * @param context typed evidence for this evaluation
-	 * @return the judgment with required status, optional score/label, reasoning, and checks
+	 * @return the judgment with required status, optional score/label, reasoning, and
+	 * checks
 	 */
 	Judgment judge(E context);
 

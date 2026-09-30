@@ -16,12 +16,14 @@ import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 /**
  * {@link JudgeModel} adapter that delegates to {@link AgentClient} for agentic judges.
  *
- * <p>Enables judge backends that can use tools, inspect files, run commands, or perform
- * multi-step verification before returning a verdict. The agent receives the user message(s)
- * as its goal and returns its output as the judge response.
+ * <p>
+ * Enables judge backends that can use tools, inspect files, run commands, or perform
+ * multi-step verification before returning a verdict. The agent receives the user
+ * message(s) as its goal and returns its output as the judge response.
  *
- * <p>This is distinct from the evaluated-side bridge ({@link AgentClientJudgmentContextBuilder}
- * which converts agent output into JudgmentContext). This adapter uses an agent <em>as</em>
+ * <p>
+ * This is distinct from the evaluated-side bridge ({@link AgentClientEvidence} which
+ * converts agent output into CompletionEvidence). This adapter uses an agent <em>as</em>
  * the judge backend.
  *
  * @author Mark Pollack
@@ -55,8 +57,6 @@ public final class AgentClientJudgeModel implements JudgeModel {
 		String model = null;
 		Map<String, Object> metadata = new HashMap<>();
 
-		metadata.put("successful", response.isSuccessful());
-
 		AgentResponseMetadata meta = safeGetMetadata(response);
 		if (meta != null) {
 			model = meta.getModel();
@@ -65,7 +65,7 @@ public final class AgentClientJudgeModel implements JudgeModel {
 			}
 		}
 
-		return new JudgeModelResponse(text, model, null, metadata);
+		return new JudgeModelResponse(text, model, null, metadata, response.isSuccessful());
 	}
 
 	private static AgentResponseMetadata safeGetMetadata(AgentClientResponse response) {

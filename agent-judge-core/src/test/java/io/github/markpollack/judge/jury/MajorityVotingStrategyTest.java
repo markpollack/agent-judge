@@ -6,8 +6,8 @@
 package io.github.markpollack.judge.jury;
 
 import org.junit.jupiter.api.Test;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import java.util.List;
 import java.util.Map;
@@ -94,8 +94,7 @@ class MajorityVotingStrategyTest {
 	void allErrorsShouldTreatAsFailWhenConfigured() {
 		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
 
-		List<Judgment> judgments = List.of(Judgment.error("Error 1"),
-				Judgment.error("Error 2"));
+		List<Judgment> judgments = List.of(Judgment.error("Error 1"), Judgment.error("Error 2"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
@@ -108,8 +107,7 @@ class MajorityVotingStrategyTest {
 	void allErrorsShouldTreatAsAbstainWhenConfigured() {
 		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN);
 
-		List<Judgment> judgments = List.of(Judgment.error("Error 1"),
-				Judgment.error("Error 2"));
+		List<Judgment> judgments = List.of(Judgment.error("Error 1"), Judgment.error("Error 2"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
@@ -125,14 +123,14 @@ class MajorityVotingStrategyTest {
 	void allErrorsShouldBeIgnoredWhenConfigured() {
 		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.IGNORE);
 
-		List<Judgment> judgments = List.of(Judgment.error("Error 1"),
-				Judgment.error("Error 2"));
+		List<Judgment> judgments = List.of(Judgment.error("Error 1"), Judgment.error("Error 2"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		// DELTA-3: IGNORE removes the errors from the population entirely. Same ABSTAIN
 		// status as TREAT_AS_ABSTAIN above, but different accounting — which is the whole
-		// reason both policies exist and why a status-only assertion cannot tell them apart.
+		// reason both policies exist and why a status-only assertion cannot tell them
+		// apart.
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.reasoning()).contains("2 error(s) ignored");
 		assertThat(evidence(result)).containsEntry(AggregationEvidence.IGNORED_ERROR_COUNT, 2)
@@ -143,8 +141,7 @@ class MajorityVotingStrategyTest {
 	void mixedErrorsAndPassesShouldRespectErrorPolicy() {
 		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_FAIL);
 
-		List<Judgment> judgments = List.of(booleanPass("Judge 1"), Judgment.error("Error"),
-				booleanPass("Judge 3"));
+		List<Judgment> judgments = List.of(booleanPass("Judge 1"), Judgment.error("Error"), booleanPass("Judge 3"));
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
@@ -163,7 +160,8 @@ class MajorityVotingStrategyTest {
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// A judge's own abstention is reported separately from an error converted into one.
+		// A judge's own abstention is reported separately from an error converted into
+		// one.
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.reasoning()).contains("All 2 judge(s) abstained");
 		assertThat(evidence(result)).containsEntry(AggregationEvidence.EXPLICIT_ABSTAIN_COUNT, 2)
@@ -225,7 +223,6 @@ class MajorityVotingStrategyTest {
 
 		assertThat(strategy.getName()).isEqualTo("majority");
 	}
-
 
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> evidence(Judgment judgment) {

@@ -2,8 +2,8 @@ package io.github.markpollack.judge.ai;
 
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.model.Usage;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -217,10 +217,17 @@ class LabelJudgmentClassifierTests {
 			.build();
 		for (String selected : List.of("excellent", "poor", "unclear")) {
 			Judgment result = classifier.classify(response(selected));
-			assertThat(result.assessment().category().alternatives()).containsExactly("excellent", "poor", "unclear");
-			assertThat(result.assessment().category().selected()).isEqualTo(selected);
-			assertThat(result.certainty()).isNull();
+			assertThat(result.finding().category().alternatives()).containsExactly("excellent", "poor", "unclear");
+			assertThat(result.finding().category().selected()).isEqualTo(selected);
+			assertThat(result.confidence()).isNull();
 		}
+	}
+
+	@Test
+	void backendFailureCannotBeClassifiedAsASubjectPass() {
+		var response = new JudgeModelResponse("yes", "test-backend", null, java.util.Map.of(), false);
+		assertThat(JudgmentClassifiers.passFail("yes", "no").classify(response).status())
+			.isEqualTo(JudgmentStatus.ERROR);
 	}
 
 }

@@ -8,9 +8,9 @@ package io.github.markpollack.judge.jury;
 import java.util.List;
 import java.util.Map;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -136,7 +136,7 @@ class VotingStrategyCharacterizationTest {
 			assertThatThrownBy(() -> new Judgment(JudgmentStatus.ERROR, 0.0, null, JudgmentReasonCode.JUDGE_REPORTED,
 					"x", List.of(), Map.of()))
 				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("must not carry assessment");
+				.hasMessageContaining("must not carry finding");
 		}
 
 	}

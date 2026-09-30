@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.markpollack.judge.description.StrategyDescription;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * Conjunctive voting strategy: every applicable judge must clear the bar.
@@ -17,7 +17,7 @@ import io.github.markpollack.judge.result.Judgment;
  * <p>
  * A numeric strategy, and the <em>non-compensatory</em> counterpart to
  * {@link AverageVotingStrategy}. It reduces over {@link Judgment#effectiveScore()} with
- * {@code min} rather than a mean, so a single low assessment decides the aggregate and
+ * {@code min} rather than a mean, so a single low finding decides the aggregate and
  * cannot be offset by strong siblings.
  * </p>
  *
@@ -52,24 +52,24 @@ import io.github.markpollack.judge.result.Judgment;
  * enforce an acceptability line, so the line is the caller's to state, the same way
  * {@link Judgment#scored(double)} refuses to produce an outcome until the caller supplies
  * a threshold. Deriving that number from the rubric's own level semantics — rather than
- * from the distribution of scores it must judge — is the caller's responsibility.
+ * from the probabilityDistribution of scores it must judge — is the caller's
+ * responsibility.
  * </p>
  *
  * <h2>Population and evidence</h2>
  * <p>
- * Abstentions leave the population entirely, because "no assessment" is not the assessment
- * zero; errors are governed by {@link ErrorPolicy} (default {@code PROPAGATE}) and exclusions
- * by {@link NotApplicablePolicy} (default {@code REFUSE}). If nothing is eligible the result
- * is {@code ABSTAIN} rather than a manufactured failing score — an empty conjunction is
- * vacuously true, and reporting that as {@code PASS} is precisely the "passed over nothing"
- * defect this strategy is meant not to have.
+ * Abstentions leave the population entirely, because "no assessment" is not the finding
+ * zero; errors are governed by {@link ErrorPolicy} (default {@code PROPAGATE}) and
+ * exclusions by {@link NotApplicablePolicy} (default {@code REFUSE}). If nothing is
+ * eligible the result is {@code ABSTAIN} rather than a manufactured failing score — an
+ * empty conjunction is vacuously true, and reporting that as {@code PASS} is precisely
+ * the "passed over nothing" defect this strategy is meant not to have.
  * </p>
  * <p>
- * Beyond the universal keys, the evidence records
- * {@link AggregationEvidence#THRESHOLD} and
- * {@link AggregationEvidence#BINDING_ELIGIBLE_INDEX} — the position, among the submitted
- * judgments, of the judgment that produced the minimum. The binding judgment is the
- * diagnosis: it names which contributor held the aggregate down, which a mean cannot
+ * Beyond the universal keys, the evidence records {@link AggregationEvidence#THRESHOLD}
+ * and {@link AggregationEvidence#BINDING_ELIGIBLE_INDEX} — the position, among the
+ * submitted judgments, of the judgment that produced the minimum. The binding judgment is
+ * the diagnosis: it names which contributor held the aggregate down, which a mean cannot
  * report.
  * </p>
  *
@@ -175,8 +175,7 @@ public class ConjunctiveStrategy implements VotingStrategy {
 		int bindingIndex = population.eligibleIndices().get(bindingPosition);
 
 		boolean passed = minimum >= this.threshold;
-		Judgment aggregate = (passed ? Judgment.builder().pass() : Judgment.builder().fail())
-			.score(minimum)
+		Judgment aggregate = (passed ? Judgment.builder().pass() : Judgment.builder().fail()).score(minimum)
 			.reasoning(String.format(
 					"Minimum score: %.2f across %d applicable judge(s) (threshold: %.2f, result: %s); "
 							+ "binding judgment at index %d",
@@ -201,8 +200,7 @@ public class ConjunctiveStrategy implements VotingStrategy {
 	 */
 	@Override
 	public StrategyDescription describe() {
-		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, this.threshold,
-				Map.of());
+		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, this.threshold, Map.of());
 	}
 
 	/** {@inheritDoc} */
@@ -210,6 +208,5 @@ public class ConjunctiveStrategy implements VotingStrategy {
 	public NotApplicablePolicy notApplicablePolicy() {
 		return this.notApplicablePolicy;
 	}
-
 
 }

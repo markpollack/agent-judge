@@ -7,15 +7,12 @@ package io.github.markpollack.judge.exec;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -68,7 +65,7 @@ class CommandJudgeTest {
 		assertThat(judgment.checks()).singleElement().satisfies(check -> {
 			assertThat(check.name()).isEqualTo("command_execution");
 			assertThat(check.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
-			assertThat(check.judgment().assessment()).isNull();
+			assertThat(check.judgment().finding()).isNull();
 		});
 	}
 
@@ -112,14 +109,8 @@ class CommandJudgeTest {
 		assertThat(judgment.elapsed()).isNotNull().isGreaterThanOrEqualTo(Duration.ZERO);
 	}
 
-	private JudgmentContext createContext() {
-		return JudgmentContext.builder()
-			.goal("Test goal")
-			.workspace(tempDir)
-			.executionTime(Duration.ofSeconds(1))
-			.startedAt(Instant.now())
-			.status(ExecutionStatus.SUCCESS)
-			.build();
+	private Path createContext() {
+		return tempDir;
 	}
 
 }

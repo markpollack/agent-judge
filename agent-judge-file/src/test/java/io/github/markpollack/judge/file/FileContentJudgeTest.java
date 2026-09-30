@@ -1,0 +1,140 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
+package io.github.markpollack.judge.file;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import io.github.markpollack.judge.file.FileContentJudge.MatchMode;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class FileContentJudgeTest {
+
+	@TempDir
+	Path tempDir;
+
+	@Test
+	void exactMatchPassesWhenContentMatches() throws IOException {
+		Path testFile = tempDir.resolve("test.txt");
+		Files.writeString(testFile, "Hello World");
+
+		FileContentJudge judge = new FileContentJudge("test.txt", "Hello World", MatchMode.EXACT);
+		Judgment judgment = judge.judge(createContext());
+
+		assertThat(judgment.pass()).isTrue();
+		assertThat(judgment.reasoning()).contains("exact").contains("matches");
+		assertThat(judgment.checks()).hasSize(3);
+		assertThat(judgment.checks()).allMatch(check -> check.passed());
+	}
+
+	@Test
+	void exactMatchFailsWhenContentDiffers() throws IOException {
+		Path testFile = tempDir.resolve("test.txt");
+		Files.writeString(testFile, "Hello World");
+
+		FileContentJudge judge = new FileContentJudge("test.txt", "Goodbye World", MatchMode.EXACT);
+		Judgment judgment = judge.judge(createContext());
+
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(judgment.checks()).hasSize(3);
+		assertThat(judgment.checks().get(2).passed()).isFalse();
+		assertThat(judgment.checks().get(2).name()).isEqualTo("content_match");
+	}
+
+	@Test
+	void readFailureProducesErrorRatherThanFail() throws IOException {
+		Files.createDirectory(tempDir.resolve("directory.txt"));
+		FileContentJudge judge = new FileContentJudge("directory.txt", "content", MatchMode.EXACT);
+
+		Judgment judgment = judge.judge(createContext());
+
+		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(judgment.reasoning()).contains("Failed to read file");
+		assertThat(judgment.checks()).extracting("name").containsExactly("file_exists", "file_readable");
+		assertThat(judgment.checks().get(0).passed()).isTrue();
+		assertThat(judgment.checks().get(1).passed()).isFalse();
+	}
+
+	@Test
+	void containsMatchPassesWhenContentContainsString() throws IOException {
+		Path testFile = tempDir.resolve("log.txt");
+		Files.writeString(testFile, "Build completed successfully at 10:30 AM");
+
+		FileContentJudge judge = new FileContentJudge("log.txt", "successfully", MatchMode.CONTAINS);
+		Judgment judgment = judge.judge(createContext());
+
+		assertThat(judgment.pass()).isTrue();
+		assertThat(judgment.reasoning()).contains("contains").contains("matches");
+	}
+
+	@Test
+	void containsMatchFailsWhenContentMissing() throws IOException {
+		Path testFile = tempDir.resolve("log.txt");
+		Files.writeString(testFile, "Build failed");
+
+		FileContentJudge judge = new FileContentJudge("log.txt", "successfully", MatchMode.CONTAINS);
+		Judgment judgment = judge.judge(createContext());
+
+		assertThat(judgment.pass()).isFalse();
+	}
+
+	@Test
+	void regexMatchPassesWhenPatternMatches() throws IOException {
+		Path testFile = tempDir.resolve("data.json");
+		Files.writeString(testFile, "{\"status\": \"success\", \"count\": 42}");
+
+		FileContentJudge judge = new FileContentJudge("data.json", "\\{.*\"status\".*\\}", MatchMode.REGEX);
+		Judgment judgment = judge.judge(createContext());
+
+		assertThat(judgment.pass()).isTrue();
+		assertThat(judgment.reasoning()).contains("regex").contains("matches");
+	}
+
+	@Test
+	void regexMatchFailsWhenPatternDoesNotMatch() throws IOException {
+		Path testFile = tempDir.resolve("data.txt");
+		Files.writeString(testFile, "plain text");
+
+		FileContentJudge judge = new FileContentJudge("data.txt", "^\\d+$", MatchMode.REGEX);
+		Judgment judgment = judge.judge(createContext());
+
+		assertThat(judgment.pass()).isFalse();
+	}
+
+	@Test
+	void failsWhenFileDoesNotExist() {
+		FileContentJudge judge = new FileContentJudge("missing.txt", "content", MatchMode.EXACT);
+		Judgment judgment = judge.judge(createContext());
+
+		assertThat(judgment.pass()).isFalse();
+		assertThat(judgment.reasoning()).contains("not found");
+		assertThat(judgment.checks()).hasSize(1);
+		assertThat(judgment.checks().get(0).name()).isEqualTo("file_exists");
+		assertThat(judgment.checks().get(0).passed()).isFalse();
+	}
+
+	@Test
+	void defaultsToExactMatch() throws IOException {
+		Path testFile = tempDir.resolve("test.txt");
+		Files.writeString(testFile, "exact");
+
+		FileContentJudge judge = new FileContentJudge("test.txt", "exact");
+		Judgment judgment = judge.judge(createContext());
+
+		assertThat(judgment.pass()).isTrue();
+	}
+
+	private Path createContext() {
+		return tempDir;
+	}
+
+}

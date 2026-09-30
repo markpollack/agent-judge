@@ -5,12 +5,6 @@
 
 package io.github.markpollack.judge;
 
-import io.github.markpollack.judge.context.JudgmentContext;
-
-import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.JudgeMetadata;
-import io.github.markpollack.judge.JudgeType;
-
 /**
  * Base class for deterministic (rule-based) judges.
  *
@@ -20,9 +14,8 @@ import io.github.markpollack.judge.JudgeType;
  * </p>
  *
  * <p>
- * Subclasses implement the
- * {@link Judge#judge(Object)} method for {@link JudgmentContext} with their specific
- * evaluation logic.
+ * Subclasses implement the {@link Judge#judge(Object)} method for their evidence type
+ * with their specific evaluation logic.
  * </p>
  *
  * <p>
@@ -40,10 +33,11 @@ import io.github.markpollack.judge.JudgeType;
  * judges can implement the Judge interface directly.
  * </p>
  *
+ * @param <E> evidence type
  * @author Mark Pollack
  * @since 0.1.0
  */
-public abstract class DeterministicJudge implements io.github.markpollack.judge.JudgeWithMetadata<JudgmentContext> {
+public abstract class DeterministicJudge<E> implements io.github.markpollack.judge.JudgeWithMetadata<E> {
 
 	private final JudgeMetadata metadata;
 

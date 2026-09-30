@@ -5,7 +5,7 @@
 
 package io.github.markpollack.judge.jury.interpretation;
 
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 
 import java.util.List;
 import java.util.Map;
@@ -19,7 +19,7 @@ import io.github.markpollack.judge.jury.ConsensusStrategy;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.TierPolicy;
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import static io.github.markpollack.judge.jury.interpretation.Fixtures.CONTEXT;
 import static io.github.markpollack.judge.jury.interpretation.Fixtures.EXAMPLE_ONE;
@@ -30,27 +30,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * A1, A12, A13: example one, the 0.17 cascade, field for field.
  *
- * <p>The stored verdict was generated through the real jury, recorder and store. One tier,
- * {@code structure} ({@code REJECT_ON_ANY_FAIL}), two declared judges under consensus: one
- * passed, one failed, consensus of the two is {@code abstain}, and the cascade adopted it.
+ * <p>
+ * The stored verdict was generated through the real jury, recorder and store. One tier,
+ * {@code structure} ({@code REJECT_ON_ANY_FAIL}), two declared judges under consensus:
+ * one passed, one failed, consensus of the two is {@code abstain}, and the cascade
+ * adopted it.
  */
 @DisplayName("Example one: the 0.17 cascade")
 class ExampleOneTest {
 
-	private static final Evidence EVIDENCE = new Evidence("consensus", "propagate", "refuse", 2, 2, 0, 0, 0, 0, 0, 0,
-			0, Map.of(), 1, 1, null, null, null, null);
+	private static final Evidence EVIDENCE = new Evidence("consensus", "propagate", "refuse", 2, 2, 0, 0, 0, 0, 0, 0, 0,
+			Map.of(), 1, 1, null, null, null, null);
 
 	private static final List<JudgeSeat> JUDGES = List.of(
-			new JudgeSeat(0, "structure:ddd-review.md", "DECLARED", "pass", null, null, null, "report present", List.of()),
+			new JudgeSeat(0, "structure:ddd-review.md", "DECLARED", "pass", null, null, null, "report present",
+					List.of()),
 			new JudgeSeat(1, "reportStructure", "DECLARED", "fail", null, null, null, "report has no bounded contexts",
 					List.of()));
 
 	private static final String REASONING = "No consensus: 1 passed, 1 failed among 2 applicable judge(s)";
 
-	/** The jury that produced example one: the structure tier stops on its FAIL, the final tier never runs. */
+	/**
+	 * The jury that produced example one: the structure tier stops on its FAIL, the final
+	 * tier never runs.
+	 */
 	static Verdict sameJury() {
-		return CascadedJury.<JudgmentContext>builder()
-			.tier("structure", SimpleJury.<JudgmentContext>builder()
+		return CascadedJury.<CompletionEvidence>builder()
+			.tier("structure", SimpleJury.<CompletionEvidence>builder()
 				.judge(Judges.named(context -> Judgment.pass("report present"), "structure:ddd-review.md"))
 				.judge(Judges.named(context -> Judgment.fail("report has no bounded contexts"), "reportStructure"))
 				.votingStrategy(new ConsensusStrategy())
@@ -65,17 +71,22 @@ class ExampleOneTest {
 	void theStoredVerdictProducesTheBlock() {
 		Interpretation interpretation = Verdicts.interpret(stored(EXAMPLE_ONE));
 
-		assertThat(interpretation.schemaVersion()).isEqualTo(2);
+		assertThat(interpretation.schemaVersion()).isEqualTo(3);
 		assertThat(interpretation.sourceVersion()).as("the seven-component form 0.17 writes").isEqualTo(1);
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.UNDECIDED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.UNRESOLVED);
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
-		assertThat(interpretation.decidedBy()).isEqualTo(new DecidedBy("structure", List.of("structure"), "tier_outcome"));
+		assertThat(interpretation.decidedBy())
+			.isEqualTo(new DecidedBy("structure", List.of("structure"), "tier_outcome"));
 		assertThat(interpretation.defects()).isEmpty();
 
-		assertThat(interpretation.root()).usingRecursiveComparison().ignoringFieldsMatchingRegexes(".*judgment").isEqualTo(new Stage(null, List.of(), null, null, null, null, null, null,
-				"abstain", null, REASONING, EVIDENCE, JUDGES));
-		assertThat(interpretation.stages()).usingRecursiveComparison().ignoringFieldsMatchingRegexes(".*judgment").isEqualTo(List.of(new Stage("structure", List.of("structure"), "cascade_tier",
-				"REJECT_ON_ANY_FAIL", "used", null, null, true, "abstain", null, REASONING, EVIDENCE, JUDGES)));
+		assertThat(interpretation.root()).usingRecursiveComparison()
+			.ignoringFieldsMatchingRegexes(".*judgment")
+			.isEqualTo(new Stage(null, List.of(), null, null, null, null, null, null, "abstain", null, REASONING,
+					EVIDENCE, JUDGES));
+		assertThat(interpretation.stages()).usingRecursiveComparison()
+			.ignoringFieldsMatchingRegexes(".*judgment")
+			.isEqualTo(List.of(new Stage("structure", List.of("structure"), "cascade_tier", "REJECT_ON_ANY_FAIL",
+					"used", null, null, true, "abstain", null, REASONING, EVIDENCE, JUDGES)));
 		assertThat(interpretation.summary()).isEqualTo(Summaries.of(interpretation));
 	}
 
@@ -85,9 +96,9 @@ class ExampleOneTest {
 		Interpretation fromStore = Verdicts.interpret(stored(EXAMPLE_ONE));
 		Interpretation fromJury = Verdicts.interpret(sameJury());
 
-		assertThat(fromJury.sourceVersion()).isEqualTo(2);
+		assertThat(fromJury.sourceVersion()).isEqualTo(3);
 		assertThat(fromStore.sourceVersion()).isEqualTo(1);
-		assertThat(fromJury.reading()).isEqualTo(fromStore.reading());
+		assertThat(fromJury.outcome()).isEqualTo(fromStore.outcome());
 		assertThat(fromJury).isEqualTo(Verdicts.interpret(Fixtures.asMap(sameJury())));
 	}
 

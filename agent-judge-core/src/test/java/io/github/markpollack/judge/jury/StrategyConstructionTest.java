@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
 import io.github.markpollack.judge.description.StrategyDescription;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import static io.github.markpollack.judge.JudgeTestFixtures.passJudgment;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,10 +30,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <p>
  * A null {@link ErrorPolicy} used to be accepted by every strategy constructor and then
- * failed every aggregation with a {@code NullPointerException}, even when every judge passed.
- * That failure surfaced only after the judges had run. A null {@link TiePolicy} on
- * {@link MajorityVotingStrategy} failed only on the first tie. Both are configuration errors
- * knowable before any judge runs, so they now fail at construction, naming the parameter.
+ * failed every aggregation with a {@code NullPointerException}, even when every judge
+ * passed. That failure surfaced only after the judges had run. A null {@link TiePolicy}
+ * on {@link MajorityVotingStrategy} failed only on the first tie. Both are configuration
+ * errors knowable before any judge runs, so they now fail at construction, naming the
+ * parameter.
  * </p>
  *
  * @author Mark Pollack
@@ -55,8 +56,7 @@ class StrategyConstructionTest {
 				() -> new MajorityVotingStrategy(TiePolicy.FAIL, null));
 		constructors.put("MedianVotingStrategy(ErrorPolicy)", () -> new MedianVotingStrategy((ErrorPolicy) null));
 		constructors.put("MedianVotingStrategy(double, ErrorPolicy)", () -> new MedianVotingStrategy(0.5, null));
-		constructors.put("WeightedAverageStrategy(ErrorPolicy)",
-				() -> new WeightedAverageStrategy((ErrorPolicy) null));
+		constructors.put("WeightedAverageStrategy(ErrorPolicy)", () -> new WeightedAverageStrategy((ErrorPolicy) null));
 		constructors.put("WeightedAverageStrategy(double, ErrorPolicy)", () -> new WeightedAverageStrategy(0.5, null));
 
 		return constructors.entrySet()
@@ -81,12 +81,13 @@ class StrategyConstructionTest {
 
 	@Test
 	void anInvalidThresholdIsStillReportedBeforeANullErrorPolicy() {
-		// The threshold was validated first before this change; that order is kept, so a caller
-		// passing both an invalid threshold and a null policy sees the same message as before.
+		// The threshold was validated first before this change; that order is kept, so a
+		// caller
+		// passing both an invalid threshold and a null policy sees the same message as
+		// before.
 		assertThatThrownBy(() -> new AverageVotingStrategy(2.0, null)).isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("threshold");
-		assertThatThrownBy(() -> new ConjunctiveStrategy(Double.NaN, null))
-			.isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> new ConjunctiveStrategy(Double.NaN, null)).isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("threshold");
 	}
 
@@ -120,14 +121,13 @@ class StrategyConstructionTest {
 			constructors.put("MedianVotingStrategy(ErrorPolicy)", MedianVotingStrategy::new);
 			constructors.put("MedianVotingStrategy(double, ErrorPolicy)", p -> new MedianVotingStrategy(0.6, p));
 			constructors.put("WeightedAverageStrategy(ErrorPolicy)", WeightedAverageStrategy::new);
-			constructors.put("WeightedAverageStrategy(double, ErrorPolicy)",
-					p -> new WeightedAverageStrategy(0.6, p));
+			constructors.put("WeightedAverageStrategy(double, ErrorPolicy)", p -> new WeightedAverageStrategy(0.6, p));
 			for (TiePolicy tiePolicy : TiePolicy.values()) {
 				constructors.put("MajorityVotingStrategy(" + tiePolicy + ", ErrorPolicy)",
 						p -> new MajorityVotingStrategy(tiePolicy, p));
 			}
-			constructors.forEach((name, constructor) -> tests
-				.add(DynamicTest.dynamicTest(name + " with " + errorPolicy, () -> {
+			constructors
+				.forEach((name, constructor) -> tests.add(DynamicTest.dynamicTest(name + " with " + errorPolicy, () -> {
 					VotingStrategy strategy = constructor.apply(errorPolicy);
 					assertThat(strategy.describe().errorPolicy()).isEqualTo(errorPolicy);
 					assertThatCode(() -> strategy.aggregate(ALL_PASS, Map.of())).doesNotThrowAnyException();

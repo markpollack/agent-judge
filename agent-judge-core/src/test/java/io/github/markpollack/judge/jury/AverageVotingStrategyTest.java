@@ -6,8 +6,8 @@
 package io.github.markpollack.judge.jury;
 
 import org.junit.jupiter.api.Test;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import java.util.List;
 import java.util.Map;
@@ -33,14 +33,14 @@ class AverageVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-				double score = result.score();
+		double score = result.score();
 		assertThat(score).isCloseTo(0.7, org.assertj.core.data.Offset.offset(0.01)); // (0.8
-																									// +
-																									// 0.7
-																									// +
-																									// 0.6)
-																									// /
-																									// 3
+																						// +
+																						// 0.7
+																						// +
+																						// 0.6)
+																						// /
+																						// 3
 		assertThat(result.reasoning()).contains("Average score: 0.70");
 	}
 
@@ -53,14 +53,14 @@ class AverageVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
-				double score = result.score();
+		double score = result.score();
 		assertThat(score).isCloseTo(0.2, org.assertj.core.data.Offset.offset(0.01)); // (0.3
-																									// +
-																									// 0.2
-																									// +
-																									// 0.1)
-																									// /
-																									// 3
+																						// +
+																						// 0.2
+																						// +
+																						// 0.1)
+																						// /
+																						// 3
 		assertThat(result.reasoning()).contains("Average score: 0.20");
 	}
 
@@ -215,7 +215,6 @@ class AverageVotingStrategyTest {
 		assertThat(evidence(strategy.aggregate(List.of(passJudgment(0.8)), Map.of())))
 			.containsEntry(AggregationEvidence.STRATEGY, "average");
 	}
-
 
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> evidence(Judgment judgment) {

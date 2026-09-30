@@ -5,13 +5,30 @@
 
 package io.github.markpollack.judge.jev;
 
+import io.github.markpollack.judge.acceptance.Policies;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.net.httpserver.HttpServer;
 import io.github.markpollack.judge.requirement.RequirementEvidence;
-import io.github.markpollack.judge.result.*;
-import io.github.markpollack.judge.jury.*;
-import io.github.markpollack.judge.jury.interpretation.*;
+import io.github.markpollack.judge.requirement.Requirement;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
+import io.github.markpollack.judge.judgment.NumericKind;
+import io.github.markpollack.judge.judgment.ProbabilityMass;
+import io.github.markpollack.judge.judgment.QualityDirection;
+import io.github.markpollack.judge.acceptance.AcceptanceAction;
+import io.github.markpollack.judge.acceptance.AcceptanceDecision;
+import io.github.markpollack.judge.acceptance.Policies;
+import io.github.markpollack.judge.provenance.ArtifactRef;
+import io.github.markpollack.judge.provenance.PolicyRef;
+import io.github.markpollack.judge.jury.AverageVotingStrategy;
+import io.github.markpollack.judge.jury.ConsensusStrategy;
+import io.github.markpollack.judge.jury.SimpleJury;
+import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.jury.interpretation.ReadingSupport;
+import io.github.markpollack.judge.jury.interpretation.RequirementOutcome;
+import io.github.markpollack.judge.jury.interpretation.Verdicts;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -61,8 +78,8 @@ class JevJudgeTest {
 			int call = calls.incrementAndGet();
 			byte[] request = exchange.getRequestBody().readAllBytes();
 			requests.put("request-" + call, request);
-			exchange.getResponseHeaders().add("x-typesafe-request-id",
-					requestId.get() == null ? "request-" + call : requestId.get());
+			exchange.getResponseHeaders()
+				.add("x-typesafe-request-id", requestId.get() == null ? "request-" + call : requestId.get());
 			byte[] body = response.get();
 			exchange.sendResponseHeaders(code.get(), body.length);
 			exchange.getResponseBody().write(body);
@@ -102,9 +119,10 @@ class JevJudgeTest {
 	}
 
 	static RequirementEvidence<String, JevEvidence> input(String requirement, String evidence, boolean complete) {
-		return new RequirementEvidence<>(requirement, new JevEvidence(evidence,
+		return new RequirementEvidence<>(Requirement.text("fixture", "1", requirement), new JevEvidence(evidence,
 				ArtifactRef.ofBytes("protected:bundle", evidence.getBytes(StandardCharsets.UTF_8), null), MANIFEST,
-				ArtifactRef.ofBytes("requirement", requirement.getBytes(StandardCharsets.UTF_8), null).sha256(), complete));
+				ArtifactRef.ofBytes("requirement", requirement.getBytes(StandardCharsets.UTF_8), null).sha256(),
+				complete));
 	}
 
 	static byte[] fixture(String name) {
@@ -155,7 +173,7 @@ class JevJudgeTest {
 				: fixture.startsWith("choice") || fixture.equals("confidence-out-of-range") ? choice() : NOUL;
 		Judgment j = judge(q).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(j.assessment()).isNull();
+		assertThat(j.finding()).isNull();
 		assertThat(calls).hasValue(1);
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
 		assertThat(j.reasoning()).doesNotContain("fake-key");
@@ -165,9 +183,9 @@ class JevJudgeTest {
 	void noulRetainsFalseProbabilityWithoutInventingCertainty() {
 		Judgment j = judge(NOUL).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(j.assessment().proposition().value()).isFalse();
-		assertThat(j.certainty()).isNull();
-		assertThat(j.distribution().masses()).containsExactly(new ProbabilityMass("false", .95),
+		assertThat(j.finding().booleanFinding().value()).isFalse();
+		assertThat(j.confidence()).isNull();
+		assertThat(j.probabilityDistribution().masses()).containsExactly(new ProbabilityMass("false", .95),
 				new ProbabilityMass("true", .05));
 		assertThat(j.metadata().get("usage")).isEqualTo(Map.of("inputTokens", 120, "outputTokens", 12));
 		assertThat(j.provenance().calibrationClaims().getFirst().signalIds())
@@ -181,9 +199,9 @@ class JevJudgeTest {
 		response.set(fixture("choice-valid"));
 		Judgment j = judge(choice()).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(j.certainty().value()).isEqualTo(.8);
-		assertThat(j.distribution().masses()).contains(new ProbabilityMass("violated", .9));
-		assertThat(j.assessment().category().alternatives()).hasSize(3);
+		assertThat(j.confidence().value()).isEqualTo(.8);
+		assertThat(j.probabilityDistribution().masses()).contains(new ProbabilityMass("violated", .9));
+		assertThat(j.finding().category().alternatives()).hasSize(3);
 	}
 
 	@Test
@@ -191,9 +209,9 @@ class JevJudgeTest {
 		response.set(fixture("score-valid"));
 		Judgment j = judge(score(true)).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ABSTAIN);
-		assertThat(j.assessment().numeric().value()).isEqualTo(1.7);
-		assertThat(j.assessment().numeric().kind()).isEqualTo(NumericKind.ORDINAL_EXPECTATION);
-		assertThat(j.certainty().value()).isEqualTo(.8);
+		assertThat(j.finding().numeric().value()).isEqualTo(1.7);
+		assertThat(j.finding().numeric().kind()).isEqualTo(NumericKind.ORDINAL_EXPECTATION);
+		assertThat(j.confidence().value()).isEqualTo(.8);
 		assertThat(j.provenance().evidence()).contains(REVIEW);
 		assertThat(j.provenance().calibrationClaims().getFirst().signalIds())
 			.containsExactly("jev.score.level-distribution:v1", "jev.score.confidence:v1");
@@ -212,15 +230,15 @@ class JevJudgeTest {
 			.votingStrategy(new ConsensusStrategy())
 			.build()
 			.vote(input());
-		assertThat(verdict.aggregated()).isEqualTo(j);
+		assertThat(verdict.judgment()).isEqualTo(j);
 		Verdict restored = Checks.JSON.readValue(Checks.JSON.writeValueAsBytes(verdict), Verdict.class);
 		assertThat(restored).isEqualTo(verdict);
 		var interpreted = Verdicts.interpret(restored);
 		assertThat(interpreted.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
-		assertThat(interpreted.root().judgment().assessment()).isEqualTo(j.assessment());
+		assertThat(interpreted.root().judgment().finding()).isEqualTo(j.finding());
 		assertThat(interpreted.root().judgment().provenance()).isEqualTo(j.provenance());
-		assertThat(interpreted.root().judgment().distribution()).isEqualTo(j.distribution());
-		assertThat(interpreted.root().judgment().certainty()).isEqualTo(j.certainty());
+		assertThat(interpreted.root().judgment().probabilityDistribution()).isEqualTo(j.probabilityDistribution());
+		assertThat(interpreted.root().judgment().confidence()).isEqualTo(j.confidence());
 		var wire = Checks.JSON.convertValue(verdict,
 				new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
 				});
@@ -258,12 +276,13 @@ class JevJudgeTest {
 		requestId.set(id);
 		response.set(Checks.json(body));
 		assertThat(response.get().length).isLessThanOrEqualTo(65536);
-		Judgment j = new JevJudge("fake-key", "jev-1.13.0", endpoint(), Duration.ofSeconds(3), 24576, 65536,
-				NOUL, http, this::capture).judge(input());
+		Judgment j = new JevJudge("fake-key", "jev-1.13.0", endpoint(), Duration.ofSeconds(3), 24576, 65536, NOUL, http,
+				this::capture)
+			.judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(j.provenance()).isNotNull();
-		assertThat(j.assessment().proposition().value()).isFalse();
-		assertThat(j.distribution().masses()).containsExactly(new ProbabilityMass("false", 0.95),
+		assertThat(j.finding().booleanFinding().value()).isFalse();
+		assertThat(j.probabilityDistribution().masses()).containsExactly(new ProbabilityMass("false", 0.95),
 				new ProbabilityMass("true", 0.05));
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
 		assertThat(diagnosticText(j, "reportedModel")).isEqualTo(reportedModel);
@@ -273,15 +292,17 @@ class JevJudgeTest {
 		assertThat(captured.values()).allSatisfy(bytes -> assertThat(bytes.length).isLessThanOrEqualTo(65536));
 		PolicyRef policy = new PolicyRef("use", "1", MANIFEST.sha256());
 		Judgment applied = Policies.apply(j, policy,
-				input -> new Acceptance(AcceptanceAction.USE_ASSESSMENT, "Use retained assessment"));
-		var verdict = io.github.markpollack.judge.jury.SimpleJury.<RequirementEvidence<String, JevEvidence>>builder().judge(input -> applied)
-			.votingStrategy(new io.github.markpollack.judge.jury.AverageVotingStrategy()).build()
+				input -> new AcceptanceDecision(AcceptanceAction.RELY, "Use retained assessment"));
+		var verdict = io.github.markpollack.judge.jury.SimpleJury.<RequirementEvidence<String, JevEvidence>>builder()
+			.judge(input -> applied)
+			.votingStrategy(new io.github.markpollack.judge.jury.AverageVotingStrategy())
+			.build()
 			.vote(input());
-		assertThat(verdict.aggregated()).isEqualTo(applied);
+		assertThat(verdict.judgment()).isEqualTo(applied);
 		assertThat(applied.provenance()).isEqualTo(j.provenance());
-		assertThat(applied.assessment()).isEqualTo(j.assessment());
-		assertThat(io.github.markpollack.judge.jury.interpretation.Verdicts.interpret(verdict).reading())
-			.isEqualTo(io.github.markpollack.judge.jury.interpretation.VerdictReading.REJECTED);
+		assertThat(applied.finding()).isEqualTo(j.finding());
+		assertThat(io.github.markpollack.judge.jury.interpretation.Verdicts.interpret(verdict).outcome())
+			.isEqualTo(io.github.markpollack.judge.jury.interpretation.RequirementOutcome.VIOLATED);
 		assertThat(calls).hasValue(1);
 	}
 
@@ -354,7 +375,9 @@ class JevJudgeTest {
 
 	@Test
 	void rejectsMissingEvidenceAndIncompleteBinaryWithoutCalls() {
-		assertThatNullPointerException().isThrownBy(() -> new RequirementEvidence<String, JevEvidence>(GOAL, null))
+		assertThatNullPointerException()
+			.isThrownBy(
+					() -> new RequirementEvidence<String, JevEvidence>(Requirement.text("fixture", "1", GOAL), null))
 			.withMessage("evidence");
 		assertThatNullPointerException().isThrownBy(() -> new RequirementEvidence<>(null, input().evidence()))
 			.withMessage("requirement");
@@ -383,7 +406,8 @@ class JevJudgeTest {
 	@Test
 	void evidenceCompletenessCannotTransferToAnotherRequirement() {
 		var original = input();
-		var changed = new RequirementEvidence<>("Unrelated requirement", original.evidence());
+		var changed = new RequirementEvidence<>(Requirement.text("unrelated", "1", "Unrelated requirement"),
+				original.evidence());
 		assertThat(judge(NOUL).judge(changed).status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(calls).hasValue(0);
 	}
@@ -409,8 +433,8 @@ class JevJudgeTest {
 			Judgment j = judge(NOUL).judge(input());
 			assertThat(j.status())
 				.isEqualTo(p == .5 ? JudgmentStatus.ABSTAIN : p == 0 ? JudgmentStatus.FAIL : JudgmentStatus.PASS);
-			assertThat(j.assessment().proposition().value()).isEqualTo(p == .5 ? null : p == 1);
-			assertThat(j.certainty()).isNull();
+			assertThat(j.finding().booleanFinding().value()).isEqualTo(p == .5 ? null : p == 1);
+			assertThat(j.confidence()).isNull();
 		}
 	}
 
@@ -460,8 +484,8 @@ class JevJudgeTest {
 			response.set(Checks.json(body));
 			Judgment j = judge(q).judge(input());
 			assertThat(j.status()).isEqualTo(index == 0 ? JudgmentStatus.PASS : JudgmentStatus.FAIL);
-			assertThat(j.assessment().numeric().value()).isEqualTo(index);
-			assertThat(j.assessment().numeric().qualityScore().orElseThrow()).isEqualTo(index == 0 ? 1 : 0);
+			assertThat(j.finding().numeric().value()).isEqualTo(index);
+			assertThat(j.finding().numeric().qualityScore().orElseThrow()).isEqualTo(index == 0 ? 1 : 0);
 		}
 	}
 
@@ -511,7 +535,7 @@ class JevJudgeTest {
 		response.set(new byte[33000]);
 		Judgment j = judge(NOUL).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(j.assessment()).isNull();
+		assertThat(j.finding()).isNull();
 		assertThat(calls).hasValue(1);
 	}
 
@@ -680,8 +704,8 @@ class JevJudgeTest {
 		response.set(Checks.json(body));
 		Judgment j = gatewayJudge(choice()).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(j.certainty().value()).isEqualTo(.8);
-		assertThat(j.distribution().masses()).contains(new ProbabilityMass("violated", .9));
+		assertThat(j.confidence().value()).isEqualTo(.8);
+		assertThat(j.probabilityDistribution().masses()).contains(new ProbabilityMass("violated", .9));
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
 		assertThat(providerMetadata(j)).isEqualTo(body.path("provider_metadata"));
 		assertThat(trace(j).path("underlyingModelVersion").asText()).isEqualTo("unknown");
@@ -718,8 +742,8 @@ class JevJudgeTest {
 		Judgment j = gatewayJudge(choice()).judge(input());
 		double expected = new java.math.BigDecimal(nativeCost.replace("\"", "")).doubleValue();
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(j.certainty().value()).isEqualTo(.8);
-		assertThat(j.distribution().masses()).contains(new ProbabilityMass("violated", .9));
+		assertThat(j.confidence().value()).isEqualTo(.8);
+		assertThat(j.probabilityDistribution().masses()).contains(new ProbabilityMass("violated", .9));
 		JsonNode usage = Checks.JSON.valueToTree(j.metadata().get("usage"));
 		assertThat(usage.path("cost").isNumber()).isTrue();
 		assertThat(usage.path("cost").doubleValue()).isEqualTo(expected);
@@ -733,7 +757,11 @@ class JevJudgeTest {
 		assertThat(j.checks()).isEmpty();
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
 		assertThat(Checks.JSON.readValue(Checks.json(j), Judgment.class)).isEqualTo(j);
-		var verdict = SimpleJury.<RequirementEvidence<String, JevEvidence>>builder().judge(c -> j).votingStrategy(new ConsensusStrategy()).build().vote(input());
+		var verdict = SimpleJury.<RequirementEvidence<String, JevEvidence>>builder()
+			.judge(c -> j)
+			.votingStrategy(new ConsensusStrategy())
+			.build()
+			.vote(input());
 		var reopened = Checks.JSON.readValue(Checks.json(verdict), Verdict.class);
 		assertThat(reopened).isEqualTo(verdict);
 		assertThat(Verdicts.interpret(reopened).root().judgment().metadata()).isEqualTo(j.metadata());
@@ -748,7 +776,7 @@ class JevJudgeTest {
 		response.set(body.replace("\"cost\":\"0\"", "\"cost\":" + nativeCost).getBytes(StandardCharsets.UTF_8));
 		Judgment j = gatewayJudge(choice()).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(j.certainty().value()).isEqualTo(.8);
+		assertThat(j.confidence().value()).isEqualTo(.8);
 		assertThat(j.metadata().get("usage")).isEqualTo(Map.of("inputTokens", 120, "outputTokens", 12));
 		assertThat(trace(j).path("usage").has("cost")).isFalse();
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
@@ -780,7 +808,10 @@ class JevJudgeTest {
 		if (fixture.equals("choice-insufficient")) {
 			ObjectNode answer = (ObjectNode) body.at("/answers/q");
 			answer.put("choice", "insufficient_evidence");
-			answer.putObject("probabilities").put("satisfied", .05).put("violated", .05).put("insufficient_evidence", .9);
+			answer.putObject("probabilities")
+				.put("satisfied", .05)
+				.put("violated", .05)
+				.put("insufficient_evidence", .9);
 		}
 		((ObjectNode) body.at("/provider_metadata/gateway")).put("cost", "0.000182742");
 		response.set(Checks.json(body));
@@ -793,8 +824,8 @@ class JevJudgeTest {
 		};
 		assertThat(j.status()).isEqualTo(expected);
 		if (expected == JudgmentStatus.ERROR) {
-			assertThat(j.assessment()).isNull();
-			assertThat(j.certainty()).isNull();
+			assertThat(j.finding()).isNull();
+			assertThat(j.confidence()).isNull();
 		}
 		assertThat(Checks.JSON.valueToTree(j.metadata()).at("/usage/cost").isNumber()).isTrue();
 		assertThat(Checks.JSON.valueToTree(j.metadata()).at("/usage/cost").doubleValue()).isEqualTo(.000182742);
@@ -814,8 +845,8 @@ class JevJudgeTest {
 		response.set(Checks.json(body));
 		Judgment j = gatewayJudge(choice()).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(j.assessment()).isNull();
-		assertThat(j.certainty()).isNull();
+		assertThat(j.finding()).isNull();
+		assertThat(j.confidence()).isNull();
 		assertThat(calls).hasValue(1);
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
 	}
@@ -895,9 +926,9 @@ class JevJudgeTest {
 			.judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(j.provenance()).isNotNull();
-		assertThat(j.assessment().category().selected()).isEqualTo("violated");
-		assertThat(j.certainty().value()).isEqualTo(.8);
-		assertThat(j.distribution().masses()).contains(new ProbabilityMass("violated", .9));
+		assertThat(j.finding().category().selected()).isEqualTo("violated");
+		assertThat(j.confidence().value()).isEqualTo(.8);
+		assertThat(j.probabilityDistribution().masses()).contains(new ProbabilityMass("violated", .9));
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
 		assertThat(calls).hasValue(1);
 		assertThat(Checks.JSON.readValue(Checks.json(j), Judgment.class)).isEqualTo(j);
@@ -933,9 +964,9 @@ class JevJudgeTest {
 			.judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(j.provenance()).isNotNull();
-		assertThat(j.assessment()).isNull();
-		assertThat(j.certainty()).isNull();
-		assertThat(j.distribution()).isNull();
+		assertThat(j.finding()).isNull();
+		assertThat(j.confidence()).isNull();
+		assertThat(j.probabilityDistribution()).isNull();
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
 		assertThat(providerMetadata(j)).isEqualTo(body.path("provider_metadata"));
 		assertThat(artifact(j, "trace").length).isLessThan(4096);

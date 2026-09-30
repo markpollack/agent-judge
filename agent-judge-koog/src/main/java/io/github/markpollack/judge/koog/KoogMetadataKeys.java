@@ -1,6 +1,6 @@
 package io.github.markpollack.judge.koog;
 
-/** Public constants for Koog facts stored in {@code JudgmentContext.metadata()}. */
+/** Public constants for Koog facts stored in {@code CompletionEvidence.metadata()}. */
 public final class KoogMetadataKeys {
 
 	/** Unique Koog agent identifier. */

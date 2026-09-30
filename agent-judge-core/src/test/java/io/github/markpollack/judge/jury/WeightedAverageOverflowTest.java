@@ -5,15 +5,15 @@
 
 package io.github.markpollack.judge.jury;
 
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 
 import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static io.github.markpollack.judge.JudgeTestFixtures.booleanFail;
 import static io.github.markpollack.judge.JudgeTestFixtures.booleanPass;
@@ -28,10 +28,10 @@ import static org.assertj.core.api.Assertions.within;
  *
  * <p>
  * Every weight here is individually legal: finite and not negative. Their total, however,
- * exceeds {@link Double#MAX_VALUE}. The ordinary arithmetic then divided {@code Infinity} by
- * {@code Infinity}, and the resulting {@code NaN} score, or the {@code Infinity} weight in the
- * evidence, was refused on the way into the {@link Judgment}. The exception escaped
- * {@code SimpleJury.vote()}.
+ * exceeds {@link Double#MAX_VALUE}. The ordinary arithmetic then divided {@code Infinity}
+ * by {@code Infinity}, and the resulting {@code NaN} score, or the {@code Infinity}
+ * weight in the evidence, was refused on the way into the {@link Judgment}. The exception
+ * escaped {@code SimpleJury.vote()}.
  * </p>
  *
  * <p>
@@ -100,7 +100,8 @@ class WeightedAverageOverflowTest {
 
 	@Test
 	void anOverflowingInputTotalWithAFiniteEligibleTotalReportsTheEligibleTotalExactly() {
-		// The abstaining judge's weight pushes the input total past MAX; the eligible total is
+		// The abstaining judge's weight pushes the input total past MAX; the eligible
+		// total is
 		// MAX/2 and is reported as computed.
 		Judgment result = new WeightedAverageStrategy().aggregate(
 				List.of(Judgment.abstain("not applicable"), passJudgment(0.8), failJudgment(0.2)),
@@ -138,7 +139,7 @@ class WeightedAverageOverflowTest {
 
 	@Test
 	void aSimpleJuryWithMaxValueWeightsVotesNormally() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(context -> passJudgment(0.9), MAX)
 			.judge(context -> failJudgment(0.3), MAX)
 			.votingStrategy(new WeightedAverageStrategy())
@@ -147,10 +148,10 @@ class WeightedAverageOverflowTest {
 
 		Verdict verdict = jury.vote(simpleContext("overflowing weights"));
 
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(verdict.aggregated().score()).isCloseTo(0.6, within(1e-15));
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().score()).isCloseTo(0.6, within(1e-15));
 		assertThat(verdict.individual()).hasSize(2);
-		assertThat(evidence(verdict.aggregated())).containsEntry(AggregationEvidence.INPUT_WEIGHT, MAX)
+		assertThat(evidence(verdict.judgment())).containsEntry(AggregationEvidence.INPUT_WEIGHT, MAX)
 			.containsEntry(AggregationEvidence.ELIGIBLE_WEIGHT, MAX);
 	}
 

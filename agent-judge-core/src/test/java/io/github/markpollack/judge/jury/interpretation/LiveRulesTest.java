@@ -5,7 +5,7 @@
 
 package io.github.markpollack.judge.jury.interpretation;
 
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 
 import java.util.List;
 
@@ -23,7 +23,7 @@ import io.github.markpollack.judge.jury.NotApplicablePolicy;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.TierPolicy;
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import static io.github.markpollack.judge.jury.interpretation.Fixtures.BOUNDARY_GOLDEN;
 import static io.github.markpollack.judge.jury.interpretation.Fixtures.COMPOSITE_GOLDEN;
@@ -42,8 +42,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("The rules on live verdicts")
 class LiveRulesTest {
 
-	private static Jury<JudgmentContext> boundaryRejectingCascade() {
-		return CascadedJury.<JudgmentContext>builder()
+	private static Jury<CompletionEvidence> boundaryRejectingCascade() {
+		return CascadedJury.<CompletionEvidence>builder()
 			.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic", passingTier("ok", "OK"), TierPolicy.FINAL_TIER)
 			.build();
@@ -52,7 +52,7 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("A4: a root error from a propagated judge error reads NOT_ASSESSED, never REJECTED")
 	void aPropagatedJudgeErrorIsNotAssessed() {
-		Verdict verdict = SimpleJury.<JudgmentContext>builder()
+		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> Judgment.error("the index was unreachable"), "flaky"))
 			.judge(Judges.named(context -> Judgment.pass("fine"), "ok"))
 			.votingStrategy(new ConsensusStrategy())
@@ -60,11 +60,11 @@ class LiveRulesTest {
 			.vote(CONTEXT);
 
 		for (Interpretation interpretation : List.of(Verdicts.interpret(verdict), Verdicts.interpret(asMap(verdict)))) {
-			assertThat(interpretation.reading()).isEqualTo(VerdictReading.NOT_ASSESSED);
+			assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.NOT_ASSESSED);
 			assertThat(interpretation.root().status()).isEqualTo("error");
 			assertThat(interpretation.root().reasonCode()).isEqualTo("errors_propagated");
-			assertThat(interpretation.root().judges()).extracting(JudgeSeat::name, JudgeSeat::status,
-					JudgeSeat::reasonCode)
+			assertThat(interpretation.root().judges())
+				.extracting(JudgeSeat::name, JudgeSeat::status, JudgeSeat::reasonCode)
 				.containsExactly(org.assertj.core.groups.Tuple.tuple("flaky", "error", "judge_reported"),
 						org.assertj.core.groups.Tuple.tuple("ok", "pass", null));
 			assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
@@ -75,14 +75,14 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("A4: a cascade that decided nothing reads NOT_ASSESSED, not UNDECIDED")
 	void noTierDecidedIsNotAssessed() {
-		Verdict verdict = CascadedJury.<JudgmentContext>builder()
+		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
 			.tier("only", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
 		Interpretation interpretation = Verdicts.interpret(verdict);
 
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.NOT_ASSESSED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.NOT_ASSESSED);
 		assertThat(interpretation.root().reasonCode()).isEqualTo("no_tier_decided");
 		assertThat(interpretation.decidedBy()).isNull();
 		assertThat(interpretation.stages().get(0).usedByParent()).isFalse();
@@ -93,7 +93,7 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("A5: an all-not-applicable roster reads NOT_APPLICABLE, and each exclusion is listed with its reason")
 	void anAllNotApplicableRosterIsNotApplicable() {
-		Verdict verdict = SimpleJury.<JudgmentContext>builder()
+		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
 			.judge(new Fixtures.Conditional("style", Judgment.notApplicable(EXCLUSION)))
 			.judge(new Fixtures.Conditional("layout", Judgment.notApplicable("no layout to check")))
 			.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
@@ -101,10 +101,10 @@ class LiveRulesTest {
 			.vote(CONTEXT);
 
 		for (Interpretation interpretation : List.of(Verdicts.interpret(verdict), Verdicts.interpret(asMap(verdict)))) {
-			assertThat(interpretation.reading()).isEqualTo(VerdictReading.NOT_APPLICABLE);
+			assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.NOT_APPLICABLE);
 			assertThat(interpretation.root().status()).isEqualTo("not_applicable");
-			assertThat(interpretation.root().judges()).extracting(JudgeSeat::name, JudgeSeat::status,
-					JudgeSeat::reasoning)
+			assertThat(interpretation.root().judges())
+				.extracting(JudgeSeat::name, JudgeSeat::status, JudgeSeat::reasoning)
 				.containsExactly(org.assertj.core.groups.Tuple.tuple("style", "not_applicable", EXCLUSION),
 						org.assertj.core.groups.Tuple.tuple("layout", "not_applicable", "no layout to check"));
 			assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
@@ -115,7 +115,7 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("A5: an excluded judge beside a passing one is listed as not applicable, not as a failure")
 	void anExcludedJudgeIsNotAFailure() {
-		Verdict verdict = SimpleJury.<JudgmentContext>builder()
+		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
 			.judge(new Fixtures.Conditional("style", Judgment.notApplicable(EXCLUSION)))
 			.judge(Judges.named(context -> Judgment.pass("compiled"), "build"))
 			.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
@@ -124,7 +124,7 @@ class LiveRulesTest {
 
 		Interpretation interpretation = Verdicts.interpret(verdict);
 
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.ACCEPTED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.SATISFIED);
 		assertThat(interpretation.root().judges().get(0).status()).isEqualTo("not_applicable");
 		assertThat(interpretation.root().judges().get(0).reasoning()).isEqualTo(EXCLUSION);
 		assertThat(interpretation.root().evidence().notApplicableCount()).isEqualTo(1);
@@ -134,15 +134,16 @@ class LiveRulesTest {
 	@Test
 	@DisplayName("A6: the CHILD_UNDECIDED variant reads REJECTED, decided by the parent's tier")
 	void theChildUndecidedVariant() {
-		Verdict verdict = CascadedJury.<JudgmentContext>builder()
+		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
 			.tier("gate", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic", passingTier("ok", "OK"), TierPolicy.FINAL_TIER)
 			.build()
 			.vote(CONTEXT);
 
 		for (Interpretation interpretation : List.of(Verdicts.interpret(verdict), Verdicts.interpret(asMap(verdict)))) {
-			assertThat(interpretation.reading()).isEqualTo(VerdictReading.REJECTED);
-			assertThat(interpretation.decidedBy()).isEqualTo(new DecidedBy("gate", List.of("gate"), "individual_rejection"));
+			assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
+			assertThat(interpretation.decidedBy())
+				.isEqualTo(new DecidedBy("gate", List.of("gate"), "individual_rejection"));
 			assertThat(interpretation.root().status()).as("no FAIL is manufactured").isEqualTo("error");
 			assertThat(interpretation.root().reasonCode()).isEqualTo("aggregation_failed");
 			assertThat(interpretation.stages()).extracting(Stage::stage).containsExactly("gate");
@@ -158,11 +159,12 @@ class LiveRulesTest {
 		Verdict verdict = boundaryRejectingCascade().vote(CONTEXT);
 
 		for (Interpretation interpretation : List.of(Verdicts.interpret(verdict), Verdicts.interpret(asMap(verdict)))) {
-			assertThat(interpretation.reading()).isEqualTo(VerdictReading.REJECTED);
+			assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
 			assertThat(interpretation.decidedBy())
 				.isEqualTo(new DecidedBy("rubric", List.of("rubric"), "individual_rejection"));
 			assertThat(interpretation.root().reasonCode()).isEqualTo("stage_failed");
-			assertThat(interpretation.stages().get(0).status()).as("the child's own claim is kept").isEqualTo("not_applicable");
+			assertThat(interpretation.stages().get(0).status()).as("the child's own claim is kept")
+				.isEqualTo("not_applicable");
 			assertThat(interpretation.stages().get(0).reason()).isEqualTo("undeclared_not_applicable");
 			assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
 			assertThat(interpretation.defects()).isEmpty();
@@ -173,7 +175,7 @@ class LiveRulesTest {
 	@ValueSource(booleans = { true, false })
 	@DisplayName("A6: a rejecting cascade nested in another is decided by the inner tier, at its full path")
 	void aNestedRejection(boolean asFinalTier) {
-		CascadedJury.Builder<JudgmentContext> builder = CascadedJury.<JudgmentContext>builder();
+		CascadedJury.Builder<CompletionEvidence> builder = CascadedJury.<CompletionEvidence>builder();
 		if (asFinalTier) {
 			builder.tier("inner", boundaryRejectingCascade(), TierPolicy.FINAL_TIER);
 		}
@@ -185,11 +187,11 @@ class LiveRulesTest {
 
 		Interpretation interpretation = Verdicts.interpret(verdict);
 
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.REJECTED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
 		assertThat(interpretation.decidedBy())
 			.isEqualTo(new DecidedBy("rubric", List.of("inner", "rubric"), "individual_rejection"));
-		assertThat(interpretation.stages()).extracting(Stage::path).containsExactly(List.of("inner"),
-				List.of("inner", "rubric"));
+		assertThat(interpretation.stages()).extracting(Stage::path)
+			.containsExactly(List.of("inner"), List.of("inner", "rubric"));
 		assertThat(interpretation.stages().get(0).usedByParent()).isTrue();
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
 		assertThat(interpretation.defects()).isEmpty();
@@ -202,7 +204,7 @@ class LiveRulesTest {
 
 		assertThat(interpretation.decidedBy())
 			.isEqualTo(new DecidedBy("rubric", List.of("rubric"), "individual_rejection"));
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.REJECTED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
 	}
 
 	@Test
@@ -212,20 +214,26 @@ class LiveRulesTest {
 
 		assertThat(interpretation.decidedBy()).isNull();
 		assertThat(interpretation.defects()).isEmpty();
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.ACCEPTED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.SATISFIED);
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
 	}
 
 	@Test
 	@DisplayName("an outcome adopted through two tiers is decided by the last edge, with basis tier_outcome")
 	void anAdoptedOutcomeIsDecidedByTheLastEdge() {
-		Jury<JudgmentContext> inner = CascadedJury.<JudgmentContext>builder().tier("leaf", twoSeatPassingReduction(), TierPolicy.FINAL_TIER).build();
-		Verdict verdict = CascadedJury.<JudgmentContext>builder().tier("outer-tier", inner, TierPolicy.FINAL_TIER).build().vote(CONTEXT);
+		Jury<CompletionEvidence> inner = CascadedJury.<CompletionEvidence>builder()
+			.tier("leaf", twoSeatPassingReduction(), TierPolicy.FINAL_TIER)
+			.build();
+		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
+			.tier("outer-tier", inner, TierPolicy.FINAL_TIER)
+			.build()
+			.vote(CONTEXT);
 
 		Interpretation interpretation = Verdicts.interpret(verdict);
 
-		assertThat(interpretation.decidedBy()).isEqualTo(new DecidedBy("leaf", List.of("outer-tier", "leaf"), "tier_outcome"));
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.ACCEPTED);
+		assertThat(interpretation.decidedBy())
+			.isEqualTo(new DecidedBy("leaf", List.of("outer-tier", "leaf"), "tier_outcome"));
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.SATISFIED);
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
 	}
 
@@ -234,12 +242,13 @@ class LiveRulesTest {
 	void aMetaJuryStageFailure() {
 		Interpretation interpretation = Verdicts.interpret(Fixtures.readMap(COMPOSITE_GOLDEN));
 
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.NOT_ASSESSED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.NOT_ASSESSED);
 		assertThat(interpretation.decidedBy()).isNull();
-		assertThat(interpretation.stages()).extracting(Stage::path).containsExactly(List.of("pipeline"),
-				List.of("pipeline", "broken-check"), List.of("pipeline", "semantic-check"), List.of("audit"));
-		assertThat(interpretation.stages()).extracting(Stage::failure).containsExactly(null, "jury_execution_failed",
-				null, "jury_execution_failed");
+		assertThat(interpretation.stages()).extracting(Stage::path)
+			.containsExactly(List.of("pipeline"), List.of("pipeline", "broken-check"),
+					List.of("pipeline", "semantic-check"), List.of("audit"));
+		assertThat(interpretation.stages()).extracting(Stage::failure)
+			.containsExactly(null, "jury_execution_failed", null, "jury_execution_failed");
 		assertThat(interpretation.stages()).extracting(Stage::usedByParent).containsExactly(true, false, true, false);
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
 		assertThat(interpretation.defects()).isEmpty();
@@ -259,11 +268,12 @@ class LiveRulesTest {
 	}
 
 	/** These legacy-reader tests exercise an explicit reduction, not modern identity. */
-	private static Jury<JudgmentContext> twoSeatPassingReduction() {
-		return io.github.markpollack.judge.jury.SimpleJury.<JudgmentContext>builder()
+	private static Jury<CompletionEvidence> twoSeatPassingReduction() {
+		return io.github.markpollack.judge.jury.SimpleJury.<CompletionEvidence>builder()
 			.judge(io.github.markpollack.judge.Judges.named(context -> Judgment.pass("first"), "first"))
 			.judge(io.github.markpollack.judge.Judges.named(context -> Judgment.pass("second"), "second"))
-			.votingStrategy(new io.github.markpollack.judge.jury.ConsensusStrategy()).build();
+			.votingStrategy(new io.github.markpollack.judge.jury.ConsensusStrategy())
+			.build();
 	}
 
 }

@@ -22,13 +22,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Generates the two example files: the full stored item with the original verdict, unchanged,
- * beside its {@code interpretation}.
+ * Generates the two example files: the full stored item with the original verdict,
+ * unchanged, beside its {@code interpretation}.
  *
- * <p>Example one comes from the generated 0.17 cascade copied into the test resources. Example
- * two comes from the {@code bud-ddd} archive on this machine ({@code -Daj26.example.two} names
- * the run file) and is skipped where that archive is absent. Both are written under
- * {@code -Daj26.examples.dir}, by default {@code target/aj26-examples} at the reactor root.
+ * <p>
+ * Example one comes from the generated 0.17 cascade copied into the test resources.
+ * Example two comes from the {@code bud-ddd} archive on this machine
+ * ({@code -Daj26.example.two} names the run file) and is skipped where that archive is
+ * absent. Both are written under {@code -Daj26.examples.dir}, by default
+ * {@code target/aj26-examples} at the reactor root.
  */
 @DisplayName("The generated example files")
 class ExampleFilesTest {
@@ -46,7 +48,9 @@ class ExampleFilesTest {
 		return dir.toAbsolutePath().normalize();
 	}
 
-	/** Every item with a verdict gains an {@code interpretation} member directly after it. */
+	/**
+	 * Every item with a verdict gains an {@code interpretation} member directly after it.
+	 */
 	private static ObjectNode withInterpretations(JsonNode run) {
 		ObjectNode out = run.deepCopy();
 		ArrayNode items = (ArrayNode) out.get("items");
@@ -61,6 +65,8 @@ class ExampleFilesTest {
 			Iterator<Map.Entry<String, JsonNode>> fields = item.fields();
 			while (fields.hasNext()) {
 				Map.Entry<String, JsonNode> field = fields.next();
+				if (field.getKey().equals("interpretation"))
+					continue;
 				rebuilt.set(field.getKey(), field.getValue());
 				if (field.getKey().equals("verdict")) {
 					rebuilt.set("interpretation", MAPPER.valueToTree(interpretation));
@@ -88,8 +94,9 @@ class ExampleFilesTest {
 
 		JsonNode written = MAPPER.readTree(file.toFile());
 		JsonNode item = written.get("items").get(0);
-		assertThat(item.get("verdict")).as("the original verdict is unchanged").isEqualTo(run.get("items").get(0).get("verdict"));
-		assertThat(item.get("interpretation").get("reading").asText()).isEqualTo("UNDECIDED");
+		assertThat(item.get("verdict")).as("the original verdict is unchanged")
+			.isEqualTo(run.get("items").get(0).get("verdict"));
+		assertThat(item.get("interpretation").get("outcome").asText()).isEqualTo("UNRESOLVED");
 		assertThat(item.get("interpretation").get("decidedBy").get("stage").asText()).isEqualTo("structure");
 		assertThat(item.fieldNames()).toIterable().containsSequence("verdict", "interpretation");
 	}
@@ -107,8 +114,9 @@ class ExampleFilesTest {
 		JsonNode written = MAPPER.readTree(file.toFile());
 		JsonNode item = written.get("items").get(0);
 		assertThat(item.get("itemSlug").asText()).isEqualTo("review-derived-brief:spring-batch");
-		assertThat(item.get("verdict")).as("the original verdict is unchanged").isEqualTo(run.get("items").get(0).get("verdict"));
-		assertThat(item.get("interpretation").get("reading").asText()).isEqualTo("REJECTED");
+		assertThat(item.get("verdict")).as("the original verdict is unchanged")
+			.isEqualTo(run.get("items").get(0).get("verdict"));
+		assertThat(item.get("interpretation").get("outcome").asText()).isEqualTo("VIOLATED");
 		assertThat(item.get("interpretation").get("decidedBy").isNull()).isTrue();
 		assertThat(item.get("interpretation").get("sourceVersion").asInt()).isEqualTo(0);
 		assertThat(item.get("interpretation").get("defects").size()).isEqualTo(10);

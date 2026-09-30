@@ -8,15 +8,15 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
 
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.jury.ErrorPolicy;
 import io.github.markpollack.judge.jury.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.TiePolicy;
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,7 +51,7 @@ class CommonPoolTemplateRenderingTests {
 		var template = JudgePromptTemplate.fromClasspath(TEMPLATE);
 
 		Rendered rendered = onCommonPoolWorkerWithoutApplicationContextClassLoader(
-				() -> new Rendered(Thread.currentThread(), template.render(renderContext())));
+				() -> new Rendered(Thread.currentThread(), template.render(CompletionVariables.from(renderContext()))));
 
 		assertThat(rendered.thread()).isInstanceOf(ForkJoinWorkerThread.class);
 		assertThat(((ForkJoinWorkerThread) rendered.thread()).getPool()).isSameAs(ForkJoinPool.commonPool());
@@ -65,9 +65,10 @@ class CommonPoolTemplateRenderingTests {
 		// worker, and the two template-backed judges below vanished from the vote.
 		var template = JudgePromptTemplate.fromClasspath(TEMPLATE);
 
-		Judge<JudgmentContext> renders = context -> Judgment.pass(blindContextClassLoader(() -> template.render(context)));
+		Judge<CompletionEvidence> renders = context -> Judgment
+			.pass(blindContextClassLoader(() -> template.render(CompletionVariables.from(context))));
 
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(renders)
 			.judge(renders)
 			.judge(context -> Judgment.pass("no template"))
@@ -80,17 +81,17 @@ class CommonPoolTemplateRenderingTests {
 		assertThat(verdict.individual()).hasSize(3);
 		assertThat(verdict.individual()).noneMatch(judgment -> judgment.status() == JudgmentStatus.ERROR);
 		assertThat(verdict.individual().get(0).reasoning()).contains("test goal").contains("test output");
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	private record Rendered(Thread thread, String text) {
 	}
 
-	private static JudgmentContext renderContext() {
-		return JudgmentContext.builder()
-			.goal("test goal")
-			.agentOutput("test output")
-			.status(ExecutionStatus.SUCCESS)
+	private static CompletionEvidence renderContext() {
+		return CompletionEvidence.builder()
+			.request("test goal")
+			.response("test output")
+			.status(CompletionStatus.SUCCESS)
 			.build();
 	}
 

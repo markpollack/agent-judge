@@ -1,6 +1,8 @@
 package io.github.markpollack.judge.langchain4j;
 
-/** Public constants for LangChain4j facts stored in {@code JudgmentContext.metadata()}. */
+/**
+ * Public constants for LangChain4j facts stored in {@code CompletionEvidence.metadata()}.
+ */
 public final class LangChain4jMetadataKeys {
 
 	/** Identifier of the final model response. */

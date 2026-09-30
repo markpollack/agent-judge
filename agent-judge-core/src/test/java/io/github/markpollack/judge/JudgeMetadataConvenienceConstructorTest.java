@@ -13,31 +13,32 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
 import io.github.markpollack.judge.jury.ErrorPolicy;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.NotApplicablePolicy;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * The three-argument constructor is the shape a judge that never excludes a subject is written in.
+ * The three-argument constructor is the shape a judge that never excludes a subject is
+ * written in.
  *
  * <p>
- * It exists so that the overwhelmingly common judge — one that answers its question every time —
- * does not have to write a trailing {@code null} for a feature it does not use. What matters is
- * that the convenience is only a convenience: it must produce exactly the record the four-argument
- * form produces with {@code null}, it must be read as <em>no declaration</em> everywhere the
- * capability is looked up, and it must not become a way round the validation the canonical
- * constructor performs.
+ * It exists so that the overwhelmingly common judge — one that answers its question every
+ * time — does not have to write a trailing {@code null} for a feature it does not use.
+ * What matters is that the convenience is only a convenience: it must produce exactly the
+ * record the four-argument form produces with {@code null}, it must be read as <em>no
+ * declaration</em> everywhere the capability is looked up, and it must not become a way
+ * round the validation the canonical constructor performs.
  * </p>
  */
 @DisplayName("JudgeMetadata's three-argument constructor")
@@ -45,15 +46,15 @@ class JudgeMetadataConvenienceConstructorTest {
 
 	private static final JudgeMetadata THREE_ARG = new JudgeMetadata("style", "a judge", JudgeType.DETERMINISTIC);
 
-	private static JudgmentContext context() {
-		return JudgmentContext.builder().goal("assess the change set").build();
+	private static CompletionEvidence context() {
+		return CompletionEvidence.builder().request("assess the change set").build();
 	}
 
 	/** A judge whose metadata is written in the three-argument style. */
-	private record NeverExcludes(String name, Judgment result) implements JudgeWithMetadata<JudgmentContext> {
+	private record NeverExcludes(String name, Judgment result) implements JudgeWithMetadata<CompletionEvidence> {
 
 		@Override
-		public Judgment judge(JudgmentContext judgmentContext) {
+		public Judgment judge(CompletionEvidence judgmentContext) {
 			return this.result;
 		}
 
@@ -106,11 +107,13 @@ class JudgeMetadataConvenienceConstructorTest {
 		@Test
 		@DisplayName("wrapping it in a NamedJudge does not manufacture one")
 		void aWrapperDoesNotManufactureOne() {
-			Judge<JudgmentContext> wrapped = Judges.named(new NeverExcludes("inner", Judgment.pass("ok")), "renamed");
+			Judge<CompletionEvidence> wrapped = Judges.named(new NeverExcludes("inner", Judgment.pass("ok")),
+					"renamed");
 
 			assertThat(Judges.notApplicableCapability(wrapped)).isEmpty();
-			assertThat(Judges.notApplicableCapability(new NamedJudge<JudgmentContext>(new NeverExcludes("inner", Judgment.pass("ok")),
-					new JudgeMetadata("outer", "", JudgeType.DETERMINISTIC))))
+			assertThat(Judges.notApplicableCapability(
+					new NamedJudge<CompletionEvidence>(new NeverExcludes("inner", Judgment.pass("ok")),
+							new JudgeMetadata("outer", "", JudgeType.DETERMINISTIC))))
 				.as("an outer wrapper written the same way declares nothing either")
 				.isEmpty();
 		}
@@ -126,12 +129,12 @@ class JudgeMetadataConvenienceConstructorTest {
 		@Test
 		@DisplayName("a jury of such judges cannot exclude, and builds under the refusing default")
 		void aJuryOfThemCannotExclude() {
-			assertThatCode(() -> SimpleJury.<JudgmentContext>builder()
+			assertThatCode(() -> SimpleJury.<CompletionEvidence>builder()
 				.judge(new NeverExcludes("plain", Judgment.pass("ok")))
 				.votingStrategy(new ConsensusStrategy())
 				.build()).doesNotThrowAnyException();
 
-			Jury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+			Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 				.judge(new NeverExcludes("plain", Judgment.pass("ok")))
 				.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
 				.build();
@@ -142,7 +145,7 @@ class JudgeMetadataConvenienceConstructorTest {
 		@Test
 		@DisplayName("the seat guard contains an exclusion from a seat built on it")
 		void theSeatGuardContainsAnExclusion() {
-			Jury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+			Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 				.judge(new NeverExcludes("sneaky", Judgment.notApplicable("the change set contains no Java sources")))
 				.judge(Judges.named(judgmentContext -> Judgment.pass("ok"), "honest"))
 				.votingStrategy(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE))

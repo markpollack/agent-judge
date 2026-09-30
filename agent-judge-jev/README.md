@@ -11,13 +11,12 @@ requires `typesafe-ai/jev`; an alias response leaves the underlying version unkn
 HTTP loopback endpoints with the corresponding paths are allowed for tests.
 No environment credentials are read.
 
-The direct typed adapter sends exactly the pair's String requirement as `state.requirement`
+The direct typed adapter sends exactly the pair's String requirement specification as `state.requirement`
 and its `JevEvidence` text as `state.evidence`. For a native `Requirement<S>`,
 `jev.bind(requirement, renderer)` captures the provider rendering once and returns an ordinary
-`Judge<RequirementEvidence<Requirement<S>, JevEvidence>>`. Evaluation verifies the bound
+`Judge<RequirementEvidence<S, JevEvidence>>`. Evaluation verifies the bound
 requirement's identity, revision, native specification and source before sending; a mismatch
-returns an instrument error. An application policy association is not part of that semantic
-binding. Native requirement structure remains in the original envelope.
+returns an instrument error. Requirements contain no application acceptance policy. Native requirement structure remains in the original envelope.
 
 The adapter consumes typed pairs only. Workspace, agent output, execution-context metadata and
 the evidence manifest are not sent. Evidence
@@ -39,8 +38,8 @@ Missing, stale, unresolved or non-independent review rejects before HTTP. A revi
 external semantic assertion, not a proof a syntax checker can manufacture. Intermediate
 quality values abstain; missing native answers are protocol errors.
 
-All native signal identities have `:v1` versions. The result's first-class assessment,
-certainty, distribution and source-backed `CalibrationClaim` pass through ordinary Jury
+All native signal identities have `:v1` versions. The result's first-class Finding,
+Confidence, ProbabilityDistribution and source-backed `CalibrationClaim` pass through ordinary Jury
 and authoritative Interpretation. The TypeSafe claim is a provider declaration, not local
 empirical calibration. Requested/reported versions remain distinct in provenance revision
 (`jev-adapter:2;jev-java:0.2.0;requested=...;reported=...;route=...;underlyingModelVersion=...`) and the protected trace.
@@ -74,7 +73,7 @@ Configuration, requirement, request and trace refs accompany bundle/manifest ref
 provenance evidence;
 the native response has its dedicated provenance response ref. Request-level token usage
 appears once on the judgment under `metadata.usage` (`inputTokens`, `outputTokens`) and in
-the protected trace; known valid usage is retained even when an assessment is malformed.
+the protected trace; known valid usage is retained even when a finding is malformed.
 Absent/untrusted usage is omitted, never fabricated as zero. No pricing is computed.
 
 For the Vercel route, valid `/provider_metadata/gateway/cost` is also exposed in

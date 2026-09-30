@@ -7,15 +7,13 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import io.github.markpollack.judge.context.JudgmentContext;
-
 /**
  * A judge prompt template loaded from an external source.
  *
- * <p>Delegates rendering to a pluggable {@link JudgeTemplateRenderer}.
- * {@code requiredVariables} is an optional invocation contract declared by the
- * template author — the implementation does not infer required variables from
- * prompt syntax.
+ * <p>
+ * Delegates rendering to a pluggable {@link JudgeTemplateRenderer}.
+ * {@code requiredVariables} is an optional invocation contract declared by the template
+ * author — the implementation does not infer required variables from prompt syntax.
  *
  * @author Mark Pollack
  * @since 0.10.0
@@ -101,19 +99,17 @@ public final class JudgePromptTemplate {
 	}
 
 	/**
-	 * Render this template with variables extracted from a judgment context.
-	 * @param context the judgment context
+	 * Render this template with explicit variables selected by the evaluator.
+	 * @param variables explicit template values
 	 * @return the rendered prompt text
 	 */
-	public String render(JudgmentContext context) {
-		Map<String, Object> variables = JudgmentVariables.from(context);
+	public String render(Map<String, Object> variables) {
 
 		// Validate declared required variables before rendering
 		for (String required : requiredVariables) {
 			if (!variables.containsKey(required) || variables.get(required) == null) {
 				throw new IllegalStateException(
-						"Required variable '" + required + "' not present in JudgmentContext for template '" + name
-								+ "'");
+						"Required variable '" + required + "' not present in variables for template '" + name + "'");
 			}
 		}
 
@@ -150,8 +146,8 @@ public final class JudgePromptTemplate {
 	 * Return the source of this template's text, before rendering.
 	 * <p>
 	 * The sources created by {@link TextSources} replay text captured at construction, so
-	 * loading from them does no I/O. A judge reads the text through this accessor to declare
-	 * a digest of the prompt it renders.
+	 * loading from them does no I/O. A judge reads the text through this accessor to
+	 * declare a digest of the prompt it renders.
 	 * </p>
 	 * @return the template text source
 	 * @since 0.17.0

@@ -4,14 +4,25 @@
  */
 package io.github.markpollack.judge.assertions;
 
+import io.github.markpollack.judge.acceptance.Policies;
+
 import io.github.markpollack.judge.requirement.Requirement;
-import io.github.markpollack.judge.result.PolicyBinding;
+import io.github.markpollack.judge.acceptance.AcceptancePolicy;
 
 import com.fasterxml.jackson.databind.*;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.requirement.RequirementEvidence;
-import io.github.markpollack.judge.jev.*;
-import io.github.markpollack.judge.result.*;
+import io.github.markpollack.judge.jev.JevEvidence;
+import io.github.markpollack.judge.jev.JevJudge;
+import io.github.markpollack.judge.jev.JevQuestion;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.acceptance.AcceptanceAction;
+import io.github.markpollack.judge.acceptance.AcceptanceDecision;
+import io.github.markpollack.judge.acceptance.AcceptancePolicy;
+import io.github.markpollack.judge.acceptance.Policies;
+import io.github.markpollack.judge.provenance.ArtifactRef;
+import io.github.markpollack.judge.provenance.PolicyRef;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
@@ -36,7 +47,7 @@ final class ConferenceFixture {
 
 	final JsonNode routing;
 
-	final PolicyBinding binding;
+	final AcceptancePolicy binding;
 
 	final JevQuestion.Choice question;
 
@@ -64,10 +75,10 @@ final class ConferenceFixture {
 				.equals(routing.path("composedConfigurationSha256").asText()))
 				throw new IllegalStateException("Changed composed configuration");
 		}
-		binding = new PolicyBinding(
+		binding = Policies.recorded(
 				new PolicyRef(policy.path("id").asText(), policy.path("revision").asText(),
 						sha(resource("assertions/v1/policy.json"))),
-				j -> new Acceptance(AcceptanceAction.valueOf(policy.path("action").asText()),
+				j -> new AcceptanceDecision(historicalAction(policy.path("action").asText()),
 						policy.path("reason").asText()));
 		Map<String, Object> criteria = new LinkedHashMap<>();
 		configuration.path("criteria").fields().forEachRemaining(e -> criteria.put(e.getKey(), e.getValue().asText()));
@@ -77,6 +88,12 @@ final class ConferenceFixture {
 			.forEachRemaining(e -> meanings.put(e.getKey(), JevQuestion.Meaning.valueOf(e.getValue().asText())));
 		question = new JevQuestion.Choice(configuration.path("instructions").asText(),
 				configuration.path("projectionId").asText(), criteria, meanings);
+	}
+
+	// The reviewed fixture bytes remain frozen. Translate their historical policy
+	// vocabulary only here; the production V3 reader does not accept V2 actions.
+	private static AcceptanceAction historicalAction(String action) {
+		return "USE_ASSESSMENT".equals(action) ? AcceptanceAction.RELY : AcceptanceAction.valueOf(action);
 	}
 
 	private static JsonNode reviewedRouting() throws Exception {
@@ -121,22 +138,24 @@ final class ConferenceFixture {
 		if (!sha(goal.getBytes(StandardCharsets.UTF_8)).equals(b.path("textSha256").asText()))
 			throw new IllegalStateException("Changed exact goal");
 		return new JevEvidence(new String(bytes, StandardCharsets.UTF_8),
-                ArtifactRef.ofBytes(ref.path("path").asText(), bytes, null),
-                ArtifactRef.ofBytes("assertions/v1/bindings.json", resource("assertions/v1/bindings.json"), null),
-                b.path("textSha256").asText(), true);
-    }
+				ArtifactRef.ofBytes(ref.path("path").asText(), bytes, null),
+				ArtifactRef.ofBytes("assertions/v1/bindings.json", resource("assertions/v1/bindings.json"), null),
+				b.path("textSha256").asText(), true);
+	}
 
-    Judge<RequirementEvidence<Requirement<String>, JevEvidence>> bind(JevJudge judge) {
-        var first = judge.bind(requirement(0), java.util.function.Function.identity());
-        var second = judge.bind(requirement(1), java.util.function.Function.identity());
-        return pair -> {
-            // Select the reviewed native binding; the production binder validates its
-            // revision, native specification and source before sending any request.
-            if (pair.requirement().id().equals(requirement(0).id())) return first.judge(pair);
-            if (pair.requirement().id().equals(requirement(1).id())) return second.judge(pair);
-            return Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "Requirement has no reviewed binding");
-        };
-    }
+	Judge<RequirementEvidence<String, JevEvidence>> bind(JevJudge judge) {
+		var first = judge.bind(requirement(0), java.util.function.Function.identity());
+		var second = judge.bind(requirement(1), java.util.function.Function.identity());
+		return pair -> {
+			// Select the reviewed native binding; the production binder validates its
+			// revision, native specification and source before sending any request.
+			if (pair.requirement().id().equals(requirement(0).id()))
+				return first.judge(pair);
+			if (pair.requirement().id().equals(requirement(1).id()))
+				return second.judge(pair);
+			return Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "Requirement has no reviewed binding");
+		};
+	}
 
 	JevJudge judge(String key, URI endpoint, HttpClient http, Path output) {
 		return new JevJudge(key, configuration.path("requestedModel").asText(), endpoint,
@@ -162,14 +181,14 @@ final class ConferenceFixture {
 			.writeValue(output.resolve("resolution.json").toFile(),
 					Map.of("origin", origin, "requirement",
 							Map.of("id", req.id(), "revision", req.revision(), "text", req.text()),
-                            "applicationDecision", result.applicationDecision()));
+							"acceptanceExecution", result.acceptanceExecution()));
 		JSON.writerWithDefaultPrettyPrinter()
-			.writeValue(output.resolve("judgment.json").toFile(), result.verdict().aggregated());
+			.writeValue(output.resolve("judgment.json").toFile(), result.verdict().judgment());
 		JSON.writerWithDefaultPrettyPrinter().writeValue(output.resolve("verdict.json").toFile(), result.verdict());
 		JSON.writerWithDefaultPrettyPrinter()
 			.writeValue(output.resolve("interpretation.json").toFile(), result.interpretation());
 		System.out.println(origin + ": " + req.id() + " => " + result.interpretation().readingSupport() + " "
-				+ result.interpretation().reading());
+				+ result.interpretation().outcome());
 	}
 
 	static byte[] resource(String path) throws Exception {

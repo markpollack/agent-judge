@@ -24,11 +24,11 @@ import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.requirement.RequirementEvidence;
 import io.github.markpollack.judge.requirement.RequirementSource;
-import io.github.markpollack.judge.result.ArtifactRef;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.provenance.ArtifactRef;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.jury.interpretation.VerdictReading;
+import io.github.markpollack.judge.jury.interpretation.RequirementOutcome;
 import io.github.markpollack.judge.jury.interpretation.Verdicts;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -58,8 +58,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class NativeRequirementConsumerTest {
 
-	private static final Rfc2119Constraint RFC = new Rfc2119Constraint("RULE-4", "MUST",
-			"Acquire Owner before Pet", "Prevent lock-order inversion", "Persistence exists");
+	private static final Rfc2119Constraint RFC = new Rfc2119Constraint("RULE-4", "MUST", "Acquire Owner before Pet",
+			"Prevent lock-order inversion", "Persistence exists");
 
 	private static final EarsCriterion EARS = new EarsCriterion("UC6-AC8", "Reject cancellation at start",
 			"When cancellation is requested at the start, the system shall reject it.", "Appointments exist");
@@ -72,11 +72,11 @@ class NativeRequirementConsumerTest {
 		String rendered = jevIdentity(requirement) + RFC.asPrompt();
 		var pair = new RequirementEvidence<>(requirement, evidence(rendered));
 		var model = new CapturingModel();
-		var seen = new ArrayList<RequirementEvidence<Requirement<Rfc2119Constraint>, JevEvidence>>();
+		var seen = new ArrayList<RequirementEvidence<Rfc2119Constraint, JevEvidence>>();
 		try (var transport = new FixtureHttp()) {
 			var artifacts = new LinkedHashMap<String, byte[]>();
 			var bound = jev(transport, artifacts).bind(requirement, spec -> jevIdentity(requirement) + spec.asPrompt());
-			Judge<RequirementEvidence<Requirement<Rfc2119Constraint>, JevEvidence>> jevConsumer = input -> {
+			Judge<RequirementEvidence<Rfc2119Constraint, JevEvidence>> jevConsumer = input -> {
 				seen.add(input);
 				return bound.judge(input);
 			};
@@ -112,19 +112,20 @@ class NativeRequirementConsumerTest {
 		String rendered = jevIdentity(requirement) + "Title: " + EARS.title() + "\n" + EARS.asPrompt();
 		var pair = new RequirementEvidence<>(requirement, evidence(rendered));
 		var model = new CapturingModel();
-		var seen = new ArrayList<RequirementEvidence<Requirement<EarsCriterion>, JevEvidence>>();
+		var seen = new ArrayList<RequirementEvidence<EarsCriterion, JevEvidence>>();
 		try (var transport = new FixtureHttp()) {
 			var artifacts = new LinkedHashMap<String, byte[]>();
 			var bound = jev(transport, artifacts).bind(requirement,
 					spec -> jevIdentity(requirement) + "Title: " + spec.title() + "\n" + spec.asPrompt());
-			var completion = completion(requirement, EARS.applicability(), NativeRequirementConsumerTest::completionEars,
-					model, Witness.APPLICABLE, seen);
+			var completion = completion(requirement, EARS.applicability(),
+					NativeRequirementConsumerTest::completionEars, model, Witness.APPLICABLE, seen);
 			assertThat(bound.judge(pair).status()).isEqualTo(JudgmentStatus.FAIL);
 			assertThat(completion.judge(pair).status()).isEqualTo(JudgmentStatus.FAIL);
 			assertThat(seen.getFirst()).isSameAs(pair);
 			assertThat(pair.requirement().specification()).isSameAs(EARS);
 			for (String field : List.of(requirement.id(), requirement.revision(), requirement.source().artifact().id(),
-					requirement.source().artifact().sha256(), EARS.id(), EARS.title(), EARS.requirement(), EARS.applicability())) {
+					requirement.source().artifact().sha256(), EARS.id(), EARS.title(), EARS.requirement(),
+					EARS.applicability())) {
 				assertThat(requestRequirement(artifacts)).contains(field);
 				assertThat(model.text()).contains(field);
 			}
@@ -136,11 +137,14 @@ class NativeRequirementConsumerTest {
 	@Test
 	void sameDisplaySentenceCannotHideRfcSemanticChanges() {
 		var requirement = requirement(RFC, RFC.id());
-		var variants = List.of(new Rfc2119Constraint("RULE-5", RFC.keyword(), RFC.requirement(), RFC.reason(), RFC.applicability()),
+		var variants = List.of(
+				new Rfc2119Constraint("RULE-5", RFC.keyword(), RFC.requirement(), RFC.reason(), RFC.applicability()),
 				new Rfc2119Constraint(RFC.id(), "SHOULD", RFC.requirement(), RFC.reason(), RFC.applicability()),
-				new Rfc2119Constraint(RFC.id(), RFC.keyword(), RFC.requirement(), "Different rationale", RFC.applicability()),
+				new Rfc2119Constraint(RFC.id(), RFC.keyword(), RFC.requirement(), "Different rationale",
+						RFC.applicability()),
 				new Rfc2119Constraint(RFC.id(), RFC.keyword(), RFC.requirement(), RFC.reason(), "Always"));
-		assertNativeMismatches(requirement, variants, Rfc2119Constraint::asPrompt, NativeRequirementConsumerTest::completionRfc);
+		assertNativeMismatches(requirement, variants, Rfc2119Constraint::asPrompt,
+				NativeRequirementConsumerTest::completionRfc);
 	}
 
 	@Test
@@ -149,13 +153,15 @@ class NativeRequirementConsumerTest {
 		var variants = List.of(new EarsCriterion("UC6-AC9", EARS.title(), EARS.requirement(), EARS.applicability()),
 				new EarsCriterion(EARS.id(), "Different title", EARS.requirement(), EARS.applicability()),
 				new EarsCriterion(EARS.id(), EARS.title(), EARS.requirement(), "Always"));
-		assertNativeMismatches(requirement, variants, EarsCriterion::asPrompt, NativeRequirementConsumerTest::completionEars);
+		assertNativeMismatches(requirement, variants, EarsCriterion::asPrompt,
+				NativeRequirementConsumerTest::completionEars);
 	}
 
 	@Test
 	void identityRevisionAndSourceChangesAreRejectedBeforeEitherProvider() {
 		var original = requirement(RFC, RFC.id());
-		var variants = List.of(new Requirement<>("another/requirement", original.revision(), original.text(), RFC, original.source()),
+		var variants = List.of(
+				new Requirement<>("another/requirement", original.revision(), original.text(), RFC, original.source()),
 				new Requirement<>(original.id(), "revision-8", original.text(), RFC, original.source()),
 				new Requirement<>(original.id(), original.revision(), original.text(), RFC,
 						new RequirementSource(ref("source:changed", "changed source bytes"), RFC.id())),
@@ -209,22 +215,23 @@ class NativeRequirementConsumerTest {
 			var bound = jev(transport, new LinkedHashMap<>()).bind(requirement, Rfc2119Constraint::asPrompt);
 			var excluded = preflight(requirement, bound, RFC.applicability(), Witness.EXCLUDED);
 			Verdict verdict = jury(excluded).vote(pair);
-			assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
+			assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
 			assertThat(verdict.individual()).hasSize(1);
 			assertThat(verdict.individual().getFirst().producerStatus()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
-			assertThat(verdict.individual().getFirst().assessment()).isNull();
+			assertThat(verdict.individual().getFirst().finding()).isNull();
 			assertThat(verdict.individual().getFirst().reasoning()).contains("No persistence in selected source");
 			assertThat(verdict.seats().getFirst().verdictKey()).isEqualTo("preflight");
-			assertThat(Verdicts.interpret(verdict).reading()).isEqualTo(VerdictReading.NOT_APPLICABLE);
+			assertThat(Verdicts.interpret(verdict).outcome()).isEqualTo(RequirementOutcome.NOT_APPLICABLE);
 			assertThat(transport.calls).hasValue(0);
 			var unconditional = new Rfc2119Constraint(RFC.id(), RFC.keyword(), RFC.requirement(), RFC.reason());
 			var changed = new Requirement<>(requirement.id(), requirement.revision(), requirement.text(), unconditional,
 					requirement.source());
 			assertThat(excluded.judge(new RequirementEvidence<>(changed, pair.evidence())).status())
 				.isEqualTo(JudgmentStatus.ERROR);
-			// Removing the declaration is observable: the real engine rejects the same exclusion.
-			Judge<RequirementEvidence<Requirement<Rfc2119Constraint>, JevEvidence>> undeclared = excluded::judge;
-			assertThat(jury(undeclared).vote(pair).aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
+			// Removing the declaration is observable: the real engine rejects the same
+			// exclusion.
+			Judge<RequirementEvidence<Rfc2119Constraint, JevEvidence>> undeclared = excluded::judge;
+			assertThat(jury(undeclared).vote(pair).judgment().status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(transport.calls).hasValue(0);
 		}
 	}
@@ -237,7 +244,8 @@ class NativeRequirementConsumerTest {
 			var bound = jev(transport, new LinkedHashMap<>()).bind(requirement, EarsCriterion::asPrompt);
 			var unresolved = preflight(requirement, bound, EARS.applicability(), Witness.TO_BE_JUDGED);
 			assertThat(unresolved.judge(pair).status()).isEqualTo(JudgmentStatus.ABSTAIN);
-			assertThat(Verdicts.interpret(jury(unresolved).vote(pair)).reading()).isEqualTo(VerdictReading.UNDECIDED);
+			assertThat(Verdicts.interpret(jury(unresolved).vote(pair)).outcome())
+				.isEqualTo(RequirementOutcome.UNRESOLVED);
 			assertThat(transport.calls).hasValue(0);
 			assertThat(preflight(requirement, bound, EARS.applicability(), Witness.APPLICABLE).judge(pair).status())
 				.isEqualTo(JudgmentStatus.FAIL);
@@ -252,7 +260,8 @@ class NativeRequirementConsumerTest {
 		var pair = new RequirementEvidence<>(requirement, evidence(specification.asPrompt()));
 		try (var transport = new FixtureHttp()) {
 			var bound = jev(transport, new LinkedHashMap<>()).bind(requirement, Rfc2119Constraint::asPrompt);
-			assertThat(preflight(requirement, bound, specification.applicability(), Witness.EXCLUDED).judge(pair).status())
+			assertThat(
+					preflight(requirement, bound, specification.applicability(), Witness.EXCLUDED).judge(pair).status())
 				.isEqualTo(JudgmentStatus.ERROR);
 			var model = new CapturingModel();
 			var completion = completion(requirement, null, NativeRequirementConsumerTest::completionRfc, model,
@@ -272,15 +281,15 @@ class NativeRequirementConsumerTest {
 		var completion = completion(requirement, EARS.applicability(), NativeRequirementConsumerTest::completionEars,
 				model, Witness.TO_BE_JUDGED, new ArrayList<>());
 		Verdict verdict = jury(completion).vote(pair);
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
-		assertThat(verdict.aggregated().reasoning()).contains("Source.java:4 has no appointments");
-		assertThat(Verdicts.interpret(verdict).reading()).isEqualTo(VerdictReading.NOT_APPLICABLE);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
+		assertThat(verdict.judgment().reasoning()).contains("Source.java:4 has no appointments");
+		assertThat(Verdicts.interpret(verdict).outcome()).isEqualTo(RequirementOutcome.NOT_APPLICABLE);
 		assertThat(model.text()).contains("NOT_APPLICABLE requires the declared condition to be false and a reason",
 				EARS.applicability(), "TO_BE_JUDGED");
 		model.answer = "INSUFFICIENT: evidence does not establish appointment support";
-		assertThat(Verdicts.interpret(jury(completion).vote(pair)).reading()).isEqualTo(VerdictReading.UNDECIDED);
+		assertThat(Verdicts.interpret(jury(completion).vote(pair)).outcome()).isEqualTo(RequirementOutcome.UNRESOLVED);
 		model.answer = "VIOLATED: Source.java:4 permits cancellation";
-		assertThat(Verdicts.interpret(jury(completion).vote(pair)).reading()).isEqualTo(VerdictReading.REJECTED);
+		assertThat(Verdicts.interpret(jury(completion).vote(pair)).outcome()).isEqualTo(RequirementOutcome.VIOLATED);
 	}
 
 	@Test
@@ -296,8 +305,9 @@ class NativeRequirementConsumerTest {
 		var unconditional = requirement(unconditionalSpec, unconditionalSpec.id());
 		var unconditionalCompletion = completion(unconditional, null, NativeRequirementConsumerTest::completionEars,
 				model, Witness.TO_BE_JUDGED, new ArrayList<>());
-		assertThat(unconditionalCompletion.judge(new RequirementEvidence<>(unconditional, evidence(unconditionalSpec.asPrompt()))).status())
-			.isEqualTo(JudgmentStatus.ERROR);
+		assertThat(unconditionalCompletion
+			.judge(new RequirementEvidence<>(unconditional, evidence(unconditionalSpec.asPrompt())))
+			.status()).isEqualTo(JudgmentStatus.ERROR);
 	}
 
 	@Test
@@ -323,11 +333,13 @@ class NativeRequirementConsumerTest {
 			var completion = completion(original, "Conditional native specification", completionRender, model,
 					Witness.APPLICABLE, new ArrayList<>());
 			for (var specification : variants) {
-				var changed = new Requirement<>(original.id(), original.revision(), original.text(), specification, original.source());
+				var changed = new Requirement<>(original.id(), original.revision(), original.text(), specification,
+						original.source());
 				var pair = new RequirementEvidence<>(changed, evidence(jevRender.apply(original.specification())));
 				assertThat(changed.text()).isEqualTo(original.text());
 				assertThat(bound.judge(pair).status()).as(specification.toString()).isEqualTo(JudgmentStatus.ERROR);
-				assertThat(completion.judge(pair).status()).as(specification.toString()).isEqualTo(JudgmentStatus.ERROR);
+				assertThat(completion.judge(pair).status()).as(specification.toString())
+					.isEqualTo(JudgmentStatus.ERROR);
 			}
 			assertThat(transport.calls).hasValue(0);
 			assertThat(model.requests).isEmpty();
@@ -355,14 +367,15 @@ class NativeRequirementConsumerTest {
 	}
 
 	private static String completionRfc(Rfc2119Constraint specification) {
-		return "RFC2119 document ID: " + specification.id() + "\nKeyword: " + specification.keyword()
-				+ "\nConstraint: " + specification.requirement() + "\nRationale: " + specification.reason()
-				+ "\nApplicability: " + specification.applicability();
+		return "RFC2119 document ID: " + specification.id() + "\nKeyword: " + specification.keyword() + "\nConstraint: "
+				+ specification.requirement() + "\nRationale: " + specification.reason() + "\nApplicability: "
+				+ specification.applicability();
 	}
 
 	private static String completionEars(EarsCriterion specification) {
 		return "EARS document ID: " + specification.id() + "\nHeading: " + specification.title()
-				+ "\nVerbatim sentence: " + specification.requirement() + "\nApplicability: " + specification.applicability();
+				+ "\nVerbatim sentence: " + specification.requirement() + "\nApplicability: "
+				+ specification.applicability();
 	}
 
 	private static JevJudge jev(FixtureHttp transport, Map<String, byte[]> artifacts) {
@@ -378,16 +391,22 @@ class NativeRequirementConsumerTest {
 	}
 
 	private static <E> SimpleJury<E> jury(Judge<E> judge) {
-		return SimpleJury.<E>builder().judge(judge).parallel(false)
-			.votingStrategy(new AllMustPassStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE)).build();
+		return SimpleJury.<E>builder()
+			.judge(judge)
+			.parallel(false)
+			.votingStrategy(new AllMustPassStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
+			.build();
 	}
 
-	private enum Witness { APPLICABLE, EXCLUDED, TO_BE_JUDGED }
+	private enum Witness {
+
+		APPLICABLE, EXCLUDED, TO_BE_JUDGED
+
+	}
 
 	/** Caller-owned preflight; it never asks Jev to invent a fourth Choice meaning. */
-	private static <S> JudgeWithMetadata<RequirementEvidence<Requirement<S>, JevEvidence>> preflight(
-			Requirement<S> expected, Judge<RequirementEvidence<Requirement<S>, JevEvidence>> delegate,
-			String condition, Witness witness) {
+	private static <S> JudgeWithMetadata<RequirementEvidence<S, JevEvidence>> preflight(Requirement<S> expected,
+			Judge<RequirementEvidence<S, JevEvidence>> delegate, String condition, Witness witness) {
 		return declared("preflight", condition, input -> {
 			if (!sameRequirement(expected, input.requirement())) {
 				return Judgment.error("Applicability preflight binds another native requirement");
@@ -403,10 +422,12 @@ class NativeRequirementConsumerTest {
 		});
 	}
 
-	/** Independent completion adapter with its own native rendering and response protocol. */
-	private static <S> JudgeWithMetadata<RequirementEvidence<Requirement<S>, JevEvidence>> completion(
-			Requirement<S> expected, String condition, Function<S, String> render, CapturingModel model, Witness witness,
-			List<RequirementEvidence<Requirement<S>, JevEvidence>> seen) {
+	/**
+	 * Independent completion adapter with its own native rendering and response protocol.
+	 */
+	private static <S> JudgeWithMetadata<RequirementEvidence<S, JevEvidence>> completion(Requirement<S> expected,
+			String condition, Function<S, String> render, CapturingModel model, Witness witness,
+			List<RequirementEvidence<S, JevEvidence>> seen) {
 		return declared("completion", condition, input -> {
 			seen.add(input);
 			var supplied = input.requirement();
@@ -420,24 +441,27 @@ class NativeRequirementConsumerTest {
 			String protocol = "Return SATISFIED, VIOLATED, INSUFFICIENT or NOT_APPLICABLE followed by colon and reason. "
 					+ "NOT_APPLICABLE requires the declared condition to be false and a reason. "
 					+ "It is prohibited for unconditional requirements or an APPLICABLE witness.";
-			String identity = "Application ID: " + supplied.id() + "\nRevision: " + supplied.revision()
-					+ "\nSource: " + supplied.source() + "\n";
+			String identity = "Application ID: " + supplied.id() + "\nRevision: " + supplied.revision() + "\nSource: "
+					+ supplied.source() + "\n";
 			try {
-				var response = model.generate(new JudgeModelRequest(List.of(
-						new JudgeMessage(JudgeMessageRole.SYSTEM, protocol),
-						new JudgeMessage(JudgeMessageRole.USER, identity + render.apply(supplied.specification())),
-						new JudgeMessage(JudgeMessageRole.USER, input.evidence().text()),
-						new JudgeMessage(JudgeMessageRole.USER, "Applicability witness: " + witness)),
+				var response = model.generate(new JudgeModelRequest(
+						List.of(new JudgeMessage(JudgeMessageRole.SYSTEM, protocol),
+								new JudgeMessage(JudgeMessageRole.USER,
+										identity + render.apply(supplied.specification())),
+								new JudgeMessage(JudgeMessageRole.USER, input.evidence().text()),
+								new JudgeMessage(JudgeMessageRole.USER, "Applicability witness: " + witness)),
 						JudgeModelOptions.defaults(), Map.of()));
 				String[] parts = response.text().split(":", 2);
-				if (parts.length != 2 || parts[1].isBlank()) return Judgment.error("Missing protocol reason");
+				if (parts.length != 2 || parts[1].isBlank())
+					return Judgment.error("Missing protocol reason");
 				String reason = parts[1].strip();
 				return switch (parts[0]) {
 					case "SATISFIED" -> Judgment.pass(reason);
 					case "VIOLATED" -> Judgment.fail(reason);
 					case "INSUFFICIENT" -> Judgment.abstain(reason);
-					case "NOT_APPLICABLE" -> condition != null && witness == Witness.TO_BE_JUDGED
-							? Judgment.notApplicable(reason) : Judgment.error("Exclusion contradicts declared applicability");
+					case "NOT_APPLICABLE" ->
+						condition != null && witness == Witness.TO_BE_JUDGED ? Judgment.notApplicable(reason)
+								: Judgment.error("Exclusion contradicts declared applicability");
 					default -> Judgment.error("Unrecognized completion protocol answer");
 				};
 			}
@@ -449,7 +473,8 @@ class NativeRequirementConsumerTest {
 
 	private static boolean sameRequirement(Requirement<?> expected, Requirement<?> supplied) {
 		return expected.id().equals(supplied.id()) && expected.revision().equals(supplied.revision())
-				&& expected.source().equals(supplied.source()) && expected.specification().equals(supplied.specification());
+				&& expected.source().equals(supplied.source())
+				&& expected.specification().equals(supplied.specification());
 	}
 
 	private static <E> JudgeWithMetadata<E> declared(String name, String condition, Judge<E> delegate) {
@@ -459,6 +484,7 @@ class NativeRequirementConsumerTest {
 				return new JudgeMetadata(name, "Native requirement fixture adapter", JudgeType.DETERMINISTIC,
 						condition == null ? null : "Declared condition does not hold: " + condition);
 			}
+
 			@Override
 			public Judgment judge(E input) {
 				return delegate.judge(input);
@@ -467,48 +493,94 @@ class NativeRequirementConsumerTest {
 	}
 
 	private static final class CapturingModel implements JudgeModel {
+
 		final List<JudgeModelRequest> requests = new ArrayList<>();
+
 		String answer = "VIOLATED: Source.java:4 violates the supplied requirement";
+
 		boolean failure;
+
 		@Override
 		public JudgeModelResponse generate(JudgeModelRequest request) {
 			requests.add(request);
-			if (failure) throw new IllegalStateException("Fixture backend failure");
+			if (failure)
+				throw new IllegalStateException("Fixture backend failure");
 			return new JudgeModelResponse(answer, "fixture-model", null, Map.of());
 		}
+
 		String text() {
 			return requests.getLast().messages().stream().map(JudgeMessage::content).reduce("", (a, b) -> a + "\n" + b);
 		}
+
 	}
 
 	/** Injects captured bytes without opening a socket; honors the SDK's body handler. */
 	private static final class FixtureHttp extends TransportTest.PendingHttp {
+
 		@Override
-		public <T> CompletableFuture<HttpResponse<T>> sendAsync(HttpRequest request, HttpResponse.BodyHandler<T> handler) {
+		public <T> CompletableFuture<HttpResponse<T>> sendAsync(HttpRequest request,
+				HttpResponse.BodyHandler<T> handler) {
 			calls.incrementAndGet();
 			var headers = HttpHeaders.of(Map.of("content-type", List.of("application/json")), (a, b) -> true);
 			var subscriber = handler.apply(new HttpResponse.ResponseInfo() {
-				@Override public int statusCode() { return 200; }
-				@Override public HttpHeaders headers() { return headers; }
-				@Override public HttpClient.Version version() { return HttpClient.Version.HTTP_1_1; }
+				@Override
+				public int statusCode() {
+					return 200;
+				}
+
+				@Override
+				public HttpHeaders headers() {
+					return headers;
+				}
+
+				@Override
+				public HttpClient.Version version() {
+					return HttpClient.Version.HTTP_1_1;
+				}
 			});
 			subscriber.onSubscribe(new Flow.Subscription() {
-				@Override public void request(long n) { }
-				@Override public void cancel() { }
+				@Override
+				public void request(long n) {
+				}
+
+				@Override
+				public void cancel() {
+				}
 			});
 			subscriber.onNext(List.of(ByteBuffer.wrap(JevJudgeTest.fixture("choice-valid"))));
 			subscriber.onComplete();
-			return subscriber.getBody().thenApply(body -> (HttpResponse<T>) new FixtureResponse<>(request, headers, body))
+			return subscriber.getBody()
+				.thenApply(body -> (HttpResponse<T>) new FixtureResponse<>(request, headers, body))
 				.toCompletableFuture();
 		}
+
 	}
 
 	private record FixtureResponse<T>(HttpRequest request, HttpHeaders headers, T body) implements HttpResponse<T> {
-		@Override public int statusCode() { return 200; }
-		@Override public Optional<HttpResponse<T>> previousResponse() { return Optional.empty(); }
-		@Override public Optional<SSLSession> sslSession() { return Optional.empty(); }
-		@Override public URI uri() { return request.uri(); }
-		@Override public HttpClient.Version version() { return HttpClient.Version.HTTP_1_1; }
+		@Override
+		public int statusCode() {
+			return 200;
+		}
+
+		@Override
+		public Optional<HttpResponse<T>> previousResponse() {
+			return Optional.empty();
+		}
+
+		@Override
+		public Optional<SSLSession> sslSession() {
+			return Optional.empty();
+		}
+
+		@Override
+		public URI uri() {
+			return request.uri();
+		}
+
+		@Override
+		public HttpClient.Version version() {
+			return HttpClient.Version.HTTP_1_1;
+		}
 	}
 
 }

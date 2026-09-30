@@ -1,106 +1,43 @@
-# Migrating to typed evidence and requirement assertions
+# Migrating to the 0.18 domain API
 
-The `0.18.0-SNAPSHOT` source line makes `Judge<E>` and `Jury<E>` generic and adds native
-requirements plus optional AssertJ integration. This is a coordinated **source and binary
-compatibility break**. Recompile implementations, wrappers, integrations and callers together;
-do not mix old implementations with the new interfaces.
+This source line intentionally redesigns the earlier 0.18 candidate. It offers no Java
+compatibility aliases. Modern portable results use [schemaVersion 3](portable-results-v3.md);
+V2 documents are unsupported. Historical unversioned interpretation remains separate.
 
-## Give judges and juries an evidence type
+| Earlier concept | Current API |
+|---|---|
+| Requirement-owned policy / `under` | Pure Requirement; acceptance on assertion configuration or after evidence |
+| PolicyBinding | AcceptancePolicy lambda; optional `Policies.recorded` provenance |
+| Acceptance / ApplicationDecision | AcceptanceDecision / retained AcceptanceExecution |
+| USE_ASSESSMENT | RELY (positive or negative Judgment) |
+| Assessment / Proposition | Finding / BooleanFinding |
+| NumericAssessment / Category | NumericFinding / CategoryFinding |
+| Certainty / Distribution | Confidence / ProbabilityDistribution |
+| EvaluationProvenance | Provenance |
+| Verdict.aggregated / decision | Verdict.judgment / provenance |
+| Decision / DecisionKind / DecisionBasis | VerdictProvenance and its kind/basis |
+| VerdictReading | RequirementOutcome: SATISFIED, VIOLATED, UNRESOLVED, NOT_APPLICABLE, NOT_ASSESSED |
+| SemanticAssertions / SemanticAssertion / SemanticAssertionError | RequirementAssertions / staged AssertJ / RequirementAssertionError |
+| `Judge<RequirementEvidence<Requirement<S>,E>>` | Ordinary `Judge<E>` or explicit `Judge<RequirementEvidence<S,E>>` |
+| STOP_ON_USABLE_ASSESSMENT | STOP_ON_RELIED_JUDGMENT |
 
-```java
-Judge<JudgmentContext> fileJudge = new FileExistsJudge("pom.xml");
-SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
-    .judge(fileJudge)
-    .votingStrategy(new AllMustPassStrategy())
-    .build();
-Verdict verdict = jury.vote(context);
-```
+`result` is split into `judgment`, `acceptance` and `provenance`. Concrete `fs` judges move
+to `agent-judge-file`. The obsolete JudgeSpec is deleted. Wire helpers use `serialization`.
 
-Execution-oriented judges retain `JudgmentContext`. An unrelated domain can use
-`Judge<String>`, `Judge<MyEvidence>` or another concrete type without a marker interface.
-`judge(E)` and `vote(E)` receive that type. Use an explicit builder type witness when Java
-cannot infer the intended type through a chained builder call; avoid raw `Judge`/`Jury` types.
+There is no universal JudgmentContext replacement. File existence/content, command/build,
+class-version and workspace requirement audits take `Path`. File and directory comparisons
+use `FileComparison` and `DirectoryComparison`. Coverage takes `CoverageComparison`, with a
+numeric baseline. Class-version expectations are constructor configuration. RAG uses
+`RagEvidence`; response bridges use `CompletionEvidence`; AgentClient execution combines a
+workspace with completion in `AgentExecutionEvidence`. Jev keeps selected `JevEvidence`.
+No required input is obtained from arbitrary metadata keys.
 
-Apply the same evidence type to `AsyncJudge`, `JudgeWithMetadata`, `NamedJudge`, configured
-wrappers, `SimpleJury`, `MetaJury`, `NamedJury`, `TierConfig` and `CascadedJury`. Factory and
-composition methods infer the type from their arguments. A typed Jury cannot combine judges
-requiring unrelated evidence types. Metadata, exclusion declarations, failure containment and
-the one-seat identity rule still apply.
+`DeterministicJudge<E>`, `LLMJudge<E>` and `ModelBackedJudge<E>` preserve the selected evidence
+type. ModelBackedJudge requires explicit `.variables(...)` rendering. CompletionVariables
+is an optional helper for request/response templates. JudgeModelResponse reports backend
+completion with a typed `completed` component, separate from incidental telemetry.
 
-## Preserve native requirements
-
-`Requirement<S>` is in `io.github.markpollack.judge.requirement`, alongside
-`RequirementEvidence<R,E>` and `RequirementSource`. `PolicyBinding` is in
-`io.github.markpollack.judge.result`. Update imports from the earlier assertions package.
-
-Replace the earlier plain-text constructor with:
-
-```java
-Requirement<String> requirement = Requirement.text("response-ready", "1", "The response is READY");
-```
-
-For native requirements, construct the envelope with its ID, semantic revision, display text,
-complete native specification and `RequirementSource` artifact/native identity. RFC2119 keywords,
-rationale and applicability, and EARS structure remain in that native specification. Supply a
-stable snapshot; the envelope does not freeze an arbitrary mutable `S`. Text equality does not
-establish identity. There is no shared flattened requirement view.
-
-A requirement-aware judge uses the ordinary Judge interface:
-
-```java
-Judge<RequirementEvidence<Requirement<MySpecification>, MyEvidence>> judge;
-```
-
-The assertion pairs the exact supplied requirement and evidence. Evaluators own any rendering
-they need. For Jev, the direct type is `Judge<RequirementEvidence<String,JevEvidence>>`, where
-the String is the exact provider-rendered requirement. `jev.bind(requirement, renderer)` adapts
-a native envelope while retaining binding checks. Jev consumes typed pairs only; migrate any
-execution-context route to supply the typed requirement/evidence input explicitly.
-Do not regenerate an evidence requirement digest to conceal changed semantics.
-
-## Separate internal and final policy
-
-`PolicyJudges.apply(...)` intentionally configures internal policy, which may affect voting
-and cascade routing. Assertion policy is resolved EXPLICIT → ASSOCIATED → DEFAULT and runs
-after the completed Jury. `.withAcceptancePolicy(...)` never reconfigures supplied Jury seats
-or tiers. Heterogeneous internal policies remain intact. The single-Judge assertion follows
-the same rule through a one-seat Jury.
-
-The optional `agent-judge-assertj` module supplies the ordinary static
-`assertThat(requirement).judgedBy(judge).withEvidence(evidence).isSatisfied()` entry.
-Its immutable default is USE_ASSESSMENT without a confidence threshold; application-specific
-defaults use `Assertions.using(new RequirementAssertions(binding))`. Core stays free of AssertJ.
-
-`AssertionResult` now holds the original Verdict and authoritative Interpretation plus a
-separate `ApplicationDecision`. Retain the final reference, source, action/reason or failure,
-or explicit bypass, as well as the full Verdict. Earlier constructors that inferred final
-application from the root's policy are replaced: a root's internal policy is not the assertion's
-final policy. `policy()` and `policySource()` refer to the separate final decision.
-
-To evaluate final policy against an already completed Verdict, call
-`AssertionResult.applyPolicy(requirement, binding, source, verdict)`. It makes no Judge call.
-To reconstruct without running policy, pass the previously retained `ApplicationDecision` and
-Verdict to `new AssertionResult(requirement, applicationDecision, verdict)`. The constructor
-checks coherence and derives the authoritative Interpretation; an overload accepts and validates
-the retained Interpretation too. Do not invent missing policy execution facts during migration.
-
-`SemanticAssertions.requireSatisfied(result)` still performs zero evaluation/policy calls.
-It now requires supported ACCEPTED plus successful final USE_ASSESSMENT. Final ABSTAIN/ESCALATE
-is inconclusive with the original Interpretation retained; final failure is an application
-instrument failure. N/A, evaluation failure and unsupported readings bypass final policy.
-Use structured errors/accessors rather than parsing diagnostic message text.
-
-The evidence-first `SemanticAssertions` facade remains available with typed
-`Judge<JudgmentContext>` routes and the same final policy scope. Its eager `satisfies(...)`
-terminal still evaluates each time. Use `evaluate(...)` then `requireSatisfied(...)` to retain
-and assert one observation.
-
-Generic evidence and separate assertion context require no change to the Judgment/Verdict V2
-wire format. AssertionResult is a runtime value, not a new wire format; persist the surrounding
-requirement/application facts explicitly and never serialize a policy function. Unknown or legacy
-wire values still use the tolerant stored-map Interpretation reader, without fabricated modern
-facts. See [portable results V2](portable-results-v2.md).
-
-The [AssertJ guide](agent-judge-assertj/README.md) and its compiled tutorial-facing tests describe
-the new progression. External tutorial and consumer repositories migrate separately against
-the matching producer revision; changing this source tree does not migrate those repositories.
+For AssertJ use `judgedBy(Judge<E>)` or `judgedBy(Jury<E>)`. When an evaluator needs the
+Requirement, use `judgedByRequirement(...)`; its pair type is `RequirementEvidence<S,E>`.
+Both produce the same evidence → optional policy → isSatisfied progression. See the
+[compiled experience examples](agent-judge-assertj/src/test/java/io/github/markpollack/judge/assertj/AssertJApiExperienceTest.java).

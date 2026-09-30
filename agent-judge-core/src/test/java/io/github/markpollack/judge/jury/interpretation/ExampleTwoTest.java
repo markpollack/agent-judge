@@ -18,11 +18,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * A2, A13: example two, a 0.13 record exported honestly.
  *
- * <p>{@code bud-ddd} run {@code 9b68576e}, item {@code review-derived-brief:spring-batch}. Scores
- * are {@code {"value": false}} objects, statuses are upper-case, there is no aggregation
- * evidence, and the composite structure is {@code subVerdicts} with no names. The root
- * duplicates its single sub-verdict entirely — which is exactly the inference the interpretation
- * refuses to make.
+ * <p>
+ * {@code bud-ddd} run {@code 9b68576e}, item {@code review-derived-brief:spring-batch}.
+ * Scores are {@code {"value": false}} objects, statuses are upper-case, there is no
+ * aggregation evidence, and the composite structure is {@code subVerdicts} with no names.
+ * The root duplicates its single sub-verdict entirely — which is exactly the inference
+ * the interpretation refuses to make.
  */
 @DisplayName("Example two: a 0.13 record")
 class ExampleTwoTest {
@@ -31,7 +32,8 @@ class ExampleTwoTest {
 			new JudgeSeat(0, "structure:ddd-action-brief.md", null, "pass", null, null, null,
 					"File exists at ddd-action-brief.md",
 					List.of(new Check("file_exists", true, "File found at ddd-action-brief.md"))),
-			new JudgeSeat(1, "structure:ddd-review.md", null, "fail", null, null, null, "File not found at ddd-review.md",
+			new JudgeSeat(1, "structure:ddd-review.md", null, "fail", null, null, null,
+					"File not found at ddd-review.md",
 					List.of(new Check("file_exists", false, "File not found at ddd-review.md"))));
 
 	private static final String REASONING = "No consensus: 1 passed, 1 failed (consensus required)";
@@ -41,15 +43,19 @@ class ExampleTwoTest {
 	void theReadingIsHonestAndLimited() {
 		Interpretation interpretation = Verdicts.interpret(stored(EXAMPLE_TWO));
 
-		assertThat(interpretation.schemaVersion()).isEqualTo(2);
+		assertThat(interpretation.schemaVersion()).isEqualTo(3);
 		assertThat(interpretation.sourceVersion()).as("an unstamped record").isEqualTo(0);
-		assertThat(interpretation.reading()).as("the record says FAIL").isEqualTo(VerdictReading.REJECTED);
+		assertThat(interpretation.outcome()).as("the record says FAIL").isEqualTo(RequirementOutcome.VIOLATED);
 		assertThat(interpretation.decidedBy()).as("not inferred from the root equalling its sub-verdict").isNull();
 
-		assertThat(interpretation.root()).usingRecursiveComparison().ignoringFieldsMatchingRegexes(".*judgment").isEqualTo(new Stage(null, List.of(), null, null, null, null, null, null,
-				"fail", null, REASONING, null, JUDGES));
-		assertThat(interpretation.stages()).usingRecursiveComparison().ignoringFieldsMatchingRegexes(".*judgment").isEqualTo(List.of(new Stage(null, List.of(), null, null, null, null, null,
-				null, "fail", null, REASONING, null, JUDGES)));
+		assertThat(interpretation.root()).usingRecursiveComparison()
+			.ignoringFieldsMatchingRegexes(".*judgment")
+			.isEqualTo(new Stage(null, List.of(), null, null, null, null, null, null, "fail", null, REASONING, null,
+					JUDGES));
+		assertThat(interpretation.stages()).usingRecursiveComparison()
+			.ignoringFieldsMatchingRegexes(".*judgment")
+			.isEqualTo(List.of(new Stage(null, List.of(), null, null, null, null, null, null, "fail", null, REASONING,
+					null, JUDGES)));
 	}
 
 	@Test

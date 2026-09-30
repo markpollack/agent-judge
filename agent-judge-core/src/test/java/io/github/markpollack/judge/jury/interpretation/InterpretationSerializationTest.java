@@ -33,13 +33,13 @@ class InterpretationSerializationTest {
 	}
 
 	/**
-	 * §7.4's {@code describe}, transliterated: it reads the interpretation node only and never
-	 * touches the stored verdict.
+	 * §7.4's {@code describe}, transliterated: it reads the interpretation node only and
+	 * never touches the stored verdict.
 	 */
 	private static List<String> describe(JsonNode i) {
 		List<String> lines = new ArrayList<>();
 		JsonNode d = i.get("decidedBy");
-		lines.add(i.get("reading").asText() + " (" + i.get("readingSupport").asText() + "); decided by "
+		lines.add(i.get("outcome").asText() + " (" + i.get("readingSupport").asText() + "); decided by "
 				+ (d.isNull() ? "not recorded" : d.get("stage").asText()));
 		List<JsonNode> stages = new ArrayList<>();
 		stages.add(i.get("root"));
@@ -49,21 +49,23 @@ class InterpretationSerializationTest {
 			s.get("path").forEach(p -> path.add(p.asText()));
 			String where = path.isEmpty() ? "<root>" : String.join("/", path);
 			lines.add("  " + where + " [" + (s.get("policy").isNull() ? "-" : s.get("policy").asText()) + "] "
-					+ s.get("status").asText() + (s.get("reasonCode").isNull() ? "" : " " + s.get("reasonCode").asText())
-					+ ": " + s.get("reasoning").asText());
+					+ s.get("status").asText()
+					+ (s.get("reasonCode").isNull() ? "" : " " + s.get("reasonCode").asText()) + ": "
+					+ s.get("reasoning").asText());
 			for (JsonNode j : s.get("judges")) {
 				lines.add("    seat " + j.get("position").asInt() + " " + j.get("name").asText() + ": "
-						+ j.get("status").asText() + (j.get("reasonCode").isNull() ? "" : " (" + j.get("reasonCode").asText() + ")")
-						+ " — " + j.get("reasoning").asText());
+						+ j.get("status").asText()
+						+ (j.get("reasonCode").isNull() ? "" : " (" + j.get("reasonCode").asText() + ")") + " — "
+						+ j.get("reasoning").asText());
 				for (JsonNode c : j.get("checks")) {
-					lines.add("      [" + (c.get("legacyPassed").asBoolean() ? "x" : " ") + "] " + c.get("name").asText() + ": "
-							+ c.get("detail").asText());
+					lines.add("      [" + (c.get("legacyPassed").asBoolean() ? "x" : " ") + "] "
+							+ c.get("name").asText() + ": " + c.get("detail").asText());
 				}
 			}
 		}
 		for (JsonNode x : i.get("defects")) {
-			lines.add("  ! " + x.get("kind").asText() + " " + x.get("path").asText() + "." + x.get("field").asText() + ": "
-					+ x.get("note").asText());
+			lines.add("  ! " + x.get("kind").asText() + " " + x.get("path").asText() + "." + x.get("field").asText()
+					+ ": " + x.get("note").asText());
 		}
 		lines.add("  " + i.get("summary").asText());
 		return lines;
@@ -75,15 +77,19 @@ class InterpretationSerializationTest {
 		JsonNode i = json(EXAMPLE_ONE);
 
 		assertThat(i.fieldNames()).toIterable()
-			.containsExactly("schemaVersion", "sourceVersion", "reading", "readingSupport", "decidedBy", "root", "stages",
-					"defects", "summary");
-		assertThat(i.get("decidedBy").toString()).isEqualTo("{\"stage\":\"structure\",\"path\":[\"structure\"],\"basis\":\"tier_outcome\"}");
+			.containsExactly("schemaVersion", "sourceVersion", "outcome", "readingSupport", "decidedBy", "root",
+					"stages", "defects", "summary");
+		assertThat(i.get("decidedBy").toString())
+			.isEqualTo("{\"stage\":\"structure\",\"path\":[\"structure\"],\"basis\":\"tier_outcome\"}");
 		assertThat(i.get("stages").get(0).fieldNames()).toIterable()
 			.containsExactly("stage", "path", "relation", "policy", "disposition", "reason", "failure", "usedByParent",
-					"status", "reasonCode", "reasoning", "evidence", "judges", "judgment", "declaredCardinality", "decision");
-		assertThat(i.get("stages").get(0).get("reasonCode").isNull()).as("an absent reason code is an explicit null").isTrue();
+					"status", "reasonCode", "reasoning", "evidence", "judges", "judgment", "declaredCardinality",
+					"provenance");
+		assertThat(i.get("stages").get(0).get("reasonCode").isNull()).as("an absent reason code is an explicit null")
+			.isTrue();
 		assertThat(i.get("stages").get(0).get("judges").get(0).fieldNames()).toIterable()
-			.containsExactly("position", "name", "keySource", "status", "reasonCode", "score", "reasoning", "checks", "judgment", "execution");
+			.containsExactly("position", "name", "keySource", "status", "reasonCode", "score", "reasoning", "checks",
+					"judgment", "execution");
 		assertThat(i.get("stages").get(0).get("evidence").get("passCount").asInt()).isEqualTo(1);
 		assertThat(i.get("stages").get(0).get("evidence").get("errorCodeCounts").toString()).isEqualTo("{}");
 		assertThat(i.get("defects").toString()).isEqualTo("[]");
@@ -116,14 +122,19 @@ class InterpretationSerializationTest {
 		List<String> lines = describe(json(BUD_EVAL_7E423DE9));
 
 		long printed = lines.stream().filter(line -> line.startsWith("      [")).count();
-		// The root's judge is one of the judgments; sub-verdict judges are the rest. Every check
-		// recorded on a judgment that is seated somewhere is printed exactly once per seat.
+		// The root's judge is one of the judgments; sub-verdict judges are the rest.
+		// Every check
+		// recorded on a judgment that is seated somewhere is printed exactly once per
+		// seat.
 		assertThat(printed).as("%d judgments carry checks", distinctCheckNodes).isEqualTo(recordedOnSeats(stored));
-		assertThat(lines.get(0)).startsWith("ACCEPTED (UNDETERMINED); decided by not recorded");
+		assertThat(lines.get(0)).startsWith("SATISFIED (UNDETERMINED); decided by not recorded");
 		assertThat(lines).anyMatch(line -> line.contains("[x] error_handling: error_handling=3/3"));
 	}
 
-	/** Checks recorded on judgments that the interpretation seats: every {@code individualByName} entry. */
+	/**
+	 * Checks recorded on judgments that the interpretation seats: every
+	 * {@code individualByName} entry.
+	 */
 	private static int recordedOnSeats(JsonNode verdict) {
 		int total = 0;
 		for (JsonNode judgment : verdict.get("individualByName")) {
@@ -140,7 +151,7 @@ class InterpretationSerializationTest {
 	void describeExampleOne() {
 		List<String> lines = describe(json(EXAMPLE_ONE));
 
-		assertThat(lines.get(0)).isEqualTo("UNDECIDED (SUPPORTED); decided by structure");
+		assertThat(lines.get(0)).isEqualTo("UNRESOLVED (SUPPORTED); decided by structure");
 		assertThat(lines).contains("    seat 0 structure:ddd-review.md: pass — report present",
 				"    seat 1 reportStructure: fail — report has no bounded contexts");
 		assertThat(lines).anyMatch(line -> line.startsWith("  structure [REJECT_ON_ANY_FAIL] abstain: No consensus"));

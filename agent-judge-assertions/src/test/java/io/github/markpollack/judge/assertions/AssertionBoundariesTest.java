@@ -26,10 +26,13 @@ class AssertionBoundariesTest {
 		noClasses().should().callMethod(Thread.class, "getContextClassLoader").check(classes);
 		noClasses().should().dependOnClassesThat().areAssignableTo(ThreadLocal.class).check(classes);
 		var core = new ClassFileImporter().withImportOption(new ImportOption.DoNotIncludeTests())
-			.importPackages("io.github.markpollack.judge.result", "io.github.markpollack.judge.jury");
+			.importPackages("io.github.markpollack.judge.judgment", "io.github.markpollack.judge.acceptance",
+                    "io.github.markpollack.judge.provenance", "io.github.markpollack.judge.requirement",
+                    "io.github.markpollack.judge.serialization", "io.github.markpollack.judge.jury");
 		noClasses().should()
 			.dependOnClassesThat()
-			.resideInAnyPackage("io.github.markpollack.judge.assertions..")
+			.resideInAnyPackage("io.github.markpollack.judge.assertions..", "io.github.markpollack.judge.jev..",
+                    "io.github.gudcks0305..", "org.springframework..")
 			.check(core);
 	}
 

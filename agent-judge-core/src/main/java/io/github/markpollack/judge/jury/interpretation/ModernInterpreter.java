@@ -20,21 +20,46 @@ import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
 import com.fasterxml.jackson.databind.type.LogicalType;
 import org.jspecify.annotations.Nullable;
 
-import io.github.markpollack.judge.jury.*;
-import io.github.markpollack.judge.result.*;
+import io.github.markpollack.judge.jury.AllMustPassStrategy;
+import io.github.markpollack.judge.jury.AttemptDisposition;
+import io.github.markpollack.judge.jury.AverageVotingStrategy;
+import io.github.markpollack.judge.jury.CompositeAttempt;
+import io.github.markpollack.judge.jury.CompositeRelation;
+import io.github.markpollack.judge.jury.ConjunctiveStrategy;
+import io.github.markpollack.judge.jury.ConsensusStrategy;
+import io.github.markpollack.judge.jury.DispositionReason;
+import io.github.markpollack.judge.jury.ErrorPolicy;
+import io.github.markpollack.judge.jury.MajorityVotingStrategy;
+import io.github.markpollack.judge.jury.MedianVotingStrategy;
+import io.github.markpollack.judge.jury.NotApplicablePolicy;
+import io.github.markpollack.judge.jury.Seat;
+import io.github.markpollack.judge.jury.SeatExecution;
+import io.github.markpollack.judge.jury.TiePolicy;
+import io.github.markpollack.judge.jury.TierPolicy;
+import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.jury.VerdictProvenance;
+import io.github.markpollack.judge.jury.VerdictProvenanceBasis;
+import io.github.markpollack.judge.jury.VerdictProvenanceKind;
+import io.github.markpollack.judge.jury.VotingStrategy;
+import io.github.markpollack.judge.jury.WeightedAverageStrategy;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
+import io.github.markpollack.judge.acceptance.AcceptanceAction;
+import io.github.markpollack.judge.acceptance.AppliedPolicy;
 
 /**
- * Strict version-2 semantic reading; historical records never pass through this reader.
+ * Strict version-3 semantic reading; historical records never pass through this reader.
  */
 final class ModernInterpreter {
 
 	private static final JsonMapper MAPPER = JsonMapper.builder()
 		.disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
 		// Jackson treats scalar-to-String conversion separately from scalar coercion.
-		.withCoercionConfig(LogicalType.Textual, config -> config
-			.setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail)
-			.setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
-			.setCoercion(CoercionInputShape.Float, CoercionAction.Fail))
+		.withCoercionConfig(LogicalType.Textual,
+				config -> config.setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail)
+					.setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
+					.setCoercion(CoercionInputShape.Float, CoercionAction.Fail))
 		.disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
 		.enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
 		.enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
@@ -60,7 +85,8 @@ final class ModernInterpreter {
 			return false;
 		if (map.containsKey("schemaVersion"))
 			return true;
-		if (modernJudgment(map.get("aggregated"), seen, depth + 1))
+		if (modernJudgment(map.get("judgment"), seen, depth + 1)
+				|| modernJudgment(map.get("aggregated"), seen, depth + 1))
 			return true;
 		if (map.get("individual") instanceof List<?> inputs)
 			for (Object input : inputs)
@@ -84,8 +110,9 @@ final class ModernInterpreter {
 	private static boolean modernJudgment(@Nullable Object value, IdentityHashMap<Object, Boolean> seen, int depth) {
 		if (!(value instanceof Map<?, ?> map) || depth > 64 || seen.put(value, Boolean.TRUE) != null)
 			return false;
-		for (String field : List.of("schemaVersion", "producerStatus", "assessment", "certainty", "distribution",
-				"provenance", "policyApplication"))
+		for (String field : List.of("schemaVersion", "producerStatus", "finding", "confidence",
+				"probabilityDistribution", "provenance", "policyApplication", "assessment", "certainty",
+				"distribution"))
 			if (map.containsKey(field))
 				return true;
 		if (map.get("checks") instanceof List<?> checks)
@@ -108,9 +135,9 @@ final class ModernInterpreter {
 			Stage root = reader.stage(verdict, null, List.of(), null);
 			reader.validate(verdict, "verdict");
 			reader.attempts(verdict, List.of(), "verdict");
-			VerdictReading reading = reading(verdict);
+			RequirementOutcome reading = reading(verdict);
 			DecidedBy decided = reader.decidedBy(verdict);
-			return reader.finish(2, reading, root, decided);
+			return reader.finish(3, reading, root, decided);
 		}
 		catch (IllegalArgumentException ex) {
 			reader.defects.add(new Defect("verdict", "schemaVersion/semantics", DefectKind.UNPARSEABLE,
@@ -122,13 +149,13 @@ final class ModernInterpreter {
 		}
 	}
 
-	private Interpretation finish(int source, @Nullable VerdictReading reading, Stage root,
+	private Interpretation finish(int source, @Nullable RequirementOutcome reading, Stage root,
 			@Nullable DecidedBy decided) {
 		// Modern defects never authorize a successful subject determination.
 		boolean supported = defects.isEmpty() && !undetermined;
-		Interpretation draft = new Interpretation(2, source, supported ? reading : null,
+		Interpretation draft = new Interpretation(3, source, supported ? reading : null,
 				supported ? ReadingSupport.SUPPORTED : ReadingSupport.UNDETERMINED, decided, root, stages, defects, "");
-		return new Interpretation(2, source, draft.reading(), draft.readingSupport(), decided, root, stages, defects,
+		return new Interpretation(3, source, draft.outcome(), draft.readingSupport(), decided, root, stages, defects,
 				Summaries.of(draft));
 	}
 
@@ -170,21 +197,21 @@ final class ModernInterpreter {
 	private static void version(Map<?, ?> value, String path) {
 		Object version = value.get("schemaVersion");
 		if (!(version instanceof Integer || version instanceof Long || version instanceof java.math.BigInteger)
-				|| !"2".equals(version.toString()))
-			throw new IllegalArgumentException(path + ".schemaVersion must be integer 2");
+				|| !"3".equals(version.toString()))
+			throw new IllegalArgumentException(path + ".schemaVersion must be integer 3");
 	}
 
 	private static void requireVersions(Map<?, ?> verdict, String path) {
 		version(verdict, path);
 		if (!verdict.containsKey("declaredCardinality"))
 			throw new IllegalArgumentException(path + ".declaredCardinality is required");
-		judgmentVersion(object(verdict.get("aggregated"), path + ".aggregated"), path + ".aggregated");
+		judgmentVersion(object(verdict.get("judgment"), path + ".judgment"), path + ".judgment");
 		for (Object judgment : array(verdict.get("individual"), path + ".individual"))
 			judgmentVersion(object(judgment, path), path + ".individual");
 		for (Object judgment : object(verdict.get("individualByName"), path + ".individualByName").values())
 			judgmentVersion(object(judgment, path), path + ".individualByName");
 		object(verdict.get("weights"), path + ".weights");
-		object(verdict.get("decision"), path + ".decision");
+		object(verdict.get("provenance"), path + ".provenance");
 		for (Object seat : array(verdict.get("seats"), path + ".seats")) {
 			Map<?, ?> seated = object(seat, path + ".seats");
 			if (!seated.containsKey("position") || !seated.containsKey("execution"))
@@ -205,7 +232,7 @@ final class ModernInterpreter {
 	}
 
 	private Stage stage(Verdict verdict, @Nullable String name, List<String> path, @Nullable CompositeAttempt attempt) {
-		Judgment j = verdict.aggregated();
+		Judgment j = verdict.judgment();
 		List<JudgeSeat> judges = new ArrayList<>();
 		for (int index = 0; index < verdict.seats().size(); index++) {
 			Seat seat = verdict.seats().get(index);
@@ -215,7 +242,7 @@ final class ModernInterpreter {
 					view.reasonCode(), input.score(), null, input.operationalReasoning(), view.checks(), view,
 					seat.execution().name()));
 		}
-		Evidence evidence = verdict.decision().kind() == DecisionKind.OWN && !identity(verdict)
+		Evidence evidence = verdict.provenance().kind() == VerdictProvenanceKind.OWN && !identity(verdict)
 				? Interpreter.reduction(j).evidence() : null;
 		return new Stage(name, path, attempt == null ? null : attempt.relation().wireName(),
 				attempt == null || attempt.policy() == null ? null : attempt.policy().wireName(),
@@ -224,7 +251,7 @@ final class ModernInterpreter {
 				null, attempt == null ? null : attempt.disposition() == AttemptDisposition.USED, j.status().wireName(),
 				j.operationalReasonCode() == null ? null : j.operationalReasonCode().wireName(),
 				j.operationalReasoning(), evidence, judges, JudgmentView.of(j), verdict.declaredCardinality(),
-				verdict.decision());
+				verdict.provenance());
 	}
 
 	private void attempts(Verdict verdict, List<String> parent, String path) {
@@ -291,28 +318,28 @@ final class ModernInterpreter {
 		if (!cascade && count == 1 && v.seats().size() == 1 && v.seats().get(0).execution() == SeatExecution.RETURNED
 				&& v.compositeAttempts().stream().noneMatch(a -> a.disposition() == AttemptDisposition.STAGE_FAILED)
 				&& !identity(v))
-			defect(path, "decision", "A valid single declared result requires OWN whole-value identity");
-		if (v.decision().kind() == DecisionKind.OWN) {
+			defect(path, "provenance", "A valid single declared result requires OWN whole-value identity");
+		if (v.provenance().kind() == VerdictProvenanceKind.OWN) {
 			if (identity(v))
 				return;
 			if (count == 1 && v.seats().size() == 1 && v.seats().get(0).execution() == SeatExecution.RETURNED) {
-				defect(path, "aggregated", "One valid declared input requires complete semantic identity");
+				defect(path, "judgment", "One valid declared input requires complete semantic identity");
 				return;
 			}
-			Judgment rawAggregate = raw(v.aggregated());
+			Judgment rawAggregate = raw(v.judgment());
 			Interpreter.Reduction reduction = Interpreter.reduction(rawAggregate);
 			for (Defect d : reduction.defects())
-				defects.add(new Defect(path + ".aggregated", d.field(), d.kind(), d.note()));
+				defects.add(new Defect(path + ".judgment", d.field(), d.kind(), d.note()));
 			if (reduction.undetermined())
 				undetermined = true;
 			Evidence e = reduction.evidence();
 			if (e != null)
 				validateReduction(v, rawAggregate, e, path);
 		}
-		else if (v.decision().kind() == DecisionKind.TIER) {
+		else if (v.provenance().kind() == VerdictProvenanceKind.TIER) {
 			CompositeAttempt selected = v.compositeAttempts()
 				.stream()
-				.filter(a -> a.name().equals(v.decision().tier()))
+				.filter(a -> a.name().equals(v.provenance().tier()))
 				.findFirst()
 				.orElseThrow();
 			Verdict child = selected.verdict();
@@ -322,8 +349,8 @@ final class ModernInterpreter {
 	}
 
 	private static Judgment raw(Judgment j) {
-		return new Judgment(j.producerStatus(), j.assessment(), j.certainty(), j.distribution(), j.reasonCode(),
-				j.reasoning(), j.checks(), j.provenance(), null, j.metadata());
+		return new Judgment(j.producerStatus(), j.finding(), j.confidence(), j.probabilityDistribution(),
+				j.reasonCode(), j.reasoning(), j.checks(), j.provenance(), null, j.metadata());
 	}
 
 	private void validateReduction(Verdict v, Judgment aggregate, Evidence e, String path) {
@@ -365,7 +392,7 @@ final class ModernInterpreter {
 		}
 		Judgment recomputed = strategy.aggregate(v.individual(), v.weights());
 		if (aggregate.producerStatus() != recomputed.producerStatus()
-				|| !Objects.equals(aggregate.assessment(), recomputed.assessment())
+				|| !Objects.equals(aggregate.finding(), recomputed.finding())
 				|| aggregate.reasonCode() != recomputed.reasonCode()
 				|| !Objects.equals(aggregate.metadata().get(Judgment.AGGREGATION_KEY),
 						recomputed.metadata().get(Judgment.AGGREGATION_KEY))) {
@@ -375,9 +402,9 @@ final class ModernInterpreter {
 	}
 
 	private static boolean contained(Judgment j) {
-		return j.producerStatus() == JudgmentStatus.ERROR && j.policyApplication() == null && j.assessment() == null
-				&& j.certainty() == null && j.distribution() == null && j.provenance() == null && j.checks().isEmpty()
-				&& j.metadata().isEmpty()
+		return j.producerStatus() == JudgmentStatus.ERROR && j.policyApplication() == null && j.finding() == null
+				&& j.confidence() == null && j.probabilityDistribution() == null && j.provenance() == null
+				&& j.checks().isEmpty() && j.metadata().isEmpty()
 				&& Set
 					.of(JudgmentReasonCode.JUDGE_FAILED, JudgmentReasonCode.JUDGE_METADATA_UNREADABLE,
 							JudgmentReasonCode.UNDECLARED_NOT_APPLICABLE)
@@ -387,8 +414,8 @@ final class ModernInterpreter {
 	private static boolean identity(Verdict v) {
 		return v.declaredCardinality() == 1 && v.individual().size() == 1 && v.seats().size() == 1
 				&& v.seats().get(0).position() == 0 && v.seats().get(0).execution() == SeatExecution.RETURNED
-				&& v.decision().kind() == DecisionKind.OWN && v.aggregated().equals(v.individual().get(0))
-				&& v.aggregated().equals(v.individualByName().get(v.seats().get(0).verdictKey()));
+				&& v.provenance().kind() == VerdictProvenanceKind.OWN && v.judgment().equals(v.individual().get(0))
+				&& v.judgment().equals(v.individualByName().get(v.seats().get(0).verdictKey()));
 	}
 
 	private void validateMeta(Verdict v, String path) {
@@ -406,35 +433,35 @@ final class ModernInterpreter {
 			if (index >= v.seats().size() || child == null || v.seats().get(index).position() != position
 					|| v.seats().get(index).execution() != SeatExecution.RETURNED
 					|| !v.seats().get(index).verdictKey().equals(a.name())
-					|| !v.individual().get(index).equals(child.aggregated()))
+					|| !v.individual().get(index).equals(child.judgment()))
 				defect(path, "seats", "Meta seats must match used members at configured positions");
 			index++;
 		}
 		if (index != v.seats().size())
 			defect(path, "seats", "Unexpected meta seat");
-		if (failed && (v.decision().kind() != DecisionKind.UNDECIDED
-				|| v.aggregated().operationalReasonCode() != JudgmentReasonCode.STAGE_FAILED))
-			defect(path, "decision", "Failed meta member requires terminal stage failure");
+		if (failed && (v.provenance().kind() != VerdictProvenanceKind.UNDECIDED
+				|| v.judgment().operationalReasonCode() != JudgmentReasonCode.STAGE_FAILED))
+			defect(path, "provenance", "Failed meta member requires terminal stage failure");
 	}
 
 	private static boolean boundedTier(Verdict child) {
 		if (!identity(child) || !child.compositeAttempts().isEmpty())
 			return false;
-		Judgment j = child.aggregated();
+		Judgment j = child.judgment();
 		return j.status() == JudgmentStatus.ERROR || j.status() == JudgmentStatus.NOT_APPLICABLE
 				|| j.policyApplication() instanceof AppliedPolicy;
 	}
 
 	private void validateCascade(Verdict v, String path) {
-		boolean assessment = v.compositeAttempts()
+		boolean finding = v.compositeAttempts()
 			.stream()
-			.anyMatch(a -> a.policy() == TierPolicy.STOP_ON_USABLE_ASSESSMENT);
+			.anyMatch(a -> a.policy() == TierPolicy.STOP_ON_RELIED_JUDGMENT);
 		boolean stopped = false;
 		for (int i = 0; i < v.compositeAttempts().size(); i++) {
 			CompositeAttempt a = v.compositeAttempts().get(i);
 			Verdict child = a.verdict();
-			boolean bounded = a.policy() == TierPolicy.STOP_ON_USABLE_ASSESSMENT
-					|| (assessment && a.policy() == TierPolicy.FINAL_TIER);
+			boolean bounded = a.policy() == TierPolicy.STOP_ON_RELIED_JUDGMENT
+					|| (finding && a.policy() == TierPolicy.FINAL_TIER);
 			if (stopped)
 				defect(path, "compositeAttempts", "An attempt follows a terminal routing outcome");
 			if (bounded && a.disposition() == AttemptDisposition.STAGE_FAILED) {
@@ -446,18 +473,18 @@ final class ModernInterpreter {
 				if (a.dispositionReason() == DispositionReason.INVALID_TIER_RESULT && child != null
 						&& boundedTier(child))
 					defect(path, "dispositionReason", "Valid bounded identity cannot be marked invalid");
-				if (v.decision().kind() != DecisionKind.UNDECIDED
-						|| v.aggregated().operationalReasonCode() != JudgmentReasonCode.STAGE_FAILED
+				if (v.provenance().kind() != VerdictProvenanceKind.UNDECIDED
+						|| v.judgment().operationalReasonCode() != JudgmentReasonCode.STAGE_FAILED
 						|| v.declaredCardinality() != 0 || !v.seats().isEmpty())
-					defect(path, "decision", "Bounded tier failure requires an empty parent machinery error");
+					defect(path, "provenance", "Bounded tier failure requires an empty parent machinery error");
 				continue;
 			}
 			if (bounded && child != null && !boundedTier(child))
 				defect(path, "compositeAttempts", "Bounded tier requires a one-seat applied-policy identity");
 			boolean stop = a.policy() == TierPolicy.FINAL_TIER;
 			if (child != null) {
-				if (a.policy() == TierPolicy.STOP_ON_USABLE_ASSESSMENT) {
-					Judgment j = child.aggregated();
+				if (a.policy() == TierPolicy.STOP_ON_RELIED_JUDGMENT) {
+					Judgment j = child.judgment();
 					stop = !(j.status() == JudgmentStatus.ABSTAIN && j.policyApplication() instanceof AppliedPolicy p
 							&& p.action() == AcceptanceAction.ESCALATE);
 				}
@@ -469,25 +496,25 @@ final class ModernInterpreter {
 			}
 			if (stop) {
 				stopped = true;
-				if (a.disposition() == AttemptDisposition.USED
-						&& (v.decision().kind() != DecisionKind.TIER || !a.name().equals(v.decision().tier())))
-					defect(path, "decision", "The first stopping tier must be selected");
+				if (a.disposition() == AttemptDisposition.USED && (v.provenance().kind() != VerdictProvenanceKind.TIER
+						|| !a.name().equals(v.provenance().tier())))
+					defect(path, "provenance", "The first stopping tier must be selected");
 			}
-			else if (a.name().equals(v.decision().tier()))
-				defect(path, "decision", "Selected tier's policy requires continuation");
+			else if (a.name().equals(v.provenance().tier()))
+				defect(path, "provenance", "Selected tier's policy requires continuation");
 		}
 		if (!stopped)
 			defect(path, "compositeAttempts", "Cascade ended without a stopping or final attempt");
-		if (v.decision().kind() == DecisionKind.OWN)
-			defect(path, "decision", "Cascade cannot claim an own reduction");
+		if (v.provenance().kind() == VerdictProvenanceKind.OWN)
+			defect(path, "provenance", "Cascade cannot claim an own reduction");
 	}
 
 	private @Nullable DecidedBy decidedBy(Verdict v) {
 		List<String> path = new ArrayList<>();
 		Verdict current = v;
-		Decision last = v.decision();
-		while (current.decision().kind() == DecisionKind.TIER) {
-			last = current.decision();
+		VerdictProvenance last = v.provenance();
+		while (current.provenance().kind() == VerdictProvenanceKind.TIER) {
+			last = current.provenance();
 			String name = Objects.requireNonNull(last.tier());
 			path.add(name);
 			Verdict next = current.compositeAttempts()
@@ -496,7 +523,7 @@ final class ModernInterpreter {
 				.findFirst()
 				.orElseThrow()
 				.verdict();
-			if (next == null || last.basis() == DecisionBasis.INDIVIDUAL_REJECTION)
+			if (next == null || last.basis() == VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
 				break;
 			current = next;
 		}
@@ -504,12 +531,12 @@ final class ModernInterpreter {
 				: new DecidedBy(path.get(path.size() - 1), path, Objects.requireNonNull(last.basis()).wireName());
 	}
 
-	private static VerdictReading reading(Verdict v) {
+	private static RequirementOutcome reading(Verdict v) {
 		Verdict deciding = v;
-		while (deciding.decision().kind() == DecisionKind.TIER) {
-			if (deciding.decision().basis() == DecisionBasis.INDIVIDUAL_REJECTION)
-				return VerdictReading.REJECTED;
-			String tier = deciding.decision().tier();
+		while (deciding.provenance().kind() == VerdictProvenanceKind.TIER) {
+			if (deciding.provenance().basis() == VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
+				return RequirementOutcome.VIOLATED;
+			String tier = deciding.provenance().tier();
 			Verdict next = deciding.compositeAttempts()
 				.stream()
 				.filter(a -> a.name().equals(tier))
@@ -520,12 +547,12 @@ final class ModernInterpreter {
 				break;
 			deciding = next;
 		}
-		return switch (v.aggregated().status()) {
-			case PASS -> VerdictReading.ACCEPTED;
-			case FAIL -> VerdictReading.REJECTED;
-			case ABSTAIN -> VerdictReading.UNDECIDED;
-			case NOT_APPLICABLE -> VerdictReading.NOT_APPLICABLE;
-			case ERROR -> VerdictReading.NOT_ASSESSED;
+		return switch (v.judgment().status()) {
+			case PASS -> RequirementOutcome.SATISFIED;
+			case FAIL -> RequirementOutcome.VIOLATED;
+			case ABSTAIN -> RequirementOutcome.UNRESOLVED;
+			case NOT_APPLICABLE -> RequirementOutcome.NOT_APPLICABLE;
+			case ERROR -> RequirementOutcome.NOT_ASSESSED;
 		};
 	}
 

@@ -7,11 +7,10 @@ package io.github.markpollack.judge.jury;
 
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
@@ -29,7 +28,7 @@ class SimpleJuryTest {
 
 	@Test
 	void shouldExecuteJudgesInParallel() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("Judge1"))
 			.judge(alwaysPass("Judge2"))
 			.judge(alwaysPass("Judge3"))
@@ -37,10 +36,10 @@ class SimpleJuryTest {
 			.parallel(true)
 			.build();
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = jury.vote(context);
 
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individual()).hasSize(3);
 		assertThat(verdict.compositeAttempts()).isEmpty();
 		assertThat(verdict.compositeAttempts()).isUnmodifiable();
@@ -48,7 +47,7 @@ class SimpleJuryTest {
 
 	@Test
 	void shouldExecuteJudgesSequentially() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("Judge1"))
 			.judge(alwaysFail("Judge2"))
 			.judge(alwaysPass("Judge3"))
@@ -56,23 +55,23 @@ class SimpleJuryTest {
 			.parallel(false)
 			.build();
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = jury.vote(context);
 
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individual()).hasSize(3);
 	}
 
 	@Test
 	void shouldPreserveJudgeIdentityByName() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("FileExists"))
 			.judge(alwaysFail("Correctness"))
 			.judge(alwaysPass("BuildSuccess"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = jury.vote(context);
 
 		assertThat(verdict.individualByName()).containsKeys("FileExists", "Correctness", "BuildSuccess");
@@ -82,16 +81,16 @@ class SimpleJuryTest {
 
 	@Test
 	void shouldGenerateDefaultNamesForUnnamedJudges() {
-		Judge<JudgmentContext> unnamedJudge1 = ctx -> Judgment.pass("Pass 1");
-		Judge<JudgmentContext> unnamedJudge2 = ctx -> Judgment.fail("Fail 2");
+		Judge<CompletionEvidence> unnamedJudge1 = ctx -> Judgment.pass("Pass 1");
+		Judge<CompletionEvidence> unnamedJudge2 = ctx -> Judgment.fail("Fail 2");
 
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(unnamedJudge1)
 			.judge(unnamedJudge2)
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = jury.vote(context);
 
 		assertThat(verdict.individualByName()).containsKeys("Judge#1", "Judge#2");
@@ -99,17 +98,17 @@ class SimpleJuryTest {
 
 	@Test
 	void shouldUseWeightedVoting() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("Judge1"), 0.3)
 			.judge(alwaysFail("Judge2"), 0.7)
 			.votingStrategy(new WeightedAverageStrategy())
 			.build();
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = jury.vote(context);
 
 		// Weighted: (1.0 * 0.3 + 0.0 * 0.7) / 1.0 = 0.3 < 0.5 → FAIL
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(verdict.weights()).containsEntry("0", 0.3).containsEntry("1", 0.7);
 	}
 
@@ -117,7 +116,7 @@ class SimpleJuryTest {
 	void shouldUseCustomExecutor() {
 		var executor = Executors.newFixedThreadPool(2);
 
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("Judge1"))
 			.judge(alwaysPass("Judge2"))
 			.votingStrategy(new MajorityVotingStrategy())
@@ -125,20 +124,20 @@ class SimpleJuryTest {
 			.executor(executor)
 			.build();
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = jury.vote(context);
 
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 
 		executor.shutdown();
 	}
 
 	@Test
 	void shouldReturnJudgesList() {
-		Judge<JudgmentContext> judge1 = alwaysPass("Judge1");
-		Judge<JudgmentContext> judge2 = alwaysFail("Judge2");
+		Judge<CompletionEvidence> judge1 = alwaysPass("Judge1");
+		Judge<CompletionEvidence> judge2 = alwaysFail("Judge2");
 
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(judge1)
 			.judge(judge2)
 			.votingStrategy(new MajorityVotingStrategy())
@@ -151,21 +150,24 @@ class SimpleJuryTest {
 	void shouldReturnVotingStrategy() {
 		VotingStrategy strategy = new MajorityVotingStrategy();
 
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder().judge(alwaysPass("Judge1")).votingStrategy(strategy).build();
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
+			.judge(alwaysPass("Judge1"))
+			.votingStrategy(strategy)
+			.build();
 
 		assertThat(jury.getVotingStrategy()).isEqualTo(strategy);
 	}
 
 	@Test
 	void shouldPreserveOrderInIndividualByName() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("First"))
 			.judge(alwaysFail("Second"))
 			.judge(alwaysPass("Third"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = jury.vote(context);
 
 		// LinkedHashMap preserves insertion order
@@ -177,37 +179,41 @@ class SimpleJuryTest {
 
 	@Test
 	void builderShouldRequireVotingStrategy() {
-		assertThatThrownBy(() -> SimpleJury.<JudgmentContext>builder().judge(alwaysPass("Judge1")).build())
+		assertThatThrownBy(() -> SimpleJury.<CompletionEvidence>builder().judge(alwaysPass("Judge1")).build())
 			.isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("Voting strategy is required");
 	}
 
 	@Test
 	void builderShouldRequireAtLeastOneJudge() {
-		assertThatThrownBy(() -> SimpleJury.<JudgmentContext>builder().votingStrategy(new MajorityVotingStrategy()).build())
+		assertThatThrownBy(
+				() -> SimpleJury.<CompletionEvidence>builder().votingStrategy(new MajorityVotingStrategy()).build())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("at least one judge");
 	}
 
 	@Test
 	void builderShouldRejectNullJudge() {
-		assertThatThrownBy(() -> SimpleJury.<JudgmentContext>builder().judge(null)).isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> SimpleJury.<CompletionEvidence>builder().judge(null))
+			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Judge cannot be null");
 	}
 
 	@Test
 	void builderShouldRejectNegativeWeight() {
-		assertThatThrownBy(() -> SimpleJury.<JudgmentContext>builder().judge(alwaysPass("Judge1"), -1.0))
+		assertThatThrownBy(() -> SimpleJury.<CompletionEvidence>builder().judge(alwaysPass("Judge1"), -1.0))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("non-negative");
 	}
 
 	@Test
 	void builderShouldRejectNonFiniteWeights() {
-		// NaN < 0 is false, so a negative-only guard let NaN and both infinities through to a
+		// NaN < 0 is false, so a negative-only guard let NaN and both infinities through
+		// to a
 		// jury that could vote with them but could not be described.
 		for (double weight : new double[] { Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY }) {
-			assertThatThrownBy(() -> SimpleJury.<JudgmentContext>builder().judge(alwaysPass("Judge1"), weight), "weight %s", weight)
+			assertThatThrownBy(() -> SimpleJury.<CompletionEvidence>builder().judge(alwaysPass("Judge1"), weight),
+					"weight %s", weight)
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("Weight must be finite");
 		}
@@ -215,7 +221,7 @@ class SimpleJuryTest {
 
 	@Test
 	void builderShouldStillAcceptFiniteAndZeroWeights() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("Zero"), 0.0)
 			.judge(alwaysPass("Tiny"), Double.MIN_VALUE)
 			.judge(alwaysPass("Heavy"), 2.5)
@@ -232,46 +238,46 @@ class SimpleJuryTest {
 	@Test
 	void builderShouldAcceptZeroWeight() {
 		// Zero weight is valid - judge participates but with no influence
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("Judge1"), 0.0)
 			.judge(alwaysFail("Judge2"), 1.0)
 			.votingStrategy(new WeightedAverageStrategy())
 			.build();
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = jury.vote(context);
 
 		// Only Judge2 has weight → result should be FAIL
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 	}
 
 	@Test
 	void builderShouldDefaultToParallelTrue() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("Judge1"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
 		// No direct way to test parallel flag, but verify it works
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = jury.vote(context);
 
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	@Test
 	void builderShouldSupportJudgeWithoutWeight() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("Judge1")) // defaults to weight 1.0
 			.judge(alwaysFail("Judge2")) // defaults to weight 1.0
 			.votingStrategy(new WeightedAverageStrategy())
 			.build();
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = jury.vote(context);
 
 		// Equal weights: (1.0 * 1.0 + 0.0 * 1.0) / 2.0 = 0.5 → PASS
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	// ==================== Edge Cases ====================
@@ -280,13 +286,13 @@ class SimpleJuryTest {
 	void shouldHandleRecordingJudges() {
 		var recording = recording("RecordingJudge", booleanPass("Recorded"));
 
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(recording)
 			.judge(alwaysPass("Judge2"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		jury.vote(context);
 
 		assertThat(recording.getInvocationCount()).isEqualTo(1);
@@ -295,19 +301,19 @@ class SimpleJuryTest {
 
 	@Test
 	void shouldHandleSlowJudgesWithTimeout() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(slow("SlowJudge", 100, booleanPass("Slow pass")))
 			.judge(alwaysPass("FastJudge"))
 			.votingStrategy(new MajorityVotingStrategy())
 			.parallel(true)
 			.build();
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = jury.vote(context);
 
 		// Both should complete
 		assertThat(verdict.individual()).hasSize(2);
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	// ==================== A failing judge still votes ====================
@@ -319,7 +325,7 @@ class SimpleJuryTest {
 
 	@Test
 	void throwingJudgeBecomesAnErrorJudgmentTheErrorPolicyResolves() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(withScore("Scorer", 0.9))
 			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
 			.judge(alwaysPass("Checker"))
@@ -330,7 +336,7 @@ class SimpleJuryTest {
 		Verdict verdict = jury.vote(simpleContext("Test goal"));
 
 		// TREAT_AS_ABSTAIN makes the failed judge a non-vote; the two that worked decide.
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 
 		// Every configured judge is still represented, and the working judges keep their
 		// scores rather than being discarded along with the failure.
@@ -349,7 +355,7 @@ class SimpleJuryTest {
 
 	@Test
 	void throwingJudgeIsContainedInSequentialModeToo() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
 			.judge(alwaysPass("Checker"))
 			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
@@ -358,14 +364,14 @@ class SimpleJuryTest {
 
 		Verdict verdict = jury.vote(simpleContext("Test goal"));
 
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individual()).hasSize(2);
 		assertThat(verdict.individual().get(0).status()).isEqualTo(JudgmentStatus.ERROR);
 	}
 
 	@Test
 	void throwingJudgeUnderPropagateErrorsRatherThanEscaping() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("Checker"))
 			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
 			.votingStrategy(new MajorityVotingStrategy())
@@ -376,14 +382,14 @@ class SimpleJuryTest {
 		// PROPAGATE is the default, so the aggregate is an ERROR — but it is a verdict
 		// the caller can read, with the working judge's result still attached, not an
 		// exception that destroys the whole jury's output.
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(verdict.individual()).hasSize(2);
 		assertThat(verdict.individual().get(0).status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	@Test
 	void judgeReturningNoJudgmentBecomesAnErrorJudgment() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(returnsNothing("Silent"))
 			.judge(alwaysPass("Checker"))
 			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
@@ -391,7 +397,7 @@ class SimpleJuryTest {
 
 		Verdict verdict = jury.vote(simpleContext("Test goal"));
 
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individual().get(0).status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(verdict.individual().get(0).reasoning()).contains("Silent").contains("returned no judgment");
 	}
@@ -399,7 +405,7 @@ class SimpleJuryTest {
 	@Test
 	@SuppressWarnings("unchecked")
 	void aggregationEvidenceReportsTheCountThatActuallyVoted() {
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("Checker"))
 			.judge(alwaysThrows("Exploder", new IllegalStateException("model timed out")))
 			.judge(alwaysPass("Reviewer"))
@@ -410,7 +416,7 @@ class SimpleJuryTest {
 
 		// This is what makes silent under-counting impossible to miss: the aggregate
 		// states that three judges were submitted and only two reduced.
-		Object block = verdict.aggregated().metadata().get(Judgment.AGGREGATION_KEY);
+		Object block = verdict.judgment().metadata().get(Judgment.AGGREGATION_KEY);
 		assertThat(block).isInstanceOf(Map.class);
 		assertThat((Map<String, Object>) block).containsEntry(AggregationEvidence.INPUT_COUNT, 3)
 			.containsEntry(AggregationEvidence.ELIGIBLE_COUNT, 2)
@@ -434,8 +440,8 @@ class SimpleJuryTest {
 		assertMetadataFailuresBecomeErrorSeats(juryWithUnreadableMetadata(false));
 	}
 
-	private static SimpleJury<JudgmentContext> juryWithUnreadableMetadata(boolean parallel) {
-		return SimpleJury.<JudgmentContext>builder()
+	private static SimpleJury<CompletionEvidence> juryWithUnreadableMetadata(boolean parallel) {
+		return SimpleJury.<CompletionEvidence>builder()
 			.judge(alwaysPass("Build"))
 			.judge(nullMetadata(Judgment.pass("a judgment the jury must not keep")))
 			.judge(withScore("Scorer", 0.9))
@@ -447,7 +453,7 @@ class SimpleJuryTest {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static void assertMetadataFailuresBecomeErrorSeats(SimpleJury<JudgmentContext> jury) {
+	private static void assertMetadataFailuresBecomeErrorSeats(SimpleJury<CompletionEvidence> jury) {
 		Verdict verdict = jury.vote(simpleContext("Test goal"));
 
 		// The judges whose metadata could be read keep their judgments.
@@ -472,9 +478,10 @@ class SimpleJuryTest {
 		assertThat(verdict.individualByName().get("Judge#2")).isSameAs(nullSeat);
 		assertThat(verdict.individualByName().get("Judge#4")).isSameAs(throwingSeat);
 
-		// The error policy governs the failures, and the evidence counts every configured judge.
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
-		Map<String, Object> evidence = (Map<String, Object>) verdict.aggregated()
+		// The error policy governs the failures, and the evidence counts every configured
+		// judge.
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
+		Map<String, Object> evidence = (Map<String, Object>) verdict.judgment()
 			.metadata()
 			.get(Judgment.AGGREGATION_KEY);
 		assertThat(evidence).containsEntry(AggregationEvidence.INPUT_COUNT, jury.getJudges().size())

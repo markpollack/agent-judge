@@ -20,8 +20,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static io.github.markpollack.judge.jury.interpretation.Fixtures.BOUNDARY_GOLDEN;
 import static io.github.markpollack.judge.jury.interpretation.Fixtures.COMPOSITE_GOLDEN;
@@ -34,18 +34,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * A14: the summary is deterministic, and it agrees with the fields.
  *
- * <p>The agreement test is the oracle for {@link Summaries}: every stage name, judge name,
- * status, reason code, reading, support value and deciding stage the summary mentions is present
- * in the fields, and every one present in the fields is mentioned. Names are mentioned in single
- * quotes, statuses as a fixed phrase, reason codes in square brackets, and recorded reasoning is
- * quoted verbatim in parentheses — so the test strips the reasoning first and reads the rest.
+ * <p>
+ * The agreement test is the oracle for {@link Summaries}: every stage name, judge name,
+ * status, reason code, reading, support value and deciding stage the summary mentions is
+ * present in the fields, and every one present in the fields is mentioned. Names are
+ * mentioned in single quotes, statuses as a fixed phrase, reason codes in square
+ * brackets, and recorded reasoning is quoted verbatim in parentheses — so the test strips
+ * the reasoning first and reads the rest.
  */
 @DisplayName("Summaries")
 class SummariesTest {
 
 	private static final Pattern QUOTED = Pattern.compile("'([^']*)'");
 
-	/** A reason code is rendered as {@code [code]} after whitespace; a defect path's own brackets follow a name. */
+	/**
+	 * A reason code is rendered as {@code [code]} after whitespace; a defect path's own
+	 * brackets follow a name.
+	 */
 	private static final Pattern BRACKETED = Pattern.compile("(?<=\\s)\\[([a-z_]+)]");
 
 	static Stream<org.junit.jupiter.params.provider.Arguments> interpretations() {
@@ -54,17 +59,23 @@ class SummariesTest {
 			all.add(org.junit.jupiter.params.provider.Arguments.of(name, Verdicts.interpret(stored(name))));
 		}
 		for (String resource : List.of(COMPOSITE_GOLDEN, BOUNDARY_GOLDEN)) {
-			all.add(org.junit.jupiter.params.provider.Arguments.of(resource, Verdicts.interpret(Fixtures.readMap(resource))));
+			all.add(org.junit.jupiter.params.provider.Arguments.of(resource,
+					Verdicts.interpret(Fixtures.readMap(resource))));
 		}
 		Verdict d1 = LiveFixturesForSummaries.childUndecidedRejection();
 		all.add(org.junit.jupiter.params.provider.Arguments.of("child-undecided D1", Verdicts.interpret(d1)));
-		all.add(org.junit.jupiter.params.provider.Arguments.of("nested D1", Verdicts.interpret(LiveFixturesForSummaries.nestedRejection())));
-		all.add(org.junit.jupiter.params.provider.Arguments.of("propagated error", Verdicts.interpret(LiveFixturesForSummaries.propagatedError())));
+		all.add(org.junit.jupiter.params.provider.Arguments.of("nested D1",
+				Verdicts.interpret(LiveFixturesForSummaries.nestedRejection())));
+		all.add(org.junit.jupiter.params.provider.Arguments.of("propagated error",
+				Verdicts.interpret(LiveFixturesForSummaries.propagatedError())));
 		all.add(org.junit.jupiter.params.provider.Arguments.of("wrong shape", Verdicts.interpret(Map.of("x", 1))));
 		return all.stream();
 	}
 
-	/** The phrase the summary uses for each status; the test's copy is the oracle for the generator's. */
+	/**
+	 * The phrase the summary uses for each status; the test's copy is the oracle for the
+	 * generator's.
+	 */
 	static String phraseFor(String status) {
 		return switch (status) {
 			case "pass" -> "passed";
@@ -172,9 +183,9 @@ class SummariesTest {
 		for (String unknown : fieldStatuses) {
 			assertThat(mentions(text, phraseFor(unknown))).as("status %s", unknown).isTrue();
 		}
-		for (VerdictReading reading : VerdictReading.values()) {
+		for (RequirementOutcome reading : RequirementOutcome.values()) {
 			assertThat(mentions(text, reading.name())).as("reading %s mentioned iff it is the reading", reading)
-				.isEqualTo(reading == interpretation.reading());
+				.isEqualTo(reading == interpretation.outcome());
 		}
 		for (ReadingSupport support : ReadingSupport.values()) {
 			assertThat(mentions(text, support.name())).as("support %s mentioned iff it is the support", support)

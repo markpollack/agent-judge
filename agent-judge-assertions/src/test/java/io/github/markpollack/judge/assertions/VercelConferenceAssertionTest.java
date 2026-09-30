@@ -7,10 +7,13 @@ package io.github.markpollack.judge.assertions;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.net.httpserver.HttpServer;
-import io.github.markpollack.judge.jev.JevEvidence;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.jury.interpretation.Verdicts;
-import io.github.markpollack.judge.result.*;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
+import io.github.markpollack.judge.judgment.ProbabilityMass;
+import io.github.markpollack.judge.acceptance.Policies;
+import io.github.markpollack.judge.provenance.ArtifactRef;
 import java.net.*;
 import java.net.http.*;
 import java.nio.file.*;
@@ -75,16 +78,15 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 		int index = label.equals("satisfied") ? 1 : 0;
 		var evidence = fixture.evidence(index);
 		var result = evaluate(evidence, fixture.requirement(index));
-		Judgment j = result.verdict().aggregated();
-		assertEquals(label, j.assessment().category().selected());
-		assertEquals(.8, j.certainty().value());
-		assertTrue(j.distribution().masses().contains(new ProbabilityMass(label, .9)));
+		Judgment j = result.verdict().judgment();
+		assertEquals(label, j.finding().category().selected());
+		assertEquals(.8, j.confidence().value());
+		assertTrue(j.probabilityDistribution().masses().contains(new ProbabilityMass(label, .9)));
 		assertEquals(1, calls.get());
 		JsonNode request = ConferenceFixture.JSON.readTree(requests.getFirst());
 		assertEquals("typesafe-ai/jev", request.path("model").asText());
 		assertEquals(fixture.requirement(index).text(), request.at("/state/requirement").asText());
-		assertEquals(evidence.text(),
-				request.at("/state/evidence").asText());
+		assertEquals(evidence.text(), request.at("/state/evidence").asText());
 		assertEquals(fixture.configuration.path("instructions"), request.at("/questions/q/instructions"));
 		assertEquals(fixture.configuration.path("criteria"), request.at("/questions/q/criteria"));
 		assertEquals("choice", request.at("/questions/q/type").asText());
@@ -101,7 +103,7 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 				Verdict.class);
 		assertEquals(result.verdict(), restored);
 		assertEquals(result.interpretation(), Verdicts.interpret(restored));
-		assertEquals(fixture.binding.reference(), result.policy());
+		assertEquals(Policies.referenceOf(fixture.binding), result.policy());
 		ConferenceFixture.save(result, output, "FAKE Vercel conference Choice " + label);
 	}
 
@@ -115,12 +117,13 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 				((ObjectNode) body.at("/answers/q")).remove(field);
 		};
 		var result = evaluate(fixture.evidence(0), fixture.requirement(0));
-		Judgment j = result.verdict().aggregated();
+		Judgment j = result.verdict().judgment();
 		assertEquals(JudgmentStatus.ERROR, j.status());
-		assertNull(j.assessment());
-		assertNull(j.certainty());
-		assertNull(j.distribution());
-		assertThrows(SemanticAssertionError.InstrumentFailure.class, () -> SemanticAssertions.requireSatisfied(result));
+		assertNull(j.finding());
+		assertNull(j.confidence());
+		assertNull(j.probabilityDistribution());
+		assertThrows(RequirementAssertionError.InstrumentFailure.class,
+				() -> RequirementAssertions.requireSatisfied(result));
 		assertEquals(1, calls.get());
 		assertArrayEquals(lastResponse, Files.readAllBytes(output.resolve(j.provenance().response().id())));
 	}
@@ -129,9 +132,9 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 	void optionalProviderMetadataAbsenceIsNotInvented() throws Exception {
 		changeResponse = body -> body.remove("provider_metadata");
 		var result = evaluate(fixture.evidence(0), fixture.requirement(0));
-		assertEquals(JudgmentStatus.FAIL, result.verdict().aggregated().status());
-		assertFalse(trace(result.verdict().aggregated()).has("providerMetadata"));
-		assertEquals("unknown", trace(result.verdict().aggregated()).path("underlyingModelVersion").asText());
+		assertEquals(JudgmentStatus.FAIL, result.verdict().judgment().status());
+		assertFalse(trace(result.verdict().judgment()).has("providerMetadata"));
+		assertEquals("unknown", trace(result.verdict().judgment()).path("underlyingModelVersion").asText());
 	}
 
 	@Test

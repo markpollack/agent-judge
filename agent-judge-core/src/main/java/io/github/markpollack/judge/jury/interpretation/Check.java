@@ -15,7 +15,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  * One check a judge recorded, as recorded.
  *
  * <p>
- * The same fact as {@link io.github.markpollack.judge.result.Check}, carried on the
+ * The same fact as {@link io.github.markpollack.judge.judgment.Check}, carried on the
  * {@link JudgeSeat} so a reader never opens the stored verdict to learn what a judge
  * checked. {@code detail} is the check's recorded message.
  *

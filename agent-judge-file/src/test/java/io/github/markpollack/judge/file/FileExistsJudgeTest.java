@@ -1,0 +1,68 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
+package io.github.markpollack.judge.file;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import io.github.markpollack.judge.JudgeType;
+import io.github.markpollack.judge.judgment.Judgment;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class FileExistsJudgeTest {
+
+	@TempDir
+	Path tempDir;
+
+	@Test
+	void passesWhenFileExists() throws IOException {
+		// Create a test file
+		Path testFile = tempDir.resolve("test.txt");
+		Files.writeString(testFile, "test content");
+
+		FileExistsJudge judge = new FileExistsJudge("test.txt");
+
+		Path context = tempDir;
+
+		Judgment judgment = judge.judge(context);
+
+		assertThat(judgment.pass()).isTrue();
+		assertThat(judgment.score()).isNull();
+		assertThat(judgment.effectiveScore()).hasValue(1.0);
+		assertThat(judgment.reasoning()).contains("File exists");
+		assertThat(judgment.checks()).hasSize(1);
+		assertThat(judgment.checks().get(0).passed()).isTrue();
+	}
+
+	@Test
+	void failsWhenFileDoesNotExist() {
+		FileExistsJudge judge = new FileExistsJudge("nonexistent.txt");
+
+		Path context = tempDir;
+
+		Judgment judgment = judge.judge(context);
+
+		assertThat(judgment.pass()).isFalse();
+		assertThat(judgment.effectiveScore()).hasValue(0.0);
+		assertThat(judgment.reasoning()).contains("File not found");
+		assertThat(judgment.checks()).hasSize(1);
+		assertThat(judgment.checks().get(0).passed()).isFalse();
+	}
+
+	@Test
+	void hasCorrectMetadata() {
+		FileExistsJudge judge = new FileExistsJudge("test.txt");
+
+		assertThat(judge.metadata().name()).isEqualTo("FileExistsJudge");
+		assertThat(judge.metadata().description()).contains("test.txt");
+		assertThat(judge.metadata().type()).isEqualTo(JudgeType.DETERMINISTIC);
+	}
+
+}

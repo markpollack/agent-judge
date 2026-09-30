@@ -16,15 +16,19 @@ import io.github.markpollack.judge.jury.Verdict;
 /**
  * Authoritative interpretation of live and stored results.
  *
- * <p>Both entry points read the same portable shape. Explicit version-2 Judgment and Verdict
- * roots retain product assessment, native support, checks, provenance, policy, raw reasons and
- * derived operational values. Nested results must use the same version. Unknown or malformed
- * modern records have no usable subject reading and report UNDETERMINED support with defects.
+ * <p>
+ * Both entry points read the same portable shape. Explicit version-2 Judgment and Verdict
+ * roots retain product finding, native support, checks, provenance, policy, raw reasons
+ * and derived operational values. Nested results must use the same version. Unknown or
+ * malformed modern records have no usable subject reading and report UNDETERMINED support
+ * with defects.
  *
- * <p>Unversioned 0.13–0.17 maps use their own tolerant historical rules, retaining missing facts
- * and legacy boolean checks without inventing modern outcomes. Direct deserialization into live
- * result types is not a historical migration reader. The public portable-results-v2 contract
- * specifies version selection, identity, execution evidence and reduction/routing validation.
+ * <p>
+ * Unversioned 0.13–0.17 maps use their own tolerant historical rules, retaining missing
+ * facts and legacy boolean checks without inventing modern outcomes. Direct
+ * deserialization into live result types is not a historical migration reader. The public
+ * portable-results-v2 contract specifies version selection, identity, execution evidence
+ * and reduction/routing validation.
  */
 public final class Verdicts {
 
@@ -37,10 +41,11 @@ public final class Verdicts {
 	}
 
 	/**
-	 * Interpret a live version-2 verdict through its ordinary portable JSON projection.
-	 * A valid one-seat {@link Verdict#single} has supported whole-value identity without new
-	 * aggregation evidence. Actual reductions and composite decisions require coherent retained
-	 * inputs and execution facts. Malformed custom results are unsupported.
+	 * Interpret a live version-2 verdict through its ordinary portable JSON projection. A
+	 * valid one-seat {@link Verdict#single} has supported whole-value identity without
+	 * new aggregation evidence. Actual reductions and composite decisions require
+	 * coherent retained inputs and execution facts. Malformed custom results are
+	 * unsupported.
 	 * @param verdict the verdict
 	 * @return its interpretation
 	 */
@@ -51,8 +56,8 @@ public final class Verdicts {
 
 	/**
 	 * Interpret a stored verdict of any age.
-	 * @param stored the stored verdict, as parsed JSON: string keys, with objects as maps,
-	 * arrays as lists, and numbers, strings, booleans and nulls as themselves
+	 * @param stored the stored verdict, as parsed JSON: string keys, with objects as
+	 * maps, arrays as lists, and numbers, strings, booleans and nulls as themselves
 	 * @return its interpretation, never null and never an exception on the map's content
 	 */
 	public static Interpretation interpret(Map<String, Object> stored) {

@@ -10,7 +10,12 @@ import io.github.gudcks0305.jev.typesafe.TypeSafeJevClient;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.requirement.RequirementEvidence;
-import io.github.markpollack.judge.result.*;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
+import io.github.markpollack.judge.provenance.ArtifactRef;
+import io.github.markpollack.judge.provenance.CalibrationClaim;
+import io.github.markpollack.judge.provenance.Provenance;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
@@ -21,16 +26,16 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Immutable, concurrently reusable Judge. Sends only the declared requirement and
- * explicitly supplied JevEvidence from the typed input pair. Uses the released Java SDK with
- * exactly one HTTP attempt. Caller owns HTTP client lifecycle and protected artifact
+ * explicitly supplied JevEvidence from the typed input pair. Uses the released Java SDK
+ * with exactly one HTTP attempt. Caller owns HTTP client lifecycle and protected artifact
  * storage. No environment credentials, implicit retrieval, truncation, live calibration
  * guarantee or acceptance policy.
  * <p>
- * Request usage is retained in {@code Judgment.metadata().get("usage")}. On the
- * Vercel route, a valid gateway-reported charge adds {@code cost} (a Double in USD),
- * {@code currency} and {@code costSource}; missing or invalid cost stays absent.
- * This is reported request cost, not a token-price calculation or evidence-preparation
- * cost. A malformed assessment can still retain valid request usage and cost.
+ * Request usage is retained in {@code Judgment.metadata().get("usage")}. On the Vercel
+ * route, a valid gateway-reported charge adds {@code cost} (a Double in USD),
+ * {@code currency} and {@code costSource}; missing or invalid cost stays absent. This is
+ * reported request cost, not a token-price calculation or evidence-preparation cost. A
+ * malformed finding can still retain valid request usage and cost.
  */
 public final class JevJudge implements Judge<RequirementEvidence<String, JevEvidence>> {
 
@@ -84,35 +89,41 @@ public final class JevJudge implements Judge<RequirementEvidence<String, JevEvid
 		this.maxBodyBytes = maxBodyBytes;
 	}
 
-    /**
-     * Bind a stable native requirement snapshot to its provider-specific rendering.
-     * Rendering happens once on the caller thread. Every invocation validates the complete
-     * envelope before reusing that rendering; the evidence's existing rendered digest is
-     * checked by the adapter, never recomputed to make a stale input match.
-     * @param <S> native specification type
-     * @param requirement stable native requirement snapshot
-     * @param render provider-specific native specification renderer
-     * @return ordinary typed requirement-aware Judge
-     */
-    public <S> Judge<RequirementEvidence<Requirement<S>, JevEvidence>> bind(Requirement<S> requirement,
-            java.util.function.Function<? super S, String> render) {
-        Objects.requireNonNull(requirement, "requirement");
-        String rendered = Objects.requireNonNull(render.apply(requirement.specification()), "rendered requirement");
-        Checks.text(rendered);
-        return input -> {
-            Requirement<S> supplied = input.requirement();
-            if (!requirement.id().equals(supplied.id()) || !requirement.revision().equals(supplied.revision())
-                    || !requirement.specification().equals(supplied.specification())
-                    || !requirement.source().equals(supplied.source())) {
-                return Judgment.error(io.github.markpollack.judge.result.JudgmentReasonCode.JUDGE_REPORTED,
-                    "Native requirement snapshot differs from the configured provider binding");
-            }
-            return judge(new RequirementEvidence<>(rendered, input.evidence()));
-        };
-    }
+	/**
+	 * Bind a stable native requirement snapshot to its provider-specific rendering.
+	 * Rendering happens once on the caller thread. Every invocation validates the
+	 * complete envelope before reusing that rendering; the evidence's existing rendered
+	 * digest is checked by the adapter, never recomputed to make a stale input match.
+	 * @param <S> native specification type
+	 * @param requirement stable native requirement snapshot
+	 * @param render provider-specific native specification renderer
+	 * @return ordinary typed requirement-aware Judge
+	 */
+	public <S> Judge<RequirementEvidence<S, JevEvidence>> bind(Requirement<S> requirement,
+			java.util.function.Function<? super S, String> render) {
+		Objects.requireNonNull(requirement, "requirement");
+		String rendered = Objects.requireNonNull(render.apply(requirement.specification()), "rendered requirement");
+		Checks.text(rendered);
+		return input -> {
+			Requirement<S> supplied = input.requirement();
+			if (!requirement.id().equals(supplied.id()) || !requirement.revision().equals(supplied.revision())
+					|| !requirement.specification().equals(supplied.specification())
+					|| !requirement.source().equals(supplied.source())) {
+				return Judgment.error(io.github.markpollack.judge.judgment.JudgmentReasonCode.JUDGE_REPORTED,
+						"Native requirement snapshot differs from the configured provider binding");
+			}
+			return evaluate(rendered, input.evidence());
+		};
+	}
 
 	@Override
 	public Judgment judge(RequirementEvidence<String, JevEvidence> input) {
+		if (input == null)
+			return Judgment.error("Requirement and evidence are required");
+		return evaluate(input.requirement().specification(), input.evidence());
+	}
+
+	private Judgment evaluate(String requirement, JevEvidence evidence) {
 		List<ArtifactRef> refs = new ArrayList<>();
 		AtomicReference<NativeResponse> nativeResult = new AtomicReference<>();
 		AtomicReference<NativeResponse.Envelope> reported = new AtomicReference<>();
@@ -128,11 +139,8 @@ public final class JevJudge implements Judge<RequirementEvidence<String, JevEvid
 		try {
 			preflight();
 			configured = true;
-			Objects.requireNonNull(input);
-			String requirement = input.requirement();
 			Checks.text(requirement);
 			Checks.portable(Map.of("requirement", requirement));
-			JevEvidence evidence = input.evidence();
 			if ((long) requirement.getBytes(StandardCharsets.UTF_8).length
 					+ evidence.text().getBytes(StandardCharsets.UTF_8).length > maxEvidenceBytes)
 				throw new IllegalArgumentException("Evidence bound exceeded");
@@ -246,8 +254,8 @@ public final class JevJudge implements Judge<RequirementEvidence<String, JevEvid
 			String revision = "jev-adapter:2;jev-java:0.2.0;requested=" + model
 					+ (envelope == null ? "" : ";reported=" + envelope.model()) + ";route=" + route
 					+ ";underlyingModelVersion=" + underlyingModelVersion;
-			EvaluationProvenance provenance = new EvaluationProvenance("typesafe.jev", revision, digest, refs,
-					responseRef, success ? List.of(calibrationClaim()) : List.of());
+			Provenance provenance = new Provenance("typesafe.jev", revision, digest, refs, responseRef,
+					success ? List.of(calibrationClaim()) : List.of());
 			Map<String, Object> metadata = new LinkedHashMap<>();
 			if (envelope != null) {
 				Map<String, Object> usage = new LinkedHashMap<>();
@@ -259,8 +267,8 @@ public final class JevJudge implements Judge<RequirementEvidence<String, JevEvid
 			if (success)
 				metadata.put(Judgment.ELAPSED_MILLIS_KEY, portableInteger(trace.elapsedNanos() / 1000000));
 			if (success && value != null)
-				return new Judgment(value.status(), value.assessment(), value.certainty(), value.distribution(), null,
-						value.status() == JudgmentStatus.ABSTAIN
+				return new Judgment(value.status(), value.finding(), value.confidence(),
+						value.probabilityDistribution(), null, value.status() == JudgmentStatus.ABSTAIN
 								? "Declared projection has no supported determination" : "",
 						List.of(), provenance, null, metadata);
 			return new Judgment(JudgmentStatus.ERROR, null, null, null, JudgmentReasonCode.JUDGE_REPORTED, problem,

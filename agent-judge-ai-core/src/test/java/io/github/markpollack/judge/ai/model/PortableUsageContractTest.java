@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import io.github.markpollack.judge.ai.LabelJudgmentClassifier;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -35,9 +35,9 @@ import static org.assertj.core.api.Assertions.entry;
 class PortableUsageContractTest {
 
 	/**
-	 * The declared quantities, in the order a portable projection emits them.
-	 * Asserted as literals because these are the wire keys, and a test coupled to the
-	 * constants cannot detect a constant being renamed.
+	 * The declared quantities, in the order a portable projection emits them. Asserted as
+	 * literals because these are the wire keys, and a test coupled to the constants
+	 * cannot detect a constant being renamed.
 	 */
 	private static final List<String> QUANTITIES = List.of("inputTokens", "outputTokens", "reasoningTokens",
 			"cacheCreationTokens", "cacheReadTokens", "reportedTotalTokens");

@@ -6,8 +6,8 @@
 package io.github.markpollack.judge.jury;
 
 import org.junit.jupiter.api.Test;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import java.util.List;
 import java.util.Map;
@@ -34,7 +34,7 @@ class MedianVotingStrategyTest {
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-				double score = result.score();
+		double score = result.score();
 		assertThat(score).isEqualTo(0.7);
 	}
 
@@ -240,7 +240,6 @@ class MedianVotingStrategyTest {
 		assertThat(evidence(strategy.aggregate(List.of(passJudgment(0.8)), Map.of())))
 			.containsEntry(AggregationEvidence.STRATEGY, "median");
 	}
-
 
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> evidence(Judgment judgment) {

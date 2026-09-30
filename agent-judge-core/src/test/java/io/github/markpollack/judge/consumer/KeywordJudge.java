@@ -6,14 +6,14 @@
 package io.github.markpollack.judge.consumer;
 
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
- * A judge class declared by a consumer, outside every library package. It declares neither
- * metadata nor configuration.
+ * A judge class declared by a consumer, outside every library package. It declares
+ * neither metadata nor configuration.
  */
-public class KeywordJudge implements Judge<JudgmentContext> {
+public class KeywordJudge implements Judge<CompletionEvidence> {
 
 	private final String keyword;
 
@@ -22,8 +22,8 @@ public class KeywordJudge implements Judge<JudgmentContext> {
 	}
 
 	@Override
-	public Judgment judge(JudgmentContext context) {
-		boolean found = context.agentOutput().orElse("").contains(this.keyword);
+	public Judgment judge(CompletionEvidence context) {
+		boolean found = java.util.Optional.ofNullable(context.response()).orElse("").contains(this.keyword);
 		return Judgment.verdict(found).reasoning("looked for '" + this.keyword + "'").build();
 	}
 

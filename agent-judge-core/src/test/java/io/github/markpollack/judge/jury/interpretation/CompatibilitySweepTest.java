@@ -30,14 +30,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * A16: the compatibility sweep over every stored result in the fleet.
  *
- * <p>Enabled by {@code -Daj26.sweep=true}. It enumerates every {@code *.json} under the roots
- * ({@code -Daj26.sweep.roots}, comma-separated; default {@code ~/tuvium/projects,~/projects}),
- * skipping {@code .git}, {@code target}, {@code node_modules}, {@code .m2} and {@code build},
- * parses each, and classifies by shape rather than by path: an item is any object with a
- * {@code verdict} member that is not itself inside a verdict tree; a verdict node is any object
- * with {@code aggregated}. Every item whose verdict is an object goes through
- * {@link Verdicts#interpret(Map)}; an exception is a failure of the sweep. The report is written
- * to {@code -Daj26.sweep.report} (default {@code target/aj26-sweep-report.md}).
+ * <p>
+ * Enabled by {@code -Daj26.sweep=true}. It enumerates every {@code *.json} under the
+ * roots ({@code -Daj26.sweep.roots}, comma-separated; default
+ * {@code ~/tuvium/projects,~/projects}), skipping {@code .git}, {@code target},
+ * {@code node_modules}, {@code .m2} and {@code build}, parses each, and classifies by
+ * shape rather than by path: an item is any object with a {@code verdict} member that is
+ * not itself inside a verdict tree; a verdict node is any object with {@code judgment}.
+ * Every item whose verdict is an object goes through {@link Verdicts#interpret(Map)}; an
+ * exception is a failure of the sweep. The report is written to
+ * {@code -Daj26.sweep.report} (default {@code target/aj26-sweep-report.md}).
  */
 @DisplayName("The compatibility sweep")
 @EnabledIfSystemProperty(named = "aj26.sweep", matches = "true")
@@ -88,15 +90,23 @@ class CompatibilitySweepTest {
 
 		final List<String> contradicted = new ArrayList<>();
 
-		/** Items whose verdict is an object that carries {@code aggregated}: the verdicts proper. */
+		/**
+		 * Items whose verdict is an object that carries {@code judgment}: the verdicts
+		 * proper.
+		 */
 		int rootsWithAggregated;
 
 		final List<String> rootsWithoutAggregated = new ArrayList<>();
 
-		/** Verdict nodes reached outside any item, such as a bare verdict fixture file. */
+		/**
+		 * Verdict nodes reached outside any item, such as a bare verdict fixture file.
+		 */
 		int nodesOutsideItems;
 
-		/** Files under an {@code experiments/runs} directory that hold at least one verdict proper. */
+		/**
+		 * Files under an {@code experiments/runs} directory that hold at least one
+		 * verdict proper.
+		 */
 		int runsFilesWithVerdicts;
 
 		/** Files under an {@code experiments/runs} directory, whatever they hold. */
@@ -186,7 +196,10 @@ class CompatibilitySweepTest {
 		}
 	}
 
-	/** Walk the tree outside any verdict; inside a verdict, count nodes but do not look for items. */
+	/**
+	 * Walk the tree outside any verdict; inside a verdict, count nodes but do not look
+	 * for items.
+	 */
 	private static void visit(JsonNode node, Path file, Tally tally, int[] counts, String where) {
 		if (node.isObject()) {
 			if (node.has("verdict")) {
@@ -199,7 +212,7 @@ class CompatibilitySweepTest {
 				if (verdict.isObject()) {
 					tally.rootVerdicts++;
 					counts[3]++;
-					if (verdict.has("aggregated")) {
+					if (verdict.has("judgment")) {
 						tally.rootsWithAggregated++;
 					}
 					else if (tally.rootsWithoutAggregated.size() < 5) {
@@ -215,15 +228,16 @@ class CompatibilitySweepTest {
 				});
 				return;
 			}
-			if (node.has("aggregated")) {
-				// A verdict node reached without an item around it: count its tree once and stop.
+			if (node.has("judgment")) {
+				// A verdict node reached without an item around it: count its tree once
+				// and stop.
 				int before = tally.verdictNodes;
 				countNodes(node, tally);
 				tally.nodesOutsideItems += tally.verdictNodes - before;
 				return;
 			}
-			node.fields().forEachRemaining(entry -> visit(entry.getValue(), file, tally, counts,
-					where + "." + entry.getKey()));
+			node.fields()
+				.forEachRemaining(entry -> visit(entry.getValue(), file, tally, counts, where + "." + entry.getKey()));
 		}
 		else if (node.isArray()) {
 			for (int index = 0; index < node.size(); index++) {
@@ -233,7 +247,7 @@ class CompatibilitySweepTest {
 	}
 
 	private static void countNodes(JsonNode verdict, Set<JsonNode> seen, Tally tally) {
-		if (verdict.isObject() && verdict.has("aggregated") && seen.add(verdict)) {
+		if (verdict.isObject() && verdict.has("judgment") && seen.add(verdict)) {
 			tally.verdictNodes++;
 			bump(tally.nodeShapes, shape(verdict));
 		}
@@ -264,7 +278,7 @@ class CompatibilitySweepTest {
 		bump(tally.rootShapes, shape);
 		String itemName = item.has("itemSlug") ? item.get("itemSlug").asText()
 				: item.has("itemId") ? item.get("itemId").asText() : "<unnamed item>";
-		if (shape.equals("flat") && verdict.has("aggregated") && tally.flatRootExamples.size() < 5) {
+		if (shape.equals("flat") && verdict.has("judgment") && tally.flatRootExamples.size() < 5) {
 			tally.flatRootExamples.add(file + " :: " + itemName);
 		}
 		Map<String, Object> stored = MAPPER.convertValue(verdict, Fixtures.MAP);
@@ -280,7 +294,7 @@ class CompatibilitySweepTest {
 			tally.exceptions.add(file + " :: " + itemName + " :: " + ex);
 			return;
 		}
-		bump(tally.readings, String.valueOf(interpretation.reading()));
+		bump(tally.readings, String.valueOf(interpretation.outcome()));
 		bump(tally.support, interpretation.readingSupport().name());
 		bump(tally.sourceVersions, "sourceVersion " + interpretation.sourceVersion());
 		for (Defect defect : interpretation.defects()) {
@@ -290,11 +304,12 @@ class CompatibilitySweepTest {
 			bump(tally.errorRootedSupport, interpretation.readingSupport().name());
 		}
 		if (interpretation.readingSupport() == ReadingSupport.CONTRADICTED && tally.contradicted.size() < 20) {
-			tally.contradicted.add(file + " :: " + itemName + " :: " + interpretation.defects()
-				.stream()
-				.filter(defect -> defect.kind() == DefectKind.INCONSISTENT)
-				.map(Defect::note)
-				.toList());
+			tally.contradicted.add(file + " :: " + itemName + " :: "
+					+ interpretation.defects()
+						.stream()
+						.filter(defect -> defect.kind() == DefectKind.INCONSISTENT)
+						.map(Defect::note)
+						.toList());
 		}
 	}
 
@@ -388,8 +403,8 @@ class CompatibilitySweepTest {
 
 	private static void table(StringBuilder out, Map<String, Integer> counts) {
 		out.append("| Value | Count |\n|---|---|\n");
-		new LinkedHashMap<>(counts).forEach((key, value) -> out.append("| ").append(key).append(" | ").append(value)
-			.append(" |\n"));
+		new LinkedHashMap<>(counts)
+			.forEach((key, value) -> out.append("| ").append(key).append(" | ").append(value).append(" |\n"));
 	}
 
 }

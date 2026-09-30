@@ -14,62 +14,70 @@ import io.github.markpollack.judge.ai.model.JudgeModel;
 import io.github.markpollack.judge.ai.model.JudgeModelRequest;
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
-import io.github.markpollack.judge.context.JudgmentContext;
+import java.util.function.Function;
+import java.util.Objects;
 import io.github.markpollack.judge.description.ConfiguredJudge;
 import io.github.markpollack.judge.description.ImplementationIdentity;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * A judge backed by an AI model or agent session.
  *
- * <p>Composes the full pipeline via builder — no subclassing needed:
+ * <p>
+ * Composes the full pipeline via builder — no subclassing needed:
  * <ol>
- *   <li>{@link JudgePromptTemplate} renders the prompt from {@link JudgmentContext}</li>
- *   <li>{@link JudgeModel} invokes the AI backend</li>
- *   <li>{@link JudgmentClassifier} maps the model response into a {@link Judgment}</li>
+ * <li>{@link JudgePromptTemplate} renders the prompt from typed evidence</li>
+ * <li>{@link JudgeModel} invokes the AI backend</li>
+ * <li>{@link JudgmentClassifier} maps the model response into a {@link Judgment}</li>
  * </ol>
  *
- * <p>It is a {@link ConfiguredJudge}: {@link #configuration()} declares the prompt it
+ * <p>
+ * It is a {@link ConfiguredJudge}: {@link #configuration()} declares the prompt it
  * renders and the classifier that reads the answer. It declares no model, because a
  * {@link JudgeModel} does not state which model it will call.
  *
- * <p>Its metadata carries the exclusion capability, if any. A judge whose rubric is partly
- * conditional declares that through {@link Builder#notApplicableWhen(String)} while the jury is
- * being assembled; a judge that does not declare it cannot exclude a criterion after seeing the
- * subject.
+ * <p>
+ * Its metadata carries the exclusion capability, if any. A judge whose rubric is partly
+ * conditional declares that through {@link Builder#notApplicableWhen(String)} while the
+ * jury is being assembled; a judge that does not declare it cannot exclude a criterion
+ * after seeing the subject.
  *
- * <p>Example:
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * <p>
+ * Example: Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
+ * @param <E> evidence type
  * @author Mark Pollack
  * @since 0.10.0
  */
-public final class ModelBackedJudge implements JudgeWithMetadata<JudgmentContext>, ConfiguredJudge<JudgmentContext> {
+public final class ModelBackedJudge<E> implements JudgeWithMetadata<E>, ConfiguredJudge<E> {
 
 	/**
-	 * Configuration key for the prompt template's {@linkplain JudgePromptTemplate#name() name}.
+	 * Configuration key for the prompt template's {@linkplain JudgePromptTemplate#name()
+	 * name}.
 	 * @since 0.17.0
 	 */
 	public static final String PROMPT_TEMPLATE_KEY = "promptTemplate";
 
 	/**
-	 * Configuration key for the lowercase hexadecimal SHA-256 digest of the template text,
-	 * encoded as UTF-8, before rendering.
+	 * Configuration key for the lowercase hexadecimal SHA-256 digest of the template
+	 * text, encoded as UTF-8, before rendering.
 	 * @since 0.17.0
 	 */
 	public static final String PROMPT_TEMPLATE_SHA256_KEY = "promptTemplateSha256";
 
 	/**
 	 * Configuration key for the template's
-	 * {@linkplain JudgePromptTemplate#missingVariablePolicy() missing-variable policy}, as its
-	 * constant name.
+	 * {@linkplain JudgePromptTemplate#missingVariablePolicy() missing-variable policy},
+	 * as its constant name.
 	 * @since 0.17.0
 	 */
 	public static final String MISSING_VARIABLE_POLICY_KEY = "missingVariablePolicy";
 
 	/**
-	 * Configuration key for the judgment classifier's implementation, in the portable form of
-	 * {@link ImplementationIdentity}, so a lambda classifier records no unstable class name.
+	 * Configuration key for the judgment classifier's implementation, in the portable
+	 * form of {@link ImplementationIdentity}, so a lambda classifier records no unstable
+	 * class name.
 	 * @since 0.17.0
 	 */
 	public static final String JUDGMENT_CLASSIFIER_KEY = "judgmentClassifier";
@@ -78,21 +86,24 @@ public final class ModelBackedJudge implements JudgeWithMetadata<JudgmentContext
 
 	private final JudgePromptTemplate promptTemplate;
 
+	private final Function<? super E, Map<String, Object>> variables;
+
 	private final JudgmentClassifier classifier;
 
 	private final JudgeModel model;
 
-	private ModelBackedJudge(JudgeMetadata metadata, JudgePromptTemplate promptTemplate,
-			JudgmentClassifier classifier, JudgeModel model) {
+	private ModelBackedJudge(JudgeMetadata metadata, JudgePromptTemplate promptTemplate, JudgmentClassifier classifier,
+			JudgeModel model, Function<? super E, Map<String, Object>> variables) {
 		this.metadata = metadata;
 		this.promptTemplate = promptTemplate;
 		this.classifier = classifier;
 		this.model = model;
+		this.variables = variables;
 	}
 
 	@Override
-	public Judgment judge(JudgmentContext context) {
-		String prompt = promptTemplate.render(context);
+	public Judgment judge(E evidence) {
+		String prompt = promptTemplate.render(variables.apply(evidence));
 		JudgeModelResponse response = model.generate(JudgeModelRequest.user(prompt));
 		return classifier.classify(response);
 	}
@@ -105,15 +116,15 @@ public final class ModelBackedJudge implements JudgeWithMetadata<JudgmentContext
 	/**
 	 * The configuration this judge's verdicts depend on, as known before any call.
 	 * <p>
-	 * Declares the prompt template's name ({@value #PROMPT_TEMPLATE_KEY}), the SHA-256 of its
-	 * text before rendering ({@value #PROMPT_TEMPLATE_SHA256_KEY}), its missing-variable policy
-	 * ({@value #MISSING_VARIABLE_POLICY_KEY}) and the classifier's implementation
-	 * ({@value #JUDGMENT_CLASSIFIER_KEY}).
+	 * Declares the prompt template's name ({@value #PROMPT_TEMPLATE_KEY}), the SHA-256 of
+	 * its text before rendering ({@value #PROMPT_TEMPLATE_SHA256_KEY}), its
+	 * missing-variable policy ({@value #MISSING_VARIABLE_POLICY_KEY}) and the
+	 * classifier's implementation ({@value #JUDGMENT_CLASSIFIER_KEY}).
 	 * </p>
 	 * <p>
-	 * There is no model key. A {@link JudgeModel} does not state which model it will call, and
-	 * an adapter such as a chat client may choose at call time, so any value here would be a
-	 * guess. The model a call actually used is reported afterwards, in
+	 * There is no model key. A {@link JudgeModel} does not state which model it will
+	 * call, and an adapter such as a chat client may choose at call time, so any value
+	 * here would be a guess. The model a call actually used is reported afterwards, in
 	 * {@link JudgeModelResponse#model()}.
 	 * </p>
 	 * @return the declared configuration, in declaration order
@@ -141,14 +152,19 @@ public final class ModelBackedJudge implements JudgeWithMetadata<JudgmentContext
 
 	/**
 	 * Start a model-backed judge builder.
+	 * @param <E> evidence type
 	 * @return a new builder
 	 */
-	public static Builder builder() {
-		return new Builder();
+	public static <E> Builder<E> builder() {
+		return new Builder<>();
 	}
 
-	/** Builds a model-backed judge from its four required collaborators. */
-	public static class Builder {
+	/**
+	 * Builds a model-backed judge with explicit evidence rendering.
+	 *
+	 * @param <E> evidence type
+	 */
+	public static class Builder<E> {
 
 		/** Create an empty builder. */
 		public Builder() {
@@ -166,12 +182,25 @@ public final class ModelBackedJudge implements JudgeWithMetadata<JudgmentContext
 
 		private String notApplicableWhen;
 
+		private Function<? super E, Map<String, Object>> variables;
+
+		/**
+		 * Define how this Judge renders its typed evidence, separately from model
+		 * configuration.
+		 * @param variables explicit evidence-to-template projection
+		 * @return this builder
+		 */
+		public Builder<E> variables(Function<? super E, Map<String, Object>> variables) {
+			this.variables = Objects.requireNonNull(variables);
+			return this;
+		}
+
 		/**
 		 * Set the judge name.
 		 * @param name judge name
 		 * @return this builder
 		 */
-		public Builder name(String name) {
+		public Builder<E> name(String name) {
 			this.name = name;
 			return this;
 		}
@@ -181,7 +210,7 @@ public final class ModelBackedJudge implements JudgeWithMetadata<JudgmentContext
 		 * @param description judge description
 		 * @return this builder
 		 */
-		public Builder description(String description) {
+		public Builder<E> description(String description) {
 			this.description = description;
 			return this;
 		}
@@ -191,7 +220,7 @@ public final class ModelBackedJudge implements JudgeWithMetadata<JudgmentContext
 		 * @param promptTemplate prompt template
 		 * @return this builder
 		 */
-		public Builder promptTemplate(JudgePromptTemplate promptTemplate) {
+		public Builder<E> promptTemplate(JudgePromptTemplate promptTemplate) {
 			this.promptTemplate = promptTemplate;
 			return this;
 		}
@@ -201,7 +230,7 @@ public final class ModelBackedJudge implements JudgeWithMetadata<JudgmentContext
 		 * @param classifier response classifier
 		 * @return this builder
 		 */
-		public Builder judgmentClassifier(JudgmentClassifier classifier) {
+		public Builder<E> judgmentClassifier(JudgmentClassifier classifier) {
 			this.classifier = classifier;
 			return this;
 		}
@@ -211,26 +240,26 @@ public final class ModelBackedJudge implements JudgeWithMetadata<JudgmentContext
 		 * @param model model adapter
 		 * @return this builder
 		 */
-		public Builder model(JudgeModel model) {
+		public Builder<E> model(JudgeModel model) {
 			this.model = model;
 			return this;
 		}
 
 		/**
 		 * Declare that this judge may return
-		 * {@link io.github.markpollack.judge.result.JudgmentStatus#NOT_APPLICABLE}, and under
-		 * what condition.
+		 * {@link io.github.markpollack.judge.judgment.JudgmentStatus#NOT_APPLICABLE}, and
+		 * under what condition.
 		 * <p>
-		 * Omit it and the judge declares no exclusion capability, which is the default: a jury
-		 * then contains an exclusion from this seat as an error rather than honouring it. State
-		 * a condition a reader could check against the subject, not the fact that the judge
-		 * sometimes excludes.
+		 * Omit it and the judge declares no exclusion capability, which is the default: a
+		 * jury then contains an exclusion from this seat as an error rather than
+		 * honouring it. State a condition a reader could check against the subject, not
+		 * the fact that the judge sometimes excludes.
 		 * </p>
 		 * @param notApplicableWhen the condition; must be non-blank
 		 * @return this builder
 		 * @since 0.17.0
 		 */
-		public Builder notApplicableWhen(String notApplicableWhen) {
+		public Builder<E> notApplicableWhen(String notApplicableWhen) {
 			this.notApplicableWhen = notApplicableWhen;
 			return this;
 		}
@@ -239,7 +268,7 @@ public final class ModelBackedJudge implements JudgeWithMetadata<JudgmentContext
 		 * Build the configured judge.
 		 * @return a model-backed judge
 		 */
-		public ModelBackedJudge build() {
+		public ModelBackedJudge<E> build() {
 			if (name == null) {
 				throw new IllegalStateException("Judge name is required");
 			}
@@ -253,7 +282,8 @@ public final class ModelBackedJudge implements JudgeWithMetadata<JudgmentContext
 				throw new IllegalStateException("Judge model is required");
 			}
 			JudgeMetadata metadata = new JudgeMetadata(name, description, JudgeType.LLM_POWERED, notApplicableWhen);
-			return new ModelBackedJudge(metadata, promptTemplate, classifier, model);
+			return new ModelBackedJudge<>(metadata, promptTemplate, classifier, model,
+					Objects.requireNonNull(variables, "evidence variables"));
 		}
 
 	}

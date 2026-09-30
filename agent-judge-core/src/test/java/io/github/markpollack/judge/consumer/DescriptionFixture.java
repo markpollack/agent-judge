@@ -16,7 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.jury.AverageVotingStrategy;
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.jury.ConjunctiveStrategy;
@@ -30,17 +30,17 @@ import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.TiePolicy;
 import io.github.markpollack.judge.jury.TierPolicy;
 import io.github.markpollack.judge.jury.WeightedAverageStrategy;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
- * The jury whose description must be byte-identical across JVM runs, and the entry point a
- * separate JVM runs to write that description.
+ * The jury whose description must be byte-identical across JVM runs, and the entry point
+ * a separate JVM runs to write that description.
  *
  * <p>
- * The jury deliberately holds everything whose runtime identity varies between runs: a lambda,
- * whose hidden class name carries a memory address; an anonymous class; a library combinator;
- * and a declared configuration built with {@code Map.of}, whose iteration order is salted per
- * JVM.
+ * The jury deliberately holds everything whose runtime identity varies between runs: a
+ * lambda, whose hidden class name carries a memory address; an anonymous class; a library
+ * combinator; and a declared configuration built with {@code Map.of}, whose iteration
+ * order is salted per JVM.
  * </p>
  */
 public final class DescriptionFixture {
@@ -61,34 +61,37 @@ public final class DescriptionFixture {
 		return new ObjectMapper().writeValueAsBytes(jury().describe().toPortable());
 	}
 
-	static Jury<JudgmentContext> jury() {
-		Judge<JudgmentContext> lambda = ctx -> Judgment.pass("lambda");
-		Judge<JudgmentContext> anonymous = new Judge<JudgmentContext>() {
+	static Jury<CompletionEvidence> jury() {
+		Judge<CompletionEvidence> lambda = ctx -> Judgment.pass("lambda");
+		Judge<CompletionEvidence> anonymous = new Judge<CompletionEvidence>() {
 			@Override
-			public Judgment judge(JudgmentContext context) {
+			public Judgment judge(CompletionEvidence context) {
 				return Judgment.fail("anonymous");
 			}
 		};
 		Map<String, Object> rubric = Map.of("passMark", 0.75, "criteria", List.of("correct", "complete"), "version", 3,
 				"strict", true, "levels", Map.of("high", 1.0, "mid", 0.5, "low", 0.0));
 
-		Jury<JudgmentContext> gate = SimpleJury.<JudgmentContext>builder()
+		Jury<CompletionEvidence> gate = SimpleJury.<CompletionEvidence>builder()
 			.judge(lambda)
 			.judge(anonymous, 2.0)
 			.judge(Judges.allOf(lambda, anonymous), 0.5)
 			.votingStrategy(new WeightedAverageStrategy(0.5, ErrorPolicy.IGNORE))
 			.build();
-		Jury<JudgmentContext> rubricJury = SimpleJury.<JudgmentContext>builder()
+		Jury<CompletionEvidence> rubricJury = SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(new DeclaringJudge(rubric), "rubric", "declares its rubric", JudgeType.LLM_POWERED))
 			.votingStrategy(new AverageVotingStrategy(0.8))
 			.build();
-		Jury<JudgmentContext> duplicates = Juries.fromJudges(new ConsensusStrategy(), Judges.named(lambda, "same"),
+		Jury<CompletionEvidence> duplicates = Juries.fromJudges(new ConsensusStrategy(), Judges.named(lambda, "same"),
 				Judges.named(anonymous, "same"));
-		Jury<JudgmentContext> review = Juries.meta(new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.TREAT_AS_ABSTAIN),
-				new NamedJury<JudgmentContext>("rubric", rubricJury), new NamedJury<JudgmentContext>("duplicates", duplicates));
-		Jury<JudgmentContext> last = Juries.fromJudges(new ConjunctiveStrategy(0.6), new KeywordJudge("done"), lambda);
+		Jury<CompletionEvidence> review = Juries.meta(
+				new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.TREAT_AS_ABSTAIN),
+				new NamedJury<CompletionEvidence>("rubric", rubricJury),
+				new NamedJury<CompletionEvidence>("duplicates", duplicates));
+		Jury<CompletionEvidence> last = Juries.fromJudges(new ConjunctiveStrategy(0.6), new KeywordJudge("done"),
+				lambda);
 
-		return CascadedJury.<JudgmentContext>builder()
+		return CascadedJury.<CompletionEvidence>builder()
 			.tier("gate", gate, TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("review", review, TierPolicy.ACCEPT_ON_ALL_PASS)
 			.tier("final", last, TierPolicy.FINAL_TIER)

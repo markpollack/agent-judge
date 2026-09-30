@@ -1,0 +1,169 @@
+package io.github.markpollack.judge.springai;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+
+import io.github.markpollack.judge.completion.CompletionStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.conformance.CompletionEvidenceConformance;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class SpringAiCompletionEvidenceBuilderTest {
+
+	private ChatResponse successResponse() {
+		AssistantMessage message = new AssistantMessage("Spring Boot simplifies application development.");
+		ChatGenerationMetadata genMeta = ChatGenerationMetadata.builder().finishReason("stop").build();
+		Generation generation = new Generation(message, genMeta);
+		ChatResponseMetadata meta = ChatResponseMetadata.builder()
+			.id("resp-123")
+			.model("gpt-4o")
+			.usage(new DefaultUsage(100, 50))
+			.build();
+		return new ChatResponse(List.of(generation), meta);
+	}
+
+	@Test
+	void shouldBuildContextFromSuccessResponse() {
+		ChatResponse response = successResponse();
+		Instant startedAt = Instant.now();
+
+		CompletionEvidence context = SpringAiCompletionEvidenceBuilder.from(response, "Explain Spring Boot", startedAt,
+				Duration.ofSeconds(2));
+
+		assertThat(context.request()).isEqualTo("Explain Spring Boot");
+		assertThat(context.status()).isEqualTo(CompletionStatus.SUCCESS);
+		assertThat(context.response()).isEqualTo("Spring Boot simplifies application development.");
+		assertThat(context.metadata()).containsEntry(SpringAiMetadataKeys.RESPONSE_ID, "resp-123");
+		assertThat(context.metadata()).containsEntry(SpringAiMetadataKeys.MODEL, "gpt-4o");
+		assertThat(context.metadata()).containsEntry(SpringAiMetadataKeys.FINISH_REASON, "stop");
+		assertThat(context.metadata()).containsEntry(SpringAiMetadataKeys.USAGE_PROMPT_TOKENS, 100);
+		assertThat(context.metadata()).containsEntry(SpringAiMetadataKeys.USAGE_COMPLETION_TOKENS, 50);
+		assertThat(context.metadata()).doesNotContainKey("springai.usage.totalTokens");
+		CompletionEvidenceConformance.assertSuccessful(context, "Explain Spring Boot",
+				"Spring Boot simplifies application development.");
+	}
+
+	@Test
+	void shouldExposeIndependentCacheQuantitiesWithoutDerivedTotal() {
+		AssistantMessage message = new AssistantMessage("Cached response");
+		Generation generation = new Generation(message, ChatGenerationMetadata.builder().finishReason("stop").build());
+		ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+			.id("resp-cache")
+			.model("gpt-cache")
+			.usage(new DefaultUsage(100, 50, null, null, 25L, 10L))
+			.build();
+
+		CompletionEvidence context = SpringAiCompletionEvidenceBuilder
+			.from(new ChatResponse(List.of(generation), metadata), "Use cache", Instant.now(), Duration.ofMillis(5));
+
+		assertThat(context.metadata()).containsEntry("springai.usage.cacheCreationTokens", 10L)
+			.containsEntry("springai.usage.cacheReadTokens", 25L)
+			.doesNotContainKey("springai.usage.totalTokens");
+	}
+
+	@Test
+	void shouldExposeNativeAssistantToolCalls() {
+		AssistantMessage.ToolCall toolCall = new AssistantMessage.ToolCall("call-1", "function", "lookupWeather",
+				"{\"city\":\"Boston\"}");
+		AssistantMessage message = AssistantMessage.builder().content("").toolCalls(List.of(toolCall)).build();
+		ChatResponse response = new ChatResponse(List.of(new Generation(message)));
+
+		CompletionEvidence context = SpringAiCompletionEvidenceBuilder.from(response, "Check the weather",
+				Instant.now(), Duration.ofMillis(5));
+
+		assertThat(context.metadata()).containsEntry(SpringAiMetadataKeys.HAS_TOOL_CALLS, true)
+			.containsEntry(SpringAiMetadataKeys.TOOL_CALLS, List.of(toolCall));
+	}
+
+	@Test
+	void shouldMapContentFilterToRefused() {
+		AssistantMessage message = new AssistantMessage("");
+		ChatGenerationMetadata genMeta = ChatGenerationMetadata.builder().finishReason("content_filter").build();
+		Generation generation = new Generation(message, genMeta);
+		ChatResponse response = new ChatResponse(List.of(generation));
+
+		CompletionEvidence context = SpringAiCompletionEvidenceBuilder.from(response, "Generate something",
+				Instant.now(), Duration.ofSeconds(1));
+
+		assertThat(context.status()).isEqualTo(CompletionStatus.REFUSED);
+	}
+
+	@Test
+	void shouldMapLengthToSuccessWithCaveat() {
+		AssistantMessage message = new AssistantMessage("Truncated response...");
+		ChatGenerationMetadata genMeta = ChatGenerationMetadata.builder().finishReason("length").build();
+		Generation generation = new Generation(message, genMeta);
+		ChatResponse response = new ChatResponse(List.of(generation));
+
+		CompletionEvidence context = SpringAiCompletionEvidenceBuilder.from(response, "Long question", Instant.now(),
+				Duration.ofSeconds(5));
+
+		assertThat(context.status()).isEqualTo(CompletionStatus.SUCCESS);
+		assertThat(context.metadata()).containsEntry(SpringAiMetadataKeys.FINISH_REASON, "length");
+	}
+
+	@Test
+	void shouldMapNullFinishReasonToUnknown() {
+		AssistantMessage message = new AssistantMessage("Some response");
+		Generation generation = new Generation(message);
+		ChatResponse response = new ChatResponse(List.of(generation));
+
+		CompletionEvidence context = SpringAiCompletionEvidenceBuilder.from(response, "Test", Instant.now(),
+				Duration.ofSeconds(1));
+
+		assertThat(context.status()).isEqualTo(CompletionStatus.UNKNOWN);
+	}
+
+	@Test
+	void shouldCaptureExceptionFromSupplier() {
+		RuntimeException failure = new RuntimeException("Connection refused");
+		CompletionEvidence context = SpringAiCompletionEvidenceBuilder.execute("Fail please", () -> {
+			throw failure;
+		});
+
+		assertThat(context.status()).isEqualTo(CompletionStatus.FAILED);
+		assertThat(context.error()).isNotNull()
+			.satisfies(e -> assertThat(e.getMessage()).isEqualTo("Connection refused"));
+		CompletionEvidenceConformance.assertFailed(context, "Fail please", failure);
+	}
+
+	@Test
+	void shouldHandleNullChatResponse() {
+		CompletionEvidence context = SpringAiCompletionEvidenceBuilder.from(null, "Test", Instant.now(),
+				Duration.ofSeconds(1));
+
+		assertThat(context.status()).isEqualTo(CompletionStatus.UNKNOWN);
+		assertThat(context.response()).isNull();
+	}
+
+	@Test
+	void shouldHandleNullSupplierResult() {
+		CompletionEvidence context = SpringAiCompletionEvidenceBuilder.execute("Test", () -> null);
+
+		assertThat(context.status()).isEqualTo(CompletionStatus.FAILED);
+		assertThat(context.error()).isNotNull();
+	}
+
+	@Test
+	void shouldIncludeExtraMetadata() {
+		ChatResponse response = successResponse();
+
+		CompletionEvidence context = SpringAiCompletionEvidenceBuilder.from(response, "Test", Instant.now(),
+				Duration.ofSeconds(1), Map.of("run.id", "exp-42"));
+
+		assertThat(context.metadata()).containsEntry("run.id", "exp-42");
+		assertThat(context.metadata()).containsEntry(SpringAiMetadataKeys.MODEL, "gpt-4o");
+	}
+
+}

@@ -18,9 +18,8 @@ import io.github.markpollack.judge.DeterministicJudge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * Judge that verifies compiled {@code .class} files have the expected major version.
@@ -38,36 +37,29 @@ import io.github.markpollack.judge.result.Judgment;
  * @author Mark Pollack
  * @since 0.9.0
  */
-public class ClassVersionJudge extends DeterministicJudge {
+public class ClassVersionJudge extends DeterministicJudge<Path> {
 
 	private static final Logger logger = LoggerFactory.getLogger(ClassVersionJudge.class);
 
 	private static final int CLASS_MAGIC = 0xCAFEBABE;
 
 	/** Create a class-file version judge. */
-	public ClassVersionJudge() {
+	private final int expectedVersion;
+
+	/**
+	 * Require the given JVM class-file major version.
+	 * @param expectedVersion required JVM major version
+	 */
+	public ClassVersionJudge(int expectedVersion) {
 		super("ClassVersionJudge", "Verifies .class file major versions match target Java version");
+		if (expectedVersion < 45 || expectedVersion > 65535)
+			throw new IllegalArgumentException("Invalid class major version");
+		this.expectedVersion = expectedVersion;
 	}
 
 	@Override
-	public Judgment judge(JudgmentContext context) {
-		Object targetVersionObj = context.metadata().get("targetClassVersion");
-		if (targetVersionObj == null) {
-			return Judgment.abstain("No targetClassVersion in metadata");
-		}
-
-		int expectedVersion;
-		if (targetVersionObj instanceof Integer i) {
-			expectedVersion = i;
-		}
-		else if (targetVersionObj instanceof Number n) {
-			expectedVersion = n.intValue();
-		}
-		else {
-			return Judgment.abstain("targetClassVersion is not a number: " + targetVersionObj.getClass().getName());
-		}
-
-		Path classesDir = context.workspace().resolve("target/classes");
+	public Judgment judge(Path workspace) {
+		Path classesDir = workspace.resolve("target/classes");
 		if (!Files.isDirectory(classesDir)) {
 			return Judgment.abstain("No target/classes directory found");
 		}
@@ -110,8 +102,10 @@ public class ClassVersionJudge extends DeterministicJudge {
 		}
 
 		if (!readErrors.isEmpty()) {
-			return Judgment.builder().error()
-				.reasoning(String.format("Could not determine the version of %d of %d .class files: %s; %d known mismatches",
+			return Judgment.builder()
+				.error()
+				.reasoning(String.format(
+						"Could not determine the version of %d of %d .class files: %s; %d known mismatches",
 						readErrors.size(), classFiles.size(), String.join(", ", readErrors), mismatches.size()))
 				.checks(checks)
 				.build();
@@ -123,7 +117,9 @@ public class ClassVersionJudge extends DeterministicJudge {
 				: String.format("%d of %d .class files have wrong version: %s", mismatches.size(), classFiles.size(),
 						String.join(", ", mismatches));
 
-		return (pass ? Judgment.builder().pass() : Judgment.builder().fail()).reasoning(reasoning).checks(checks).build();
+		return (pass ? Judgment.builder().pass() : Judgment.builder().fail()).reasoning(reasoning)
+			.checks(checks)
+			.build();
 	}
 
 	/**

@@ -9,7 +9,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * Contract constants for the aggregation evidence a voting strategy records.
@@ -29,10 +29,11 @@ import io.github.markpollack.judge.result.Judgment;
  *
  * <p>
  * This is a factory, not a value type: it produces an immutable, JSON-compatible
- * {@code Map<String, Object>} in declared key order. An {@code AggregationEvidence} object
- * is never placed into {@code metadata}; the portable value algebra {@link Judgment}
- * enforces at construction would refuse it. Every value produced here is an integer, a
- * finite double, or a string, and {@code Judgment} freezes the block again on the way in.
+ * {@code Map<String, Object>} in declared key order. An {@code AggregationEvidence}
+ * object is never placed into {@code metadata}; the portable value algebra
+ * {@link Judgment} enforces at construction would refuse it. Every value produced here is
+ * an integer, a finite double, or a string, and {@code Judgment} freezes the block again
+ * on the way in.
  * </p>
  *
  * @author Mark Pollack
@@ -68,9 +69,9 @@ public final class AggregationEvidence {
 	 * How many arrived with NOT_APPLICABLE — the judge's own exclusion.
 	 * <p>
 	 * Counted on the submitted originals under every policy, including
-	 * {@link NotApplicablePolicy#REFUSE}, so a reader can always say how much of a rubric the
-	 * instrument claimed did not apply. The <em>rate</em> is the reader's to derive; a result
-	 * stores counts.
+	 * {@link NotApplicablePolicy#REFUSE}, so a reader can always say how much of a rubric
+	 * the instrument claimed did not apply. The <em>rate</em> is the reader's to derive;
+	 * a result stores counts.
 	 * </p>
 	 *
 	 * @since 0.17.0
@@ -90,7 +91,8 @@ public final class AggregationEvidence {
 	public static final String ERRORS_TREATED_AS_FAIL_COUNT = "errorsTreatedAsFailCount";
 
 	/**
-	 * Exclusions that participated as FAIL under {@link NotApplicablePolicy#TREAT_AS_FAIL}.
+	 * Exclusions that participated as FAIL under
+	 * {@link NotApplicablePolicy#TREAT_AS_FAIL}.
 	 *
 	 * @since 0.17.0
 	 */
@@ -99,14 +101,15 @@ public final class AggregationEvidence {
 	/**
 	 * The terminal causes behind the errored inputs, as wire name to count.
 	 * <p>
-	 * Flattened through propagating wrappers, so the block names causes rather than the fact
-	 * that something propagated. A total here may exceed {@link #ERROR_COUNT}, which counts the
-	 * immediate errored inputs: one propagating input can stand for several failures.
+	 * Flattened through propagating wrappers, so the block names causes rather than the
+	 * fact that something propagated. A total here may exceed {@link #ERROR_COUNT}, which
+	 * counts the immediate errored inputs: one propagating input can stand for several
+	 * failures.
 	 * </p>
 	 * <p>
 	 * On an aggregate coded
-	 * {@link io.github.markpollack.judge.result.JudgmentReasonCode#ERRORS_PROPAGATED} this block
-	 * is not merely evidence but the invariant that makes the code legal, and
+	 * {@link io.github.markpollack.judge.judgment.JudgmentReasonCode#ERRORS_PROPAGATED}
+	 * this block is not merely evidence but the invariant that makes the code legal, and
 	 * {@link Judgment} refuses the code without it.
 	 * </p>
 	 *
@@ -150,14 +153,14 @@ public final class AggregationEvidence {
 	// ==================== Weighted keys ====================
 
 	/**
-	 * Sum of resolved weights before eligibility filtering. A sum beyond the largest finite
-	 * {@code double} is reported as {@link Double#MAX_VALUE}.
+	 * Sum of resolved weights before eligibility filtering. A sum beyond the largest
+	 * finite {@code double} is reported as {@link Double#MAX_VALUE}.
 	 */
 	public static final String INPUT_WEIGHT = "inputWeight";
 
 	/**
-	 * Sum of resolved weights after eligibility filtering. A sum beyond the largest finite
-	 * {@code double} is reported as {@link Double#MAX_VALUE}.
+	 * Sum of resolved weights after eligibility filtering. A sum beyond the largest
+	 * finite {@code double} is reported as {@link Double#MAX_VALUE}.
 	 */
 	public static final String ELIGIBLE_WEIGHT = "eligibleWeight";
 
@@ -173,9 +176,9 @@ public final class AggregationEvidence {
 	 * Replace a judgment's evidence block, preserving an origin the replacement omits.
 	 * <p>
 	 * A propagating aggregate carries its origin inside the same reserved block, and a
-	 * judgment's construction refuses the code without it. Overwriting the block with evidence
-	 * that does not name the origin would destroy the fact that made the code legal, so the
-	 * existing origin is carried across rather than dropped.
+	 * judgment's construction refuses the code without it. Overwriting the block with
+	 * evidence that does not name the origin would destroy the fact that made the code
+	 * legal, so the existing origin is carried across rather than dropped.
 	 * </p>
 	 * @param judgment the aggregate
 	 * @param evidence the replacement evidence block
@@ -192,9 +195,9 @@ public final class AggregationEvidence {
 		}
 		Map<String, Object> metadata = new LinkedHashMap<>(judgment.metadata());
 		metadata.put(Judgment.AGGREGATION_KEY, block);
-		return new Judgment(judgment.producerStatus(), judgment.assessment(), judgment.certainty(), judgment.distribution(),
-				judgment.reasonCode(), judgment.reasoning(), judgment.checks(), judgment.provenance(),
-				judgment.policyApplication(), metadata);
+		return new Judgment(judgment.producerStatus(), judgment.finding(), judgment.confidence(),
+				judgment.probabilityDistribution(), judgment.reasonCode(), judgment.reasoning(), judgment.checks(),
+				judgment.provenance(), judgment.policyApplication(), metadata);
 	}
 
 	/**
@@ -226,8 +229,8 @@ public final class AggregationEvidence {
 		 * Record a nested block of portable values, such as a count keyed by cause.
 		 * <p>
 		 * A flat key per cause would put a growing vocabulary into the evidence's own
-		 * namespace, where a new code could collide with a strategy's parameter. One block
-		 * keeps the vocabulary where it belongs.
+		 * namespace, where a new code could collide with a strategy's parameter. One
+		 * block keeps the vocabulary where it belongs.
 		 * </p>
 		 * @param key the evidence key
 		 * @param value the block, copied in encounter order

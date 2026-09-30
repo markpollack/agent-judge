@@ -11,19 +11,19 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import org.jspecify.annotations.Nullable;
 
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 /**
  * One named composite stage that was entered during jury execution.
  *
  * <p>
  * Every attempt says whether its parent could use what the stage produced. That marker is
- * always written, because the alternative is that a composition failure becomes invisible the
- * moment a later stage succeeds: the item passes, the evidence of the failure is a verdict
- * buried three levels down that looks exactly like a verdict nobody minded, and nobody ever
- * counts it. A {@link AttemptDisposition#STAGE_FAILED} attempt keeps the child's actual verdict
- * — the claim it made is not rewritten — and names the reason in a fixed vocabulary a reader
- * can count.
+ * always written, because the alternative is that a composition failure becomes invisible
+ * the moment a later stage succeeds: the item passes, the evidence of the failure is a
+ * verdict buried three levels down that looks exactly like a verdict nobody minded, and
+ * nobody ever counts it. A {@link AttemptDisposition#STAGE_FAILED} attempt keeps the
+ * child's actual verdict — the claim it made is not rewritten — and names the reason in a
+ * fixed vocabulary a reader can count.
  * </p>
  *
  * @param name stable configured sibling identity
@@ -42,7 +42,10 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 		AttemptDisposition disposition, @Nullable DispositionReason dispositionReason, @Nullable Verdict verdict,
 		@Nullable CompositeFailure failure) {
 
-	/** Validate identity, relation/policy legality, the exactly-one outcome rule, and the disposition. */
+	/**
+	 * Validate identity, relation/policy legality, the exactly-one outcome rule, and the
+	 * disposition.
+	 */
 	public CompositeAttempt {
 		name = NamedJury.requireValidName(name);
 		Objects.requireNonNull(relation, "relation must not be null");
@@ -58,25 +61,28 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 		}
 		if ((disposition == AttemptDisposition.STAGE_FAILED) != (dispositionReason != null)) {
 			throw new IllegalArgumentException(
-					"dispositionReason is required exactly when the disposition is STAGE_FAILED, but was "
-							+ disposition + " with " + (dispositionReason == null ? "no reason" : dispositionReason));
+					"dispositionReason is required exactly when the disposition is STAGE_FAILED, but was " + disposition
+							+ " with " + (dispositionReason == null ? "no reason" : dispositionReason));
 		}
-		// The reason must agree with what the attempt actually holds, or the marker describes a
-		// stage other than the one recorded. Presence of a verdict is not enough: a reader counts
-		// these markers by reason and cannot re-derive them, so a marker that can be false is
+		// The reason must agree with what the attempt actually holds, or the marker
+		// describes a
+		// stage other than the one recorded. Presence of a verdict is not enough: a
+		// reader counts
+		// these markers by reason and cannot re-derive them, so a marker that can be
+		// false is
 		// worse than one that is absent — absence at least says "not recorded".
 		if (disposition == AttemptDisposition.USED && verdict == null) {
 			throw new IllegalArgumentException("a USED attempt consumed a verdict, so it must carry one");
 		}
 		if (dispositionReason == DispositionReason.EXECUTION_FAILED && failure == null) {
-			throw new IllegalArgumentException("EXECUTION_FAILED means the stage threw, so it carries a failure code "
-					+ "rather than a verdict");
+			throw new IllegalArgumentException(
+					"EXECUTION_FAILED means the stage threw, so it carries a failure code " + "rather than a verdict");
 		}
 		if ((dispositionReason == DispositionReason.CHILD_UNDECIDED
 				|| dispositionReason == DispositionReason.UNDECLARED_NOT_APPLICABLE
 				|| dispositionReason == DispositionReason.INVALID_TIER_RESULT) && verdict == null) {
-			throw new IllegalArgumentException(dispositionReason
-					+ " describes a verdict the stage returned, so the attempt must keep it");
+			throw new IllegalArgumentException(
+					dispositionReason + " describes a verdict the stage returned, so the attempt must keep it");
 		}
 		if (verdict != null) {
 			requireReasonMatchesVerdict(name, disposition, dispositionReason, verdict);
@@ -92,22 +98,21 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 	 */
 	private static void requireReasonMatchesVerdict(String name, AttemptDisposition disposition,
 			@Nullable DispositionReason reason, Verdict verdict) {
-		boolean undecided = verdict.decision().kind() == DecisionKind.UNDECIDED;
+		boolean undecided = verdict.provenance().kind() == VerdictProvenanceKind.UNDECIDED;
 		if (reason == DispositionReason.CHILD_UNDECIDED && !undecided) {
-			throw new IllegalArgumentException("CHILD_UNDECIDED says stage '" + name
-					+ "' determined nothing, but its verdict decided " + verdict.decision().kind()
-					+ " with aggregate " + verdict.aggregated().status());
+			throw new IllegalArgumentException(
+					"CHILD_UNDECIDED says stage '" + name + "' determined nothing, but its verdict decided "
+							+ verdict.provenance().kind() + " with aggregate " + verdict.judgment().status());
 		}
 		if (reason == DispositionReason.UNDECLARED_NOT_APPLICABLE
-				&& verdict.aggregated().status() != JudgmentStatus.NOT_APPLICABLE) {
+				&& verdict.judgment().status() != JudgmentStatus.NOT_APPLICABLE) {
 			throw new IllegalArgumentException("UNDECLARED_NOT_APPLICABLE says stage '" + name
 					+ "' returned an exclusion the parent would not honour, but its aggregate was "
-					+ verdict.aggregated().status());
+					+ verdict.judgment().status());
 		}
 		if (disposition == AttemptDisposition.USED && undecided) {
 			throw new IllegalArgumentException("a USED attempt consumed stage '" + name
-					+ "' as a determination, but its verdict decided nothing; that is a stage failure, "
-					+ "not a use");
+					+ "' as a determination, but its verdict decided nothing; that is a stage failure, " + "not a use");
 		}
 	}
 

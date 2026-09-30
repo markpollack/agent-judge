@@ -5,12 +5,10 @@
 
 package io.github.markpollack.judge;
 
-import java.nio.file.Path;
-
 import org.junit.jupiter.api.Test;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,16 +19,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class JudgeFunctionalTest {
 
-	private static JudgmentContext context() {
-		return JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+	private static CompletionEvidence context() {
+		return CompletionEvidence.builder().request("test").build();
 	}
 
 	@Test
 	void lambdaJudgeWorks() {
 		// Lambda judge - very simple
-		Judge<JudgmentContext> simplePass = ctx -> Judgment.pass("All good");
+		Judge<CompletionEvidence> simplePass = ctx -> Judgment.pass("All good");
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = simplePass.judge(context);
 
@@ -41,9 +39,9 @@ class JudgeFunctionalTest {
 	@Test
 	void namedJudgeHasMetadata() {
 		// Lambda with metadata via Judges.named()
-		Judge<JudgmentContext> simple = ctx -> Judgment.pass("Success");
+		Judge<CompletionEvidence> simple = ctx -> Judgment.pass("Success");
 
-		NamedJudge<JudgmentContext> named = Judges.named(simple, "MyJudge", "A test judge");
+		NamedJudge<CompletionEvidence> named = Judges.named(simple, "MyJudge", "A test judge");
 
 		assertThat(named.metadata().name()).isEqualTo("MyJudge");
 		assertThat(named.metadata().description()).isEqualTo("A test judge");
@@ -52,9 +50,9 @@ class JudgeFunctionalTest {
 
 	@Test
 	void alwaysPassJudge() {
-		Judge<JudgmentContext> pass = Judges.alwaysPass("Default success");
+		Judge<CompletionEvidence> pass = Judges.alwaysPass("Default success");
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = pass.judge(context);
 
@@ -64,9 +62,9 @@ class JudgeFunctionalTest {
 
 	@Test
 	void alwaysFailJudge() {
-		Judge<JudgmentContext> fail = Judges.alwaysFail("Not implemented yet");
+		Judge<CompletionEvidence> fail = Judges.alwaysFail("Not implemented yet");
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = fail.judge(context);
 
@@ -77,13 +75,9 @@ class JudgeFunctionalTest {
 	@Test
 	void methodReferenceWorks() {
 		// Method reference judge
-		Judge<JudgmentContext> methodRef = this::validateOutput;
+		Judge<CompletionEvidence> methodRef = this::validateOutput;
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test")
-			.workspace(Path.of("/tmp"))
-			.agentOutput("valid output")
-			.build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").response("valid output").build();
 
 		Judgment judgment = methodRef.judge(context);
 
@@ -91,18 +85,19 @@ class JudgeFunctionalTest {
 	}
 
 	// Method to use as reference
-	private Judgment validateOutput(JudgmentContext ctx) {
-		boolean valid = ctx.agentOutput().isPresent() && ctx.agentOutput().get().contains("valid");
+	private Judgment validateOutput(CompletionEvidence ctx) {
+		boolean valid = java.util.Optional.ofNullable(ctx.response()).isPresent()
+				&& java.util.Optional.ofNullable(ctx.response()).get().contains("valid");
 		return valid ? Judgment.pass("Output valid") : Judgment.fail("Output invalid");
 	}
 
 	@Test
 	void andComposition_bothPass() {
-		Judge<JudgmentContext> first = ctx -> Judgment.pass("First passed");
-		Judge<JudgmentContext> second = ctx -> Judgment.pass("Second passed");
-		Judge<JudgmentContext> composed = Judges.and(first, second);
+		Judge<CompletionEvidence> first = ctx -> Judgment.pass("First passed");
+		Judge<CompletionEvidence> second = ctx -> Judgment.pass("Second passed");
+		Judge<CompletionEvidence> composed = Judges.and(first, second);
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = composed.judge(context);
 
@@ -112,11 +107,11 @@ class JudgeFunctionalTest {
 
 	@Test
 	void andComposition_firstFails_shortCircuit() {
-		Judge<JudgmentContext> first = ctx -> Judgment.fail("First failed");
-		Judge<JudgmentContext> second = ctx -> Judgment.pass("Second passed");
-		Judge<JudgmentContext> composed = Judges.and(first, second);
+		Judge<CompletionEvidence> first = ctx -> Judgment.fail("First failed");
+		Judge<CompletionEvidence> second = ctx -> Judgment.pass("Second passed");
+		Judge<CompletionEvidence> composed = Judges.and(first, second);
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = composed.judge(context);
 
@@ -126,11 +121,11 @@ class JudgeFunctionalTest {
 
 	@Test
 	void andComposition_secondFails() {
-		Judge<JudgmentContext> first = ctx -> Judgment.pass("First passed");
-		Judge<JudgmentContext> second = ctx -> Judgment.fail("Second failed");
-		Judge<JudgmentContext> composed = Judges.and(first, second);
+		Judge<CompletionEvidence> first = ctx -> Judgment.pass("First passed");
+		Judge<CompletionEvidence> second = ctx -> Judgment.fail("Second failed");
+		Judge<CompletionEvidence> composed = Judges.and(first, second);
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = composed.judge(context);
 
@@ -140,11 +135,11 @@ class JudgeFunctionalTest {
 
 	@Test
 	void orComposition_firstPasses_shortCircuit() {
-		Judge<JudgmentContext> first = ctx -> Judgment.pass("First passed");
-		Judge<JudgmentContext> second = ctx -> Judgment.fail("Second failed");
-		Judge<JudgmentContext> composed = Judges.or(first, second);
+		Judge<CompletionEvidence> first = ctx -> Judgment.pass("First passed");
+		Judge<CompletionEvidence> second = ctx -> Judgment.fail("Second failed");
+		Judge<CompletionEvidence> composed = Judges.or(first, second);
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = composed.judge(context);
 
@@ -154,11 +149,11 @@ class JudgeFunctionalTest {
 
 	@Test
 	void orComposition_firstFails_secondPasses() {
-		Judge<JudgmentContext> first = ctx -> Judgment.fail("First failed");
-		Judge<JudgmentContext> second = ctx -> Judgment.pass("Second passed");
-		Judge<JudgmentContext> composed = Judges.or(first, second);
+		Judge<CompletionEvidence> first = ctx -> Judgment.fail("First failed");
+		Judge<CompletionEvidence> second = ctx -> Judgment.pass("Second passed");
+		Judge<CompletionEvidence> composed = Judges.or(first, second);
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = composed.judge(context);
 
@@ -168,11 +163,11 @@ class JudgeFunctionalTest {
 
 	@Test
 	void orComposition_bothFail() {
-		Judge<JudgmentContext> first = ctx -> Judgment.fail("First failed");
-		Judge<JudgmentContext> second = ctx -> Judgment.fail("Second failed");
-		Judge<JudgmentContext> composed = Judges.or(first, second);
+		Judge<CompletionEvidence> first = ctx -> Judgment.fail("First failed");
+		Judge<CompletionEvidence> second = ctx -> Judgment.fail("Second failed");
+		Judge<CompletionEvidence> composed = Judges.or(first, second);
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = composed.judge(context);
 
@@ -182,12 +177,12 @@ class JudgeFunctionalTest {
 
 	@Test
 	void allOfComposition_allPass() {
-		Judge<JudgmentContext> first = ctx -> Judgment.pass("First passed");
-		Judge<JudgmentContext> second = ctx -> Judgment.pass("Second passed");
-		Judge<JudgmentContext> third = ctx -> Judgment.pass("Third passed");
-		Judge<JudgmentContext> composed = Judges.allOf(first, second, third);
+		Judge<CompletionEvidence> first = ctx -> Judgment.pass("First passed");
+		Judge<CompletionEvidence> second = ctx -> Judgment.pass("Second passed");
+		Judge<CompletionEvidence> third = ctx -> Judgment.pass("Third passed");
+		Judge<CompletionEvidence> composed = Judges.allOf(first, second, third);
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = composed.judge(context);
 
@@ -197,12 +192,12 @@ class JudgeFunctionalTest {
 
 	@Test
 	void allOfComposition_middleFails_shortCircuit() {
-		Judge<JudgmentContext> first = ctx -> Judgment.pass("First passed");
-		Judge<JudgmentContext> second = ctx -> Judgment.fail("Second failed");
-		Judge<JudgmentContext> third = ctx -> Judgment.pass("Third passed");
-		Judge<JudgmentContext> composed = Judges.allOf(first, second, third);
+		Judge<CompletionEvidence> first = ctx -> Judgment.pass("First passed");
+		Judge<CompletionEvidence> second = ctx -> Judgment.fail("Second failed");
+		Judge<CompletionEvidence> third = ctx -> Judgment.pass("Third passed");
+		Judge<CompletionEvidence> composed = Judges.allOf(first, second, third);
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = composed.judge(context);
 
@@ -212,12 +207,12 @@ class JudgeFunctionalTest {
 
 	@Test
 	void anyOfComposition_firstPasses_shortCircuit() {
-		Judge<JudgmentContext> first = ctx -> Judgment.pass("First passed");
-		Judge<JudgmentContext> second = ctx -> Judgment.fail("Second failed");
-		Judge<JudgmentContext> third = ctx -> Judgment.fail("Third failed");
-		Judge<JudgmentContext> composed = Judges.anyOf(first, second, third);
+		Judge<CompletionEvidence> first = ctx -> Judgment.pass("First passed");
+		Judge<CompletionEvidence> second = ctx -> Judgment.fail("Second failed");
+		Judge<CompletionEvidence> third = ctx -> Judgment.fail("Third failed");
+		Judge<CompletionEvidence> composed = Judges.anyOf(first, second, third);
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = composed.judge(context);
 
@@ -227,12 +222,12 @@ class JudgeFunctionalTest {
 
 	@Test
 	void anyOfComposition_middlePasses() {
-		Judge<JudgmentContext> first = ctx -> Judgment.fail("First failed");
-		Judge<JudgmentContext> second = ctx -> Judgment.pass("Second passed");
-		Judge<JudgmentContext> third = ctx -> Judgment.fail("Third failed");
-		Judge<JudgmentContext> composed = Judges.anyOf(first, second, third);
+		Judge<CompletionEvidence> first = ctx -> Judgment.fail("First failed");
+		Judge<CompletionEvidence> second = ctx -> Judgment.pass("Second passed");
+		Judge<CompletionEvidence> third = ctx -> Judgment.fail("Third failed");
+		Judge<CompletionEvidence> composed = Judges.anyOf(first, second, third);
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = composed.judge(context);
 
@@ -242,12 +237,12 @@ class JudgeFunctionalTest {
 
 	@Test
 	void anyOfComposition_allFail() {
-		Judge<JudgmentContext> first = ctx -> Judgment.fail("First failed");
-		Judge<JudgmentContext> second = ctx -> Judgment.fail("Second failed");
-		Judge<JudgmentContext> third = ctx -> Judgment.fail("Third failed");
-		Judge<JudgmentContext> composed = Judges.anyOf(first, second, third);
+		Judge<CompletionEvidence> first = ctx -> Judgment.fail("First failed");
+		Judge<CompletionEvidence> second = ctx -> Judgment.fail("Second failed");
+		Judge<CompletionEvidence> third = ctx -> Judgment.fail("Third failed");
+		Judge<CompletionEvidence> composed = Judges.anyOf(first, second, third);
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = composed.judge(context);
 
@@ -257,22 +252,22 @@ class JudgeFunctionalTest {
 
 	@Test
 	void compositionWithMetadata() {
-		Judge<JudgmentContext> first = ctx -> Judgment.pass("First passed");
-		Judge<JudgmentContext> second = ctx -> Judgment.pass("Second passed");
-		Judge<JudgmentContext> composed = Judges.and(first, second);
+		Judge<CompletionEvidence> first = ctx -> Judgment.pass("First passed");
+		Judge<CompletionEvidence> second = ctx -> Judgment.pass("Second passed");
+		Judge<CompletionEvidence> composed = Judges.and(first, second);
 
 		// Wrap composition with metadata
-		Judge<JudgmentContext> namedComposed = Judges.named(composed, "BuildAndTest", "Both build and tests must succeed",
-				JudgeType.DETERMINISTIC);
+		Judge<CompletionEvidence> namedComposed = Judges.named(composed, "BuildAndTest",
+				"Both build and tests must succeed", JudgeType.DETERMINISTIC);
 
 		assertThat(namedComposed).isInstanceOf(JudgeWithMetadata.class);
 
-		JudgeWithMetadata<JudgmentContext> withMeta = (JudgeWithMetadata<JudgmentContext>) namedComposed;
+		JudgeWithMetadata<CompletionEvidence> withMeta = (JudgeWithMetadata<CompletionEvidence>) namedComposed;
 		assertThat(withMeta.metadata().name()).isEqualTo("BuildAndTest");
 		assertThat(withMeta.metadata().description()).isEqualTo("Both build and tests must succeed");
 
 		// Composition still works
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 		Judgment judgment = namedComposed.judge(context);
 		assertThat(judgment.pass()).isTrue();
 	}
@@ -280,16 +275,16 @@ class JudgeFunctionalTest {
 	@Test
 	void nestedComposition() {
 		// Complex composition: (A AND B) OR (C AND D)
-		Judge<JudgmentContext> a = ctx -> Judgment.fail("A failed");
-		Judge<JudgmentContext> b = ctx -> Judgment.pass("B passed");
-		Judge<JudgmentContext> c = ctx -> Judgment.pass("C passed");
-		Judge<JudgmentContext> d = ctx -> Judgment.pass("D passed");
+		Judge<CompletionEvidence> a = ctx -> Judgment.fail("A failed");
+		Judge<CompletionEvidence> b = ctx -> Judgment.pass("B passed");
+		Judge<CompletionEvidence> c = ctx -> Judgment.pass("C passed");
+		Judge<CompletionEvidence> d = ctx -> Judgment.pass("D passed");
 
-		Judge<JudgmentContext> ab = Judges.and(a, b);
-		Judge<JudgmentContext> cd = Judges.and(c, d);
-		Judge<JudgmentContext> composed = Judges.or(ab, cd);
+		Judge<CompletionEvidence> ab = Judges.and(a, b);
+		Judge<CompletionEvidence> cd = Judges.and(c, d);
+		Judge<CompletionEvidence> composed = Judges.or(ab, cd);
 
-		JudgmentContext context = JudgmentContext.builder().goal("test").workspace(Path.of("/tmp")).build();
+		CompletionEvidence context = CompletionEvidence.builder().request("test").build();
 
 		Judgment judgment = composed.judge(context);
 
@@ -298,11 +293,11 @@ class JudgeFunctionalTest {
 		assertThat(judgment.reasoning()).isEqualTo("D passed");
 	}
 
-
 	// ---------------------------------------------------------------------------------
 	// Boundary of the Boolean combinators, PINNED rather than changed.
 	//
-	// These four branch on Judgment.pass(), so ABSTAIN and ERROR are "not passed". That is
+	// These four branch on Judgment.pass(), so ABSTAIN and ERROR are "not passed". That
+	// is
 	// the documented contract of a Boolean combinator, and widening it would alter every
 	// existing composition. The jury API covers abstaining judges properly; these tests
 	// exist so the boundary is visible and cannot drift unnoticed.
@@ -310,9 +305,9 @@ class JudgeFunctionalTest {
 
 	@Test
 	void allOfShortCircuitsOnAbstainAndReturnsIt() {
-		Judge<JudgmentContext> first = ctx -> Judgment.pass("first passed");
-		Judge<JudgmentContext> abstaining = ctx -> Judgment.abstain("not applicable to this subject");
-		Judge<JudgmentContext> never = ctx -> {
+		Judge<CompletionEvidence> first = ctx -> Judgment.pass("first passed");
+		Judge<CompletionEvidence> abstaining = ctx -> Judgment.abstain("not applicable to this subject");
+		Judge<CompletionEvidence> never = ctx -> {
 			throw new AssertionError("must not run: allOf short-circuits on a non-PASS");
 		};
 
@@ -323,8 +318,8 @@ class JudgeFunctionalTest {
 
 	@Test
 	void allOfShortCircuitsOnErrorAndReturnsIt() {
-		Judge<JudgmentContext> erroring = ctx -> Judgment.error("judge could not complete");
-		Judge<JudgmentContext> never = ctx -> {
+		Judge<CompletionEvidence> erroring = ctx -> Judgment.error("judge could not complete");
+		Judge<CompletionEvidence> never = ctx -> {
 			throw new AssertionError("must not run: allOf short-circuits on a non-PASS");
 		};
 
@@ -335,10 +330,12 @@ class JudgeFunctionalTest {
 
 	@Test
 	void anyOfReportsFailWhenEveryJudgeAbstained() {
-		// Documented consequence of a Boolean contract: "nothing passed" is reported as FAIL
-		// even though no judge made a negative finding. Use a jury when judges can abstain.
-		Judge<JudgmentContext> a = ctx -> Judgment.abstain("not applicable");
-		Judge<JudgmentContext> b = ctx -> Judgment.abstain("not applicable");
+		// Documented consequence of a Boolean contract: "nothing passed" is reported as
+		// FAIL
+		// even though no judge made a negative finding. Use a jury when judges can
+		// abstain.
+		Judge<CompletionEvidence> a = ctx -> Judgment.abstain("not applicable");
+		Judge<CompletionEvidence> b = ctx -> Judgment.abstain("not applicable");
 
 		Judgment result = Judges.anyOf(a, b).judge(context());
 
@@ -348,11 +345,12 @@ class JudgeFunctionalTest {
 
 	@Test
 	void aJuryIsTheSupportedRouteForAbstainingJudges() {
-		// The same two abstaining judges through the jury API: ABSTAIN, not FAIL, with the
+		// The same two abstaining judges through the jury API: ABSTAIN, not FAIL, with
+		// the
 		// population published. This is why the combinators are left alone.
-		Judgment aggregate = new io.github.markpollack.judge.jury.AllMustPassStrategy()
-			.aggregate(java.util.List.of(Judgment.abstain("not applicable"), Judgment.abstain("not applicable")),
-					java.util.Map.of());
+		Judgment aggregate = new io.github.markpollack.judge.jury.AllMustPassStrategy().aggregate(
+				java.util.List.of(Judgment.abstain("not applicable"), Judgment.abstain("not applicable")),
+				java.util.Map.of());
 
 		assertThat(aggregate.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 	}

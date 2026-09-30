@@ -10,8 +10,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static io.github.markpollack.judge.JudgeTestFixtures.failJudgment;
 import static io.github.markpollack.judge.JudgeTestFixtures.passJudgment;
@@ -22,8 +22,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Tests for {@link ConjunctiveStrategy}.
  *
  * <p>
- * The first test is the reason this class exists: the same seven scores that a mean passes,
- * the conjunction rejects. Everything else guards the edges around that.
+ * The first test is the reason this class exists: the same seven scores that a mean
+ * passes, the conjunction rejects. Everything else guards the edges around that.
  * </p>
  *
  * @author Mark Pollack
@@ -37,7 +37,8 @@ class ConjunctiveStrategyTest {
 
 	@Test
 	void meanPassesTheRubricHoleAndTheConjunctionRejectsIt() {
-		// The mean: 6 of 7 criteria perfect, one missed entirely -> 0.857, a comfortable pass.
+		// The mean: 6 of 7 criteria perfect, one missed entirely -> 0.857, a comfortable
+		// pass.
 		Judgment byMean = new AverageVotingStrategy().aggregate(SIX_STRONG_ONE_MISSED, Map.of());
 		assertThat(byMean.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(byMean.score()).isCloseTo(0.857, org.assertj.core.data.Offset.offset(0.001));
@@ -58,7 +59,8 @@ class ConjunctiveStrategyTest {
 
 	@Test
 	void bindingIndexCountsSubmittedPositionNotSurvivingPosition() {
-		// Two abstentions ahead of the low score: the survivor list shifts, the index must not.
+		// Two abstentions ahead of the low score: the survivor list shifts, the index
+		// must not.
 		List<Judgment> judgments = List.of(Judgment.abstain("n/a"), Judgment.abstain("n/a"), passJudgment(0.9),
 				failJudgment(0.1));
 
@@ -100,7 +102,8 @@ class ConjunctiveStrategyTest {
 
 	@Test
 	void anEmptyConjunctionAbstainsRatherThanPassingVacuously() {
-		// The whole point of the strategy: "every one of nothing cleared the bar" is not a pass.
+		// The whole point of the strategy: "every one of nothing cleared the bar" is not
+		// a pass.
 		Judgment result = new ConjunctiveStrategy(0.9)
 			.aggregate(List.of(Judgment.abstain("n/a"), Judgment.abstain("n/a")), Map.of());
 

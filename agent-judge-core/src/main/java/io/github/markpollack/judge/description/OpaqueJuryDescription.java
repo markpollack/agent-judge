@@ -5,8 +5,6 @@
 
 package io.github.markpollack.judge.description;
 
-import io.github.markpollack.judge.context.JudgmentContext;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,14 +24,13 @@ import io.github.markpollack.judge.jury.VotingStrategy;
  *
  * <p>
  * What it knows comes from the jury's public view: the implementing class,
- * {@link Jury#getVotingStrategy()} and the flattened {@link Jury#getJudges()}. It does not
- * know how the jury seats, keys, weights or orders those judges, and it does not claim to.
- * A jury author who wants a structural description overrides {@code describe()}, and may
- * return one of the other {@link JuryDescription} variants.
+ * {@link Jury#getVotingStrategy()} and the flattened {@link Jury#getJudges()}. It does
+ * not know how the jury seats, keys, weights or orders those judges, and it does not
+ * claim to. A jury author who wants a structural description overrides
+ * {@code describe()}, and may return one of the other {@link JuryDescription} variants.
  * </p>
  *
- * <h2>Portable form</h2>
- * <pre>
+ * <h2>Portable form</h2> <pre>
  * {
  *   "descriptionVersion": 2,
  *   "kind": "OPAQUE",
@@ -48,8 +45,8 @@ import io.github.markpollack.judge.jury.VotingStrategy;
  * </p>
  *
  * @param implementation the class that implements the jury
- * @param aggregateMayBeNotApplicable what the jury itself declared, since an opaque jury's
- * structure gives no way to derive it
+ * @param aggregateMayBeNotApplicable what the jury itself declared, since an opaque
+ * jury's structure gives no way to derive it
  * @param strategy the jury's strategy, or null when it reports none
  * @param judges the jury's flattened judges, in the order it reports them
  * @author Mark Pollack
@@ -68,7 +65,8 @@ public record OpaqueJuryDescription(ImplementationIdentity implementation, boole
 		Objects.requireNonNull(jury, "jury must not be null");
 		VotingStrategy votingStrategy = jury.getVotingStrategy();
 		StrategyDescription strategy = votingStrategy == null ? null : votingStrategy.describe();
-		List<? extends Judge<?>> reported = Objects.requireNonNull(jury.getJudges(), "getJudges() must not return null");
+		List<? extends Judge<?>> reported = Objects.requireNonNull(jury.getJudges(),
+				"getJudges() must not return null");
 		List<JudgeDescription> judges = new ArrayList<>(reported.size());
 		for (int index = 0; index < reported.size(); index++) {
 			try {
@@ -78,8 +76,8 @@ public record OpaqueJuryDescription(ImplementationIdentity implementation, boole
 				throw new IllegalArgumentException("judges[" + index + "]: " + ex.getMessage(), ex);
 			}
 		}
-		return new OpaqueJuryDescription(ImplementationIdentity.of(jury.getClass()),
-				jury.aggregateMayBeNotApplicable(), strategy, judges);
+		return new OpaqueJuryDescription(ImplementationIdentity.of(jury.getClass()), jury.aggregateMayBeNotApplicable(),
+				strategy, judges);
 	}
 
 	@Override

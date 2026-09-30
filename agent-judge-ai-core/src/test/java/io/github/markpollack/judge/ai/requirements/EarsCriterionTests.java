@@ -14,8 +14,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * Reading the roster out of the document somebody wrote.
  *
- * <p>The judge does not get to choose its criteria, so this is where the roster is fixed. A
- * document with 52 criteria must yield 52; anything less has silently sampled the specification.
+ * <p>
+ * The judge does not get to choose its criteria, so this is where the roster is fixed. A
+ * document with 52 criteria must yield 52; anything less has silently sampled the
+ * specification.
  */
 class EarsCriterionTests {
 
@@ -25,22 +27,22 @@ class EarsCriterionTests {
 	@Test
 	void everyCriterionInTheDocumentIsRead() {
 		Path file = write("""
-			    # Acceptance Criteria: UC5 — Resolve a Request Through Staff
+				# AcceptanceDecision Criteria: UC5 — Resolve a Request Through Staff
 
-			    ## Functional
+				## Functional
 
-			    ### UC5-AC1: Persist every defined fallback
+				### UC5-AC1: Persist every defined fallback
 
-			    **Covers:** UC5-B1
+				**Covers:** UC5-B1
 
-			    When automation reaches `UNSUPPORTED_LANGUAGE`, the system shall persist the request.
+				When automation reaches `UNSUPPORTED_LANGUAGE`, the system shall persist the request.
 
-			    ### UC5-AC2: Represent ordinary exhaustion as fallback
+				### UC5-AC2: Represent ordinary exhaustion as fallback
 
-			    **Covers:** UC5-B2
+				**Covers:** UC5-B2
 
-			    When automated matching has no feasible candidate, the system shall represent the outcome.
-			    """);
+				When automated matching has no feasible candidate, the system shall represent the outcome.
+				""");
 
 		List<EarsCriterion> criteria = EarsCriterion.from(file);
 
@@ -55,12 +57,12 @@ class EarsCriterionTests {
 	void theCoversLineAndSectionHeadingsAreNotRequirements() {
 		// The requirement is the sentence, not the traceability annotation above it.
 		Path file = write("""
-			    ### UC5-AC1: Persist every defined fallback
+				### UC5-AC1: Persist every defined fallback
 
-			    **Covers:** UC5-B1
+				**Covers:** UC5-B1
 
-			    When automation reaches a fallback, the system shall persist the request.
-			    """);
+				When automation reaches a fallback, the system shall persist the request.
+				""");
 
 		assertThat(EarsCriterion.from(file)).singleElement()
 			.extracting(EarsCriterion::requirement)
@@ -71,12 +73,12 @@ class EarsCriterionTests {
 	void onlyTheFirstSentenceUnderAHeadingIsTheRequirement() {
 		// Prose that follows belongs to the document, not to the roster.
 		Path file = write("""
-			    ### UC5-AC1: Persist every defined fallback
+				### UC5-AC1: Persist every defined fallback
 
-			    When automation reaches a fallback, the system shall persist the request.
+				When automation reaches a fallback, the system shall persist the request.
 
-			    This paragraph explains the reasoning and is not a second criterion.
-			    """);
+				This paragraph explains the reasoning and is not a second criterion.
+				""");
 
 		assertThat(EarsCriterion.from(file)).hasSize(1);
 	}
@@ -84,20 +86,19 @@ class EarsCriterionTests {
 	@Test
 	void aHeadingWithNothingUnderItYieldsNoCriterion() {
 		Path file = write("""
-			    ### UC5-AC1: A criterion nobody finished writing
+				### UC5-AC1: A criterion nobody finished writing
 
-			    ### UC5-AC2: Represent ordinary exhaustion as fallback
+				### UC5-AC2: Represent ordinary exhaustion as fallback
 
-			    When matching has no feasible candidate, the system shall represent the outcome.
-			    """);
+				When matching has no feasible candidate, the system shall represent the outcome.
+				""");
 
-		assertThat(EarsCriterion.from(file)).singleElement()
-			.extracting(EarsCriterion::id).isEqualTo("UC5-AC2");
+		assertThat(EarsCriterion.from(file)).singleElement().extracting(EarsCriterion::id).isEqualTo("UC5-AC2");
 	}
 
 	@Test
 	void anEmptyDocumentYieldsNoCriteriaRatherThanFailing() {
-		assertThat(EarsCriterion.from(write("# Acceptance Criteria\n\nNothing written yet.\n"))).isEmpty();
+		assertThat(EarsCriterion.from(write("# AcceptanceDecision Criteria\n\nNothing written yet.\n"))).isEmpty();
 	}
 
 	@Test
@@ -131,25 +132,24 @@ class EarsCriterionTests {
 	void anUnreadableDocumentSaysWhichOne() {
 		Path missing = directory.resolve("nothing-here.md");
 
-		assertThatThrownBy(() -> EarsCriterion.from(missing))
-			.isInstanceOf(UncheckedIOException.class)
+		assertThatThrownBy(() -> EarsCriterion.from(missing)).isInstanceOf(UncheckedIOException.class)
 			.hasMessageContaining("nothing-here.md");
 	}
 
 	private Path threeCriteria() {
 		return write("""
-			    ### UC5-AC1: First
+				### UC5-AC1: First
 
-			    When a thing happens, the system shall do the first thing.
+				When a thing happens, the system shall do the first thing.
 
-			    ### UC5-AC2: Second
+				### UC5-AC2: Second
 
-			    If a thing happens, then the system shall do the second thing.
+				If a thing happens, then the system shall do the second thing.
 
-			    ### UC5-AC3: Third
+				### UC5-AC3: Third
 
-			    While a state holds, the system shall do the third thing.
-			    """);
+				While a state holds, the system shall do the third thing.
+				""");
 	}
 
 	private Path write(String content) {

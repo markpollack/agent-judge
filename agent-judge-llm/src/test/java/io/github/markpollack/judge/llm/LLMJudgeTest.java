@@ -8,13 +8,12 @@ package io.github.markpollack.judge.llm;
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.JudgeType;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.completion.CompletionStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.springframework.ai.chat.client.ChatClient;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -43,7 +42,7 @@ class LLMJudgeTest {
 	void shouldBuildPromptFromContext() {
 		TestLLMJudge judge = new TestLLMJudge("TestJudge", "Test", null);
 
-		JudgmentContext context = createTestContext();
+		CompletionEvidence context = createTestContext();
 
 		String prompt = judge.buildPrompt(context);
 
@@ -55,7 +54,7 @@ class LLMJudgeTest {
 	void shouldParseResponseIntoJudgment() {
 		TestLLMJudge judge = new TestLLMJudge("TestJudge", "Test", null);
 
-		JudgmentContext context = createTestContext();
+		CompletionEvidence context = createTestContext();
 		String response = "Test LLM response";
 
 		Judgment judgment = judge.parseResponse(response, context);
@@ -74,33 +73,33 @@ class LLMJudgeTest {
 
 	// ==================== Helper Methods ====================
 
-	private JudgmentContext createTestContext() {
-		return JudgmentContext.builder()
-			.goal("Test goal")
-			.workspace(Path.of("/tmp/test"))
-			.agentOutput("Test output")
-			.executionTime(Duration.ofSeconds(1))
+	private CompletionEvidence createTestContext() {
+		return CompletionEvidence.builder()
+			.request("Test goal")
+			.response("Test output")
+			.elapsedTime(Duration.ofSeconds(1))
 			.startedAt(Instant.now())
-			.status(ExecutionStatus.SUCCESS)
+			.status(CompletionStatus.SUCCESS)
 			.build();
 	}
 
 	/**
 	 * Test implementation of LLMJudge for testing the abstract base class.
 	 */
-	static class TestLLMJudge extends LLMJudge {
+	static class TestLLMJudge extends LLMJudge<CompletionEvidence> {
 
 		TestLLMJudge(String name, String description, ChatClient.Builder chatClientBuilder) {
 			super(name, description, chatClientBuilder);
 		}
 
 		@Override
-		protected String buildPrompt(JudgmentContext context) {
-			return String.format("Evaluate: Goal=%s, Output=%s", context.goal(), context.agentOutput().orElse("None"));
+		protected String buildPrompt(CompletionEvidence context) {
+			return String.format("Evaluate: Goal=%s, Output=%s", context.request(),
+					java.util.Optional.ofNullable(context.response()).orElse("None"));
 		}
 
 		@Override
-		protected Judgment parseResponse(String response, JudgmentContext context) {
+		protected Judgment parseResponse(String response, CompletionEvidence context) {
 			return Judgment.builder().pass().reasoning("Parsed from LLM: " + response).build();
 		}
 

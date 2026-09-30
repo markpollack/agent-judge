@@ -4,6 +4,8 @@
  */
 package io.github.markpollack.judge.assertj.usage;
 
+import io.github.markpollack.judge.acceptance.Policies;
+
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -12,23 +14,21 @@ import io.github.markpollack.judge.PolicyJudges;
 import io.github.markpollack.judge.assertj.Assertions;
 import io.github.markpollack.judge.assertions.AssertionResult;
 import io.github.markpollack.judge.assertions.RequirementAssertions;
-import io.github.markpollack.judge.assertions.SemanticAssertionError;
-import io.github.markpollack.judge.assertions.SemanticAssertions;
+import io.github.markpollack.judge.assertions.RequirementAssertionError;
 import io.github.markpollack.judge.jury.AllMustPassStrategy;
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.TierPolicy;
-import io.github.markpollack.judge.jury.interpretation.VerdictReading;
+import io.github.markpollack.judge.jury.interpretation.RequirementOutcome;
 import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.requirement.RequirementEvidence;
-import io.github.markpollack.judge.result.Acceptance;
-import io.github.markpollack.judge.result.AcceptanceAction;
-import io.github.markpollack.judge.result.AcceptancePolicy;
-import io.github.markpollack.judge.result.AppliedPolicy;
-import io.github.markpollack.judge.result.ArtifactRef;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.PolicyBinding;
-import io.github.markpollack.judge.result.PolicyRef;
+import io.github.markpollack.judge.acceptance.AcceptanceDecision;
+import io.github.markpollack.judge.acceptance.AcceptanceAction;
+import io.github.markpollack.judge.acceptance.AcceptancePolicy;
+import io.github.markpollack.judge.acceptance.AppliedPolicy;
+import io.github.markpollack.judge.provenance.ArtifactRef;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.provenance.PolicyRef;
 import org.junit.jupiter.api.Test;
 
 import static io.github.markpollack.judge.assertj.Assertions.assertThat;
@@ -40,77 +40,90 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /** Executable counterparts of the module README's local, credential-free examples. */
 class TutorialExamplesTest {
 
-	private static final Requirement<String> READY =
-			Requirement.text("response-ready", "1", "The response is exactly READY");
+	private static final Requirement<String> READY_REQUIREMENT = Requirement.text("response-ready", "1",
+			"The response is exactly READY");
 
-	private static final Judge<RequirementEvidence<Requirement<String>, String>> EXACT_RESPONSE =
-			input -> "READY".equals(input.evidence())
-					? Judgment.pass("Response is exactly READY") : Judgment.fail("Response differs from READY");
+	private static final Judge<RequirementEvidence<String, String>> READY_RESPONSE_JUDGE = input -> "READY"
+		.equals(input.evidence()) ? Judgment.pass("Response is exactly READY")
+				: Judgment.fail("Response differs from READY");
 
 	@Test
 	void helloWorldNeedsNoPolicyBoilerplate() {
-		assertThat(READY).judgedBy(EXACT_RESPONSE).withEvidence("READY").isSatisfied();
+		assertThat(READY_REQUIREMENT).judgedByRequirement(READY_RESPONSE_JUDGE).withEvidence("READY").isSatisfied();
 	}
 
 	@Test
 	void explicitApplicationEscalationRetainsTheAcceptedDetermination() {
-		PolicyBinding criticalPolicy = policy("critical-response", "always ESCALATE; require independent confirmation", raw ->
-				new Acceptance(AcceptanceAction.ESCALATE, "Independent confirmation is required before acting"));
+		AcceptancePolicy criticalPolicy = policy("critical-response",
+				"always ESCALATE; require independent confirmation",
+				raw -> new AcceptanceDecision(AcceptanceAction.ESCALATE,
+						"Independent confirmation is required before acting"));
 
-		AssertionError error = assertThrows(AssertionError.class, () ->
-				assertThat(READY).judgedBy(EXACT_RESPONSE).withEvidence("READY")
-						.withAcceptancePolicy(criticalPolicy).isSatisfied());
+		AssertionError error = assertThrows(AssertionError.class,
+				() -> assertThat(READY_REQUIREMENT).judgedByRequirement(READY_RESPONSE_JUDGE)
+					.withEvidence("READY")
+					.withAcceptancePolicy(criticalPolicy)
+					.isSatisfied());
 
-		var inconclusive = assertInstanceOf(SemanticAssertionError.Inconclusive.class, error.getCause());
-		assertEquals(VerdictReading.ACCEPTED, inconclusive.result().interpretation().reading());
+		var inconclusive = assertInstanceOf(RequirementAssertionError.Inconclusive.class, error.getCause());
+		assertEquals(RequirementOutcome.SATISFIED, inconclusive.result().interpretation().outcome());
 		assertEquals(AssertionResult.PolicySource.EXPLICIT, inconclusive.result().policySource());
 		var finalApplication = assertInstanceOf(AppliedPolicy.class,
-				inconclusive.result().applicationDecision().application());
+				inconclusive.result().acceptanceExecution().application());
 		assertEquals(AcceptanceAction.ESCALATE, finalApplication.action());
 	}
 
 	@Test
 	void applicationConfigurationProvidesTheDefault() {
-		PolicyBinding applicationDefault = policy("local-response", "always USE_ASSESSMENT; exact response", raw ->
-				new Acceptance(AcceptanceAction.USE_ASSESSMENT, "Use the deterministic response finding"));
+		AcceptancePolicy applicationDefault = policy("local-response", "always RELY; exact response",
+				raw -> new AcceptanceDecision(AcceptanceAction.RELY, "Use the deterministic response finding"));
 		var applicationAssertions = Assertions.using(new RequirementAssertions(applicationDefault));
 
-		applicationAssertions.assertThat(READY).judgedBy(EXACT_RESPONSE).withEvidence("READY").isSatisfied();
+		applicationAssertions.assertThat(READY_REQUIREMENT)
+			.judgedByRequirement(READY_RESPONSE_JUDGE)
+			.withEvidence("READY")
+			.isSatisfied();
 	}
 
 	@Test
 	void finalEscalationDoesNotEnterAnotherJuryTier() {
-		PolicyBinding internalUse = policy("response-tier", "always USE_ASSESSMENT; first tier", raw ->
-				new Acceptance(AcceptanceAction.USE_ASSESSMENT, "Use this tier's finding"));
-		PolicyBinding fallbackWithhold = policy("fallback-tier", "always ABSTAIN; require manual confirmation", raw ->
-				new Acceptance(AcceptanceAction.ABSTAIN, "Fallback requires manual confirmation"));
-		PolicyBinding finalEscalation = policy("application-follow-up", "always ESCALATE; application follow-up", raw ->
-				new Acceptance(AcceptanceAction.ESCALATE, "Application follow-up is required"));
+		AcceptancePolicy internalUse = policy("response-tier", "always RELY; first tier",
+				raw -> new AcceptanceDecision(AcceptanceAction.RELY, "Use this tier's finding"));
+		AcceptancePolicy fallbackWithhold = policy("fallback-tier", "always ABSTAIN; require manual confirmation",
+				raw -> new AcceptanceDecision(AcceptanceAction.ABSTAIN, "Fallback requires manual confirmation"));
+		AcceptancePolicy finalEscalation = policy("application-follow-up", "always ESCALATE; application follow-up",
+				raw -> new AcceptanceDecision(AcceptanceAction.ESCALATE, "Application follow-up is required"));
 		AtomicInteger fallbackCalls = new AtomicInteger();
-		Judge<RequirementEvidence<Requirement<String>, String>> fallback = input -> {
+		Judge<RequirementEvidence<String, String>> fallback = input -> {
 			fallbackCalls.incrementAndGet();
 			return Judgment.pass("Fallback finding");
 		};
-		var firstTier = SimpleJury.<RequirementEvidence<Requirement<String>, String>>builder()
-				.judge(PolicyJudges.apply(EXACT_RESPONSE, internalUse.reference(), internalUse.policy()))
-				.votingStrategy(new AllMustPassStrategy()).parallel(false).build();
-		var fallbackTier = SimpleJury.<RequirementEvidence<Requirement<String>, String>>builder()
-				.judge(PolicyJudges.apply(fallback, fallbackWithhold.reference(), fallbackWithhold.policy()))
-				.votingStrategy(new AllMustPassStrategy()).parallel(false).build();
-		var jury = CascadedJury.<RequirementEvidence<Requirement<String>, String>>builder()
-				.tier("response", firstTier, TierPolicy.STOP_ON_USABLE_ASSESSMENT)
-				.tier("fallback", fallbackTier, TierPolicy.FINAL_TIER).build();
+		var firstTier = SimpleJury.<RequirementEvidence<String, String>>builder()
+			.judge(PolicyJudges.apply(READY_RESPONSE_JUDGE, Policies.referenceOf(internalUse), internalUse))
+			.votingStrategy(new AllMustPassStrategy())
+			.parallel(false)
+			.build();
+		var fallbackTier = SimpleJury.<RequirementEvidence<String, String>>builder()
+			.judge(PolicyJudges.apply(fallback, Policies.referenceOf(fallbackWithhold), fallbackWithhold))
+			.votingStrategy(new AllMustPassStrategy())
+			.parallel(false)
+			.build();
+		var jury = CascadedJury.<RequirementEvidence<String, String>>builder()
+			.tier("response", firstTier, TierPolicy.STOP_ON_RELIED_JUDGMENT)
+			.tier("fallback", fallbackTier, TierPolicy.FINAL_TIER)
+			.build();
 
-		AssertionResult result = RequirementAssertions.usingAssessment()
-				.evaluate(READY, jury, "READY", finalEscalation);
+		AssertionResult result = RequirementAssertions.relyingOnJudgment()
+			.evaluateRequirement(READY_REQUIREMENT, jury, "READY", finalEscalation);
 
-		assertEquals(VerdictReading.ACCEPTED, result.interpretation().reading());
+		assertEquals(RequirementOutcome.SATISFIED, result.interpretation().outcome());
 		assertEquals(1, result.verdict().compositeAttempts().size());
 		assertEquals(0, fallbackCalls.get());
 		var internalApplication = assertInstanceOf(AppliedPolicy.class,
 				result.verdict().individual().getFirst().policyApplication());
-		assertEquals(internalUse.reference(), internalApplication.policy());
-		assertThrows(SemanticAssertionError.Inconclusive.class, () -> SemanticAssertions.requireSatisfied(result));
+		assertEquals(Policies.referenceOf(internalUse), internalApplication.policy());
+		assertThrows(RequirementAssertionError.Inconclusive.class,
+				() -> RequirementAssertions.requireSatisfied(result));
 		assertEquals(0, fallbackCalls.get());
 	}
 
@@ -118,26 +131,27 @@ class TutorialExamplesTest {
 	void retainedResultsCanBeAssertedRepeatedlyWithoutEvaluationOrPolicyCalls() {
 		AtomicInteger judgeCalls = new AtomicInteger();
 		AtomicInteger policyCalls = new AtomicInteger();
-		Judge<RequirementEvidence<Requirement<String>, String>> judge = input -> {
-			assertSame(READY, input.requirement());
+		Judge<RequirementEvidence<String, String>> judge = input -> {
+			assertSame(READY_REQUIREMENT, input.requirement());
 			judgeCalls.incrementAndGet();
-			return EXACT_RESPONSE.judge(input);
+			return READY_RESPONSE_JUDGE.judge(input);
 		};
-		PolicyBinding applicationDefault = policy("retained-response", "always USE_ASSESSMENT; retained finding", raw -> {
+		AcceptancePolicy applicationDefault = policy("retained-response", "always RELY; retained finding", raw -> {
 			policyCalls.incrementAndGet();
-			return new Acceptance(AcceptanceAction.USE_ASSESSMENT, "Use the retained finding");
+			return new AcceptanceDecision(AcceptanceAction.RELY, "Use the retained finding");
 		});
-		AssertionResult result = new RequirementAssertions(applicationDefault)
-				.evaluate(READY, judge, "READY", null);
+		AssertionResult result = new RequirementAssertions(applicationDefault).evaluateRequirement(READY_REQUIREMENT,
+				judge, "READY", null);
 
-		SemanticAssertions.requireSatisfied(result);
-		SemanticAssertions.requireSatisfied(result);
+		RequirementAssertions.requireSatisfied(result);
+		RequirementAssertions.requireSatisfied(result);
 		assertEquals(1, judgeCalls.get());
 		assertEquals(1, policyCalls.get());
 	}
 
-	private static PolicyBinding policy(String id, String configuration, AcceptancePolicy policy) {
+	private static AcceptancePolicy policy(String id, String configuration, AcceptancePolicy policy) {
 		String digest = ArtifactRef.ofBytes("policy", configuration.getBytes(StandardCharsets.UTF_8), null).sha256();
-		return new PolicyBinding(new PolicyRef(id, "1", digest), policy);
+		return Policies.recorded(new PolicyRef(id, "1", digest), policy);
 	}
+
 }

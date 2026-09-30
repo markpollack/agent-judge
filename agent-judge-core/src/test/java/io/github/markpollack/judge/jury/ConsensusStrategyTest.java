@@ -11,8 +11,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import java.util.List;
 import java.util.Map;
@@ -63,7 +63,7 @@ class ConsensusStrategyTest {
 	/**
 	 * M5: applicable judges that split between PASS and FAIL reached no collective
 	 * finding, so consensus reports ABSTAIN. Rejecting or escalating that disagreement is
-	 * a downstream gate decision, not an aggregation conclusion.
+	 * a downstream gate provenance, not an aggregation conclusion.
 	 */
 	@Test
 	void mixedApplicableVotesAbstain() {
@@ -86,8 +86,8 @@ class ConsensusStrategyTest {
 
 		Judgment disagreed = strategy
 			.aggregate(List.of(booleanPass("Judge 1"), booleanPass("Judge 2"), booleanFail("Judge 3")), Map.of());
-		Judgment unanimouslyFailed = strategy
-			.aggregate(List.of(booleanFail("Judge 1"), booleanFail("Judge 2")), Map.of());
+		Judgment unanimouslyFailed = strategy.aggregate(List.of(booleanFail("Judge 1"), booleanFail("Judge 2")),
+				Map.of());
 
 		assertThat(disagreed.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(disagreed.reasoning()).contains("No consensus").contains("2 passed, 1 failed");
@@ -111,8 +111,8 @@ class ConsensusStrategyTest {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
 		Judgment disagreed = strategy.aggregate(List.of(booleanPass("Judge 1"), booleanFail("Judge 2")), Map.of());
-		Judgment noneApplicable = strategy
-			.aggregate(List.of(Judgment.abstain("n/a"), Judgment.abstain("n/a")), Map.of());
+		Judgment noneApplicable = strategy.aggregate(List.of(Judgment.abstain("n/a"), Judgment.abstain("n/a")),
+				Map.of());
 
 		assertThat(disagreed.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(noneApplicable.status()).isEqualTo(JudgmentStatus.ABSTAIN);
@@ -148,7 +148,8 @@ class ConsensusStrategyTest {
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// DELTA-1: the scores are along for the ride. Consensus reads status, so what makes
+		// DELTA-1: the scores are along for the ride. Consensus reads status, so what
+		// makes
 		// this unanimous is that all three judges passed, not where their scores sit.
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 	}
@@ -173,7 +174,8 @@ class ConsensusStrategyTest {
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
 
-		// A scored judgment and a status-only one are substitutable here: both declare PASS.
+		// A scored judgment and a status-only one are substitutable here: both declare
+		// PASS.
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
@@ -197,8 +199,7 @@ class ConsensusStrategyTest {
 		// Both judges passed while scoring at the bottom of the range. The removed
 		// implementation thresholded the score at 0.5 and would have called this a
 		// unanimous FAIL; reading status is what makes it a PASS.
-		List<Judgment> judgments = List.of(
-				Judgment.builder().pass().score(0.1).reasoning("low but ok").build(),
+		List<Judgment> judgments = List.of(Judgment.builder().pass().score(0.1).reasoning("low but ok").build(),
 				Judgment.builder().pass().score(0.2).reasoning("low but ok").build());
 
 		Judgment result = strategy.aggregate(judgments, Map.of());
@@ -207,9 +208,9 @@ class ConsensusStrategyTest {
 	}
 
 	/**
-	 * DELTA-2: an abstention is not a vote. It leaves the population rather than
-	 * counting as a fail, so it cannot break the unanimity of the applicable judges.
-	 * This is the case a judge that legitimately does not apply to every run depends on.
+	 * DELTA-2: an abstention is not a vote. It leaves the population rather than counting
+	 * as a fail, so it cannot break the unanimity of the applicable judges. This is the
+	 * case a judge that legitimately does not apply to every run depends on.
 	 */
 	@Test
 	void abstentionDoesNotBreakUnanimity() {
@@ -227,8 +228,8 @@ class ConsensusStrategyTest {
 
 	/**
 	 * DELTA-2: an abstention alongside a fail is still a unanimous fail among the
-	 * applicable judges — previously this reported "Unanimous consensus" only because
-	 * the abstention had been miscounted as a second fail vote.
+	 * applicable judges — previously this reported "Unanimous consensus" only because the
+	 * abstention had been miscounted as a second fail vote.
 	 */
 	@Test
 	void abstentionAlongsideFailIsUnanimousFail() {

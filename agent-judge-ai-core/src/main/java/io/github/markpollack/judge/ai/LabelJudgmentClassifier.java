@@ -10,22 +10,22 @@ import java.util.OptionalDouble;
 
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.model.Usage;
-import io.github.markpollack.judge.result.Assessment;
-import io.github.markpollack.judge.result.Category;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.result.NumericAssessment;
-import io.github.markpollack.judge.result.NumericKind;
-import io.github.markpollack.judge.result.QualityDirection;
+import io.github.markpollack.judge.judgment.Finding;
+import io.github.markpollack.judge.judgment.CategoryFinding;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
+import io.github.markpollack.judge.judgment.NumericFinding;
+import io.github.markpollack.judge.judgment.NumericKind;
+import io.github.markpollack.judge.judgment.QualityDirection;
 
 /**
  * Label-based classification using exact normalized matching (trim + lowercase).
  *
  * <p>
- * Maps a model response's text to a {@link JudgmentStatus} via declared label mappings.
- * A recognized result retains the complete ordered category domain. Uses exact matching
- * after normalization — substring matching is intentionally avoided
- * because "irrelevant" contains "relevant".
+ * Maps a model response's text to a {@link JudgmentStatus} via declared label mappings. A
+ * recognized result retains the complete ordered category domain. Uses exact matching
+ * after normalization — substring matching is intentionally avoided because "irrelevant"
+ * contains "relevant".
  *
  * <p>
  * When no label matches, returns {@link JudgmentStatus#ABSTAIN} with the raw judge output
@@ -75,6 +75,10 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 
 	@Override
 	public Judgment classify(JudgeModelResponse response) {
+		if (response == null || !response.completed()) {
+			return Judgment.error(response == null ? "No model response" : response.text());
+		}
+
 		String raw = response.text();
 		String normalized = normalize(raw);
 		Map<String, Object> metadata = new LinkedHashMap<>();
@@ -93,11 +97,11 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 		}
 
 		Double declaredScore = scores.get(normalized);
-		Assessment assessment = new Assessment(null,
-				declaredScore == null ? null : new NumericAssessment(declaredScore, NumericKind.MEASUREMENT,
+		Finding finding = new Finding(null,
+				declaredScore == null ? null : new NumericFinding(declaredScore, NumericKind.MEASUREMENT,
 						"normalized-quality:v1", 0, 1, List.of(), QualityDirection.INCREASING),
-				new Category(normalized, categories()));
-		return new Judgment(status, assessment, null, null, null, raw, List.of(), null, null, metadata);
+				new CategoryFinding(normalized, categories()));
+		return new Judgment(status, finding, null, null, null, raw, List.of(), null, null, metadata);
 	}
 
 	private static void addResponseMetadata(Map<String, Object> metadata, JudgeModelResponse response) {

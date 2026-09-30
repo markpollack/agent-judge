@@ -2,12 +2,12 @@ package io.github.markpollack.judge.koog;
 
 import ai.koog.agents.core.agent.AIAgent;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.jury.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +30,7 @@ class KoogEvaluatorTest {
 	@Test
 	void shouldEvaluateWithSingleJudge() {
 		AIAgent<String, String> agent = mockAgent();
-		Judge<JudgmentContext> judge = (JudgmentContext ctx) -> Judgment.pass("Output looks good");
+		Judge<CompletionEvidence> judge = (CompletionEvidence ctx) -> Judgment.pass("Output looks good");
 
 		Judgment result = KoogEvaluator.evaluate(agent, "Build a REST API", judge);
 
@@ -41,11 +41,11 @@ class KoogEvaluatorTest {
 	@Test
 	void shouldEvaluateWithJury() {
 		AIAgent<String, String> agent = mockAgent();
-		Judge<JudgmentContext> passJudge = (JudgmentContext ctx) -> Judgment.pass("Looks good");
-		Judge<JudgmentContext> failJudge = (JudgmentContext ctx) -> Judgment.fail("Missing tests");
-		Judge<JudgmentContext> passJudge2 = (JudgmentContext ctx) -> Judgment.pass("Compiles fine");
+		Judge<CompletionEvidence> passJudge = (CompletionEvidence ctx) -> Judgment.pass("Looks good");
+		Judge<CompletionEvidence> failJudge = (CompletionEvidence ctx) -> Judgment.fail("Missing tests");
+		Judge<CompletionEvidence> passJudge2 = (CompletionEvidence ctx) -> Judgment.pass("Compiles fine");
 
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(passJudge)
 			.judge(failJudge)
 			.judge(passJudge2)
@@ -54,7 +54,7 @@ class KoogEvaluatorTest {
 
 		Verdict verdict = KoogEvaluator.evaluate(agent, "Build a REST API", jury);
 
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individual()).hasSize(3);
 	}
 

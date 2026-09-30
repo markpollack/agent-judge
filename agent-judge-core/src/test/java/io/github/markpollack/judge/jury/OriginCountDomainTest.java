@@ -15,30 +15,32 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * One checked count domain for origin counts, carried through validation, merging and emission.
+ * One checked count domain for origin counts, carried through validation, merging and
+ * emission.
  *
  * <p>
  * An origin count is a portable integer, and the portable integer range reaches
- * 9,007,199,254,740,991 — far beyond {@code int}. A count that validation accepts and merging
- * then narrows is not rejected, it is <em>changed</em>: the propagation outcome a reader counts
- * is a different number from the one that was recorded, with nothing anywhere saying so. That is
- * the worst failure a result format can have, because the corrupted value is indistinguishable
- * from a correct one.
+ * 9,007,199,254,740,991 — far beyond {@code int}. A count that validation accepts and
+ * merging then narrows is not rejected, it is <em>changed</em>: the propagation outcome a
+ * reader counts is a different number from the one that was recorded, with nothing
+ * anywhere saying so. That is the worst failure a result format can have, because the
+ * corrupted value is indistinguishable from a correct one.
  * </p>
  *
  * <p>
- * So the domain is {@code long}, bounded by the portable integer range at every edge — what
- * validation accepts, what merging accumulates, and what emission writes are one domain — and a
- * sum that would leave it fails loudly rather than wrapping into a plausible smaller number.
+ * So the domain is {@code long}, bounded by the portable integer range at every edge —
+ * what validation accepts, what merging accumulates, and what emission writes are one
+ * domain — and a sum that would leave it fails loudly rather than wrapping into a
+ * plausible smaller number.
  * </p>
  */
 @DisplayName("Origin count domain")
@@ -50,18 +52,21 @@ class OriginCountDomainTest {
 	/** The largest integer that survives a JSON boundary as the value it is. */
 	private static final long MAX_PORTABLE = 9007199254740991L;
 
-	/** Two of these exceed {@link #MAX_PORTABLE}; narrowed, two of them look like 1,874,919,424. */
+	/**
+	 * Two of these exceed {@link #MAX_PORTABLE}; narrowed, two of them look like
+	 * 1,874,919,424.
+	 */
 	private static final long HALF_OVER = 5000000000000000L;
 
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 
-	private static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("count origins").build();
+	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder().request("count origins").build();
 
 	/**
 	 * A live propagating wrapper carrying one origin count.
 	 * <p>
-	 * Built through the canonical constructor with the portable value the wire would carry, which
-	 * is exactly the shape a jury receives from a child that propagated.
+	 * Built through the canonical constructor with the portable value the wire would
+	 * carry, which is exactly the shape a jury receives from a child that propagated.
 	 * </p>
 	 * @param count the origin count; a portable integer
 	 * @return the wrapper
@@ -147,7 +152,7 @@ class OriginCountDomainTest {
 		@Test
 		@DisplayName("is contained by the jury boundary, leaving every individual result intact")
 		void isContainedByTheJuryBoundary() {
-			Verdict verdict = SimpleJury.<JudgmentContext>builder()
+			Verdict verdict = SimpleJury.<CompletionEvidence>builder()
 				.judge(Judges.named(context -> Judgment.pass("all good"), "healthy"))
 				.judge(Judges.named(context -> wrapper(HALF_OVER), "first"))
 				.judge(Judges.named(context -> wrapper(HALF_OVER), "second"))
@@ -155,8 +160,8 @@ class OriginCountDomainTest {
 				.build()
 				.vote(CONTEXT);
 
-			assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
-			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
+			assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
 			assertThat(verdict.individual()).hasSize(3);
 			assertThat(verdict.individualByName().get("healthy").status()).isEqualTo(JudgmentStatus.PASS);
 		}
@@ -202,10 +207,14 @@ class OriginCountDomainTest {
 		@Test
 		@DisplayName("replacing the evidence block preserves an origin the replacement omits")
 		void reattachingEvidenceKeepsTheOrigin() {
-			// The origin lives inside the same reserved block as the rest of the evidence, so
-			// rebuilding that block without naming the origin would destroy the fact that makes
-			// errors_propagated legal. Every built-in reduction writes the key, which is exactly
-			// why the obligation needs its own witness: nothing in a normal reduction would
+			// The origin lives inside the same reserved block as the rest of the
+			// evidence, so
+			// rebuilding that block without naming the origin would destroy the fact that
+			// makes
+			// errors_propagated legal. Every built-in reduction writes the key, which is
+			// exactly
+			// why the obligation needs its own witness: nothing in a normal reduction
+			// would
 			// notice this carry-across going missing.
 			Judgment propagated = Judgment.propagatedError(Map.of(JudgmentReasonCode.JUDGE_REPORTED, 2L),
 					"2 of 3 judgments errored and the error policy is propagate");
@@ -226,9 +235,8 @@ class OriginCountDomainTest {
 			Judgment propagated = Judgment.propagatedError(Map.of(JudgmentReasonCode.JUDGE_REPORTED, 2L),
 					"2 of 3 judgments errored and the error policy is propagate");
 
-			Judgment reattached = AggregationEvidence.attach(propagated,
-					Map.of(AggregationEvidence.ERROR_CODE_COUNTS,
-							Judgment.portableOriginCounts(Map.of(JudgmentReasonCode.JUDGE_FAILED, 1L))));
+			Judgment reattached = AggregationEvidence.attach(propagated, Map.of(AggregationEvidence.ERROR_CODE_COUNTS,
+					Judgment.portableOriginCounts(Map.of(JudgmentReasonCode.JUDGE_FAILED, 1L))));
 
 			assertThat(originOf(reattached)).containsOnlyKeys("judge_failed");
 		}

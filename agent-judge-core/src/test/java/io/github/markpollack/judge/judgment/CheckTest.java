@@ -1,0 +1,115 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
+package io.github.markpollack.judge.judgment;
+
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * Tests for {@link Check}.
+ *
+ * @author Mark Pollack
+ * @since 0.1.0
+ */
+class CheckTest {
+
+	@Test
+	void shouldCreatePassCheck() {
+		Check check = Check.pass("Test passed");
+
+		assertThat(check.name()).isEqualTo("Test passed");
+		assertThat(check.passed()).isTrue();
+		assertThat(check.message()).isEmpty();
+	}
+
+	@Test
+	void shouldCreatePassCheckWithMessage() {
+		Check check = Check.pass("Test passed", "All assertions succeeded");
+
+		assertThat(check.name()).isEqualTo("Test passed");
+		assertThat(check.passed()).isTrue();
+		assertThat(check.message()).isEqualTo("All assertions succeeded");
+	}
+
+	@Test
+	void shouldCreateFailCheck() {
+		Check check = Check.fail("Test failed", "Expected 5 but was 3");
+
+		assertThat(check.name()).isEqualTo("Test failed");
+		assertThat(check.passed()).isFalse();
+		assertThat(check.message()).isEqualTo("Expected 5 but was 3");
+	}
+
+	@Test
+	void shouldCreateCheckWithConstructor() {
+		Check check = new Check("Custom check", true, "Custom message");
+
+		assertThat(check.name()).isEqualTo("Custom check");
+		assertThat(check.passed()).isTrue();
+		assertThat(check.message()).isEqualTo("Custom message");
+	}
+
+	// ==================== Record Tests ====================
+
+	@Test
+	void recordShouldProvideEquality() {
+		Check c1 = Check.pass("Test", "Message");
+		Check c2 = Check.pass("Test", "Message");
+
+		assertThat(c1).isEqualTo(c2);
+		assertThat(c1.hashCode()).isEqualTo(c2.hashCode());
+	}
+
+	@Test
+	void recordShouldProvideToString() {
+		Check check = Check.fail("Build", "Compilation failed");
+
+		String toString = check.toString();
+
+		assertThat(toString).contains("Check");
+		assertThat(toString).contains("Build");
+		assertThat(toString).contains("Compilation failed");
+	}
+
+	@Test
+	void recordShouldDistinguishPassFromFail() {
+		Check pass = Check.pass("Test");
+		Check fail = Check.fail("Test", "Failed");
+
+		assertThat(pass).isNotEqualTo(fail);
+	}
+
+	// ==================== Use Case Tests ====================
+
+	@Test
+	void shouldSupportMultipleChecksInJudgment() {
+		Check compilationCheck = Check.pass("Compilation");
+		Check testCheck = Check.pass("Tests ran");
+		Check coverageCheck = Check.fail("Coverage", "Only 70%, expected 80%");
+
+		assertThat(compilationCheck.passed()).isTrue();
+		assertThat(testCheck.passed()).isTrue();
+		assertThat(coverageCheck.passed()).isFalse();
+		assertThat(coverageCheck.message()).contains("70%");
+	}
+
+	@Test
+	void shouldHandleEmptyMessage() {
+		Check check = new Check("Test", true, "");
+
+		assertThat(check.message()).isEmpty();
+	}
+
+	@Test
+	void shouldRejectInvalidRecordComponents() {
+		assertThatThrownBy(() -> new Check(null, true, "message")).isInstanceOf(NullPointerException.class);
+		assertThatThrownBy(() -> new Check("  ", true, "message")).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> new Check("name", true, null)).isInstanceOf(NullPointerException.class);
+	}
+
+}

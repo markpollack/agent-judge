@@ -5,7 +5,6 @@
 
 package io.github.markpollack.judge.jury;
 
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -17,25 +16,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.description.JuryDescription;
 import io.github.markpollack.judge.description.KeySource;
 import io.github.markpollack.judge.description.MemberDescription;
 import io.github.markpollack.judge.description.MetaJuryDescription;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 
 /**
  * Named jury-of-juries implementation used by {@link Juries}. Exactly one declared usable
- * member retains its complete aggregate without invoking the meta-strategy. Failed members
- * remain stage failures; one survivor among multiple declared members is not identity.
+ * member retains its complete aggregate without invoking the meta-strategy. Failed
+ * members remain stage failures; one survivor among multiple declared members is not
+ * identity.
  */
 class MetaJury<E> implements Jury<E> {
 
 	private static final Logger logger = LoggerFactory.getLogger(MetaJury.class);
 
-	private static final CompositeFailure EXECUTION_FAILURE =
-			new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED);
+	private static final CompositeFailure EXECUTION_FAILURE = new CompositeFailure(
+			CompositeFailureCode.JURY_EXECUTION_FAILED);
 
 	private final List<NamedJury<E>> members;
 
@@ -83,7 +82,6 @@ class MetaJury<E> implements Jury<E> {
 		}
 	}
 
-
 	@Override
 	public List<Judge<E>> getJudges() {
 		return List.of();
@@ -97,12 +95,12 @@ class MetaJury<E> implements Jury<E> {
 	/**
 	 * Describe this meta-jury's strategy and its named members in execution order.
 	 * <p>
-	 * {@link #getJudges()} is empty for a meta-jury, so this description is the only view of
-	 * its members before a vote.
+	 * {@link #getJudges()} is empty for a meta-jury, so this description is the only view
+	 * of its members before a vote.
 	 * </p>
 	 * @return a meta-jury description
-	 * @throws IllegalArgumentException if a member cannot be described; the message names the
-	 * member
+	 * @throws IllegalArgumentException if a member cannot be described; the message names
+	 * the member
 	 */
 	@Override
 	public JuryDescription describe() {
@@ -150,8 +148,10 @@ class MetaJury<E> implements Jury<E> {
 
 			DispositionReason reason = NotApplicableGuard.stageFailure(member.jury(), verdict);
 			if (reason != null) {
-				// The member's own verdict is kept exactly as it came back. The parent records
-				// that it could not use it, which is a different fact from what the member said.
+				// The member's own verdict is kept exactly as it came back. The parent
+				// records
+				// that it could not use it, which is a different fact from what the
+				// member said.
 				attempts.add(CompositeAttempt.stageFailed(member.name(), CompositeRelation.META_MEMBER, null, reason,
 						verdict));
 				anyStageFailed = true;
@@ -159,29 +159,33 @@ class MetaJury<E> implements Jury<E> {
 			}
 
 			attempts.add(CompositeAttempt.used(member.name(), CompositeRelation.META_MEMBER, null, verdict));
-			successful.add(verdict.aggregated());
-			successfulByName.put(member.name(), verdict.aggregated());
-			// Seats are the configured positions of the members that were used, so a gap in the
+			successful.add(verdict.judgment());
+			successfulByName.put(member.name(), verdict.judgment());
+			// Seats are the configured positions of the members that were used, so a gap
+			// in the
 			// positions is itself the record that a member between them failed.
 			seats.add(new Seat(position, member.name(), KeySource.DECLARED));
 		}
 
 		if (anyStageFailed) {
-			// Successful members are kept: their work is evidence, and discarding it would make
+			// Successful members are kept: their work is evidence, and discarding it
+			// would make
 			// a single broken member indistinguishable from a jury that ran nothing.
-			// Any exclusion this jury refused is named: a meta-jury has no later tier whose
-			// reasoning could explain the outcome instead, so R-E's enum-only allowance does not
+			// Any exclusion this jury refused is named: a meta-jury has no later tier
+			// whose
+			// reasoning could explain the outcome instead, so R-E's enum-only allowance
+			// does not
 			// reach here and §7.3's free-text requirement stands.
 			Judgment aggregate = Judgment.error(JudgmentReasonCode.STAGE_FAILED,
 					"One or more jury members did not produce a usable determination, so this jury reduced nothing."
 							+ NotApplicableGuard.refusedExclusionNote(attempts, "Member"));
 			return Verdict.builder()
-			.declaredCardinality(members.size())
-				.aggregated(aggregate)
+				.declaredCardinality(members.size())
+				.judgment(aggregate)
 				.individual(successful)
 				.individualByName(successfulByName)
 				.seats(seats)
-				.decision(Decision.undecided())
+				.provenance(VerdictProvenance.undecided())
 				.compositeAttempts(attempts)
 				.build();
 		}
@@ -190,11 +194,11 @@ class MetaJury<E> implements Jury<E> {
 		Judgment aggregate = identity ? successful.get(0) : aggregateWithinBoundary(successful);
 		return Verdict.builder()
 			.declaredCardinality(members.size())
-			.aggregated(aggregate)
+			.judgment(aggregate)
 			.individual(successful)
 			.individualByName(successfulByName)
 			.seats(seats)
-			.decision(identity ? Decision.own() : AggregationBoundary.decisionFor(aggregate))
+			.provenance(identity ? VerdictProvenance.own() : AggregationBoundary.decisionFor(aggregate))
 			.compositeAttempts(attempts)
 			.build();
 	}
@@ -205,8 +209,7 @@ class MetaJury<E> implements Jury<E> {
 	 * @return the strategy's aggregate, or the contained error that replaces it
 	 */
 	private Judgment aggregateWithinBoundary(List<Judgment> successful) {
-		return AggregationBoundary.aggregate(metaStrategy, successful, Map.of(), aggregateMayBeNotApplicable(),
-				logger);
+		return AggregationBoundary.aggregate(metaStrategy, successful, Map.of(), aggregateMayBeNotApplicable(), logger);
 	}
 
 }

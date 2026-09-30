@@ -5,20 +5,17 @@
 
 package io.github.markpollack.judge.jury;
 
-
-
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.description.JuryDescription;
 import io.github.markpollack.judge.description.KeySource;
 import io.github.markpollack.judge.description.SeatDescription;
 import io.github.markpollack.judge.description.SimpleJuryDescription;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,33 +43,37 @@ import org.slf4j.LoggerFactory;
  *
  * <p>
  * <strong>A judge that fails still votes.</strong> If a judge throws, or returns no
- * judgment at all, the jury records an {@link io.github.markpollack.judge.result.JudgmentStatus#ERROR}
- * judgment naming the judge and the cause, and continues. Every configured judge is
- * therefore represented in the returned {@link Verdict}, and the strategy's
- * {@link ErrorPolicy} decides what an error means — which is the whole point of having
- * one. Letting the exception escape instead would discard every other judge's result in
- * the same jury and, inside a {@link CascadedJury}, collapse the entire tier: a jury would
- * silently score with fewer judges than it lists, or report nothing where most judges
- * succeeded. The count that actually voted is recoverable from the
- * {@link AggregationEvidence} block on the aggregate.
+ * judgment at all, the jury records an
+ * {@link io.github.markpollack.judge.judgment.JudgmentStatus#ERROR} judgment naming the
+ * judge and the cause, and continues. Every configured judge is therefore represented in
+ * the returned {@link Verdict}, and the strategy's {@link ErrorPolicy} decides what an
+ * error means — which is the whole point of having one. Letting the exception escape
+ * instead would discard every other judge's result in the same jury and, inside a
+ * {@link CascadedJury}, collapse the entire tier: a jury would silently score with fewer
+ * judges than it lists, or report nothing where most judges succeeded. The count that
+ * actually voted is recoverable from the {@link AggregationEvidence} block on the
+ * aggregate.
  * </p>
  *
  * <p>
  * The same holds for a {@link JudgeWithMetadata} whose {@code metadata()} returns
- * {@code null} or throws. The jury cannot tell what the judge is called, so it does not run
- * it: the seat's judgment is an {@code ERROR} naming its position and the metadata failure,
- * stored under the positional key {@code "Judge#" + (position + 1)}.
+ * {@code null} or throws. The jury cannot tell what the judge is called, so it does not
+ * run it: the seat's judgment is an {@code ERROR} naming its position and the metadata
+ * failure, stored under the positional key {@code "Judge#" + (position + 1)}.
  * </p>
  *
  * <p>
  * Example usage with builder:
  * </p>
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
- * <p>One declared seat with a valid returned result is identity composition: the complete
- * Judgment is retained, with an OWN decision and no strategy invocation or added aggregation
- * evidence. Configuration and exclusion guards still apply. Failed invocations remain
- * contained inputs to the configured error reduction; they are not identity results.
+ * <p>
+ * One declared seat with a valid returned result is identity composition: the complete
+ * Judgment is retained, with an OWN provenance and no strategy invocation or added
+ * aggregation evidence. Configuration and exclusion guards still apply. Failed
+ * invocations remain contained inputs to the configured error reduction; they are not
+ * identity results.
  *
  * @param <E> evidence type
  * @author Mark Pollack
@@ -92,22 +93,25 @@ public class SimpleJury<E> implements Jury<E> {
 
 	private final Executor executor;
 
-	/** Positions whose verdict key {@link Juries#fromJudges} manufactured to break a name collision. */
+	/**
+	 * Positions whose verdict key {@link Juries#fromJudges} manufactured to break a name
+	 * collision.
+	 */
 	private final Set<Integer> deduplicatedPositions;
 
 	/**
 	 * Each seat's declared exclusion capability, read once at construction.
 	 * <p>
-	 * Read here, not at vote time, for two reasons. The composition check below needs it before
-	 * anything is spent, and the guard must honour what was validated: a judge whose metadata
-	 * changed between construction and the vote does not get to acquire a capability the jury
-	 * was never built with.
+	 * Read here, not at vote time, for two reasons. The composition check below needs it
+	 * before anything is spent, and the guard must honour what was validated: a judge
+	 * whose metadata changed between construction and the vote does not get to acquire a
+	 * capability the jury was never built with.
 	 * </p>
 	 */
 	private final List<String> declaredCapabilities;
 
-	private SimpleJury(List<Judge<E>> judges, VotingStrategy votingStrategy, Map<String, Double> weights, boolean parallel,
-			Executor executor, Set<Integer> deduplicatedPositions, boolean requireDeclaredNames) {
+	private SimpleJury(List<Judge<E>> judges, VotingStrategy votingStrategy, Map<String, Double> weights,
+			boolean parallel, Executor executor, Set<Integer> deduplicatedPositions, boolean requireDeclaredNames) {
 		if (judges == null || judges.isEmpty()) {
 			throw new IllegalArgumentException("Jury must have at least one judge");
 		}
@@ -127,15 +131,14 @@ public class SimpleJury<E> implements Jury<E> {
 		}
 	}
 
-
 	/**
 	 * Read every seat's declared exclusion capability.
 	 * <p>
-	 * A judge whose metadata cannot be read has declared nothing, and is recorded as declaring
-	 * nothing rather than failing construction. It never gets to exercise the absent capability
-	 * either: the jury cannot tell what it is called, so it does not run it, and the seat is an
-	 * {@code ERROR judge_metadata_unreadable}. Describing such a jury still fails loudly, which
-	 * is where an unreadable judge is actually reported.
+	 * A judge whose metadata cannot be read has declared nothing, and is recorded as
+	 * declaring nothing rather than failing construction. It never gets to exercise the
+	 * absent capability either: the jury cannot tell what it is called, so it does not
+	 * run it, and the seat is an {@code ERROR judge_metadata_unreadable}. Describing such
+	 * a jury still fails loudly, which is where an unreadable judge is actually reported.
 	 * </p>
 	 * @param judges the configured judges
 	 * @return the declaration per position, with null for a seat that declares none
@@ -156,11 +159,12 @@ public class SimpleJury<E> implements Jury<E> {
 	}
 
 	/**
-	 * Refuse a jury whose strategy would not honour an exclusion one of its seats declares.
+	 * Refuse a jury whose strategy would not honour an exclusion one of its seats
+	 * declares.
 	 * <p>
-	 * Cheap configuration is validated at build time rather than contained at vote time: the
-	 * contradiction is visible in the jury as assembled, and every run of it would waste a
-	 * judge's work to reach the same error.
+	 * Cheap configuration is validated at build time rather than contained at vote time:
+	 * the contradiction is visible in the jury as assembled, and every run of it would
+	 * waste a judge's work to reach the same error.
 	 * </p>
 	 * @param judges the configured judges
 	 * @param capabilities each seat's declaration
@@ -174,10 +178,11 @@ public class SimpleJury<E> implements Jury<E> {
 		for (int position = 0; position < capabilities.size(); position++) {
 			String declared = capabilities.get(position);
 			if (declared != null) {
-				throw new IllegalArgumentException("seats[" + position + "] declares that it may return NOT_APPLICABLE ("
-						+ declared + "), but strategy '" + strategy.getName()
-						+ "' refuses exclusions; configure NotApplicablePolicy.EXCLUDE or TREAT_AS_FAIL, "
-						+ "or seat a judge that does not exclude");
+				throw new IllegalArgumentException(
+						"seats[" + position + "] declares that it may return NOT_APPLICABLE (" + declared
+								+ "), but strategy '" + strategy.getName()
+								+ "' refuses exclusions; configure NotApplicablePolicy.EXCLUDE or TREAT_AS_FAIL, "
+								+ "or seat a judge that does not exclude");
 			}
 		}
 	}
@@ -198,9 +203,9 @@ public class SimpleJury<E> implements Jury<E> {
 			}
 			Integer earlier = byKey.putIfAbsent(key.verdictKey(), position);
 			if (earlier != null) {
-				throw new IllegalArgumentException("seats[" + position + "] and seats[" + earlier
-						+ "] share the verdict key '" + key.verdictKey()
-						+ "', so one judgment would overwrite the other in individualByName");
+				throw new IllegalArgumentException(
+						"seats[" + position + "] and seats[" + earlier + "] share the verdict key '" + key.verdictKey()
+								+ "', so one judgment would overwrite the other in individualByName");
 			}
 		}
 	}
@@ -209,7 +214,8 @@ public class SimpleJury<E> implements Jury<E> {
 	 * A capable seat exists and either identity applies or the strategy excludes N/A.
 	 * <p>
 	 * One declared seat preserves N/A even with TREAT_AS_FAIL configured. A refusing
-	 * strategy still rejects a capable seat at construction; multi-seat bounds are unchanged.
+	 * strategy still rejects a capable seat at construction; multi-seat bounds are
+	 * unchanged.
 	 * </p>
 	 * @return true when this jury's aggregate may be NOT_APPLICABLE
 	 * @since 0.17.0
@@ -234,17 +240,17 @@ public class SimpleJury<E> implements Jury<E> {
 	 * Describe this jury's strategy and seats, before any vote.
 	 * <p>
 	 * Each seat pairs a zero-based position, which is the index of
-	 * {@link Verdict#individual()} and the key of {@link Verdict#weights()}, with the verdict
-	 * key its judgment is stored under in {@link Verdict#individualByName()} and the weight it
-	 * votes with. The key is {@link KeySource#DECLARED} when the judge declares a name,
-	 * {@link KeySource#DEDUPLICATED} when {@link Juries#fromJudges} suffixed a colliding name,
-	 * and {@link KeySource#POSITIONAL} when the judge declares no name and the key is
-	 * {@code "Judge#" + (position + 1)}.
+	 * {@link Verdict#individual()} and the key of {@link Verdict#weights()}, with the
+	 * verdict key its judgment is stored under in {@link Verdict#individualByName()} and
+	 * the weight it votes with. The key is {@link KeySource#DECLARED} when the judge
+	 * declares a name, {@link KeySource#DEDUPLICATED} when {@link Juries#fromJudges}
+	 * suffixed a colliding name, and {@link KeySource#POSITIONAL} when the judge declares
+	 * no name and the key is {@code "Judge#" + (position + 1)}.
 	 * </p>
 	 * @return a simple jury description
-	 * @throws IllegalArgumentException if a seat cannot be described, for example because its
-	 * judge declares a non-portable configuration or its metadata cannot be read; the message
-	 * names the seat
+	 * @throws IllegalArgumentException if a seat cannot be described, for example because
+	 * its judge declares a non-portable configuration or its metadata cannot be read; the
+	 * message names the seat
 	 * @since 0.17.0
 	 */
 	@Override
@@ -265,7 +271,8 @@ public class SimpleJury<E> implements Jury<E> {
 			}
 			double weight = weights.getOrDefault(String.valueOf(position), 1.0);
 			try {
-				// Judges.describe refuses metadata it cannot read, rather than describing the
+				// Judges.describe refuses metadata it cannot read, rather than describing
+				// the
 				// judge as undeclared.
 				SeatDescription seat = new SeatDescription(position, key.verdictKey(), keySource, weight,
 						Judges.describe(judge));
@@ -279,7 +286,8 @@ public class SimpleJury<E> implements Jury<E> {
 		}
 		// The capability is stated by the jury rather than re-derived from the strategy's
 		// description: a custom strategy may declare its policy only through
-		// notApplicablePolicy(), which a default describe() does not carry, and a derivation
+		// notApplicablePolicy(), which a default describe() does not carry, and a
+		// derivation
 		// would then publish a confident false about a jury that can exclude.
 		return new SimpleJuryDescription(votingStrategy.describe(), seats, aggregateMayBeNotApplicable());
 	}
@@ -287,9 +295,10 @@ public class SimpleJury<E> implements Jury<E> {
 	/**
 	 * Refuse to describe a seat whose declaration has changed since the jury was built.
 	 * <p>
-	 * The description and the guard must agree, or the description is a claim about a jury that
-	 * does not exist. A judge whose {@code metadata()} answers differently on each call would
-	 * otherwise be described as capable while being guarded as incapable, or the reverse.
+	 * The description and the guard must agree, or the description is a claim about a
+	 * jury that does not exist. A judge whose {@code metadata()} answers differently on
+	 * each call would otherwise be described as capable while being guarded as incapable,
+	 * or the reverse.
 	 * </p>
 	 * @param position the seat's position
 	 * @param described what the judge declares now
@@ -317,8 +326,10 @@ public class SimpleJury<E> implements Jury<E> {
 	}
 
 	CompositionVote voteForComposition(E context) {
-		// Read every seat's key once, on the caller's thread and before any judge runs, so a
-		// judge whose metadata cannot be read becomes an ERROR seat instead of an exception.
+		// Read every seat's key once, on the caller's thread and before any judge runs,
+		// so a
+		// judge whose metadata cannot be read becomes an ERROR seat instead of an
+		// exception.
 		List<SeatKey> keys = IntStream.range(0, judges.size())
 			.mapToObj(index -> SeatKey.of(judges.get(index), index))
 			.toList();
@@ -348,7 +359,8 @@ public class SimpleJury<E> implements Jury<E> {
 		List<Judgment> individualJudgments = invocations.stream().map(Invocation::judgment).toList();
 		boolean identity = judges.size() == 1 && invocations.get(0).returned();
 
-		// Build identity map (preserves order via LinkedHashMap) and the seats that join it to
+		// Build identity map (preserves order via LinkedHashMap) and the seats that join
+		// it to
 		// the ordered list.
 		Map<String, Judgment> judgmentByName = new LinkedHashMap<>();
 		List<Seat> seats = new ArrayList<>(judges.size());
@@ -358,16 +370,16 @@ public class SimpleJury<E> implements Jury<E> {
 					invocations.get(i).returned() ? SeatExecution.RETURNED : SeatExecution.CONTAINED_FAILURE));
 		}
 
-		Judgment aggregated = identity ? individualJudgments.get(0) : aggregateWithinBoundary(individualJudgments);
+		Judgment judgment = identity ? individualJudgments.get(0) : aggregateWithinBoundary(individualJudgments);
 
 		Verdict verdict = Verdict.builder()
 			.declaredCardinality(judges.size())
-			.aggregated(aggregated)
+			.judgment(judgment)
 			.individual(individualJudgments)
 			.individualByName(judgmentByName)
 			.weights(weights)
 			.seats(seats)
-			.decision(identity ? Decision.own() : AggregationBoundary.decisionFor(aggregated))
+			.provenance(identity ? VerdictProvenance.own() : AggregationBoundary.decisionFor(judgment))
 			.compositeAttempts(List.of())
 			.build();
 		return new CompositionVote(verdict, identity);
@@ -384,8 +396,9 @@ public class SimpleJury<E> implements Jury<E> {
 	}
 
 	/**
-	 * Call the strategy inside the shared boundary, so a broken reduction becomes a contained,
-	 * countable error instead of an exception that discards every judge that succeeded.
+	 * Call the strategy inside the shared boundary, so a broken reduction becomes a
+	 * contained, countable error instead of an exception that discards every judge that
+	 * succeeded.
 	 * @param individualJudgments the judgments to reduce
 	 * @return the strategy's aggregate, or the contained error that replaces it
 	 */
@@ -422,8 +435,9 @@ public class SimpleJury<E> implements Jury<E> {
 			if (judgment == null) {
 				logger.warn("Judge '{}' returned no judgment; recording an ERROR for the error policy to resolve",
 						name);
-				return new Invocation(Judgment.error(JudgmentReasonCode.JUDGE_FAILED,
-						"Judge '" + name + "' returned no judgment"), false);
+				return new Invocation(
+						Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "Judge '" + name + "' returned no judgment"),
+						false);
 			}
 			return new Invocation(judgment, judgment == raw);
 		}
@@ -438,11 +452,12 @@ public class SimpleJury<E> implements Jury<E> {
 	/**
 	 * Convert an exclusion from a seat that never declared one into an error.
 	 * <p>
-	 * Exclusion is the only outcome that removes a judge from its own denominator, so it is the
-	 * one a judge could use to dodge a criterion it does not like the look of. A seat that
-	 * declared the capability in advance is honoured; a seat that did not gets an
-	 * {@code ERROR undeclared_not_applicable}, which is a judge-origin error and therefore the
-	 * configured {@link ErrorPolicy}'s to resolve, exactly like any other judge failure.
+	 * Exclusion is the only outcome that removes a judge from its own denominator, so it
+	 * is the one a judge could use to dodge a criterion it does not like the look of. A
+	 * seat that declared the capability in advance is honoured; a seat that did not gets
+	 * an {@code ERROR undeclared_not_applicable}, which is a judge-origin error and
+	 * therefore the configured {@link ErrorPolicy}'s to resolve, exactly like any other
+	 * judge failure.
 	 * </p>
 	 * @param index the seat's position
 	 * @param name the seat's verdict key
@@ -466,14 +481,15 @@ public class SimpleJury<E> implements Jury<E> {
 	}
 
 	/**
-	 * The key a seat's judgment is stored under in {@link Verdict#individualByName()}, read
-	 * from its judge's metadata without letting a failure to read it escape.
+	 * The key a seat's judgment is stored under in {@link Verdict#individualByName()},
+	 * read from its judge's metadata without letting a failure to read it escape.
 	 *
 	 * @param position the seat's zero-based position
-	 * @param verdictKey the declared name, or {@code "Judge#" + (position + 1)} when the judge
-	 * declares none or its metadata cannot be read
+	 * @param verdictKey the declared name, or {@code "Judge#" + (position + 1)} when the
+	 * judge declares none or its metadata cannot be read
 	 * @param declared whether the judge declared the name
-	 * @param metadataFailure why the metadata could not be read, or {@code null} when it could
+	 * @param metadataFailure why the metadata could not be read, or {@code null} when it
+	 * could
 	 * @param cause the exception {@code metadata()} threw, or {@code null}
 	 */
 	record SeatKey(int position, String verdictKey, boolean declared, String metadataFailure, Exception cause) {
@@ -522,6 +538,7 @@ public class SimpleJury<E> implements Jury<E> {
 
 	/**
 	 * {@code Builder<E>} for SimpleJury.
+	 *
 	 * @param <E> evidence type
 	 */
 	public static class Builder<E> {
@@ -558,14 +575,15 @@ public class SimpleJury<E> implements Jury<E> {
 		 * @param judge the judge to add
 		 * @param weight the weight for this judge; finite and not negative
 		 * @return this builder
-		 * @throws IllegalArgumentException if the judge is null, or the weight is not finite or
-		 * is negative
+		 * @throws IllegalArgumentException if the judge is null, or the weight is not
+		 * finite or is negative
 		 */
 		public Builder<E> judge(Judge<E> judge, double weight) {
 			if (judge == null) {
 				throw new IllegalArgumentException("Judge cannot be null");
 			}
-			// Checked before the sign: NaN < 0 is false, so a sign check alone accepts NaN.
+			// Checked before the sign: NaN < 0 is false, so a sign check alone accepts
+			// NaN.
 			if (!Double.isFinite(weight)) {
 				throw new IllegalArgumentException("Weight must be finite, but was " + weight);
 			}
@@ -578,8 +596,8 @@ public class SimpleJury<E> implements Jury<E> {
 		}
 
 		/**
-		 * Add a judge, with equal weight, whose name was suffixed to break a collision, so its
-		 * seat is described as {@link KeySource#DEDUPLICATED}.
+		 * Add a judge, with equal weight, whose name was suffixed to break a collision,
+		 * so its seat is described as {@link KeySource#DEDUPLICATED}.
 		 * @param judge the renamed judge
 		 * @return this builder
 		 */
@@ -620,19 +638,20 @@ public class SimpleJury<E> implements Jury<E> {
 		}
 
 		/**
-		 * Require every seat to be identified by a name its judge declared, and require those
-		 * names to be unique.
+		 * Require every seat to be identified by a name its judge declared, and require
+		 * those names to be unique.
 		 * <p>
-		 * Opt-in, because it is a real constraint and existing juries seat unnamed lambdas
-		 * freely. Turn it on where the verdict is going to be <em>stored</em> and read later:
-		 * without it a seat can be keyed {@code "Judge#2"}, which identifies a position rather
-		 * than a judge and silently means something else the moment a judge is inserted above
-		 * it — and a judge that declares the name {@code "Judge#2"} collides with exactly that
-		 * key, so one judgment overwrites the other in {@code individualByName}.
+		 * Opt-in, because it is a real constraint and existing juries seat unnamed
+		 * lambdas freely. Turn it on where the verdict is going to be <em>stored</em> and
+		 * read later: without it a seat can be keyed {@code "Judge#2"}, which identifies
+		 * a position rather than a judge and silently means something else the moment a
+		 * judge is inserted above it — and a judge that declares the name
+		 * {@code "Judge#2"} collides with exactly that key, so one judgment overwrites
+		 * the other in {@code individualByName}.
 		 * </p>
 		 * <p>
-		 * {@link #build()} then rejects a positional seat, a duplicate declared name, and a
-		 * declared name that collides with a positional key.
+		 * {@link #build()} then rejects a positional seat, a duplicate declared name, and
+		 * a declared name that collides with a positional key.
 		 * </p>
 		 * @return this builder
 		 * @since 0.17.0

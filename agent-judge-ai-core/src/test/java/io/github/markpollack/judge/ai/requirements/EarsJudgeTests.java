@@ -5,11 +5,10 @@ import java.util.Map;
 
 import io.github.markpollack.judge.ai.model.JudgeModel;
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import java.nio.file.Path;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -17,27 +16,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * What a set of per-criterion answers means.
  *
- * <p>Every case reads "the answers said X, therefore the judgment must be Y" — written from the
- * rubric, never from the code. A test written from the code's behaviour cannot disagree with it.
+ * <p>
+ * Every case reads "the answers said X, therefore the judgment must be Y" — written from
+ * the rubric, never from the code. A test written from the code's behaviour cannot
+ * disagree with it.
  *
- * <p>Every assertion is on {@link Judgment#status()}, never {@code pass()}. {@code pass()} is false
- * for FAIL, ERROR and ABSTAIN alike, so a test asserting it is false cannot tell a rejection from a
- * judge that never ran.
+ * <p>
+ * Every assertion is on {@link Judgment#status()}, never {@code pass()}. {@code pass()}
+ * is false for FAIL, ERROR and ABSTAIN alike, so a test asserting it is false cannot tell
+ * a rejection from a judge that never ran.
  */
 class EarsJudgeTests {
 
 	private static final List<EarsCriterion> THREE = List.of(
-		new EarsCriterion("UC1-AC1", "first", "When a thing happens, the system shall do the first thing."),
-		new EarsCriterion("UC1-AC2", "second", "If a thing happens, then the system shall do the second thing."),
-		new EarsCriterion("UC1-AC3", "third", "While a state holds, the system shall do the third thing."));
+			new EarsCriterion("UC1-AC1", "first", "When a thing happens, the system shall do the first thing."),
+			new EarsCriterion("UC1-AC2", "second", "If a thing happens, then the system shall do the second thing."),
+			new EarsCriterion("UC1-AC3", "third", "While a state holds, the system shall do the third thing."));
 
 	@Test
 	void everyRequirementEstablishedIsAPass() {
 		Judgment judgment = judge("""
-			    UC1-AC1: PASS - Foo.java:10 does it
-			    UC1-AC2: PASS - Bar.java:20 does it
-			    UC1-AC3: PASS - Baz.java:30 does it
-			    """);
+				UC1-AC1: PASS - Foo.java:10 does it
+				UC1-AC2: PASS - Bar.java:20 does it
+				UC1-AC3: PASS - Baz.java:30 does it
+				""");
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.checks()).as("every answer is evidence and must be kept").hasSize(3);
@@ -48,32 +50,32 @@ class EarsJudgeTests {
 	void oneUnsatisfiedRequirementFailsTheWhole() {
 		// Required criteria are conjunctive. Two of three is not two-thirds done.
 		Judgment judgment = judge("""
-			    UC1-AC1: PASS - Foo.java:10 does it
-			    UC1-AC2: FAIL - Bar.java:20 compares the wrong way round
-			    UC1-AC3: PASS - Baz.java:30 does it
-			    """);
+				UC1-AC1: PASS - Foo.java:10 does it
+				UC1-AC2: FAIL - Bar.java:20 compares the wrong way round
+				UC1-AC3: PASS - Baz.java:30 does it
+				""");
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(check(judgment, "UC1-AC2").passed()).isFalse();
-		assertThat(check(judgment, "UC1-AC2").message())
-			.as("the binding item's evidence survives")
+		assertThat(check(judgment, "UC1-AC2").message()).as("the binding item's evidence survives")
 			.contains("compares the wrong way round");
 	}
 
 	@Test
 	void oneAbstentionMakesTheWholeAbstain() {
-		// The load-bearing rule. A written acceptance criterion is required by construction:
-		// the specification says it applies. So CANNOT_DETERMINE means "could not establish",
+		// The load-bearing rule. A written acceptance criterion is required by
+		// construction:
+		// the specification says it applies. So CANNOT_DETERMINE means "could not
+		// establish",
 		// not "does not apply", and it must not be absorbed into a passing population.
 		// PASS means every required criterion was affirmatively established.
 		Judgment judgment = judge("""
-			    UC1-AC1: PASS - Foo.java:10 does it
-			    UC1-AC2: CANNOT_DETERMINE - nothing here exercises it
-			    UC1-AC3: PASS - Baz.java:30 does it
-			    """);
+				UC1-AC1: PASS - Foo.java:10 does it
+				UC1-AC2: CANNOT_DETERMINE - nothing here exercises it
+				UC1-AC3: PASS - Baz.java:30 does it
+				""");
 
-		assertThat(judgment.status())
-			.as("51 of 52 established is not the specification passing")
+		assertThat(judgment.status()).as("51 of 52 established is not the specification passing")
 			.isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(judgment.reasoning()).contains("UC1-AC2");
 		assertThat(judgment.metadata()).containsEntry("unestablished", "UC1-AC2");
@@ -82,10 +84,10 @@ class EarsJudgeTests {
 	@Test
 	void aFailureOutranksAnAbstention() {
 		Judgment judgment = judge("""
-			    UC1-AC1: CANNOT_DETERMINE - nothing here exercises it
-			    UC1-AC2: FAIL - Bar.java:20 does the opposite
-			    UC1-AC3: PASS - Baz.java:30 does it
-			    """);
+				UC1-AC1: CANNOT_DETERMINE - nothing here exercises it
+				UC1-AC2: FAIL - Bar.java:20 does the opposite
+				UC1-AC3: PASS - Baz.java:30 does it
+				""");
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 	}
@@ -93,10 +95,10 @@ class EarsJudgeTests {
 	@Test
 	void nothingEstablishedIsAnAbstentionNotAPass() {
 		Judgment judgment = judge("""
-			    UC1-AC1: CANNOT_DETERMINE - nothing here exercises it
-			    UC1-AC2: CANNOT_DETERMINE - nothing here exercises it
-			    UC1-AC3: CANNOT_DETERMINE - nothing here exercises it
-			    """);
+				UC1-AC1: CANNOT_DETERMINE - nothing here exercises it
+				UC1-AC2: CANNOT_DETERMINE - nothing here exercises it
+				UC1-AC3: CANNOT_DETERMINE - nothing here exercises it
+				""");
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 	}
@@ -106,9 +108,9 @@ class EarsJudgeTests {
 		// Answering two of three is not an audit of three. The subject is not at fault:
 		// the audit is incomplete, which is an ERROR.
 		Judgment judgment = judge("""
-			    UC1-AC1: PASS - Foo.java:10 does it
-			    UC1-AC2: PASS - Bar.java:20 does it
-			    """);
+				UC1-AC1: PASS - Foo.java:10 does it
+				UC1-AC2: PASS - Bar.java:20 does it
+				""");
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).contains("1 of 3").contains("UC1-AC3");
@@ -118,10 +120,10 @@ class EarsJudgeTests {
 	void answersForRequirementsNobodyAskedAboutAreIgnored() {
 		// An invented identifier must not satisfy the roster.
 		Judgment judgment = judge("""
-			    UC1-AC1: PASS - Foo.java:10 does it
-			    UC1-AC2: PASS - Bar.java:20 does it
-			    UC9-AC9: PASS - a criterion nobody wrote
-			    """);
+				UC1-AC1: PASS - Foo.java:10 does it
+				UC1-AC2: PASS - Bar.java:20 does it
+				UC9-AC9: PASS - a criterion nobody wrote
+				""");
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).contains("UC1-AC3");
@@ -129,13 +131,14 @@ class EarsJudgeTests {
 
 	@Test
 	void answersOutOfOrderAreStillAnswers() {
-		// The real agent emitted AC1-AC46, then AC48-AC52, then AC47. Order is not part of
+		// The real agent emitted AC1-AC46, then AC48-AC52, then AC47. Order is not part
+		// of
 		// the contract; completeness is.
 		Judgment judgment = judge("""
-			    UC1-AC3: PASS - Baz.java:30 does it
-			    UC1-AC1: PASS - Foo.java:10 does it
-			    UC1-AC2: PASS - Bar.java:20 does it
-			    """);
+				UC1-AC3: PASS - Baz.java:30 does it
+				UC1-AC1: PASS - Foo.java:10 does it
+				UC1-AC2: PASS - Bar.java:20 does it
+				""");
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.checks().stream().map(Check::name).toList())
@@ -146,11 +149,11 @@ class EarsJudgeTests {
 	@Test
 	void aRepeatedAnswerDoesNotCountTwice() {
 		Judgment judgment = judge("""
-			    UC1-AC1: PASS - Foo.java:10 does it
-			    UC1-AC1: FAIL - changed my mind
-			    UC1-AC2: PASS - Bar.java:20 does it
-			    UC1-AC3: PASS - Baz.java:30 does it
-			    """);
+				UC1-AC1: PASS - Foo.java:10 does it
+				UC1-AC1: FAIL - changed my mind
+				UC1-AC2: PASS - Bar.java:20 does it
+				UC1-AC3: PASS - Baz.java:30 does it
+				""");
 
 		assertThat(judgment.status()).as("ambiguous repeated answers are instrument failures")
 			.isEqualTo(JudgmentStatus.ERROR);
@@ -167,12 +170,15 @@ class EarsJudgeTests {
 
 	@Test
 	void aBackendThatCouldNotAnswerBlamesTheJudgeNotTheSubject() {
-		// DD-8. An unrunnable judge is an ERROR about the judge, never a FAIL about the subject.
-		// The backend is the only component that knows which operator problem occurred, so its
-		// text is carried through verbatim: an ERROR reading "the agent did not complete" would
+		// DD-8. An unrunnable judge is an ERROR about the judge, never a FAIL about the
+		// subject.
+		// The backend is the only component that knows which operator problem occurred,
+		// so its
+		// text is carried through verbatim: an ERROR reading "the agent did not complete"
+		// would
 		// send the reader to look at the wrong thing.
-		JudgeModel model = request -> new JudgeModelResponse(
-			"No API credentials are configured for this backend", "recorded", null, Map.of("successful", false));
+		JudgeModel model = request -> new JudgeModelResponse("No API credentials are configured for this backend",
+				"recorded", null, Map.of(), false);
 		Judgment judgment = EarsJudge.create("audit", THREE, model).judge(context());
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
@@ -181,7 +187,7 @@ class EarsJudgeTests {
 
 	@Test
 	void aSilentlyUnsuccessfulBackendStillNamesItselfAsTheProblem() {
-		JudgeModel model = request -> new JudgeModelResponse("", "recorded", null, Map.of("successful", false));
+		JudgeModel model = request -> new JudgeModelResponse("", "recorded", null, Map.of(), false);
 		Judgment judgment = EarsJudge.create("audit", THREE, model).judge(context());
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
@@ -190,32 +196,35 @@ class EarsJudgeTests {
 
 	@Test
 	void noNumericScoreAppearsAnywhere() {
-		// DD-12. A score of 6 out of 10 is meaningless if you do not know what makes it 7.
+		// DD-12. A score of 6 out of 10 is meaningless if you do not know what makes it
+		// 7.
 		Judgment judgment = judge("""
-			    UC1-AC1: PASS - Foo.java:10 does it
-			    UC1-AC2: CANNOT_DETERMINE - nothing here exercises it
-			    UC1-AC3: PASS - Baz.java:30 does it
-			    """);
+				UC1-AC1: PASS - Foo.java:10 does it
+				UC1-AC2: CANNOT_DETERMINE - nothing here exercises it
+				UC1-AC3: PASS - Baz.java:30 does it
+				""");
 
 		assertThat(judgment.score()).as("no score is set, because none is meaningful here").isNull();
-		assertThat(judgment.reasoning())
-			.as("the report counts requirements; it does not rate them")
+		assertThat(judgment.reasoning()).as("the report counts requirements; it does not rate them")
 			.matches(".*\\d+ of \\d+ established.*");
 	}
 
-	// --- Observations: useful evidence, and never a verdict -------------------------------
+	// --- Observations: useful evidence, and never a verdict
+	// -------------------------------
 
 	private static final String WITH_OBSERVATION = """
-		UC1-AC1: PASS - Foo.java:10 does it
-		UC1-AC2: PASS - Bar.java:20 does it
-		UC1-AC3: PASS - Baz.java:30 does it
-		OBSERVATION UC1-AC2: no existing test exercises the exact-equality boundary, only the after-start case at BarTests.java:191
-		""";
+			UC1-AC1: PASS - Foo.java:10 does it
+			UC1-AC2: PASS - Bar.java:20 does it
+			UC1-AC3: PASS - Baz.java:30 does it
+			OBSERVATION UC1-AC2: no existing test exercises the exact-equality boundary, only the after-start case at BarTests.java:191
+			""";
 
 	@Test
 	void anObservationDoesNotChangeTheVerdict() {
-		// The requirement says the implementation must behave correctly. It does not say a test
-		// must exist. So the criterion passes, and the gap is kept beside it, not inside it.
+		// The requirement says the implementation must behave correctly. It does not say
+		// a test
+		// must exist. So the criterion passes, and the gap is kept beside it, not inside
+		// it.
 		Judgment judgment = judge(WITH_OBSERVATION);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
@@ -228,21 +237,20 @@ class EarsJudgeTests {
 		List<Observation> found = Observation.of(judge(WITH_OBSERVATION));
 
 		assertThat(found).hasSize(1);
-		assertThat(found.get(0).requirementId())
-			.as("attributed to the criterion it was noticed under")
+		assertThat(found.get(0).requirementId()).as("attributed to the criterion it was noticed under")
 			.isEqualTo("UC1-AC2");
 		assertThat(found.get(0).message()).contains("exact-equality boundary");
 	}
 
 	@Test
 	void aLocationIsExtractedWhenOneWasGiven() {
-		assertThat(Observation.of(judge(WITH_OBSERVATION)).get(0).locations())
-			.containsExactly("BarTests.java:191");
+		assertThat(Observation.of(judge(WITH_OBSERVATION)).get(0).locations()).containsExactly("BarTests.java:191");
 	}
 
 	@Test
 	void anObservationDoesNotJoinTheRoster() {
-		// Three criteria were asked; three checks come back. An observation is not a fourth.
+		// Three criteria were asked; three checks come back. An observation is not a
+		// fourth.
 		Judgment judgment = judge(WITH_OBSERVATION);
 
 		assertThat(judgment.checks()).hasSize(3);
@@ -252,13 +260,14 @@ class EarsJudgeTests {
 
 	@Test
 	void anObservationCannotRescueOrDamageARollup() {
-		// Observed alongside a genuine failure, the verdict is still decided by the failure.
+		// Observed alongside a genuine failure, the verdict is still decided by the
+		// failure.
 		Judgment failing = judge("""
-			    UC1-AC1: PASS - Foo.java:10 does it
-			    UC1-AC2: FAIL - Bar.java:20 does the opposite
-			    UC1-AC3: PASS - Baz.java:30 does it
-			    OBSERVATION UC1-AC1: an aside about Foo.java:10
-			    """);
+				UC1-AC1: PASS - Foo.java:10 does it
+				UC1-AC2: FAIL - Bar.java:20 does the opposite
+				UC1-AC3: PASS - Baz.java:30 does it
+				OBSERVATION UC1-AC1: an aside about Foo.java:10
+				""");
 
 		assertThat(failing.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(Observation.of(failing)).hasSize(1);
@@ -266,16 +275,17 @@ class EarsJudgeTests {
 
 	@Test
 	void malformedOrUnknownObservationsAreDroppedNotFatal() {
-		// The roster parsing is strict. This channel is forgiving on purpose: a cosmetic change
+		// The roster parsing is strict. This channel is forgiving on purpose: a cosmetic
+		// change
 		// in non-binding model prose must never break a valid judgment.
 		Judgment judgment = judge("""
-			    UC1-AC1: PASS - Foo.java:10 does it
-			    UC1-AC2: PASS - Bar.java:20 does it
-			    UC1-AC3: PASS - Baz.java:30 does it
-			    OBSERVATION
-			    OBSERVATION UC9-AC9: about a criterion nobody asked for
-			    OBSERVATION UC1-AC1:
-			    """);
+				UC1-AC1: PASS - Foo.java:10 does it
+				UC1-AC2: PASS - Bar.java:20 does it
+				UC1-AC3: PASS - Baz.java:30 does it
+				OBSERVATION
+				OBSERVATION UC9-AC9: about a criterion nobody asked for
+				OBSERVATION UC1-AC1:
+				""");
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(Observation.of(judgment)).isEmpty();
@@ -284,10 +294,10 @@ class EarsJudgeTests {
 	@Test
 	void noObservationsIsNormal() {
 		Judgment judgment = judge("""
-			    UC1-AC1: PASS - Foo.java:10 does it
-			    UC1-AC2: PASS - Bar.java:20 does it
-			    UC1-AC3: PASS - Baz.java:30 does it
-			    """);
+				UC1-AC1: PASS - Foo.java:10 does it
+				UC1-AC2: PASS - Bar.java:20 does it
+				UC1-AC3: PASS - Baz.java:30 does it
+				""");
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(Observation.of(judgment)).isEmpty();
@@ -295,8 +305,10 @@ class EarsJudgeTests {
 
 	@Test
 	void theRosterAndItsCountReachThePrompt() {
-		// The model is told how many answers it owes, and asked about each criterion by name.
-		String prompt = EarsJudge.templateFor("audit", THREE).render(context());
+		// The model is told how many answers it owes, and asked about each criterion by
+		// name.
+		String prompt = EarsJudge.templateFor("audit", THREE)
+			.render(java.util.Map.of("workspace", context().toString()));
 
 		assertThat(prompt).contains("Answer every one of the 3 criteria");
 		assertThat(prompt).contains("UC1-AC1:").contains("UC1-AC2:").contains("UC1-AC3:");
@@ -312,11 +324,8 @@ class EarsJudgeTests {
 		return EarsJudge.create("audit", THREE, model).judge(context());
 	}
 
-	private static JudgmentContext context() {
-		return JudgmentContext.builder()
-			.goal("audit the requirements")
-			.status(ExecutionStatus.SUCCESS)
-			.build();
+	private static Path context() {
+		return Path.of("/tmp/implementation");
 	}
 
 }

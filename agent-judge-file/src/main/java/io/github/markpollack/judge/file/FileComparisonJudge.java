@@ -4,23 +4,22 @@ import io.github.markpollack.judge.DeterministicJudge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Stream;
 
 /**
  * Composite judge that walks the expected (after/) directory and dispatches each file to
  * the appropriate sub-judge based on file type.
  */
-public class FileComparisonJudge extends DeterministicJudge {
+public class FileComparisonJudge extends DeterministicJudge<DirectoryComparison> {
 
 	private static final Logger logger = LoggerFactory.getLogger(FileComparisonJudge.class);
 
@@ -38,13 +37,15 @@ public class FileComparisonJudge extends DeterministicJudge {
 	}
 
 	@Override
-	public Judgment judge(JudgmentContext context) {
-		Path expectedDir = (Path) context.metadata().get("expectedDir");
-		Path actualDir = context.workspace();
+	public Judgment judge(DirectoryComparison evidence) {
+		Path expectedDir = evidence.expectedDirectory();
+		Path actualDir = evidence.actualDirectory();
 
 		try {
 			List<Check> checks = new ArrayList<>();
 			List<String> failures = new ArrayList<>();
+			boolean instrumentFailure = false;
+			boolean unresolved = false;
 
 			try (Stream<Path> paths = Files.walk(expectedDir)) {
 				for (Path expectedPath : paths.filter(Files::isRegularFile).toList()) {
@@ -58,29 +59,48 @@ public class FileComparisonJudge extends DeterministicJudge {
 
 					Path actualPath = actualDir.resolve(relativePath);
 
-					JudgmentContext fileContext = JudgmentContext.builder()
-						.goal("Compare " + filePath)
-						.workspace(actualDir)
-						.metadata(Map.of("filePath", filePath, "expectedFile", expectedPath, "actualFile", actualPath))
-						.build();
+					FileComparison fileEvidence = new FileComparison(filePath, expectedPath, actualPath);
 
-					Judgment fileJudgment = dispatch(filePath, fileContext);
+					Judgment fileJudgment = dispatch(filePath, fileEvidence);
 
-					checks.addAll(fileJudgment.checks());
+					if (fileJudgment.checks().isEmpty()) {
+						checks.add(new Check(filePath, fileJudgment));
+					}
+					else {
+						checks.addAll(fileJudgment.checks());
+					}
+					instrumentFailure |= fileJudgment.status() == JudgmentStatus.ERROR;
+					unresolved |= fileJudgment.status() == JudgmentStatus.ABSTAIN;
 					if (!fileJudgment.pass()) {
 						failures.add(filePath + ": " + fileJudgment.operationalReasoning());
 					}
 				}
 			}
 
+			if (instrumentFailure) {
+				return Judgment.error("File comparison could not complete: " + String.join("; ", failures))
+					.toBuilder()
+					.checks(checks)
+					.build();
+			}
+			if (unresolved) {
+				return Judgment.abstain("File comparison is unresolved: " + String.join("; ", failures))
+					.toBuilder()
+					.checks(checks)
+					.build();
+			}
+			if (checks.isEmpty())
+				return Judgment.abstain("No files to compare");
 			if (failures.isEmpty()) {
-				return Judgment.builder().pass()
+				return Judgment.builder()
+					.pass()
 					.reasoning("All " + checks.size() + " files match")
 					.checks(checks)
 					.build();
 			}
 
-			return Judgment.builder().fail()
+			return Judgment.builder()
+				.fail()
 				.reasoning(failures.size() + " file(s) differ: " + String.join("; ", failures))
 				.checks(checks)
 				.build();
@@ -92,17 +112,17 @@ public class FileComparisonJudge extends DeterministicJudge {
 		}
 	}
 
-	private Judgment dispatch(String filePath, JudgmentContext context) {
+	private Judgment dispatch(String filePath, FileComparison evidence) {
 		if (filePath.endsWith("pom.xml")) {
-			return mavenJudge.judge(context);
+			return mavenJudge.judge(evidence);
 		}
 		if (filePath.endsWith(".xml")) {
-			return xmlJudge.judge(context);
+			return xmlJudge.judge(evidence);
 		}
 		if (filePath.endsWith(".java")) {
-			return javaJudge.judge(context);
+			return javaJudge.judge(evidence);
 		}
-		return textJudge.judge(context);
+		return textJudge.judge(evidence);
 	}
 
 }

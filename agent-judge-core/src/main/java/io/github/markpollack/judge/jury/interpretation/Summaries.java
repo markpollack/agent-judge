@@ -14,13 +14,14 @@ import org.jspecify.annotations.Nullable;
 /**
  * The deterministic prose summary of an {@link Interpretation}.
  *
- * <p>{@link #of(Interpretation)} reads the interpretation's fields alone — no model, no clock,
- * no access to the original verdict — so the same input always yields the same text, and the
- * text can be checked against the fields it describes. Every stage name, judge name and deciding
- * stage is mentioned in single quotes; every status as a fixed phrase ({@code passed},
- * {@code failed}, {@code abstained}, {@code was not applicable}, {@code errored}); every reason
- * code in square brackets; the reading and the support value as their own tokens; and every
- * recorded reasoning verbatim in parentheses.
+ * <p>
+ * {@link #of(Interpretation)} reads the interpretation's fields alone — no model, no
+ * clock, no access to the original verdict — so the same input always yields the same
+ * text, and the text can be checked against the fields it describes. Every stage name,
+ * judge name and deciding stage is mentioned in single quotes; every status as a fixed
+ * phrase ({@code passed}, {@code failed}, {@code abstained}, {@code was not applicable},
+ * {@code errored}); every reason code in square brackets; the reading and the support
+ * value as their own tokens; and every recorded reasoning verbatim in parentheses.
  *
  * @author Mark Pollack
  * @since 0.17.0
@@ -33,9 +34,9 @@ public final class Summaries {
 	/**
 	 * Summarise an interpretation from its fields alone.
 	 * <p>
-	 * Every field except {@link Interpretation#summary()} is read; that one is what this method
-	 * produces, so {@code Summaries.of(i).equals(i.summary())} holds for every interpretation
-	 * {@link Verdicts} returns.
+	 * Every field except {@link Interpretation#summary()} is read; that one is what this
+	 * method produces, so {@code Summaries.of(i).equals(i.summary())} holds for every
+	 * interpretation {@link Verdicts} returns.
 	 * </p>
 	 * @param interpretation the interpretation
 	 * @return the summary, the same text for the same fields
@@ -51,13 +52,15 @@ public final class Summaries {
 		sentences.add(rootSentence(interpretation.root()));
 		addEvidence(sentences, interpretation.root().evidence());
 		sentences.add(decidedBySentence(interpretation));
-		sentences.add(readingSentence(interpretation.reading()));
+		sentences.add(readingSentence(interpretation.outcome()));
 		sentences.add(supportSentence(interpretation.readingSupport()));
-		sentences.add(interpretation.sourceVersion() == 2 ? "Source: explicit version-2 semantic results (sourceVersion 2)."
-				: interpretation.sourceVersion() < 0 || interpretation.sourceVersion() > 2 ? "Source: unsupported version " + interpretation.sourceVersion() + "."
-				: interpretation.sourceVersion() == 1
-				? "Source: the seven-component form 0.17 writes (sourceVersion 1)."
-				: "Source: an unstamped record written before 0.17 (sourceVersion 0).");
+		sentences
+			.add(interpretation.sourceVersion() == 2 ? "Source: explicit version-2 semantic results (sourceVersion 2)."
+					: interpretation.sourceVersion() < 0 || interpretation.sourceVersion() > 2
+							? "Source: unsupported version " + interpretation.sourceVersion() + "."
+							: interpretation.sourceVersion() == 1
+									? "Source: the seven-component form 0.17 writes (sourceVersion 1)."
+									: "Source: an unstamped record written before 0.17 (sourceVersion 0).");
 		sentences.add(defectsSentence(interpretation.defects()));
 		return String.join(" ", sentences);
 	}
@@ -133,14 +136,16 @@ public final class Summaries {
 			}
 			return subject + " records no readable status" + judgesClause(stage) + ".";
 		}
-		return subject + " " + outcome(stage.status(), stage.reasonCode(), stage.reasoning()) + semantic(stage.judgment()) + judgesClause(stage) + ".";
+		return subject + " " + outcome(stage.status(), stage.reasonCode(), stage.reasoning())
+				+ semantic(stage.judgment()) + judgesClause(stage) + ".";
 	}
 
 	private static String rootSentence(Stage root) {
 		if (root.status() == null) {
 			return "The root records no readable status" + judgesClause(root) + ".";
 		}
-		return "The root " + outcome(root.status(), root.reasonCode(), root.reasoning()) + semantic(root.judgment()) + judgesClause(root) + ".";
+		return "The root " + outcome(root.status(), root.reasonCode(), root.reasoning()) + semantic(root.judgment())
+				+ judgesClause(root) + ".";
 	}
 
 	private static String outcome(String status, @Nullable String reasonCode, @Nullable String reasoning) {
@@ -162,24 +167,38 @@ public final class Summaries {
 	}
 
 	private static String semantic(@Nullable JudgmentView view) {
-		if (view == null || view.producerStatus() == null) return "";
+		if (view == null || view.producerStatus() == null)
+			return "";
 		List<String> facts = new ArrayList<>();
-		if (view.producerStatus() != null) facts.add("producer=" + view.producerStatus());
-		if (view.assessment() != null) facts.add("assessment=" + view.assessment());
-		if (view.certainty() != null) facts.add("certainty=" + view.certainty());
-		if (view.distribution() != null) facts.add("distribution=" + view.distribution());
-		if (view.provenance() != null) facts.add("provenance=" + view.provenance());
-		if (view.policyApplication() != null) facts.add("policy=" + view.policyApplication());
-		if (view.producerReasonCode() != null) facts.add("rawCause=" + view.producerReasonCode());
-		if (view.producerReasoning() != null && !view.producerReasoning().equals(view.reasoning())) facts.add("rawReason=" + view.producerReasoning());
-		if (view.legacyLabel() != null) facts.add("legacyLabel=" + view.legacyLabel());
-		for (Check check : view.checks()) facts.add("check '" + check.name() + "' " +
-			(check.judgment() == null ? "legacyPassed=" + check.legacyPassed() + "; finer status unrecorded"
-				: check.judgment().status() + semantic(check.judgment())));
+		if (view.producerStatus() != null)
+			facts.add("producer=" + view.producerStatus());
+		if (view.finding() != null)
+			facts.add("assessment=" + view.finding());
+		if (view.confidence() != null)
+			facts.add("certainty=" + view.confidence());
+		if (view.probabilityDistribution() != null)
+			facts.add("distribution=" + view.probabilityDistribution());
+		if (view.provenance() != null)
+			facts.add("provenance=" + view.provenance());
+		if (view.policyApplication() != null)
+			facts.add("policy=" + view.policyApplication());
+		if (view.producerReasonCode() != null)
+			facts.add("rawCause=" + view.producerReasonCode());
+		if (view.producerReasoning() != null && !view.producerReasoning().equals(view.reasoning()))
+			facts.add("rawReason=" + view.producerReasoning());
+		if (view.legacyLabel() != null)
+			facts.add("legacyLabel=" + view.legacyLabel());
+		for (Check check : view.checks())
+			facts.add("check '" + check.name() + "' "
+					+ (check.judgment() == null ? "legacyPassed=" + check.legacyPassed() + "; finer status unrecorded"
+							: check.judgment().status() + semantic(check.judgment())));
 		return facts.isEmpty() ? "" : " {" + String.join("; ", facts) + "}";
 	}
 
-	/** The fixed phrase for a status token; the agreement test holds its own copy as the oracle. */
+	/**
+	 * The fixed phrase for a status token; the agreement test holds its own copy as the
+	 * oracle.
+	 */
 	private static String phrase(String status) {
 		return switch (status) {
 			case "pass" -> "passed";
@@ -233,31 +252,32 @@ public final class Summaries {
 			String where = quotedPath(decidedBy.path().isEmpty() ? List.of(decidedBy.stage()) : decidedBy.path());
 			return switch (decidedBy.basis()) {
 				case "tier_outcome" -> "The root adopted the outcome of " + where + " (tier_outcome).";
-				case "individual_rejection" -> "The root stopped on an individual rejection established in " + where
-						+ " (individual_rejection).";
+				case "individual_rejection" ->
+					"The root stopped on an individual rejection established in " + where + " (individual_rejection).";
 				default -> "The root's decision names " + where + " with basis " + decidedBy.basis() + ".";
 			};
 		}
 		boolean unreadable = interpretation.defects()
 			.stream()
-			.anyMatch(defect -> (defect.path().equals("verdict") && defect.field().equals("decision"))
-					|| defect.path().equals("verdict.decision"));
+			.anyMatch(defect -> (defect.path().equals("verdict")
+					&& (defect.field().equals("provenance") || defect.field().equals("decision")))
+					|| (defect.path().equals("verdict.provenance") || defect.path().equals("verdict.decision")));
 		return unreadable ? "Which stage decided is not recorded and has not been inferred."
 				: "The root's own decision applies; no stage is named.";
 	}
 
-	private static String readingSentence(@Nullable VerdictReading reading) {
+	private static String readingSentence(@Nullable RequirementOutcome reading) {
 		if (reading == null) {
-			return "Reading: none; the record does not support a usable subject determination.";
+			return "Outcome: none; the record does not support a usable subject determination.";
 		}
 		String gloss = switch (reading) {
-			case ACCEPTED -> "the subject was judged and accepted";
-			case REJECTED -> "the subject was judged and rejected";
-			case UNDECIDED -> "the subject was judged and the jury could not decide; not an instrument failure";
+			case SATISFIED -> "the requirement was found satisfied";
+			case VIOLATED -> "the requirement was found violated";
+			case UNRESOLVED -> "the subject was judged and the jury could not decide; not an instrument failure";
 			case NOT_APPLICABLE -> "the criteria did not apply to the subject";
 			case NOT_ASSESSED -> "the instrument did not reach an assessment of the subject";
 		};
-		return "Reading: " + reading + " — " + gloss + ".";
+		return "Outcome: " + reading + " — " + gloss + ".";
 	}
 
 	private static String supportSentence(ReadingSupport support) {

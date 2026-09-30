@@ -2,7 +2,6 @@ package io.github.markpollack.judge.agentclient;
 
 import io.github.markpollack.agents.client.AgentClient;
 import io.github.markpollack.agents.client.AgentClientResponse;
-import io.github.markpollack.agents.model.AgentResponse;
 import io.github.markpollack.agents.model.AgentResponseMetadata;
 import io.github.markpollack.judge.ai.model.JudgeModelRequest;
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
@@ -31,7 +30,7 @@ class AgentClientJudgeModelTests {
 
 		assertThat(response.text()).isEqualTo("The code is correct.");
 		assertThat(response.model()).isEqualTo("claude-sonnet-4-20250514");
-		assertThat(response.metadata()).containsEntry("successful", true);
+		assertThat(response.completed()).isTrue();
 		assertThat(response.metadata()).containsEntry("sessionId", "session-abc");
 	}
 
@@ -50,7 +49,7 @@ class AgentClientJudgeModelTests {
 
 		assertThat(response.text()).isEqualTo("output");
 		assertThat(response.model()).isNull();
-		assertThat(response.metadata()).containsEntry("successful", false);
+		assertThat(response.completed()).isFalse();
 	}
 
 	@Test

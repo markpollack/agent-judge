@@ -15,13 +15,14 @@ import static java.util.stream.Collectors.joining;
 
 import io.github.markpollack.judge.ai.JudgmentClassifier;
 import io.github.markpollack.judge.ai.ModelBackedJudge;
+import java.nio.file.Path;
 import io.github.markpollack.judge.ai.model.JudgeModel;
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +84,7 @@ public final class EarsJudge {
 	 *
 	 * <p>
 	 * The model is supplied rather than constructed here. Where its answers come from — a
-	 * live agent, a recorded one, a stub in a test — is the caller's decision and not
+	 * live agent, a recorded one, a stub in a test — is the caller's provenance and not
 	 * this judge's business, and keeping it that way is what lets the same judge run on a
 	 * build server and on a laptop with no credentials.
 	 * @param name the judge's name, also used to name its prompt template
@@ -94,7 +95,7 @@ public final class EarsJudge {
 	 * @throws IllegalArgumentException if the roster is empty or contains invalid or
 	 * duplicate IDs
 	 */
-	public static ModelBackedJudge create(String name, List<EarsCriterion> criteria, JudgeModel model) {
+	public static ModelBackedJudge<Path> create(String name, List<EarsCriterion> criteria, JudgeModel model) {
 		// A jury assembled around an empty roster is a configuration mistake, and it
 		// should never
 		// reach a model: the run would spend an agent to produce a verdict computed over
@@ -107,7 +108,8 @@ public final class EarsJudge {
 					+ "an empty roster has no denominator, and a conjunctive rollup over one is vacuously satisfied");
 		}
 		criteria = snapshot(criteria);
-		ModelBackedJudge.Builder builder = ModelBackedJudge.builder()
+		ModelBackedJudge.Builder<Path> builder = ModelBackedJudge.<Path>builder()
+			.variables(workspace -> Map.of("workspace", workspace.toAbsolutePath().normalize().toString()))
 			.name(name)
 			.description("Did the implementation satisfy the acceptance criteria it was built from?")
 			.promptTemplate(templateFor(name, criteria))
@@ -144,12 +146,12 @@ public final class EarsJudge {
 			try {
 				JudgeModelResponse response = model.generate(request);
 				return response == null ? new JudgeModelResponse("The judging backend returned no response", null, null,
-						Map.of("successful", false)) : response;
+						Map.of(), false) : response;
 			}
 			catch (RuntimeException failure) {
 				logger.error("Requirement judging backend failed", failure);
 				return new JudgeModelResponse("The judging backend failed: " + failure.getMessage(), null, null,
-						Map.of("successful", false));
+						Map.of(), false);
 			}
 		};
 	}
@@ -176,44 +178,46 @@ public final class EarsJudge {
 				other criterion, and do not use it because a criterion is hard to establish; that is
 				CANNOT_DETERMINE.
 				""".formatted(conditional);
-		return JudgePromptTemplate.fromString(name, """
-				You are auditing a Java implementation against the acceptance criteria it was
-				built to satisfy. You are in the implementation's root. Read files, grep, and
-				inspect tests.
+		return JudgePromptTemplate.fromString(name,
+				"""
+						You are auditing a Java implementation against the acceptance criteria it was
+						built to satisfy. The implementation workspace is {{workspace}}. The judging backend must be configured to access it. Read files, grep, and
+						inspect tests.
 
-				Answer every one of the %d criteria below. Do not add criteria, do not merge two
-				into one, and do not skip one because it looks obvious or looks hard. The
-				specification asked %d questions and owes %d answers.
+						Answer every one of the %d criteria below. Do not add criteria, do not merge two
+						into one, and do not skip one because it looks obvious or looks hard. The
+						specification asked %d questions and owes %d answers.
 
-				For each, reply with exactly one line:
+						For each, reply with exactly one line:
 
-				  <criterion-id>: PASS|FAIL|CANNOT_DETERMINE - <one sentence, citing a file>
+						  <criterion-id>: PASS|FAIL|CANNOT_DETERMINE - <one sentence, citing a file>
 
-				PASS              the code demonstrably does this, and you can point at where
-				FAIL              the code demonstrably does not
-				CANNOT_DETERMINE  this cannot be settled from the code and tests available
+						PASS              the code demonstrably does this, and you can point at where
+						FAIL              the code demonstrably does not
+						CANNOT_DETERMINE  this cannot be settled from the code and tests available
 
-				Cite a file and line for every claim. If you state a count, obtain it with a
-				command rather than by reading and estimating.
+						Cite a file and line for every claim. If you state a count, obtain it with a
+						command rather than by reading and estimating.
 
-				CANNOT_DETERMINE is a real answer. Use it rather than guessing.
-				%s
+						CANNOT_DETERMINE is a real answer. Use it rather than guessing.
+						%s
 
-				Do not state an overall verdict. You assess each criterion; deciding what the set
-				of assessments means is not your job.
+						Do not state an overall verdict. You assess each criterion; deciding what the set
+						of assessments means is not your job.
 
-				OPTIONAL. If, while establishing a criterion, you notice something useful that the
-				criterion does not itself require, you may add a line:
+						OPTIONAL. If, while establishing a criterion, you notice something useful that the
+						criterion does not itself require, you may add a line:
 
-				  OBSERVATION <criterion-id>: <one externally verifiable sentence, citing a file>
+						  OBSERVATION <criterion-id>: <one externally verifiable sentence, citing a file>
 
-				This does not change any answer. It is not a new criterion and it is not a
-				complaint. Omit it entirely if there is nothing worth saying.
+						This does not change any answer. It is not a new criterion and it is not a
+						complaint. Omit it entirely if there is nothing worth saying.
 
-				THE CRITERIA
+						THE CRITERIA
 
-				%s
-				""".formatted(n, n, n, exclusion, list.toString()));
+						%s
+						"""
+					.formatted(n, n, n, exclusion, list.toString()));
 	}
 
 	/**
@@ -235,7 +239,7 @@ public final class EarsJudge {
 		return response -> {
 			String text = response == null || response.text() == null ? "" : response.text().strip();
 
-			// A backend that could not produce an answer says so in metadata, and
+			// A backend that could not produce an answer reports that explicitly, and
 			// whatever text
 			// it carries is its explanation to the operator. Passing that through
 			// matters: the
@@ -244,8 +248,7 @@ public final class EarsJudge {
 			// never given credentials is the difference between blaming the subject and
 			// naming
 			// the real problem, and only the backend knows which it is.
-			Object successful = response == null ? Boolean.FALSE : response.metadata().get("successful");
-			if (Boolean.FALSE.equals(successful)) {
+			if (response == null || !response.completed()) {
 				return auditError(criteria, text.isEmpty() ? "The judging agent did not complete its run" : text);
 			}
 			if (text.isEmpty()) {

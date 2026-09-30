@@ -3,8 +3,7 @@ package io.github.markpollack.judge.file;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -63,7 +62,7 @@ class JavaSemanticJudgeTest {
 		Files.writeString(expectedFile, expected);
 		Files.writeString(actualFile, actual);
 
-		JudgmentContext context = createContext("Foo.java");
+		FileComparison context = createContext("Foo.java");
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.pass()).isTrue();
@@ -92,7 +91,7 @@ class JavaSemanticJudgeTest {
 		Files.writeString(expectedFile, expected);
 		Files.writeString(actualFile, actual);
 
-		JudgmentContext context = createContext("Foo.java");
+		FileComparison context = createContext("Foo.java");
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.pass()).isFalse();
@@ -105,7 +104,7 @@ class JavaSemanticJudgeTest {
 		Files.writeString(expectedFile, expected);
 		// Don't create actual file
 
-		JudgmentContext context = createContext("Foo.java");
+		FileComparison context = createContext("Foo.java");
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.pass()).isFalse();
@@ -135,7 +134,7 @@ class JavaSemanticJudgeTest {
 		Files.writeString(expectedFile, expected);
 		Files.writeString(actualFile, actual);
 
-		JudgmentContext context = createContext("Foo.java");
+		FileComparison context = createContext("Foo.java");
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.pass()).isTrue();
@@ -162,7 +161,7 @@ class JavaSemanticJudgeTest {
 		Files.writeString(expectedFile, expected);
 		Files.writeString(actualFile, actual);
 
-		JudgmentContext context = createContext("Foo.java");
+		FileComparison context = createContext("Foo.java");
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.pass()).isTrue();
@@ -182,19 +181,15 @@ class JavaSemanticJudgeTest {
 		Files.writeString(expectedFile, expected);
 		Files.writeString(actualFile, actual);
 
-		JudgmentContext context = createContext("Foo.java");
+		FileComparison context = createContext("Foo.java");
 		Judgment judgment = judge.judge(context);
 
 		assertThat(judgment.pass()).isFalse();
 		assertThat(judgment.reasoning()).contains("annotation");
 	}
 
-	private JudgmentContext createContext(String filePath) {
-		return JudgmentContext.builder()
-			.goal("Compare " + filePath)
-			.workspace(actualFile.getParent())
-			.metadata(Map.of("filePath", filePath, "expectedFile", expectedFile, "actualFile", actualFile))
-			.build();
+	private FileComparison createContext(String filePath) {
+		return new FileComparison(filePath, expectedFile, actualFile);
 	}
 
 }

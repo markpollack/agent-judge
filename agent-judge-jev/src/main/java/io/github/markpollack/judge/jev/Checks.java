@@ -7,7 +7,7 @@ package io.github.markpollack.judge.jev;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.*;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 import java.util.*;
 
 final class Checks {

@@ -6,8 +6,8 @@
 package io.github.markpollack.judge.jury;
 
 import org.junit.jupiter.api.Test;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import java.util.List;
 
@@ -25,56 +25,65 @@ class MetaJuryTest {
 
 	@Test
 	void shouldAggregateSubJuryVerdicts() {
-		Jury<JudgmentContext> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"), alwaysPass("J2"));
+		Jury<CompletionEvidence> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"),
+				alwaysPass("J2"));
 
-		Jury<JudgmentContext> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J3"), alwaysPass("J4"));
+		Jury<CompletionEvidence> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J3"),
+				alwaysPass("J4"));
 
-		MetaJury<JudgmentContext> metaJury = new MetaJury<JudgmentContext>(members(jury1, jury2), new MajorityVotingStrategy());
+		MetaJury<CompletionEvidence> metaJury = new MetaJury<CompletionEvidence>(members(jury1, jury2),
+				new MajorityVotingStrategy());
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
 		// Both juries pass → meta passes
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.compositeAttempts()).hasSize(2);
 		assertThat(verdict.individual()).hasSize(2);
 	}
 
 	@Test
 	void shouldPreserveSubVerdictsInFinalVerdict() {
-		Jury<JudgmentContext> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("FileCheck"), alwaysPass("Build"));
+		Jury<CompletionEvidence> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("FileCheck"),
+				alwaysPass("Build"));
 
-		Jury<JudgmentContext> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("Correctness"), alwaysFail("Security"));
+		Jury<CompletionEvidence> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("Correctness"),
+				alwaysFail("Security"));
 
-		MetaJury<JudgmentContext> metaJury = new MetaJury<JudgmentContext>(members(jury1, jury2), new MajorityVotingStrategy());
+		MetaJury<CompletionEvidence> metaJury = new MetaJury<CompletionEvidence>(members(jury1, jury2),
+				new MajorityVotingStrategy());
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
 		assertThat(verdict.compositeAttempts()).hasSize(2);
 
 		Verdict subVerdict1 = verdict.compositeAttempts().get(0).verdict();
-		assertThat(subVerdict1.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(subVerdict1.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(subVerdict1.individual()).hasSize(2);
 
 		Verdict subVerdict2 = verdict.compositeAttempts().get(1).verdict();
-		assertThat(subVerdict2.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(subVerdict2.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(subVerdict2.individual()).hasSize(2);
 	}
 
 	@Test
 	void shouldAggregateWithMixedJuryResults() {
-		Jury<JudgmentContext> passJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("P1"), alwaysPass("P2"));
+		Jury<CompletionEvidence> passJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("P1"),
+				alwaysPass("P2"));
 
-		Jury<JudgmentContext> failJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("F1"), alwaysFail("F2"));
+		Jury<CompletionEvidence> failJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("F1"),
+				alwaysFail("F2"));
 
-		MetaJury<JudgmentContext> metaJury = new MetaJury<JudgmentContext>(members(passJury, failJury), new MajorityVotingStrategy());
+		MetaJury<CompletionEvidence> metaJury = new MetaJury<CompletionEvidence>(members(passJury, failJury),
+				new MajorityVotingStrategy());
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
 		// One pass, one fail → tie → depends on TiePolicy (default FAIL)
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(verdict.individual()).hasSize(2);
 		assertThat(verdict.individual().get(0).status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individual().get(1).status()).isEqualTo(JudgmentStatus.FAIL);
@@ -82,24 +91,26 @@ class MetaJuryTest {
 
 	@Test
 	void shouldHandleSingleJury() {
-		Jury<JudgmentContext> singleJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"), alwaysFail("J2"),
-				alwaysPass("J3"));
+		Jury<CompletionEvidence> singleJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"),
+				alwaysFail("J2"), alwaysPass("J3"));
 
-		MetaJury<JudgmentContext> metaJury = new MetaJury<JudgmentContext>(members(singleJury), new ConsensusStrategy());
+		MetaJury<CompletionEvidence> metaJury = new MetaJury<CompletionEvidence>(members(singleJury),
+				new ConsensusStrategy());
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
 		// Single jury verdict → meta result is same
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.compositeAttempts()).hasSize(1);
 	}
 
 	@Test
 	void shouldReturnEmptyJudgesList() {
-		Jury<JudgmentContext> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"));
+		Jury<CompletionEvidence> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"));
 
-		MetaJury<JudgmentContext> metaJury = new MetaJury<JudgmentContext>(members(jury1), new MajorityVotingStrategy());
+		MetaJury<CompletionEvidence> metaJury = new MetaJury<CompletionEvidence>(members(jury1),
+				new MajorityVotingStrategy());
 
 		// Meta-jury doesn't expose judges directly, only sub-juries
 		assertThat(metaJury.getJudges()).isEmpty();
@@ -107,63 +118,73 @@ class MetaJuryTest {
 
 	@Test
 	void shouldReturnMetaVotingStrategy() {
-		Jury<JudgmentContext> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"));
+		Jury<CompletionEvidence> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"));
 
 		VotingStrategy metaStrategy = new WeightedAverageStrategy();
-		MetaJury<JudgmentContext> metaJury = new MetaJury<JudgmentContext>(members(jury1), metaStrategy);
+		MetaJury<CompletionEvidence> metaJury = new MetaJury<CompletionEvidence>(members(jury1), metaStrategy);
 
 		assertThat(metaJury.getVotingStrategy()).isEqualTo(metaStrategy);
 	}
 
 	@Test
 	void shouldUseWeightedAverageForMetaAggregation() {
-		Jury<JudgmentContext> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"), alwaysPass("J2"));
+		Jury<CompletionEvidence> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"),
+				alwaysPass("J2"));
 
-		Jury<JudgmentContext> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"), alwaysFail("J4"));
+		Jury<CompletionEvidence> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"),
+				alwaysFail("J4"));
 
 		// Use weighted average - equal weights should give 0.5
-		MetaJury<JudgmentContext> metaJury = new MetaJury<JudgmentContext>(members(jury1, jury2), new WeightedAverageStrategy());
+		MetaJury<CompletionEvidence> metaJury = new MetaJury<CompletionEvidence>(members(jury1, jury2),
+				new WeightedAverageStrategy());
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
 		// (1.0 + 0.0) / 2 = 0.5 → PASS (threshold is >= 0.5)
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	@Test
 	void shouldUseConsensusForMetaAggregation() {
-		Jury<JudgmentContext> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"), alwaysPass("J2"));
+		Jury<CompletionEvidence> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"),
+				alwaysPass("J2"));
 
-		Jury<JudgmentContext> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J3"), alwaysPass("J4"));
+		Jury<CompletionEvidence> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J3"),
+				alwaysPass("J4"));
 
-		Jury<JudgmentContext> jury3 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J5"), alwaysPass("J6"));
+		Jury<CompletionEvidence> jury3 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J5"),
+				alwaysPass("J6"));
 
-		MetaJury<JudgmentContext> metaJury = new MetaJury<JudgmentContext>(members(jury1, jury2, jury3), new ConsensusStrategy());
+		MetaJury<CompletionEvidence> metaJury = new MetaJury<CompletionEvidence>(members(jury1, jury2, jury3),
+				new ConsensusStrategy());
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
 		// All juries pass → consensus passes
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.compositeAttempts()).hasSize(3);
 	}
 
 	@Test
 	void shouldAbstainWhenSubJuriesDisagree() {
-		Jury<JudgmentContext> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"), alwaysPass("J2"));
+		Jury<CompletionEvidence> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"),
+				alwaysPass("J2"));
 
-		Jury<JudgmentContext> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"), alwaysFail("J4"));
+		Jury<CompletionEvidence> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"),
+				alwaysFail("J4"));
 
-		MetaJury<JudgmentContext> metaJury = new MetaJury<JudgmentContext>(members(jury1, jury2), new ConsensusStrategy());
+		MetaJury<CompletionEvidence> metaJury = new MetaJury<CompletionEvidence>(members(jury1, jury2),
+				new ConsensusStrategy());
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
 		// One sub-jury passing and one failing is disagreement, not a collective failure.
 		// A caller that must reject a split panel decides that for itself.
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
-		assertThat(verdict.aggregated().reasoning()).contains("No consensus");
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(verdict.judgment().reasoning()).contains("No consensus");
 	}
 
 	/**
@@ -172,38 +193,42 @@ class MetaJuryTest {
 	 */
 	@Test
 	void shouldFailConsensusWhenAllSubJuriesFail() {
-		Jury<JudgmentContext> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J1"), alwaysFail("J2"));
-		Jury<JudgmentContext> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"), alwaysFail("J4"));
+		Jury<CompletionEvidence> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J1"),
+				alwaysFail("J2"));
+		Jury<CompletionEvidence> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"),
+				alwaysFail("J4"));
 
-		MetaJury<JudgmentContext> metaJury = new MetaJury<JudgmentContext>(members(jury1, jury2), new ConsensusStrategy());
+		MetaJury<CompletionEvidence> metaJury = new MetaJury<CompletionEvidence>(members(jury1, jury2),
+				new ConsensusStrategy());
 
 		Verdict verdict = metaJury.vote(simpleContext("Test goal"));
 
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(verdict.aggregated().reasoning()).contains("Unanimous consensus");
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(verdict.judgment().reasoning()).contains("Unanimous consensus");
 	}
 
 	// ==================== Constructor Validation Tests ====================
 
 	@Test
 	void shouldRejectNullJuries() {
-		assertThatThrownBy(() -> new MetaJury<JudgmentContext>(null, new MajorityVotingStrategy()))
+		assertThatThrownBy(() -> new MetaJury<CompletionEvidence>(null, new MajorityVotingStrategy()))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("At least one named jury is required");
 	}
 
 	@Test
 	void shouldRejectEmptyJuries() {
-		assertThatThrownBy(() -> new MetaJury<JudgmentContext>(List.of(), new MajorityVotingStrategy()))
+		assertThatThrownBy(() -> new MetaJury<CompletionEvidence>(List.of(), new MajorityVotingStrategy()))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("At least one named jury is required");
 	}
 
 	@Test
 	void shouldRejectNullMetaStrategy() {
-		Jury<JudgmentContext> jury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"));
+		Jury<CompletionEvidence> jury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"));
 
-		assertThatThrownBy(() -> new MetaJury<JudgmentContext>(members(jury), null)).isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> new MetaJury<CompletionEvidence>(members(jury), null))
+			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Meta voting strategy is required");
 	}
 
@@ -212,27 +237,29 @@ class MetaJuryTest {
 	@Test
 	void shouldSupportNestedMetaJuries() {
 		// Create base juries
-		Jury<JudgmentContext> fileJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("FileExists"),
+		Jury<CompletionEvidence> fileJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("FileExists"),
 				alwaysPass("FileContent"));
 
-		Jury<JudgmentContext> buildJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("MavenBuild"),
+		Jury<CompletionEvidence> buildJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("MavenBuild"),
 				alwaysPass("GradleBuild"));
 
 		// Create first-level meta-jury
-		MetaJury<JudgmentContext> infraJury = new MetaJury<JudgmentContext>(members(fileJury, buildJury), new ConsensusStrategy());
+		MetaJury<CompletionEvidence> infraJury = new MetaJury<CompletionEvidence>(members(fileJury, buildJury),
+				new ConsensusStrategy());
 
 		// Create correctness jury
-		Jury<JudgmentContext> correctnessJury = Juries.fromJudges(new ConsensusStrategy(), alwaysPass("Correctness1"),
-				alwaysPass("Correctness2"));
+		Jury<CompletionEvidence> correctnessJury = Juries.fromJudges(new ConsensusStrategy(),
+				alwaysPass("Correctness1"), alwaysPass("Correctness2"));
 
 		// Create second-level meta-jury (jury of juries of juries)
-		MetaJury<JudgmentContext> topLevelJury = new MetaJury<JudgmentContext>(members(infraJury, correctnessJury), new MajorityVotingStrategy());
+		MetaJury<CompletionEvidence> topLevelJury = new MetaJury<CompletionEvidence>(
+				members(infraJury, correctnessJury), new MajorityVotingStrategy());
 
-		JudgmentContext context = simpleContext("Complex nested evaluation");
+		CompletionEvidence context = simpleContext("Complex nested evaluation");
 		Verdict verdict = topLevelJury.vote(context);
 
 		// All pass → top level passes
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.compositeAttempts()).hasSize(2);
 
 		Verdict infraVerdict = verdict.compositeAttempts().get(0).verdict();
@@ -241,25 +268,27 @@ class MetaJuryTest {
 
 	@Test
 	void shouldPreserveIndividualJudgmentsFromEachJury() {
-		Jury<JudgmentContext> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"), alwaysPass("J2"));
+		Jury<CompletionEvidence> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"),
+				alwaysPass("J2"));
 
-		Jury<JudgmentContext> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"));
+		Jury<CompletionEvidence> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"));
 
-		MetaJury<JudgmentContext> metaJury = new MetaJury<JudgmentContext>(members(jury1, jury2), new MajorityVotingStrategy());
+		MetaJury<CompletionEvidence> metaJury = new MetaJury<CompletionEvidence>(members(jury1, jury2),
+				new MajorityVotingStrategy());
 
-		JudgmentContext context = simpleContext("Test goal");
+		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote(context);
 
-		// Individual list contains aggregated judgments from each jury
+		// Individual list contains judgment judgments from each jury
 		assertThat(verdict.individual()).hasSize(2);
 		assertThat(verdict.individual().get(0).status()).isEqualTo(JudgmentStatus.PASS); // jury1
 		assertThat(verdict.individual().get(1).status()).isEqualTo(JudgmentStatus.FAIL); // jury2
 	}
 
-	private static List<NamedJury<JudgmentContext>> members(Jury<JudgmentContext>... juries) {
-		java.util.ArrayList<NamedJury<JudgmentContext>> members = new java.util.ArrayList<>();
+	private static List<NamedJury<CompletionEvidence>> members(Jury<CompletionEvidence>... juries) {
+		java.util.ArrayList<NamedJury<CompletionEvidence>> members = new java.util.ArrayList<>();
 		for (int index = 0; index < juries.length; index++) {
-			members.add(new NamedJury<JudgmentContext>("member-" + (index + 1), juries[index]));
+			members.add(new NamedJury<CompletionEvidence>("member-" + (index + 1), juries[index]));
 		}
 		return members;
 	}

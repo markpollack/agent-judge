@@ -5,13 +5,11 @@
 
 package io.github.markpollack.judge.llm;
 
-import java.nio.file.Path;
-
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.JudgeType;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,16 +37,15 @@ class CorrectnessJudgeTest {
 	void buildsPromptWithAllContext() {
 		TestCorrectnessJudge judge = new TestCorrectnessJudge();
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("Create hello.txt")
-			.workspace(Path.of("/tmp"))
-			.agentOutput("File created successfully")
+		CompletionEvidence context = CompletionEvidence.builder()
+			.request("Create hello.txt")
+			.response("File created successfully")
 			.build();
 
 		String prompt = judge.testBuildPrompt(context);
 
 		assertThat(prompt).contains("Goal: Create hello.txt");
-		assertThat(prompt).contains("Workspace: /tmp");
+		assertThat(prompt).doesNotContain("Workspace:");
 		assertThat(prompt).contains("Agent Output: File created successfully");
 		assertThat(prompt).contains("Did the agent accomplish the goal?");
 	}
@@ -85,7 +82,8 @@ class CorrectnessJudgeTest {
 
 		assertThat(judgment.pass()).isFalse();
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
-		// A completed negative finding, not an absent one: FAIL stores no score either, and
+		// A completed negative finding, not an absent one: FAIL stores no score either,
+		// and
 		// 0.0 is the derived projection rather than a measurement of zero quality.
 		assertThat(judgment.score()).isNull();
 		assertThat(judgment.effectiveScore()).hasValue(0.0);
@@ -143,11 +141,11 @@ class CorrectnessJudgeTest {
 			super(null);
 		}
 
-		public String testBuildPrompt(JudgmentContext context) {
+		public String testBuildPrompt(CompletionEvidence context) {
 			return buildPrompt(context);
 		}
 
-		public Judgment testParseResponse(String response, JudgmentContext context) {
+		public Judgment testParseResponse(String response, CompletionEvidence context) {
 			return parseResponse(response, context);
 		}
 

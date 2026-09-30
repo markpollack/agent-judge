@@ -11,9 +11,6 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
-
 import static io.github.markpollack.judge.jury.interpretation.Fixtures.asMap;
 import static io.github.markpollack.judge.jury.interpretation.Fixtures.assertDefect;
 import static io.github.markpollack.judge.jury.interpretation.Fixtures.at;
@@ -21,18 +18,23 @@ import static io.github.markpollack.judge.jury.interpretation.Fixtures.mutableCo
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The four stored score shapes: a bounded object is read on its own recorded scale, a bare
- * number in {@code [0, 1]} as is, a boolean object is unparseable, and absent is absent.
+ * The four stored score shapes: a bounded object is read on its own recorded scale, a
+ * bare number in {@code [0, 1]} as is, a boolean object is unparseable, and absent is
+ * absent.
  */
 @DisplayName("The score rule")
 class ScoreRuleTest {
 
-	/** A one-judge verdict whose three copies of the judgment all carry the given score. */
+	/**
+	 * A one-judge verdict whose three copies of the judgment all carry the given score.
+	 */
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> singleWithScore(Object score) {
-		Map<String, Object> baseJudgment = new LinkedHashMap<>(Map.of("status", "pass", "reasoning", "graded", "checks", java.util.List.of(), "metadata", Map.of()));
-		Map<String,Object> stored = new LinkedHashMap<>(Map.of("aggregated", new LinkedHashMap<>(baseJudgment),
-			"individual", java.util.List.of(new LinkedHashMap<>(baseJudgment)), "individualByName", new LinkedHashMap<>(Map.of("grader", new LinkedHashMap<>(baseJudgment)))));
+		Map<String, Object> baseJudgment = new LinkedHashMap<>(
+				Map.of("status", "pass", "reasoning", "graded", "checks", java.util.List.of(), "metadata", Map.of()));
+		Map<String, Object> stored = new LinkedHashMap<>(Map.of("aggregated", new LinkedHashMap<>(baseJudgment),
+				"individual", java.util.List.of(new LinkedHashMap<>(baseJudgment)), "individualByName",
+				new LinkedHashMap<>(Map.of("grader", new LinkedHashMap<>(baseJudgment)))));
 		stored.put("seats", java.util.List.of(Map.of("position", 0, "verdictKey", "grader", "keySource", "DECLARED")));
 		for (Map<String, Object> judgment : java.util.List.<Map<String, Object>>of(at(stored, "aggregated"),
 				(Map<String, Object>) Fixtures.listAt(stored, "individual").get(0),
@@ -47,7 +49,10 @@ class ScoreRuleTest {
 		return stored;
 	}
 
-	/** Only the score defects: a hand-built single verdict carries no evidence block, which is its own defect. */
+	/**
+	 * Only the score defects: a hand-built single verdict carries no evidence block,
+	 * which is its own defect.
+	 */
 	private static java.util.List<Defect> scoreDefects(Interpretation interpretation) {
 		return interpretation.defects().stream().filter(defect -> defect.field().equals("score")).toList();
 	}
@@ -137,8 +142,9 @@ class ScoreRuleTest {
 		assertThat(scoreDefects(Verdicts.interpret(explicitNull))).isEmpty();
 	}
 
-	@Test void extremeFiniteBoundsRetainMidpointAndEndpoints() {
-		for (double raw : new double[]{-1e308, 0, 1e308}) {
+	@Test
+	void extremeFiniteBoundsRetainMidpointAndEndpoints() {
+		for (double raw : new double[] { -1e308, 0, 1e308 }) {
 			Interpretation i = Verdicts.interpret(singleWithScore(bounded(raw, -1e308, 1e308)));
 			assertThat(grader(i).score()).isEqualTo(raw < 0 ? 0.0 : raw > 0 ? 1.0 : 0.5);
 			assertThat(scoreDefects(i)).isEmpty();

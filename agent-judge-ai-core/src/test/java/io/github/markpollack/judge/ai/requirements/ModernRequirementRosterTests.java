@@ -8,10 +8,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import io.github.markpollack.judge.ai.ModelBackedJudge;
 import io.github.markpollack.judge.ai.model.JudgeModel;
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import java.nio.file.Path;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -26,7 +26,7 @@ class ModernRequirementRosterTests {
 
 	}
 
-	private static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("audit").build();
+	private static final Path CONTEXT = Path.of("/tmp/implementation");
 
 	private static final String COMPLETE = "R-1: PASS - verified\nR-2: PASS - verified\nR-3: PASS - verified";
 
@@ -79,7 +79,7 @@ class ModernRequirementRosterTests {
 	@EnumSource(Kind.class)
 	void emptyAndFailedBackendResponsesKeepTheWholeRoster(Kind kind) {
 		for (JudgeModelResponse response : List.of(new JudgeModelResponse("", null, null, Map.of()),
-				new JudgeModelResponse("backend unavailable", null, null, Map.of("successful", false)))) {
+				new JudgeModelResponse("backend unavailable", null, null, Map.of(), false))) {
 			Judgment result = configured(kind, List.of("R-1", "R-2", "R-3"), request -> response).judge(CONTEXT);
 			assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
 			roster(result, JudgmentStatus.ERROR, JudgmentStatus.ERROR, JudgmentStatus.ERROR);

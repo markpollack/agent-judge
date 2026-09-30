@@ -7,7 +7,9 @@ package io.github.markpollack.judge.jev;
 
 import io.github.gudcks0305.jev.NoulQuestion;
 import io.github.gudcks0305.jev.typesafe.TypeSafeJevClient;
-import io.github.markpollack.judge.result.*;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
+import io.github.markpollack.judge.provenance.ArtifactRef;
 import java.io.IOException;
 import java.net.*;
 import java.net.http.*;

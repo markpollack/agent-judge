@@ -19,23 +19,24 @@ import io.github.markpollack.judge.jury.AggregationEvidence;
 import io.github.markpollack.judge.jury.AttemptDisposition;
 import io.github.markpollack.judge.jury.CompositeFailureCode;
 import io.github.markpollack.judge.jury.CompositeRelation;
-import io.github.markpollack.judge.jury.DecisionBasis;
-import io.github.markpollack.judge.jury.DecisionKind;
+import io.github.markpollack.judge.jury.VerdictProvenanceBasis;
+import io.github.markpollack.judge.jury.VerdictProvenanceKind;
 import io.github.markpollack.judge.jury.DispositionReason;
 import io.github.markpollack.judge.jury.ErrorPolicy;
 import io.github.markpollack.judge.jury.NotApplicablePolicy;
 import io.github.markpollack.judge.jury.TierPolicy;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 /**
  * Reads one stored verdict into its {@link Interpretation}.
  *
- * <p>Every reader here is absence-tolerant by construction: an absent member is an
+ * <p>
+ * Every reader here is absence-tolerant by construction: an absent member is an
  * {@code ABSENT} defect, an unreadable one {@code UNPARSEABLE}, an unrecognised token
- * {@code UNKNOWN_VOCABULARY}, and a member the vocabulary does not know is ignored. Nothing here
- * throws on the content of the map.
+ * {@code UNKNOWN_VOCABULARY}, and a member the vocabulary does not know is ignored.
+ * Nothing here throws on the content of the map.
  */
 final class Interpreter {
 
@@ -51,15 +52,15 @@ final class Interpreter {
 
 	private static final String ERROR = JudgmentStatus.ERROR.wireName();
 
-	private static final String TIER = DecisionKind.TIER.wireName();
+	private static final String TIER = VerdictProvenanceKind.TIER.wireName();
 
-	private static final String OWN = DecisionKind.OWN.wireName();
+	private static final String OWN = VerdictProvenanceKind.OWN.wireName();
 
-	private static final String UNDECIDED = DecisionKind.UNDECIDED.wireName();
+	private static final String UNDECIDED = VerdictProvenanceKind.UNDECIDED.wireName();
 
-	private static final String TIER_OUTCOME = DecisionBasis.TIER_OUTCOME.wireName();
+	private static final String TIER_OUTCOME = VerdictProvenanceBasis.TIER_OUTCOME.wireName();
 
-	private static final String INDIVIDUAL_REJECTION = DecisionBasis.INDIVIDUAL_REJECTION.wireName();
+	private static final String INDIVIDUAL_REJECTION = VerdictProvenanceBasis.INDIVIDUAL_REJECTION.wireName();
 
 	private static final String USED = AttemptDisposition.USED.wireName();
 
@@ -71,7 +72,10 @@ final class Interpreter {
 
 	private final List<Stage> stages = new ArrayList<>();
 
-	/** A fact the support check needed was absent, or the rule it needed is not closed-form. */
+	/**
+	 * A fact the support check needed was absent, or the rule it needed is not
+	 * closed-form.
+	 */
 	private boolean undeterminable;
 
 	private Interpreter() {
@@ -79,23 +83,26 @@ final class Interpreter {
 
 	static Interpretation interpret(Map<String, Object> stored) {
 		return stored.containsKey("schemaVersion") || ModernInterpreter.containsModern(stored)
-			? ModernInterpreter.interpret(stored) : new Interpreter().run(stored);
+				? ModernInterpreter.interpret(stored) : new Interpreter().run(stored);
 	}
 
 	static Reduction reduction(Judgment judgment) {
 		Interpreter reader = new Interpreter();
-		Map<String,Object> facts = new LinkedHashMap<>();
+		Map<String, Object> facts = new LinkedHashMap<>();
 		facts.put("metadata", judgment.metadata());
 		facts.put("score", judgment.score());
 		Evidence evidence = reader.readEvidence(facts, "verdict.aggregated");
-		if (evidence == null) reader.absent("verdict.aggregated", "metadata.aggregation", "No reduction evidence.");
-		else reader.checkEvidence(evidence, judgment.status().wireName(),
-			judgment.operationalReasonCode() == null ? null : judgment.operationalReasonCode().wireName(),
-			facts, "verdict.aggregated");
+		if (evidence == null)
+			reader.absent("verdict.aggregated", "metadata.aggregation", "No reduction evidence.");
+		else
+			reader.checkEvidence(evidence, judgment.status().wireName(),
+					judgment.operationalReasonCode() == null ? null : judgment.operationalReasonCode().wireName(),
+					facts, "verdict.aggregated");
 		return new Reduction(evidence, List.copyOf(reader.defects), reader.undeterminable);
 	}
 
-	record Reduction(@Nullable Evidence evidence, List<Defect> defects, boolean undetermined) { }
+	record Reduction(@Nullable Evidence evidence, List<Defect> defects, boolean undetermined) {
+	}
 
 	// ==================== The whole ====================
 
@@ -104,11 +111,12 @@ final class Interpreter {
 
 		Node rootNode = readVerdict(verdict, "verdict", true);
 		Stage root = new Stage(null, List.of(), null, null, null, null, null, null, rootNode.status(),
-				rootNode.reasonCode(), rootNode.reasoning(), rootNode.evidence(), rootNode.judges(), rootNode.judgment());
+				rootNode.reasonCode(), rootNode.reasoning(), rootNode.evidence(), rootNode.judges(),
+				rootNode.judgment());
 		readAttempts(verdict, "verdict", List.of(), 1);
 
 		Walk walk = walk(verdict);
-		@Nullable VerdictReading reading = reading(walk, rootNode.status());
+		@Nullable RequirementOutcome reading = reading(walk, rootNode.status());
 		checkSupport(walk, verdict, rootNode);
 
 		boolean contradicted = this.defects.stream().anyMatch(defect -> defect.kind() == DefectKind.INCONSISTENT);
@@ -117,7 +125,7 @@ final class Interpreter {
 
 		Interpretation draft = new Interpretation(Interpretation.SCHEMA_VERSION, sourceVersion, reading, support,
 				walk.decidedBy(), root, this.stages, this.defects, "");
-		return new Interpretation(draft.schemaVersion(), draft.sourceVersion(), draft.reading(), draft.readingSupport(),
+		return new Interpretation(draft.schemaVersion(), draft.sourceVersion(), draft.outcome(), draft.readingSupport(),
 				draft.decidedBy(), draft.root(), draft.stages(), draft.defects(), Summaries.of(draft));
 	}
 
@@ -177,8 +185,8 @@ final class Interpreter {
 		Score score = readScore(judgment, path);
 		List<Check> checks = readChecks(judgment, path);
 		String label = judgment.get("label") instanceof String text ? text : null;
-		JudgmentView view = new JudgmentView(null, status, reasonCode, reasoning, null, null, null, null, null,
-			null, null, checks, label, score.value(), Map.of());
+		JudgmentView view = new JudgmentView(null, status, reasonCode, reasoning, null, null, null, null, null, null,
+				null, checks, label, score.value(), Map.of());
 		return new Facts(status, reasonCode, reasoning, score.value(), score.scale(), checks, view);
 	}
 
@@ -246,19 +254,21 @@ final class Interpreter {
 		}
 		Object inner = object.get("value");
 		if (inner instanceof Boolean) {
-			unparseable(path, "score", "0.13 Score object {value: " + inner + "}; 0.17 scores are numbers in [0,1]. Ignored.");
+			unparseable(path, "score",
+					"0.13 Score object {value: " + inner + "}; 0.17 scores are numbers in [0,1]. Ignored.");
 			return new Score(null, null);
 		}
 		if (!(inner instanceof Number raw) || !(object.get("min") instanceof Number min)
 				|| !(object.get("max") instanceof Number max)) {
-			unparseable(path, "score", "A score object must carry a numeric value with its min and max; this one does "
-					+ "not. Ignored.");
+			unparseable(path, "score",
+					"A score object must carry a numeric value with its min and max; this one does " + "not. Ignored.");
 			return new Score(null, null);
 		}
 		double low = min.doubleValue();
 		double high = max.doubleValue();
 		if (!Double.isFinite(low) || !Double.isFinite(high) || high <= low) {
-			unparseable(path, "score", "The recorded bounds [" + low + ", " + high + "] are not a usable scale. Ignored.");
+			unparseable(path, "score",
+					"The recorded bounds [" + low + ", " + high + "] are not a usable scale. Ignored.");
 			return new Score(null, null);
 		}
 		ScoreScale scale = new ScoreScale(low, high);
@@ -268,12 +278,11 @@ final class Interpreter {
 			return new Score(null, scale);
 		}
 		double width = high - low;
-		double normalised = valueOnScale == low ? 0 : valueOnScale == high ? 1
-				: Double.isFinite(width) ? (valueOnScale - low) / width
-				: (valueOnScale / 2 - low / 2) / (high / 2 - low / 2);
+		double normalised = valueOnScale == low ? 0 : valueOnScale == high ? 1 : Double.isFinite(width)
+				? (valueOnScale - low) / width : (valueOnScale / 2 - low / 2) / (high / 2 - low / 2);
 		if (!Double.isFinite(normalised) || normalised < 0.0 || normalised > 1.0) {
-			unparseable(path, "score", "The value " + raw + " lies outside its recorded scale [" + low + ", " + high
-					+ "]. Ignored.");
+			unparseable(path, "score",
+					"The value " + raw + " lies outside its recorded scale [" + low + ", " + high + "]. Ignored.");
 			return new Score(null, scale);
 		}
 		return new Score(normalised, scale);
@@ -432,8 +441,8 @@ final class Interpreter {
 				origin.put(entry.getKey(), number.longValue());
 			}
 			else {
-				unparseable(path, key + "." + entry.getKey(), "Expected a count, but the recorded value is "
-						+ entry.getValue() + ".");
+				unparseable(path, key + "." + entry.getKey(),
+						"Expected a count, but the recorded value is " + entry.getValue() + ".");
 			}
 		}
 		return origin;
@@ -477,7 +486,8 @@ final class Interpreter {
 				@Nullable String keySource = null;
 				Object source = seat.get("keySource");
 				if (source == null) {
-					absent(seatPath, "keySource", "No key source; whether the name is a declared identity is unrecorded.");
+					absent(seatPath, "keySource",
+							"No key source; whether the name is a declared identity is unrecorded.");
 				}
 				else if (source instanceof String token) {
 					keySource = token;
@@ -690,7 +700,7 @@ final class Interpreter {
 		for (TierPolicy policy : TierPolicy.values()) {
 			// The v1 reader cannot certify the new identity/policy routing protocol.
 			// Its full coherence checks belong to the versioned modern reader.
-			if (policy != TierPolicy.STOP_ON_USABLE_ASSESSMENT) {
+			if (policy != TierPolicy.STOP_ON_RELIED_JUDGMENT) {
 				tokens.add(policy.wireName());
 			}
 		}
@@ -722,7 +732,8 @@ final class Interpreter {
 	 * @param rejection whether the chain stopped on an individual rejection
 	 * @param stopping the verdict node the chain stopped at
 	 * @param stoppingPath its path
-	 * @param stoppingKind the stopping decision's kind token, or null when none is readable
+	 * @param stoppingKind the stopping decision's kind token, or null when none is
+	 * readable
 	 * @param namedTier the tier the stopping decision names, for a rejection
 	 */
 	private record Walk(@Nullable DecidedBy decidedBy, boolean rejection, Map<String, Object> stopping,
@@ -739,8 +750,10 @@ final class Interpreter {
 			@Nullable DecidedBy viaEdge = lastEdge == null ? null : new DecidedBy(lastEdge, ownPath, TIER_OUTCOME);
 			if (value == null) {
 				if (lastEdge == null) {
-					// A record with no decision at all: the root's own evidence block is the one
-					// closed form left, and §7.2 rules a 0.14–0.16 block that agrees SUPPORTED.
+					// A record with no decision at all: the root's own evidence block is
+					// the one
+					// closed form left, and §7.2 rules a 0.14–0.16 block that agrees
+					// SUPPORTED.
 					absent(path, "decision", "No decision recorded; which stage decided cannot be established. Not "
 							+ "inferred from the root equalling a sub-verdict, from attempt order, or from reasoning "
 							+ "text.");
@@ -797,17 +810,18 @@ final class Interpreter {
 				return new Walk(new DecidedBy(tier, tierPath, basis), true, current, path, kind, tier);
 			}
 			if (!TIER_OUTCOME.equals(basis)) {
-				unknown(decisionPath, "basis", "'" + basis + "' is not a decision basis this version defines; the "
-						+ "edge is not followed.");
+				unknown(decisionPath, "basis",
+						"'" + basis + "' is not a decision basis this version defines; the " + "edge is not followed.");
 				this.undeterminable = true;
 				return new Walk(new DecidedBy(tier, tierPath, basis), false, current, path, kind, tier);
 			}
-			// TIER_OUTCOME: the chain continues into the named tier, if the record holds it.
+			// TIER_OUTCOME: the chain continues into the named tier, if the record holds
+			// it.
 			int index = attemptIndex(current, tier);
 			@Nullable Map<String, Object> attempt = index < 0 ? null : attemptAt(current, index);
 			if (attempt == null) {
-				inconsistent(decisionPath, "tier", "The decision names tier '" + tier
-						+ "', which is not a direct cascade tier of this verdict.");
+				inconsistent(decisionPath, "tier",
+						"The decision names tier '" + tier + "', which is not a direct cascade tier of this verdict.");
 				return new Walk(new DecidedBy(tier, tierPath, basis), false, current, path, kind, tier);
 			}
 			String attemptPath = path + ".compositeAttempts[" + index + "]";
@@ -826,8 +840,8 @@ final class Interpreter {
 				return new Walk(new DecidedBy(tier, tierPath, basis), false, current, path, kind, tier);
 			}
 			if (!Objects.equals(current.get("aggregated"), child.get("aggregated"))) {
-				inconsistent(decisionPath, "basis", "TIER_OUTCOME copies tier '" + tier
-						+ "' exactly, but the aggregate differs from the tier's.");
+				inconsistent(decisionPath, "basis",
+						"TIER_OUTCOME copies tier '" + tier + "' exactly, but the aggregate differs from the tier's.");
 			}
 			checkStopCondition(decisionPath, tier, attempt, child);
 			@Nullable Map<String, Object> childDecision = map(child.get("decision"));
@@ -845,7 +859,10 @@ final class Interpreter {
 		return new Walk(null, false, current, path, null, null);
 	}
 
-	/** A used tier stopped the cascade only if its policy's condition held over its individuals. */
+	/**
+	 * A used tier stopped the cascade only if its policy's condition held over its
+	 * individuals.
+	 */
 	private void checkStopCondition(String decisionPath, String tier, Map<String, Object> attempt,
 			Map<String, Object> child) {
 		Object policy = attempt.get("policy");
@@ -858,8 +875,7 @@ final class Interpreter {
 			inconsistent(decisionPath, "basis", "The outcome of tier '" + tier + "' was adopted under "
 					+ "REJECT_ON_ANY_FAIL, which stops only on a failing judge, but no judge in the tier failed.");
 		}
-		else if (TierPolicy.ACCEPT_ON_ALL_PASS.wireName().equals(policy)
-				&& !statuses.stream().allMatch(PASS::equals)) {
+		else if (TierPolicy.ACCEPT_ON_ALL_PASS.wireName().equals(policy) && !statuses.stream().allMatch(PASS::equals)) {
 			inconsistent(decisionPath, "basis", "The outcome of tier '" + tier + "' was adopted under "
 					+ "ACCEPT_ON_ALL_PASS, which stops only when every judge passes, but one did not.");
 		}
@@ -885,7 +901,10 @@ final class Interpreter {
 		return attempts == null ? null : map(attempts.get(index));
 	}
 
-	/** The statuses of a verdict node's ordered individuals, or null when they cannot be read. */
+	/**
+	 * The statuses of a verdict node's ordered individuals, or null when they cannot be
+	 * read.
+	 */
 	private static @Nullable List<String> individualStatuses(Map<String, Object> verdict) {
 		@Nullable List<Object> individual = list(verdict.get("individual"));
 		if (individual == null) {
@@ -917,27 +936,27 @@ final class Interpreter {
 
 	// ==================== The reading ====================
 
-	private static @Nullable VerdictReading reading(Walk walk, @Nullable String rootStatus) {
+	private static @Nullable RequirementOutcome reading(Walk walk, @Nullable String rootStatus) {
 		if (walk.rejection()) {
-			return VerdictReading.REJECTED;
+			return RequirementOutcome.VIOLATED;
 		}
 		if (rootStatus == null) {
 			return null;
 		}
 		if (ERROR.equals(rootStatus)) {
-			return VerdictReading.NOT_ASSESSED;
+			return RequirementOutcome.NOT_ASSESSED;
 		}
 		if (NOT_APPLICABLE.equals(rootStatus)) {
-			return VerdictReading.NOT_APPLICABLE;
+			return RequirementOutcome.NOT_APPLICABLE;
 		}
 		if (FAIL.equals(rootStatus)) {
-			return VerdictReading.REJECTED;
+			return RequirementOutcome.VIOLATED;
 		}
 		if (PASS.equals(rootStatus)) {
-			return VerdictReading.ACCEPTED;
+			return RequirementOutcome.SATISFIED;
 		}
 		if (ABSTAIN.equals(rootStatus)) {
-			return VerdictReading.UNDECIDED;
+			return RequirementOutcome.UNRESOLVED;
 		}
 		return null;
 	}
@@ -951,8 +970,10 @@ final class Interpreter {
 		else if (UNDECIDED.equals(walk.stoppingKind())) {
 			checkUndecided(walk);
 		}
-		// The evidence test always reads the root's own block, never one found elsewhere in the
-		// tree. It is required only where nothing else is closed-form: an own reduction, or a
+		// The evidence test always reads the root's own block, never one found elsewhere
+		// in the
+		// tree. It is required only where nothing else is closed-form: an own reduction,
+		// or a
 		// record with no decision at all.
 		boolean ownReduction = walk.stoppingKind() == null || OWN.equals(walk.stoppingKind());
 		if (rootNode.aggregated() == null) {
@@ -1009,8 +1030,8 @@ final class Interpreter {
 		int index = attemptIndex(walk.stopping(), tier);
 		@Nullable Map<String, Object> attempt = index < 0 ? null : attemptAt(walk.stopping(), index);
 		if (attempt == null) {
-			inconsistent(decisionPath, "tier", "The decision names tier '" + tier
-					+ "', which is not a direct cascade tier of this verdict.");
+			inconsistent(decisionPath, "tier",
+					"The decision names tier '" + tier + "', which is not a direct cascade tier of this verdict.");
 			return;
 		}
 		Object disposition = attempt.get("disposition");
@@ -1019,8 +1040,7 @@ final class Interpreter {
 		if (disposition == null || reason == null) {
 			this.undeterminable = true;
 		}
-		else if (!STAGE_FAILED.equals(disposition)
-				|| DispositionReason.EXECUTION_FAILED.wireName().equals(reason)) {
+		else if (!STAGE_FAILED.equals(disposition) || DispositionReason.EXECUTION_FAILED.wireName().equals(reason)) {
 			inconsistent(decisionPath, "basis", "INDIVIDUAL_REJECTION means tier '" + tier
 					+ "' returned a verdict the cascade could not use, so the attempt must be stage_failed with "
 					+ "child_undecided or undeclared_not_applicable, but was " + disposition + " / " + reason + ".");
@@ -1038,8 +1058,8 @@ final class Interpreter {
 		}
 		@Nullable Map<String, Object> child = map(attempt.get("verdict"));
 		if (child == null) {
-			inconsistent(decisionPath, "tier", "The decision names tier '" + tier
-					+ "', which returned no verdict to establish a rejection in.");
+			inconsistent(decisionPath, "tier",
+					"The decision names tier '" + tier + "', which returned no verdict to establish a rejection in.");
 			return;
 		}
 		@Nullable List<String> statuses = individualStatuses(child);
@@ -1067,9 +1087,10 @@ final class Interpreter {
 						+ "' returned an exclusion, but its aggregate is " + token + ".");
 			}
 			if (!JudgmentReasonCode.STAGE_FAILED.wireName().equals(rootAggregate.get("reasonCode"))) {
-				inconsistent(decisionPath, "basis", "A rejection on a boundary-refused exclusion builds a "
-						+ "parent-authored error coded stage_failed, but the root is coded "
-						+ rootAggregate.get("reasonCode") + ".");
+				inconsistent(decisionPath, "basis",
+						"A rejection on a boundary-refused exclusion builds a "
+								+ "parent-authored error coded stage_failed, but the root is coded "
+								+ rootAggregate.get("reasonCode") + ".");
 			}
 		}
 	}
@@ -1121,8 +1142,8 @@ final class Interpreter {
 			return;
 		}
 		if (!expected.status().equals(status)) {
-			inconsistent(path, "status", describe(evidence) + " is " + expected.status() + ", but the recorded status is "
-					+ status + ".");
+			inconsistent(path, "status",
+					describe(evidence) + " is " + expected.status() + ", but the recorded status is " + status + ".");
 			return;
 		}
 		if (expected.reasonCode() != null && reasonCode != null && !expected.reasonCode().equals(reasonCode)) {
@@ -1227,7 +1248,9 @@ final class Interpreter {
 			text.append(" with ").append(e.errorCount()).append(" error(s) under ").append(e.errorPolicy());
 		}
 		if (e.notApplicableCount() != null && e.notApplicableCount() > 0) {
-			text.append(" with ").append(e.notApplicableCount()).append(" not applicable under ")
+			text.append(" with ")
+				.append(e.notApplicableCount())
+				.append(" not applicable under ")
 				.append(e.notApplicablePolicy());
 		}
 		return text.toString();

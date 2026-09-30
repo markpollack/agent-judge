@@ -7,14 +7,24 @@ package io.github.markpollack.judge.jev;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import io.github.markpollack.judge.result.*;
+import io.github.markpollack.judge.judgment.BooleanFinding;
+import io.github.markpollack.judge.judgment.CategoryFinding;
+import io.github.markpollack.judge.judgment.Confidence;
+import io.github.markpollack.judge.judgment.Finding;
+import io.github.markpollack.judge.judgment.FindingTarget;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
+import io.github.markpollack.judge.judgment.NumericFinding;
+import io.github.markpollack.judge.judgment.NumericKind;
+import io.github.markpollack.judge.judgment.ProbabilityDistribution;
+import io.github.markpollack.judge.judgment.ProbabilityMass;
+import io.github.markpollack.judge.judgment.SupportOrigin;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.*;
 import org.jspecify.annotations.Nullable;
 
-record NativeResponse(String model, long inputTokens, long outputTokens, JudgmentStatus status, Assessment assessment,
-		@Nullable Certainty certainty, Distribution distribution) {
+record NativeResponse(String model, long inputTokens, long outputTokens, JudgmentStatus status, Finding finding,
+		@Nullable Confidence confidence, ProbabilityDistribution probabilityDistribution) {
 	record Envelope(String model, long inputTokens, long outputTokens, boolean providerMetadataPresent,
 			@Nullable Double cost) {
 
@@ -37,7 +47,7 @@ record NativeResponse(String model, long inputTokens, long outputTokens, Judgmen
 				root.has("provider_metadata"), gateway ? gatewayCost(bytes) : null);
 	}
 
-	/** Read optional billing independently of assessment validity and token pricing. */
+	/** Read optional billing independently of finding validity and token pricing. */
 	private static @Nullable Double gatewayCost(byte[] bytes) {
 		try {
 			// Read only this decimal at full precision before projecting to portable
@@ -50,12 +60,12 @@ record NativeResponse(String model, long inputTokens, long outputTokens, Judgmen
 				return null;
 			BigDecimal decimal = new BigDecimal(node.asText());
 			double amount = decimal.doubleValue();
-			return decimal.signum() < 0 || !Double.isFinite(amount) || amount == 0 && decimal.signum() != 0
-					? null : amount;
+			return decimal.signum() < 0 || !Double.isFinite(amount) || amount == 0 && decimal.signum() != 0 ? null
+					: amount;
 		}
 		catch (IOException | NumberFormatException e) {
 			// Missing or invalid optional billing is unknown, not a free request or
-			// an invalid assessment. Exact native bytes remain in protected capture.
+			// an invalid finding. Exact native bytes remain in protected capture.
 			return null;
 		}
 	}
@@ -77,8 +87,8 @@ record NativeResponse(String model, long inputTokens, long outputTokens, Judgmen
 			Boolean selected = p == .5 ? null : p > .5;
 			return new NativeResponse(model, in, out,
 					selected == null ? JudgmentStatus.ABSTAIN : selected ? JudgmentStatus.PASS : JudgmentStatus.FAIL,
-					new Assessment(new Proposition(selected), null, null), null,
-					new Distribution(AssessmentTarget.PROPOSITION, "jev.noul.probability-of-true:v1",
+					new Finding(new BooleanFinding(selected), null, null), null,
+					new ProbabilityDistribution(FindingTarget.BOOLEAN, "jev.noul.probability-of-true:v1",
 							List.of(new ProbabilityMass("false", 1 - p), new ProbabilityMass("true", p))));
 		}
 		double confidence = probability(answer.path("confidence"));
@@ -103,10 +113,10 @@ record NativeResponse(String model, long inputTokens, long outputTokens, Judgmen
 				case INSUFFICIENT -> JudgmentStatus.ABSTAIN;
 			};
 			return new NativeResponse(model, in, out, status,
-					new Assessment(null, null, new Category(selected, domain)),
-					new Certainty(confidence, "jev.choice.confidence:v1", SupportOrigin.REPORTED,
-							AssessmentTarget.CATEGORY, null),
-					new Distribution(AssessmentTarget.CATEGORY, "jev.choice.distribution:v1", masses));
+					new Finding(null, null, new CategoryFinding(selected, domain)),
+					new Confidence(confidence, "jev.choice.confidence:v1", SupportOrigin.REPORTED,
+							FindingTarget.CATEGORY, null),
+					new ProbabilityDistribution(FindingTarget.CATEGORY, "jev.choice.distribution:v1", masses));
 		}
 		JevQuestion.Score score = (JevQuestion.Score) question;
 		if (!type.equals("score"))
@@ -126,15 +136,15 @@ record NativeResponse(String model, long inputTokens, long outputTokens, Judgmen
 			expected += i * masses.get(i).probability();
 		if (mean < 0 || mean > domain.size() - 1 || Math.abs(mean - expected) > 1e-6 * (domain.size() - 1))
 			throw invalid();
-		NumericAssessment numeric = new NumericAssessment(mean, NumericKind.ORDINAL_EXPECTATION, score.rubricId(), 0,
+		NumericFinding numeric = new NumericFinding(mean, NumericKind.ORDINAL_EXPECTATION, score.rubricId(), 0,
 				domain.size() - 1, domain, score.direction());
 		double quality = numeric.qualityScore().orElseThrow();
 		JudgmentStatus status = quality <= score.violatedAtOrBelow() ? JudgmentStatus.FAIL
 				: quality >= score.satisfiedAtOrAbove() ? JudgmentStatus.PASS : JudgmentStatus.ABSTAIN;
-		return new NativeResponse(
-				model, in, out, status, new Assessment(null, numeric, null), new Certainty(confidence,
-						"jev.score.confidence:v1", SupportOrigin.REPORTED, AssessmentTarget.NUMERIC, null),
-				new Distribution(AssessmentTarget.NUMERIC, "jev.score.level-distribution:v1", masses));
+		return new NativeResponse(model, in, out, status, new Finding(null, numeric, null),
+				new Confidence(confidence, "jev.score.confidence:v1", SupportOrigin.REPORTED, FindingTarget.NUMERIC,
+						null),
+				new ProbabilityDistribution(FindingTarget.NUMERIC, "jev.score.level-distribution:v1", masses));
 	}
 
 	private static List<ProbabilityMass> masses(JsonNode node, List<String> domain) {

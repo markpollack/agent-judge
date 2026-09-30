@@ -5,11 +5,10 @@
 
 package io.github.markpollack.judge.exec;
 
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
+import java.nio.file.Path;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 
 /**
@@ -24,7 +23,8 @@ import java.time.Duration;
  * Example usage:
  * </p>
  *
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
  * <p>
  * The judge uses a 10-minute default timeout (longer than CommandJudge's 2 minutes) since
@@ -82,12 +82,12 @@ public class BuildSuccessJudge extends CommandJudge {
 		}
 
 		@Override
-		public Judgment judge(JudgmentContext context) {
+		public Judgment judge(Path workspace) {
 			// Detect wrapper in workspace
-			String command = detectMavenCommand(context.workspace());
+			String command = detectMavenCommand(workspace);
 			// Create new judge with detected command
 			BuildSuccessJudge actualJudge = new BuildSuccessJudge(command);
-			return actualJudge.judge(context);
+			return actualJudge.judge(workspace);
 		}
 
 		private String detectMavenCommand(Path workspace) {
@@ -114,12 +114,12 @@ public class BuildSuccessJudge extends CommandJudge {
 		}
 
 		@Override
-		public Judgment judge(JudgmentContext context) {
+		public Judgment judge(Path workspace) {
 			// Detect wrapper in workspace
-			String command = detectGradleCommand(context.workspace());
+			String command = detectGradleCommand(workspace);
 			// Create new judge with detected command
 			BuildSuccessJudge actualJudge = new BuildSuccessJudge(command);
-			return actualJudge.judge(context);
+			return actualJudge.judge(workspace);
 		}
 
 		private String detectGradleCommand(Path workspace) {

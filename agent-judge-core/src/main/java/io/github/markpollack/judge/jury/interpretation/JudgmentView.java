@@ -7,20 +7,27 @@ package io.github.markpollack.judge.jury.interpretation;
 import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
-import io.github.markpollack.judge.result.*;
+import io.github.markpollack.judge.judgment.Confidence;
+import io.github.markpollack.judge.judgment.Finding;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
+import io.github.markpollack.judge.judgment.ProbabilityDistribution;
+import io.github.markpollack.judge.acceptance.PolicyApplication;
+import io.github.markpollack.judge.provenance.Provenance;
 
 /**
  * Complete semantic reading of a judgment; raw facts and operational policy outcome
- * remain distinct. Historical labels and scores do not manufacture modern assessment
- * domains or certainty.
+ * remain distinct. Historical labels and scores do not manufacture modern finding domains
+ * or confidence.
  *
  * @param producerStatus raw disposition, absent for historical results
  * @param status operational disposition
  * @param reasonCode operational cause
  * @param reasoning operational explanation
- * @param assessment full product assessment
- * @param certainty native/derived support
- * @param distribution native distribution
+ * @param finding full product finding
+ * @param confidence native/derived support
+ * @param probabilityDistribution native probabilityDistribution
  * @param provenance complete provenance including provider calibration declarations
  * @param policyApplication recorded policy
  * @param producerReasonCode raw cause
@@ -31,8 +38,8 @@ import io.github.markpollack.judge.result.*;
  * @param legacyScore historical normalized numeric score
  */
 public record JudgmentView(@Nullable String producerStatus, @Nullable String status, @Nullable String reasonCode,
-		@Nullable String reasoning, @Nullable Assessment assessment, @Nullable Certainty certainty,
-		@Nullable Distribution distribution, @Nullable EvaluationProvenance provenance,
+		@Nullable String reasoning, @Nullable Finding finding, @Nullable Confidence confidence,
+		@Nullable ProbabilityDistribution probabilityDistribution, @Nullable Provenance provenance,
 		@Nullable PolicyApplication policyApplication, @Nullable String producerReasonCode,
 		@Nullable String producerReasoning, List<Check> checks, @Nullable String legacyLabel,
 		@Nullable Double legacyScore, Map<String, Object> metadata) {
@@ -45,8 +52,8 @@ public record JudgmentView(@Nullable String producerStatus, @Nullable String sta
 
 	static JudgmentView of(Judgment value) {
 		return new JudgmentView(value.producerStatus().wireName(), value.status().wireName(),
-				token(value.operationalReasonCode()), value.operationalReasoning(), value.assessment(),
-				value.certainty(), value.distribution(), value.provenance(), value.policyApplication(),
+				token(value.operationalReasonCode()), value.operationalReasoning(), value.finding(), value.confidence(),
+				value.probabilityDistribution(), value.provenance(), value.policyApplication(),
 				token(value.reasonCode()), value.reasoning(),
 				value.checks()
 					.stream()

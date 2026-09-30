@@ -19,7 +19,7 @@ import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate.MissingVariable
 import io.github.markpollack.judge.ai.prompt.TextSources;
 import io.github.markpollack.judge.description.ImplementationIdentity;
 import io.github.markpollack.judge.description.JudgeDescription;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import static io.github.markpollack.judge.ai.ModelBackedJudge.JUDGMENT_CLASSIFIER_KEY;
 import static io.github.markpollack.judge.ai.ModelBackedJudge.MISSING_VARIABLE_POLICY_KEY;
@@ -142,7 +142,8 @@ class ModelBackedJudgeDescriptionTests {
 
 	private static ModelBackedJudge judge(JudgePromptTemplate template, JudgmentClassifier classifier,
 			JudgeModel model) {
-		return ModelBackedJudge.builder()
+		return ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
+			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
 			.name("relevance")
 			.promptTemplate(template)
 			.judgmentClassifier(classifier)

@@ -12,10 +12,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * One thing the record is missing, cannot say, or contradicts itself on.
  *
- * <p>Every defect names the path of the structure it is about — {@code verdict},
- * {@code verdict.compositeAttempts[1].verdict.aggregated} — and the field within it. A reader
- * that wants to know what is wrong reads the list; a reader that wants to know what follows from
- * it applies its own policy.
+ * <p>
+ * Every defect names the path of the structure it is about — {@code verdict},
+ * {@code verdict.compositeAttempts[1].verdict.judgment} — and the field within it. A
+ * reader that wants to know what is wrong reads the list; a reader that wants to know
+ * what follows from it applies its own policy.
  *
  * @param path the path of the structure the defect is about, rooted at {@code verdict}
  * @param field the field within that structure

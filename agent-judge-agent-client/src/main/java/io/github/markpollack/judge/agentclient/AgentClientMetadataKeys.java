@@ -1,7 +1,8 @@
 package io.github.markpollack.judge.agentclient;
 
 /**
- * Public constants for AgentClient metadata keys stored in {@code JudgmentContext.metadata()}.
+ * Public constants for AgentClient metadata keys stored in
+ * {@code CompletionEvidence.metadata()}.
  *
  * @author Mark Pollack
  * @since 0.10.0

@@ -1,15 +1,12 @@
 package io.github.markpollack.judge.ai;
 
-import java.nio.file.Path;
-
 import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelRequest;
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.completion.CompletionStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,17 +18,18 @@ class ModelBackedJudgeTests {
 	void passJudgment() {
 		JudgeModel model = stubModel("relevant");
 
-		var judge = ModelBackedJudge.builder()
+		var judge = ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
+			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
 			.name("relevance")
 			.promptTemplate(JudgePromptTemplate.fromString("relevance", "Is {{output}} relevant to {{goal}}?"))
 			.judgmentClassifier(JudgmentClassifiers.passFail("relevant", "irrelevant"))
 			.model(model)
 			.build();
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("summarize the document")
-			.agentOutput("Here is a summary of the document.")
-			.status(ExecutionStatus.SUCCESS)
+		CompletionEvidence context = CompletionEvidence.builder()
+			.request("summarize the document")
+			.response("Here is a summary of the document.")
+			.status(CompletionStatus.SUCCESS)
 			.build();
 
 		Judgment judgment = judge.judge(context);
@@ -44,17 +42,18 @@ class ModelBackedJudgeTests {
 	void failJudgment() {
 		JudgeModel model = stubModel("irrelevant");
 
-		var judge = ModelBackedJudge.builder()
+		var judge = ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
+			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
 			.name("relevance")
 			.promptTemplate(JudgePromptTemplate.fromString("relevance", "Is {{output}} relevant to {{goal}}?"))
 			.judgmentClassifier(JudgmentClassifiers.passFail("relevant", "irrelevant"))
 			.model(model)
 			.build();
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("summarize the document")
-			.agentOutput("I like pizza.")
-			.status(ExecutionStatus.SUCCESS)
+		CompletionEvidence context = CompletionEvidence.builder()
+			.request("summarize the document")
+			.response("I like pizza.")
+			.status(CompletionStatus.SUCCESS)
 			.build();
 
 		Judgment judgment = judge.judge(context);
@@ -66,17 +65,18 @@ class ModelBackedJudgeTests {
 	void abstainOnUnrecognizedLabel() {
 		JudgeModel model = stubModel("maybe");
 
-		var judge = ModelBackedJudge.builder()
+		var judge = ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
+			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
 			.name("relevance")
 			.promptTemplate(JudgePromptTemplate.fromString("relevance", "Is {{output}} relevant to {{goal}}?"))
 			.judgmentClassifier(JudgmentClassifiers.passFail("relevant", "irrelevant"))
 			.model(model)
 			.build();
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test")
-			.agentOutput("test output")
-			.status(ExecutionStatus.SUCCESS)
+		CompletionEvidence context = CompletionEvidence.builder()
+			.request("test")
+			.response("test output")
+			.status(CompletionStatus.SUCCESS)
 			.build();
 
 		Judgment judgment = judge.judge(context);
@@ -89,17 +89,18 @@ class ModelBackedJudgeTests {
 	void classpathTemplate() {
 		JudgeModel model = stubModel("relevant");
 
-		var judge = ModelBackedJudge.builder()
+		var judge = ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
+			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
 			.name("relevance")
 			.promptTemplate(JudgePromptTemplate.fromClasspath("judges/test-relevance.md"))
 			.judgmentClassifier(JudgmentClassifiers.passFail("relevant", "irrelevant"))
 			.model(model)
 			.build();
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test goal")
-			.agentOutput("test output")
-			.status(ExecutionStatus.SUCCESS)
+		CompletionEvidence context = CompletionEvidence.builder()
+			.request("test goal")
+			.response("test output")
+			.status(CompletionStatus.SUCCESS)
 			.build();
 
 		Judgment judgment = judge.judge(context);
@@ -109,7 +110,8 @@ class ModelBackedJudgeTests {
 
 	@Test
 	void metadataExposed() {
-		var judge = ModelBackedJudge.builder()
+		var judge = ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
+			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
 			.name("test-judge")
 			.description("A test judge")
 			.promptTemplate(JudgePromptTemplate.fromString("test", "{{goal}}"))
@@ -123,8 +125,9 @@ class ModelBackedJudgeTests {
 
 	@Test
 	void builderValidation() {
-		assertThatThrownBy(() -> ModelBackedJudge.builder().build()).isInstanceOf(IllegalStateException.class)
-			.hasMessageContaining("name");
+		assertThatThrownBy(() -> ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
+			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
+			.build()).isInstanceOf(IllegalStateException.class).hasMessageContaining("name");
 	}
 
 	private JudgeModel stubModel(String response) {

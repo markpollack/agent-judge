@@ -12,9 +12,9 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * Whether a composite parent could use what a stage returned.
  *
  * <p>
- * Always written, on every attempt. A stage that ran and a stage the parent had to set aside
- * both leave an attempt behind, and without this they look alike — which is how a composition
- * failure becomes invisible once a later stage succeeds.
+ * Always written, on every attempt. A stage that ran and a stage the parent had to set
+ * aside both leave an attempt behind, and without this they look alike — which is how a
+ * composition failure becomes invisible once a later stage succeeds.
  * </p>
  *
  * @author Mark Pollack
@@ -29,9 +29,10 @@ public enum AttemptDisposition {
 	/**
 	 * The parent could not use what the stage produced.
 	 * <p>
-	 * A structural marker, not a {@link io.github.markpollack.judge.result.JudgmentReasonCode}:
-	 * it describes the parent's relationship to the stage, not a judgment's cause. The stage's
-	 * own verdict, where it returned one, is kept unchanged on the attempt.
+	 * A structural marker, not a
+	 * {@link io.github.markpollack.judge.judgment.JudgmentReasonCode}: it describes the
+	 * parent's relationship to the stage, not a judgment's cause. The stage's own
+	 * verdict, where it returned one, is kept unchanged on the attempt.
 	 * </p>
 	 */
 	STAGE_FAILED("stage_failed");

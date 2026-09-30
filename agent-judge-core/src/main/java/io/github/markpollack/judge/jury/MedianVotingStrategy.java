@@ -9,10 +9,10 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.markpollack.judge.description.StrategyDescription;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
- * Median voting strategy: the middle assessment among the applicable judges.
+ * Median voting strategy: the middle finding among the applicable judges.
  *
  * <p>
  * A numeric strategy, robust to outliers. It reduces over
@@ -22,22 +22,24 @@ import io.github.markpollack.judge.result.Judgment;
  *
  * <p>
  * Abstentions leave the population entirely rather than participating as zero — under the
- * old behaviour two abstentions could drag the median to zero and flip the verdict. Errors
- * are governed by {@link ErrorPolicy} (default {@code PROPAGATE}) and exclusions by
- * {@link NotApplicablePolicy} (default {@code REFUSE}). If nothing is eligible the result is
- * {@code ABSTAIN}, or {@code NOT_APPLICABLE} when every input was an honoured exclusion.
+ * old behaviour two abstentions could drag the median to zero and flip the verdict.
+ * Errors are governed by {@link ErrorPolicy} (default {@code PROPAGATE}) and exclusions
+ * by {@link NotApplicablePolicy} (default {@code REFUSE}). If nothing is eligible the
+ * result is {@code ABSTAIN}, or {@code NOT_APPLICABLE} when every input was an honoured
+ * exclusion.
  * </p>
  *
  * <p>
- * For an even number of eligible judgments the median is the mean of the two middle values.
- * The judgment passes if the median is greater than or equal to the acceptance
+ * For an even number of eligible judgments the median is the mean of the two middle
+ * values. The judgment passes if the median is greater than or equal to the acceptance
  * threshold, which defaults to {@link #DEFAULT_THRESHOLD}.
  * </p>
  *
  * <p>
  * Example usage:
  * </p>
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0
@@ -48,9 +50,10 @@ public class MedianVotingStrategy implements VotingStrategy {
 	 * The acceptance bar applied when the caller does not state one.
 	 * <p>
 	 * 0.5 is the convention across the evaluation ecosystem and is retained as the
-	 * default so existing behaviour is unchanged. It is a convention, not a derivation: it
-	 * knows nothing about the scale your judges score on. Prefer a threshold derived from
-	 * the rubric that produced the scores, supplied through the threshold constructor.
+	 * default so existing behaviour is unchanged. It is a convention, not a derivation:
+	 * it knows nothing about the scale your judges score on. Prefer a threshold derived
+	 * from the rubric that produced the scores, supplied through the threshold
+	 * constructor.
 	 * </p>
 	 *
 	 * @since 0.16.0
@@ -181,8 +184,7 @@ public class MedianVotingStrategy implements VotingStrategy {
 	 */
 	@Override
 	public StrategyDescription describe() {
-		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, this.threshold,
-				Map.of());
+		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, this.threshold, Map.of());
 	}
 
 	/** {@inheritDoc} */
@@ -190,6 +192,5 @@ public class MedianVotingStrategy implements VotingStrategy {
 	public NotApplicablePolicy notApplicablePolicy() {
 		return this.notApplicablePolicy;
 	}
-
 
 }

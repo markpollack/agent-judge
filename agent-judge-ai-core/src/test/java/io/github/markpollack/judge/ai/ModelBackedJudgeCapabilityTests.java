@@ -16,7 +16,7 @@ import io.github.markpollack.judge.ai.model.JudgeModel;
 import io.github.markpollack.judge.ai.model.JudgeModelRequest;
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.description.SeatDescription;
 import io.github.markpollack.judge.description.SimpleJuryDescription;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
@@ -26,8 +26,8 @@ import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.NotApplicablePolicy;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -38,10 +38,11 @@ import static org.assertj.core.api.Assertions.tuple;
  *
  * <p>
  * The three witnesses the design pins: an ordinary model judge composes under the default
- * refusing policy because it declares nothing; a judge that declares a condition carries it
- * through {@code Judges.notApplicableCapability}; and the rename
- * {@code Juries.fromJudges} applies to break a name collision does not strip the declaration
- * off the judge underneath, which is the one place a capability could silently disappear.
+ * refusing policy because it declares nothing; a judge that declares a condition carries
+ * it through {@code Judges.notApplicableCapability}; and the rename
+ * {@code Juries.fromJudges} applies to break a name collision does not strip the
+ * declaration off the judge underneath, which is the one place a capability could
+ * silently disappear.
  * </p>
  */
 @DisplayName("ModelBackedJudge exclusion capability")
@@ -59,13 +60,14 @@ class ModelBackedJudgeCapabilityTests {
 	}
 
 	private static ModelBackedJudge judge(String name, String notApplicableWhen, String answer) {
-		ModelBackedJudge.Builder builder = ModelBackedJudge.builder()
+		ModelBackedJudge.Builder builder = ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
+			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
 			.name(name)
 			.description("a model-backed judge")
 			.promptTemplate(JudgePromptTemplate.fromString(name, "assess {goal}"))
 			.model(model(answer))
-			.judgmentClassifier(response -> "excluded".equals(response.text())
-					? Judgment.notApplicable(CONDITION) : Judgment.pass(response.text()));
+			.judgmentClassifier(response -> "excluded".equals(response.text()) ? Judgment.notApplicable(CONDITION)
+					: Judgment.pass(response.text()));
 		if (notApplicableWhen != null) {
 			builder.notApplicableWhen(notApplicableWhen);
 		}
@@ -79,7 +81,7 @@ class ModelBackedJudgeCapabilityTests {
 
 		assertThat(unconditional.metadata().notApplicableWhen()).isNull();
 		assertThat(Judges.notApplicableCapability(unconditional)).isEmpty();
-		assertThatCode(() -> SimpleJury.<JudgmentContext>builder()
+		assertThatCode(() -> SimpleJury.<CompletionEvidence>builder()
 			.judge(unconditional)
 			.votingStrategy(new ConsensusStrategy())
 			.build()).doesNotThrowAnyException();
@@ -93,30 +95,30 @@ class ModelBackedJudgeCapabilityTests {
 		assertThat(Judges.notApplicableCapability(conditional)).contains(CONDITION);
 		assertThat(Judges.describe(conditional).notApplicableWhen()).isEqualTo(CONDITION);
 
-		Jury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(conditional)
 			.votingStrategy(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
 			.build();
 
 		assertThat(jury.aggregateMayBeNotApplicable()).isTrue();
-		Verdict verdict = jury.vote(JudgmentContext.builder().goal("assess the implementation").build());
+		Verdict verdict = jury.vote(CompletionEvidence.builder().request("assess the implementation").build());
 		assertThat(verdict.individualByName().get("rubric").status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
-		assertThat(verdict.aggregated().status()).as("every criterion was excluded, so the aggregate is too")
+		assertThat(verdict.judgment().status()).as("every criterion was excluded, so the aggregate is too")
 			.isEqualTo(JudgmentStatus.NOT_APPLICABLE);
 	}
 
 	@Test
 	@DisplayName("the deduplicating rename keeps the declaration on the judge it wraps")
 	void deduplicationPreservesTheDeclaration() {
-		Judge<JudgmentContext> first = judge("rubric", CONDITION, "excluded");
-		Judge<JudgmentContext> second = judge("rubric", CONDITION, "excluded");
+		Judge<CompletionEvidence> first = judge("rubric", CONDITION, "excluded");
+		Judge<CompletionEvidence> second = judge("rubric", CONDITION, "excluded");
 
-		Jury<JudgmentContext> jury = Juries.fromJudges(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE), first,
-				second);
+		Jury<CompletionEvidence> jury = Juries
+			.fromJudges(new ConsensusStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE), first, second);
 
 		SimpleJuryDescription description = (SimpleJuryDescription) jury.describe();
-		assertThat(description.seats()).extracting(SeatDescription::verdictKey,
-				seat -> seat.judge().notApplicableWhen())
+		assertThat(description.seats())
+			.extracting(SeatDescription::verdictKey, seat -> seat.judge().notApplicableWhen())
 			.containsExactly(tuple("rubric", CONDITION), tuple("rubric-2", CONDITION));
 		assertThat(jury.aggregateMayBeNotApplicable()).isTrue();
 	}
@@ -126,8 +128,8 @@ class ModelBackedJudgeCapabilityTests {
 	void thePortableDescriptionCarriesIt() {
 		assertThat(Judges.describe(judge("rubric", CONDITION, "excluded")).toPortable())
 			.containsEntry("notApplicableWhen", Map.of("declared", true, "value", CONDITION));
-		assertThat(Judges.describe(judge("correctness", null, "ok")).toPortable())
-			.containsEntry("notApplicableWhen", Map.of("declared", false));
+		assertThat(Judges.describe(judge("correctness", null, "ok")).toPortable()).containsEntry("notApplicableWhen",
+				Map.of("declared", false));
 	}
 
 }

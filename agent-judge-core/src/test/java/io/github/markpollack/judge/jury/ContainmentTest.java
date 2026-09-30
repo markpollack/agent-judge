@@ -17,11 +17,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.description.KeySource;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,31 +30,30 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Part C: a jury contains its own failures instead of taking the run down with them.
  *
  * <p>
- * Before containment, a strategy that threw discarded every judge in its jury and, inside a
- * cascade, collapsed the enclosing tier: a run where nine judges succeeded and one reduction
- * broke reported nothing at all. What replaces that is loud rather than quiet — an
- * {@code ERROR aggregation_failed} verdict, marked undecided, carrying no evidence block
- * because there is no reduction to describe, with every judge's own result intact.
+ * Before containment, a strategy that threw discarded every judge in its jury and, inside
+ * a cascade, collapsed the enclosing tier: a run where nine judges succeeded and one
+ * reduction broke reported nothing at all. What replaces that is loud rather than quiet —
+ * an {@code ERROR aggregation_failed} verdict, marked undecided, carrying no evidence
+ * block because there is no reduction to describe, with every judge's own result intact.
  * </p>
  *
  * <p>
- * The thing containment must never do is invent a finding. A contained failure produces no
- * synthetic FAIL and no score of zero, because a rejection nobody can tell apart from a real one
- * is worse than no rejection at all.
+ * The thing containment must never do is invent a finding. A contained failure produces
+ * no synthetic FAIL and no score of zero, because a rejection nobody can tell apart from
+ * a real one is worse than no rejection at all.
  * </p>
  */
 @DisplayName("Containment")
 class ContainmentTest {
 
-	private static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("contain failures").build();
+	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder().request("contain failures").build();
 
 	private static final Judgment PASS = Judgment.pass("qualified");
 
 	private static final Judgment FAIL = Judgment.fail("did not qualify");
 
 	/** A strategy that does whatever the test tells it to, instead of aggregating. */
-	private record Misbehaving(String name, java.util.function.Supplier<Judgment> behaviour)
-			implements VotingStrategy {
+	private record Misbehaving(String name, java.util.function.Supplier<Judgment> behaviour) implements VotingStrategy {
 
 		@Override
 		public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
@@ -73,8 +72,8 @@ class ContainmentTest {
 
 	}
 
-	private static Jury<JudgmentContext> juryWith(VotingStrategy strategy) {
-		return SimpleJury.<JudgmentContext>builder()
+	private static Jury<CompletionEvidence> juryWith(VotingStrategy strategy) {
+		return SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> PASS, "first"))
 			.judge(Judges.named(context -> FAIL, "second"))
 			.votingStrategy(strategy)
@@ -97,10 +96,10 @@ class ContainmentTest {
 				throw new IllegalStateException("token=opaque-secret");
 			})).vote(CONTEXT);
 
-			assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
-			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
-			assertThat(verdict.aggregated().reasoning()).contains("broken").contains("IllegalStateException");
-			assertThat(verdict.decision()).isEqualTo(Decision.undecided());
+			assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
+			assertThat(verdict.judgment().reasoning()).contains("broken").contains("IllegalStateException");
+			assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.undecided());
 			assertThat(verdict.individual()).containsExactly(PASS, FAIL);
 			assertThat(verdict.individualByName()).containsKeys("first", "second");
 			assertThat(verdict.seats()).containsExactly(new Seat(0, "first", KeySource.DECLARED),
@@ -112,9 +111,9 @@ class ContainmentTest {
 		void aNullIsContained() {
 			Verdict verdict = juryWith(new Misbehaving("silent", () -> null)).vote(CONTEXT);
 
-			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
-			assertThat(verdict.aggregated().reasoning()).contains("returned no aggregate");
-			assertThat(verdict.decision()).isEqualTo(Decision.undecided());
+			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
+			assertThat(verdict.judgment().reasoning()).contains("returned no aggregate");
+			assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.undecided());
 		}
 
 		@Test
@@ -124,9 +123,9 @@ class ContainmentTest {
 					new Misbehaving("presumptuous", () -> Judgment.notApplicable("I have decided this does not apply")))
 				.vote(CONTEXT);
 
-			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
-			assertThat(verdict.aggregated().reasoning()).contains("NOT_APPLICABLE");
-			assertThat(verdict.decision()).isEqualTo(Decision.undecided());
+			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
+			assertThat(verdict.judgment().reasoning()).contains("NOT_APPLICABLE");
+			assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.undecided());
 		}
 
 		@Test
@@ -138,7 +137,7 @@ class ContainmentTest {
 				Verdict verdict = juryWith(new Misbehaving("misattributing", () -> Judgment.error(code, "boom")))
 					.vote(CONTEXT);
 
-				assertThat(verdict.aggregated().reasoning()).as("%s is not a strategy's to emit", code)
+				assertThat(verdict.judgment().reasoning()).as("%s is not a strategy's to emit", code)
 					.contains("names a cause outside the reduction");
 			}
 		}
@@ -153,19 +152,21 @@ class ContainmentTest {
 					() -> Judgment.propagatedError(Map.of(JudgmentReasonCode.JUDGE_REPORTED, 1L), "an input errored")))
 				.vote(CONTEXT);
 
-			assertThat(refused.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.NOT_APPLICABLE_REFUSED);
-			assertThat(refused.decision()).as("a refusal is machinery, so nothing was decided")
-				.isEqualTo(Decision.undecided());
-			assertThat(propagated.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.ERRORS_PROPAGATED);
-			assertThat(propagated.decision()).as("propagation is this jury's own policy outcome")
-				.isEqualTo(Decision.own());
+			assertThat(refused.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.NOT_APPLICABLE_REFUSED);
+			assertThat(refused.provenance()).as("a refusal is machinery, so nothing was decided")
+				.isEqualTo(VerdictProvenance.undecided());
+			assertThat(propagated.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.ERRORS_PROPAGATED);
+			assertThat(propagated.provenance()).as("propagation is this jury's own policy outcome")
+				.isEqualTo(VerdictProvenance.own());
 		}
 
 		@Test
 		@DisplayName("the allow-list is complete: every declared status has been classified here")
 		void theAllowListIsComplete() {
-			// If a status is added, this fails until someone decides whether a strategy may
-			// produce it. That decision is the point; silently inheriting a branch is not.
+			// If a status is added, this fails until someone decides whether a strategy
+			// may
+			// produce it. That provenance is the point; silently inheriting a branch is
+			// not.
 			for (JudgmentStatus status : JudgmentStatus.values()) {
 				assertThat(List.of(JudgmentStatus.PASS, JudgmentStatus.FAIL, JudgmentStatus.ABSTAIN,
 						JudgmentStatus.NOT_APPLICABLE, JudgmentStatus.ERROR))
@@ -191,7 +192,7 @@ class ContainmentTest {
 
 			Verdict verdict = juryWith(nameless).vote(CONTEXT);
 
-			assertThat(verdict.aggregated().reasoning()).contains(nameless.getClass().getName());
+			assertThat(verdict.judgment().reasoning()).contains(nameless.getClass().getName());
 		}
 
 		@Test
@@ -199,7 +200,7 @@ class ContainmentTest {
 		void containmentInventsNothing() {
 			Judgment aggregate = juryWith(new Misbehaving("broken", () -> {
 				throw new IllegalStateException("boom");
-			})).vote(CONTEXT).aggregated();
+			})).vote(CONTEXT).judgment();
 
 			assertThat(aggregate.status()).isNotEqualTo(JudgmentStatus.FAIL);
 			assertThat(aggregate.score()).isNull();
@@ -210,7 +211,7 @@ class ContainmentTest {
 		@Test
 		@DisplayName("an Error is not a judgment any jury can report on, so it is not caught")
 		void errorsAreNotCaught() {
-			Jury<JudgmentContext> jury = juryWith(new Misbehaving("fatal", () -> {
+			Jury<CompletionEvidence> jury = juryWith(new Misbehaving("fatal", () -> {
 				throw new StackOverflowError("simulated");
 			}));
 
@@ -228,17 +229,16 @@ class ContainmentTest {
 		void aThrowingMemberIsAStageFailure() {
 			Verdict verdict = Juries
 				.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-						new NamedJury<JudgmentContext>("first", returning(Verdict.single("a", PASS))),
-						new NamedJury<JudgmentContext>("broken", throwing(new IllegalArgumentException("boom"))),
-						new NamedJury<JudgmentContext>("last", returning(Verdict.single("b", PASS))))
+						new NamedJury<CompletionEvidence>("first", returning(Verdict.single("a", PASS))),
+						new NamedJury<CompletionEvidence>("broken", throwing(new IllegalArgumentException("boom"))),
+						new NamedJury<CompletionEvidence>("last", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
 
-			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
-			assertThat(verdict.decision()).isEqualTo(Decision.undecided());
-			assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name, CompositeAttempt::disposition,
-					CompositeAttempt::dispositionReason)
-				.containsExactly(
-						org.assertj.core.api.Assertions.tuple("first", AttemptDisposition.USED, null),
+			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+			assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.undecided());
+			assertThat(verdict.compositeAttempts())
+				.extracting(CompositeAttempt::name, CompositeAttempt::disposition, CompositeAttempt::dispositionReason)
+				.containsExactly(org.assertj.core.api.Assertions.tuple("first", AttemptDisposition.USED, null),
 						org.assertj.core.api.Assertions.tuple("broken", AttemptDisposition.STAGE_FAILED,
 								DispositionReason.EXECUTION_FAILED),
 						org.assertj.core.api.Assertions.tuple("last", AttemptDisposition.USED, null));
@@ -255,35 +255,35 @@ class ContainmentTest {
 
 			Verdict verdict = Juries
 				.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-						new NamedJury<JudgmentContext>("broken", returning(undecided)),
-						new NamedJury<JudgmentContext>("last", returning(Verdict.single("b", PASS))))
+						new NamedJury<CompletionEvidence>("broken", returning(undecided)),
+						new NamedJury<CompletionEvidence>("last", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
 
 			CompositeAttempt attempt = verdict.compositeAttempts().get(0);
 			assertThat(attempt.dispositionReason()).isEqualTo(DispositionReason.CHILD_UNDECIDED);
 			assertThat(attempt.verdict()).as("the child's claim is not rewritten").isSameAs(undecided);
-			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
 		}
 
 		@Test
 		@DisplayName("a member excluding itself without declaring it may is a failed stage")
 		void anUndeclaredExclusionIsAStageFailure() {
 			Verdict excluded = Verdict.builder()
-				.aggregated(Judgment.notApplicable("nothing here applies"))
-				.decision(Decision.own())
+				.judgment(Judgment.notApplicable("nothing here applies"))
+				.provenance(VerdictProvenance.own())
 				.build();
 
 			Verdict verdict = Juries
 				.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-						new NamedJury<JudgmentContext>("presumptuous", returning(excluded)),
-						new NamedJury<JudgmentContext>("last", returning(Verdict.single("b", PASS))))
+						new NamedJury<CompletionEvidence>("presumptuous", returning(excluded)),
+						new NamedJury<CompletionEvidence>("last", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
 
 			CompositeAttempt attempt = verdict.compositeAttempts().get(0);
 			assertThat(attempt.disposition()).isEqualTo(AttemptDisposition.STAGE_FAILED);
 			assertThat(attempt.dispositionReason()).isEqualTo(DispositionReason.UNDECLARED_NOT_APPLICABLE);
-			assertThat(attempt.verdict().aggregated().status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
-			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+			assertThat(attempt.verdict().judgment().status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
+			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
 		}
 
 		@ParameterizedTest
@@ -292,20 +292,17 @@ class ContainmentTest {
 		void anOwnErrorIsStrategyInput(ErrorPolicy errorPolicy) {
 			Judgment propagated = Judgment.propagatedError(Map.of(JudgmentReasonCode.JUDGE_REPORTED, 1L),
 					"1 of 1 judgments errored and the error policy is propagate");
-			Verdict member = Verdict.builder()
-				.aggregated(propagated)
-				.decision(Decision.own())
-				.build();
+			Verdict member = Verdict.builder().judgment(propagated).provenance(VerdictProvenance.own()).build();
 
 			Verdict verdict = Juries
 				.meta(new ConsensusStrategy(errorPolicy, NotApplicablePolicy.EXCLUDE),
-						new NamedJury<JudgmentContext>("propagating", returning(member)),
-						new NamedJury<JudgmentContext>("healthy", returning(Verdict.single("b", PASS))))
+						new NamedJury<CompletionEvidence>("propagating", returning(member)),
+						new NamedJury<CompletionEvidence>("healthy", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
 
 			assertThat(verdict.compositeAttempts().get(0).disposition()).as("it determined an outcome")
 				.isEqualTo(AttemptDisposition.USED);
-			assertThat(verdict.aggregated().reasonCode()).isNotEqualTo(JudgmentReasonCode.STAGE_FAILED);
+			assertThat(verdict.judgment().reasonCode()).isNotEqualTo(JudgmentReasonCode.STAGE_FAILED);
 		}
 
 		@ParameterizedTest
@@ -313,58 +310,58 @@ class ContainmentTest {
 		@DisplayName("a machinery error reaching a member's strategy is never charged to the subject")
 		void aMachineryErrorMemberIsNeverScored(ErrorPolicy errorPolicy) {
 			Verdict machinery = Verdict.builder()
-				.aggregated(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
-				.decision(Decision.undecided())
+				.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
+				.provenance(VerdictProvenance.undecided())
 				.build();
 
 			Verdict verdict = Juries
 				.meta(new AllMustPassStrategy(errorPolicy, NotApplicablePolicy.EXCLUDE),
-						new NamedJury<JudgmentContext>("broken", returning(machinery)),
-						new NamedJury<JudgmentContext>("healthy", returning(Verdict.single("b", PASS))))
+						new NamedJury<CompletionEvidence>("broken", returning(machinery)),
+						new NamedJury<CompletionEvidence>("healthy", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
 
-			assertThat(verdict.aggregated().status()).as("a machinery failure never becomes a rejection")
+			assertThat(verdict.judgment().status()).as("a machinery failure never becomes a rejection")
 				.isNotEqualTo(JudgmentStatus.FAIL);
-			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
 		}
 
 		@ParameterizedTest
 		@MethodSource("io.github.markpollack.judge.jury.ContainmentTest#stageFailureMatrix")
 		@DisplayName("every machinery cause, every stage-failure reason, every error policy: never a rejection")
 		void theWholeMatrix(ErrorPolicy errorPolicy, JudgmentReasonCode machineryCode, DispositionReason reason) {
-			Jury<JudgmentContext> member = memberFailing(reason, machineryCode);
+			Jury<CompletionEvidence> member = memberFailing(reason, machineryCode);
 
 			Verdict verdict = Juries
 				.meta(new AllMustPassStrategy(errorPolicy, NotApplicablePolicy.EXCLUDE),
-						new NamedJury<JudgmentContext>("broken", member),
-						new NamedJury<JudgmentContext>("healthy", returning(Verdict.single("b", PASS))))
+						new NamedJury<CompletionEvidence>("broken", member),
+						new NamedJury<CompletionEvidence>("healthy", returning(Verdict.single("b", PASS))))
 				.vote(CONTEXT);
 
 			CompositeAttempt attempt = verdict.compositeAttempts().get(0);
 			assertThat(attempt.disposition()).as("%s / %s / %s", errorPolicy, machineryCode, reason)
 				.isEqualTo(AttemptDisposition.STAGE_FAILED);
 			assertThat(attempt.dispositionReason()).isEqualTo(reason);
-			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
-			assertThat(verdict.decision()).isEqualTo(Decision.undecided());
-			assertThat(verdict.aggregated().status()).as("a contained failure never becomes a rejection")
+			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+			assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.undecided());
+			assertThat(verdict.judgment().status()).as("a contained failure never becomes a rejection")
 				.isNotEqualTo(JudgmentStatus.FAIL);
-			assertThat(verdict.aggregated().score()).as("and never a score of zero").isNull();
-			assertThat(verdict.individualByName()).as("the members that worked are kept")
-				.containsOnlyKeys("healthy");
+			assertThat(verdict.judgment().score()).as("and never a score of zero").isNull();
+			assertThat(verdict.individualByName()).as("the members that worked are kept").containsOnlyKeys("healthy");
 		}
 
 		/** A member that fails its stage in the way the matrix asks for. */
-		private Jury<JudgmentContext> memberFailing(DispositionReason reason, JudgmentReasonCode machineryCode) {
+		private Jury<CompletionEvidence> memberFailing(DispositionReason reason, JudgmentReasonCode machineryCode) {
 			return switch (reason) {
-				case INVALID_TIER_RESULT -> throw new IllegalArgumentException("Only assessment cascade tiers use this reason");
+				case INVALID_TIER_RESULT ->
+					throw new IllegalArgumentException("Only assessment cascade tiers use this reason");
 				case EXECUTION_FAILED -> throwing(new IllegalStateException("boom"));
 				case CHILD_UNDECIDED -> returning(Verdict.builder()
-					.aggregated(Judgment.error(machineryCode, "the stage reached no outcome"))
-					.decision(Decision.undecided())
+					.judgment(Judgment.error(machineryCode, "the stage reached no outcome"))
+					.provenance(VerdictProvenance.undecided())
 					.build());
 				case UNDECLARED_NOT_APPLICABLE -> returning(Verdict.builder()
-					.aggregated(Judgment.notApplicable("nothing here applies"))
-					.decision(Decision.own())
+					.judgment(Judgment.notApplicable("nothing here applies"))
+					.provenance(VerdictProvenance.own())
 					.build());
 			};
 		}
@@ -372,18 +369,21 @@ class ContainmentTest {
 		@Test
 		@DisplayName("a nested meta-jury contains its child's failure rather than inheriting it")
 		void nestedMetaJuriesContainTheirChildren() {
-			Jury<JudgmentContext> inner = Juries.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-					new NamedJury<JudgmentContext>("broken", throwing(new IllegalStateException("boom"))));
-			Jury<JudgmentContext> outer = Juries.meta(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
-					new NamedJury<JudgmentContext>("inner", inner), new NamedJury<JudgmentContext>("healthy", returning(Verdict.single("b", PASS))));
+			Jury<CompletionEvidence> inner = Juries.meta(
+					new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+					new NamedJury<CompletionEvidence>("broken", throwing(new IllegalStateException("boom"))));
+			Jury<CompletionEvidence> outer = Juries.meta(
+					new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE),
+					new NamedJury<CompletionEvidence>("inner", inner),
+					new NamedJury<CompletionEvidence>("healthy", returning(Verdict.single("b", PASS))));
 
 			Verdict verdict = outer.vote(CONTEXT);
 
 			assertThat(verdict.compositeAttempts().get(0).dispositionReason())
 				.isEqualTo(DispositionReason.CHILD_UNDECIDED);
-			assertThat(verdict.compositeAttempts().get(0).verdict().aggregated().reasonCode())
+			assertThat(verdict.compositeAttempts().get(0).verdict().judgment().reasonCode())
 				.isEqualTo(JudgmentReasonCode.STAGE_FAILED);
-			assertThat(verdict.aggregated().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
 		}
 
 	}
@@ -391,9 +391,10 @@ class ContainmentTest {
 	// ==================== Helpers ====================
 
 	/**
-	 * Every combination the design pins: four error policies, four machinery causes, three ways a
-	 * stage can fail. The matrix exists because the rule it checks has no exceptions, and a rule
-	 * with no exceptions is exactly the kind that acquires one quietly.
+	 * Every combination the design pins: four error policies, four machinery causes,
+	 * three ways a stage can fail. The matrix exists because the rule it checks has no
+	 * exceptions, and a rule with no exceptions is exactly the kind that acquires one
+	 * quietly.
 	 * @return the arguments
 	 */
 	static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> stageFailureMatrix() {
@@ -414,15 +415,15 @@ class ContainmentTest {
 
 	static Verdict undecidedVerdict() {
 		return Verdict.builder()
-			.aggregated(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
-			.decision(Decision.undecided())
+			.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
+			.provenance(VerdictProvenance.undecided())
 			.build();
 	}
 
-	static Jury<JudgmentContext> returning(Verdict verdict) {
-		return new Jury<JudgmentContext>() {
+	static Jury<CompletionEvidence> returning(Verdict verdict) {
+		return new Jury<CompletionEvidence>() {
 			@Override
-			public List<Judge<JudgmentContext>> getJudges() {
+			public List<Judge<CompletionEvidence>> getJudges() {
 				return List.of();
 			}
 
@@ -432,16 +433,16 @@ class ContainmentTest {
 			}
 
 			@Override
-			public Verdict vote(JudgmentContext context) {
+			public Verdict vote(CompletionEvidence context) {
 				return verdict;
 			}
 		};
 	}
 
-	static Jury<JudgmentContext> throwing(RuntimeException failure) {
-		return new Jury<JudgmentContext>() {
+	static Jury<CompletionEvidence> throwing(RuntimeException failure) {
+		return new Jury<CompletionEvidence>() {
 			@Override
-			public List<Judge<JudgmentContext>> getJudges() {
+			public List<Judge<CompletionEvidence>> getJudges() {
 				return List.of();
 			}
 
@@ -451,7 +452,7 @@ class ContainmentTest {
 			}
 
 			@Override
-			public Verdict vote(JudgmentContext context) {
+			public Verdict vote(CompletionEvidence context) {
 				throw failure;
 			}
 		};

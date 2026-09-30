@@ -17,8 +17,8 @@ import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static io.github.markpollack.judge.JudgeTestFixtures.booleanFail;
 import static io.github.markpollack.judge.JudgeTestFixtures.booleanPass;
@@ -28,22 +28,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.SoftAssertions.assertSoftly;
 
 /**
- * Every weighted-average input that aggregated before the overflow fix still produces a
+ * Every weighted-average input that judgment before the overflow fix still produces a
  * bit-identical result.
  *
  * <p>
  * The expected fingerprints below were captured by running this table against the
- * unmodified sources at {@code 063d234}. A fingerprint records the status, the score's raw
- * IEEE 754 bits, label, checks, metadata keys, reasoning, and every evidence entry. Evidence
- * is compared in key order so that the comparison does not depend on iteration order, which
- * is unspecified for the no-result path. {@code Double.toString} is exact for a
- * {@code double}, and it distinguishes an integer {@code 1} from a double {@code 1.0}.
+ * unmodified sources at {@code 063d234}. A fingerprint records the status, the score's
+ * raw IEEE 754 bits, label, checks, metadata keys, reasoning, and every evidence entry.
+ * Evidence is compared in key order so that the comparison does not depend on iteration
+ * order, which is unspecified for the no-result path. {@code Double.toString} is exact
+ * for a {@code double}, and it distinguishes an integer {@code 1} from a double
+ * {@code 1.0}.
  * </p>
  *
  * <p>
  * A second, seeded random test compares the strategy against a verbatim copy of the
  * pre-change arithmetic over thousands of inputs whose weight total is finite. Those are
- * exactly the inputs that aggregated before the fix.
+ * exactly the inputs that judgment before the fix.
  * </p>
  *
  * @author Mark Pollack
@@ -65,42 +66,52 @@ class WeightedAverageBitIdentityTest {
 		List<Case> cases = new ArrayList<>();
 		cases.add(new Case("empty weight map", standard, List.of(passJudgment(0.8), passJudgment(0.6)), Map.of(),
 				"PASS score=3fe6666666666666 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.70 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=2.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("null weight map", standard, List.of(passJudgment(0.8), passJudgment(0.6)), null,
 				"PASS score=3fe6666666666666 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.70 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=2.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("weights summing to one", standard, List.of(passJudgment(0.8), passJudgment(0.6)),
 				Map.of("0", 0.3, "1", 0.7),
 				"PASS score=3fe51eb851eb851e label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.66 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=1.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("unnormalized weights", standard, List.of(passJudgment(0.8), passJudgment(0.6)),
 				Map.of("0", 3.0, "1", 7.0),
 				"PASS score=3fe51eb851eb851f label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.66 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=10.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=10.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=2, inputWeight=10.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("missing weights default to one", standard,
 				List.of(passJudgment(0.8), passJudgment(0.6), passJudgment(0.4)), Map.of("0", 2.0),
 				"PASS score=3fe4cccccccccccd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.65 across 3 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=3, eligibleWeight=4.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=3, inputWeight=4.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=3, inputWeight=4.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("boolean outcomes", standard, List.of(booleanPass("a"), booleanFail("b")),
 				Map.of("0", 0.7, "1", 0.3),
 				"PASS score=3fe6666666666666 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.70 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=1.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("an individual zero weight", standard, List.of(passJudgment(0.8), passJudgment(0.2)),
 				Map.of("0", 1.0, "1", 0.0),
 				"PASS score=3fe999999999999a label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.80 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=1.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("below the default bar", standard, List.of(passJudgment(0.8), failJudgment(0.2)),
 				Map.of("0", 0.2, "1", 0.8),
 				"FAIL score=3fd47ae147ae147c label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.32 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=1.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=2, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("exactly the default bar", standard, List.of(passJudgment(1.0), failJudgment(0.0)),
 				Map.of("0", 1.0, "1", 1.0),
 				"PASS score=3fe0000000000000 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.50 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=2.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("rounding-sensitive tenths", standard,
 				List.of(passJudgment(0.1), passJudgment(0.2), failJudgment(0.3)), Map.of("0", 0.1, "1", 0.2, "2", 0.7),
 				"FAIL score=3fd0a3d70a3d70a4 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.26 across 3 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=3, eligibleWeight=1.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=3, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=3, inputWeight=1.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("a single MAX_VALUE weight", standard, List.of(passJudgment(0.8)), Map.of("0", MAX),
 				"PASS score=3fe999999999999a label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.80 across 1 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=1, eligibleWeight=1.7976931348623157E308, "
 						+ UNIVERSAL_PASS_2
@@ -114,7 +125,8 @@ class WeightedAverageBitIdentityTest {
 				List.of(passJudgment(0.75), failJudgment(0.25), passJudgment(0.5)),
 				Map.of("0", 1e308, "1", 5e307, "2", 1e307),
 				"PASS score=3fe2800000000001 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.58 across 3 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=3, eligibleWeight=1.6E308, "
-						+ UNIVERSAL_PASS_2 + "inputCount=3, inputWeight=1.6E308, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=3, inputWeight=1.6E308, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("MAX_VALUE absorbs small weights without overflowing", standard,
 				List.of(passJudgment(0.9), failJudgment(0.1), failJudgment(0.2)), Map.of("0", MAX, "1", 1.0, "2", 3.0),
 				"PASS score=3feccccccccccccd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.90 across 3 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=3, eligibleWeight=1.7976931348623157E308, "
@@ -123,22 +135,25 @@ class WeightedAverageBitIdentityTest {
 		cases.add(new Case("subnormal weights", standard, List.of(passJudgment(0.8), failJudgment(0.3)),
 				Map.of("0", Double.MIN_VALUE, "1", 3 * Double.MIN_VALUE),
 				"PASS score=3fe0000000000000 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.50 across 2 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=2, eligibleWeight=2.0E-323, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=2.0E-323, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=2, inputWeight=2.0E-323, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("extreme weight ratio", standard, List.of(passJudgment(0.9), failJudgment(0.1)),
 				Map.of("0", 1e-300, "1", 1e300),
 				"FAIL score=3fb999999999999a label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.10 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=1.0E300, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=1.0E300, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=2, inputWeight=1.0E300, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("a stated bar", new WeightedAverageStrategy(0.8),
 				List.of(passJudgment(0.7), passJudgment(0.9)), Map.of("0", 1.0, "1", 3.0),
 				"PASS score=3feb333333333334 label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.85 across 2 applicable judge(s) (threshold: 0.80, result: pass) evidence={eligibleCount=2, eligibleWeight=4.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=2, inputWeight=4.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.8}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=2, inputWeight=4.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.8}"));
 		cases.add(new Case("IGNORE drops a heavily weighted error", new WeightedAverageStrategy(ErrorPolicy.IGNORE),
 				List.of(Judgment.error("boom"), passJudgment(0.6), failJudgment(0.4)),
 				Map.of("0", 5.0, "1", 1.0, "2", 2.0),
 				"FAIL score=3fdddddddddddddd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.47 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=3.0, errorCodeCounts={judge_reported=1}, errorCount=1, errorPolicy=ignore, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=0, explicitAbstainCount=0, ignoredErrorCount=1, inputCount=3, inputWeight=8.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("TREAT_AS_FAIL keeps the error's weight",
-				new WeightedAverageStrategy(ErrorPolicy.TREAT_AS_FAIL), List.of(Judgment.error("boom"), passJudgment(0.9)),
-				Map.of("0", 1.0, "1", 1.0),
+				new WeightedAverageStrategy(ErrorPolicy.TREAT_AS_FAIL),
+				List.of(Judgment.error("boom"), passJudgment(0.9)), Map.of("0", 1.0, "1", 1.0),
 				"FAIL score=3fdccccccccccccd label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.45 across 2 applicable judge(s) (threshold: 0.50, result: fail) evidence={eligibleCount=2, eligibleWeight=2.0, errorCodeCounts={judge_reported=1}, errorCount=1, errorPolicy=treatAsFail, errorsTreatedAsAbstainCount=0, errorsTreatedAsFailCount=1, explicitAbstainCount=0, ignoredErrorCount=0, inputCount=2, inputWeight=2.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		cases.add(new Case("TREAT_AS_ABSTAIN removes the error's weight",
 				new WeightedAverageStrategy(ErrorPolicy.TREAT_AS_ABSTAIN),
@@ -171,7 +186,8 @@ class WeightedAverageBitIdentityTest {
 		}
 		cases.add(new Case("ten judges with fractional weights", standard, ten, tenWeights,
 				"PASS score=3fe3ae147ae147af label=null checks=0 metadataKeys=[aggregation] reasoning=Weighted average: 0.62 across 10 applicable judge(s) (threshold: 0.50, result: pass) evidence={eligibleCount=10, eligibleWeight=50.0, "
-						+ UNIVERSAL_PASS_2 + "inputCount=10, inputWeight=50.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
+						+ UNIVERSAL_PASS_2
+						+ "inputCount=10, inputWeight=50.0, notApplicableCount=0, notApplicablePolicy=refuse, notApplicableTreatedAsFailCount=0, strategy=weightedAverage, threshold=0.5}"));
 		return cases;
 	}
 
@@ -205,7 +221,8 @@ class WeightedAverageBitIdentityTest {
 			}
 			Reference expected = Reference.of(judgments, weights);
 			if (expected == null) {
-				// A zero or overflowing total threw before the fix; it is not a working input.
+				// A zero or overflowing total threw before the fix; it is not a working
+				// input.
 				continue;
 			}
 			if (expected.inputWeight() > 1e307) {
@@ -223,16 +240,16 @@ class WeightedAverageBitIdentityTest {
 			compared++;
 		}
 		assertThat(compared).isEqualTo(5_000);
-		// The sample must reach the region near overflow, or it guards nothing interesting.
+		// The sample must reach the region near overflow, or it guards nothing
+		// interesting.
 		assertThat(nearOverflow).isGreaterThan(500);
 	}
 
 	/**
-	 * The weighted-average arithmetic exactly as it stood at {@code 063d234}, for the default
-	 * {@code PROPAGATE} policy over judgments that include no ERROR.
+	 * The weighted-average arithmetic exactly as it stood at {@code 063d234}, for the
+	 * default {@code PROPAGATE} policy over judgments that include no ERROR.
 	 */
-	private record Reference(JudgmentStatus status, @Nullable Double score, double inputWeight,
-			double eligibleWeight) {
+	private record Reference(JudgmentStatus status, @Nullable Double score, double inputWeight, double eligibleWeight) {
 
 		static @Nullable Reference of(List<Judgment> judgments, Map<String, Double> weights) {
 			double[] resolved = new double[judgments.size()];

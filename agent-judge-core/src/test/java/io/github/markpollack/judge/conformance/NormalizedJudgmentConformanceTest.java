@@ -31,8 +31,8 @@ import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.jury.AggregationEvidence;
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.jury.CompositeAttempt;
@@ -48,9 +48,9 @@ import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.TierPolicy;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.jury.VotingStrategy;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -113,9 +113,9 @@ class NormalizedJudgmentConformanceTest {
 				.isEqualTo("715749d0ca4ddf2be2e64e1c3adce4bcbcc6c7c94acb21a821026ff9a3010600");
 
 			HistoricalVerdictFixture historical = MAPPER.readValue(bytes, HistoricalVerdictFixture.class);
-			assertThat(fieldNames(goldenTree()))
-				.containsExactlyElementsOf(componentNames(HistoricalVerdictFixture.class));
-			assertThat(historical.aggregated()).isNotNull();
+			assertThat(fieldNames(goldenTree())).containsExactly("aggregated", "individual", "individualByName",
+					"weights", "subVerdicts");
+			assertThat(historical.judgment()).isNotNull();
 			assertThat(historical.individual()).hasSize(4);
 			assertThat(historical.individualByName()).hasSize(4);
 			assertThat(historical.weights()).hasSize(4);
@@ -140,8 +140,7 @@ class NormalizedJudgmentConformanceTest {
 		void liveTypesRefuseAnUnrecordedRequiredFact() {
 			JsonNode errored = goldenTree().at("/individualByName/licence-audit");
 
-			assertThatThrownBy(() -> MAPPER.treeToValue(errored, Judgment.class))
-				.isInstanceOf(Exception.class)
+			assertThatThrownBy(() -> MAPPER.treeToValue(errored, Judgment.class)).isInstanceOf(Exception.class)
 				.hasMessageContaining("schemaVersion");
 		}
 
@@ -154,7 +153,7 @@ class NormalizedJudgmentConformanceTest {
 				.as("re-serializing a parsed verdict must reproduce the same corrected document")
 				.isEqualTo(fixtureTree());
 
-			assertThat(parsed.aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
+			assertThat(parsed.judgment().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 			assertThat(parsed.individual()).extracting(Judgment::status)
 				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.FAIL, JudgmentStatus.ABSTAIN,
 						JudgmentStatus.NOT_APPLICABLE, JudgmentStatus.ERROR);
@@ -177,8 +176,9 @@ class NormalizedJudgmentConformanceTest {
 		@DisplayName("every judgment keeps the pinned presentation order")
 		void judgmentFieldOrderIsPinned() {
 			for (JsonNode judgment : allJudgmentNodes(fixtureTree())) {
-				List<String> declared = List.of("schemaVersion", "producerStatus", "assessment", "certainty", "distribution",
-						"reasonCode", "reasoning", "checks", "provenance", "policyApplication", "metadata");
+				List<String> declared = List.of("schemaVersion", "producerStatus", "finding", "confidence",
+						"probabilityDistribution", "reasonCode", "reasoning", "checks", "provenance",
+						"policyApplication", "metadata");
 				assertThat(fieldNames(judgment))
 					.containsExactlyElementsOf(declared.stream().filter(judgment::has).toList());
 			}
@@ -192,15 +192,15 @@ class NormalizedJudgmentConformanceTest {
 			assertThat(fieldNames(metadata)).containsExactly("elapsedMillis", "model", "usage", "findings");
 			assertThat(fieldNames(metadata.get("usage"))).containsExactly("inputTokens", "outputTokens",
 					"reasoningTokens", "cacheCreationTokens", "cacheReadTokens", "reportedTotalTokens");
-			assertThat(fieldNames(fixtureTree().at("/aggregated/metadata/" + Judgment.AGGREGATION_KEY)))
-				.containsExactly(AggregationEvidence.STRATEGY, AggregationEvidence.ERROR_POLICY,
-						AggregationEvidence.NOT_APPLICABLE_POLICY, AggregationEvidence.INPUT_COUNT,
-						AggregationEvidence.ELIGIBLE_COUNT, AggregationEvidence.EXPLICIT_ABSTAIN_COUNT,
-						AggregationEvidence.NOT_APPLICABLE_COUNT, AggregationEvidence.ERROR_COUNT,
-						AggregationEvidence.IGNORED_ERROR_COUNT, AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT,
-						AggregationEvidence.ERRORS_TREATED_AS_FAIL_COUNT,
-						AggregationEvidence.NOT_APPLICABLE_TREATED_AS_FAIL_COUNT, AggregationEvidence.ERROR_CODE_COUNTS,
-						AggregationEvidence.PASS_COUNT, AggregationEvidence.FAIL_COUNT);
+			assertThat(fieldNames(fixtureTree().at("/judgment/metadata/" + Judgment.AGGREGATION_KEY))).containsExactly(
+					AggregationEvidence.STRATEGY, AggregationEvidence.ERROR_POLICY,
+					AggregationEvidence.NOT_APPLICABLE_POLICY, AggregationEvidence.INPUT_COUNT,
+					AggregationEvidence.ELIGIBLE_COUNT, AggregationEvidence.EXPLICIT_ABSTAIN_COUNT,
+					AggregationEvidence.NOT_APPLICABLE_COUNT, AggregationEvidence.ERROR_COUNT,
+					AggregationEvidence.IGNORED_ERROR_COUNT, AggregationEvidence.ERRORS_TREATED_AS_ABSTAIN_COUNT,
+					AggregationEvidence.ERRORS_TREATED_AS_FAIL_COUNT,
+					AggregationEvidence.NOT_APPLICABLE_TREATED_AS_FAIL_COUNT, AggregationEvidence.ERROR_CODE_COUNTS,
+					AggregationEvidence.PASS_COUNT, AggregationEvidence.FAIL_COUNT);
 		}
 
 	}
@@ -212,8 +212,7 @@ class NormalizedJudgmentConformanceTest {
 		@Test
 		void realCompositeExecutionPreservesHistoricalStructureWithModernIdentity() {
 			assertThat(compositeFixtureTree())
-				.as("only the declared one-seat identity projections differ from frozen %s",
-						COMPOSITE_GOLDEN_RESOURCE)
+				.as("only the declared one-seat identity projections differ from frozen %s", COMPOSITE_GOLDEN_RESOURCE)
 				.isEqualTo(modernCompositeIdentityExpectation());
 		}
 
@@ -228,7 +227,7 @@ class NormalizedJudgmentConformanceTest {
 			HistoricalCompositeVerdict historical = MAPPER.readValue(bytes, HistoricalCompositeVerdict.class);
 			assertThat(historical.seats()).as("0.14 recorded no seats, so the fact is missing rather than empty")
 				.isNull();
-			assertThat(historical.decision()).isNull();
+			assertThat(historical.provenance()).isNull();
 			assertThat(historical.compositeAttempts()).extracting(HistoricalCompositeAttempt::name)
 				.containsExactly("pipeline", "audit");
 			assertThat(historical.compositeAttempts())
@@ -241,7 +240,7 @@ class NormalizedJudgmentConformanceTest {
 			Verdict parsed = MAPPER.readValue(writeCompositeFixture(), Verdict.class);
 			assertThat(MAPPER.readTree(MAPPER.writeValueAsString(parsed)))
 				.isEqualTo(modernCompositeIdentityExpectation());
-			assertThat(parsed.aggregated().status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(parsed.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(parsed.compositeAttempts()).extracting(CompositeAttempt::name)
 				.containsExactly("pipeline", "audit");
 			assertThat(parsed.compositeAttempts().get(0).verdict().compositeAttempts())
@@ -252,7 +251,8 @@ class NormalizedJudgmentConformanceTest {
 		@Test
 		void declarationsDeriveTheCompleteCompositePropertySet() {
 			for (JsonNode verdictNode : allVerdictNodes(compositeFixtureTree())) {
-				assertThat(fieldNames(verdictNode)).containsExactly("schemaVersion", "declaredCardinality", "aggregated", "individual", "individualByName", "weights", "seats", "decision", "compositeAttempts");
+				assertThat(fieldNames(verdictNode)).containsExactly("schemaVersion", "declaredCardinality", "judgment",
+						"individual", "individualByName", "weights", "seats", "provenance", "compositeAttempts");
 			}
 
 			Set<String> attemptProperties = new LinkedHashSet<>();
@@ -304,7 +304,7 @@ class NormalizedJudgmentConformanceTest {
 	 * an instrument failure nobody can count, and letting one in through a lenient reader
 	 * would put it back into circulation as though it had been recorded. Reading old data
 	 * is therefore a separate type, and conversion to the live type is a separate, loud
-	 * decision.
+	 * provenance.
 	 * </p>
 	 */
 	private record HistoricalJudgment(@Nullable String status, @Nullable Double score, @Nullable String label,
@@ -312,15 +312,18 @@ class NormalizedJudgmentConformanceTest {
 			@Nullable Map<String, Object> metadata) {
 	}
 
-	private record HistoricalVerdictFixture(HistoricalJudgment aggregated, List<HistoricalJudgment> individual,
-			Map<String, HistoricalJudgment> individualByName, Map<String, Double> weights,
-			List<HistoricalVerdictFixture> subVerdicts) {
+	private record HistoricalVerdictFixture(
+			@com.fasterxml.jackson.annotation.JsonProperty("aggregated") HistoricalJudgment judgment,
+			List<HistoricalJudgment> individual, Map<String, HistoricalJudgment> individualByName,
+			Map<String, Double> weights, List<HistoricalVerdictFixture> subVerdicts) {
 	}
 
 	/** The 0.14 composite verdict, with the markers 0.17 added declared and absent. */
-	private record HistoricalCompositeVerdict(HistoricalJudgment aggregated, List<HistoricalJudgment> individual,
-			Map<String, HistoricalJudgment> individualByName, Map<String, Double> weights,
-			@Nullable List<Map<String, Object>> seats, @Nullable Map<String, Object> decision,
+	private record HistoricalCompositeVerdict(
+			@com.fasterxml.jackson.annotation.JsonProperty("aggregated") HistoricalJudgment judgment,
+			List<HistoricalJudgment> individual, Map<String, HistoricalJudgment> individualByName,
+			Map<String, Double> weights, @Nullable List<Map<String, Object>> seats,
+			@com.fasterxml.jackson.annotation.JsonProperty("decision") @Nullable Map<String, Object> provenance,
 			List<HistoricalCompositeAttempt> compositeAttempts) {
 	}
 
@@ -382,8 +385,8 @@ class NormalizedJudgmentConformanceTest {
 			Set<String> present = new LinkedHashSet<>();
 			allJudgmentNodes(fixtureTree()).forEach(judgment -> present.addAll(fieldNames(judgment)));
 
-			assertThat(present).containsExactlyInAnyOrder("schemaVersion", "producerStatus", "assessment", "reasonCode", "reasoning",
-					"checks", "metadata");
+			assertThat(present).containsExactlyInAnyOrder("schemaVersion", "producerStatus", "finding", "reasonCode",
+					"reasoning", "checks", "metadata");
 			// Modern-only optional components are exercised by ModernResultValuesTest.
 		}
 
@@ -418,7 +421,7 @@ class NormalizedJudgmentConformanceTest {
 		@Test
 		@DisplayName("every declared aggregation-evidence key is accounted for, present or deliberately absent")
 		void coversEveryEvidenceKey() {
-			JsonNode evidence = fixtureTree().at("/aggregated/metadata/" + Judgment.AGGREGATION_KEY);
+			JsonNode evidence = fixtureTree().at("/judgment/metadata/" + Judgment.AGGREGATION_KEY);
 
 			// Keys that belong to one strategy family. A status-counting aggregate that
 			// emitted them would be reporting a reduction it never performed.
@@ -448,7 +451,7 @@ class NormalizedJudgmentConformanceTest {
 		@Test
 		@DisplayName("the reserved and timing metadata keys both appear")
 		void coversTheReservedAndTimingKeys() {
-			assertThat(fixtureTree().at("/aggregated/metadata").has(Judgment.AGGREGATION_KEY)).isTrue();
+			assertThat(fixtureTree().at("/judgment/metadata").has(Judgment.AGGREGATION_KEY)).isTrue();
 			assertThat(judgmentNode(MODEL_BACKED_JUDGE).get("metadata").has(Judgment.ELAPSED_MILLIS_KEY)).isTrue();
 		}
 
@@ -465,7 +468,8 @@ class NormalizedJudgmentConformanceTest {
 				boolean declaredNullable = component.getAnnotatedType().getAnnotation(Nullable.class) != null;
 				assertThat(declaredNullable).as("Judgment.%s nullability declaration", component.getName())
 					.isEqualTo(List
-						.of("assessment", "certainty", "distribution", "reasonCode", "provenance", "policyApplication")
+						.of("finding", "confidence", "probabilityDistribution", "reasonCode", "provenance",
+								"policyApplication")
 						.contains(component.getName()));
 			}
 
@@ -501,7 +505,7 @@ class NormalizedJudgmentConformanceTest {
 		@Test
 		@DisplayName("M5: disagreement aggregates to ABSTAIN and stays distinguishable from a no-result abstention")
 		void disagreementIsNotUnanimityAndNotEmptiness() {
-			Judgment disagreement = verdict().aggregated();
+			Judgment disagreement = verdict().judgment();
 			Judgment noResult = new ConsensusStrategy(ErrorPolicy.IGNORE)
 				.aggregate(List.of(Judgment.abstain("the retrieval index was empty")), Map.of());
 
@@ -540,7 +544,7 @@ class NormalizedJudgmentConformanceTest {
 	 * implementation does not reach.
 	 */
 	private static Verdict verdict() {
-		Jury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.votingStrategy(new ConsensusStrategy(ErrorPolicy.IGNORE, NotApplicablePolicy.EXCLUDE))
 			.parallel(false)
 			.judge(Judges.named(context -> buildSuccess(), "build-success"))
@@ -550,33 +554,34 @@ class NormalizedJudgmentConformanceTest {
 			.judge(Judges.named(context -> licenceAudit(), "licence-audit"))
 			.build();
 
-		return jury.vote(JudgmentContext.builder()
-			.goal("Add the portable token-usage projection")
-			.status(ExecutionStatus.SUCCESS)
-			.agentOutput("Implemented Usage.toPortableMap()")
+		return jury.vote(CompletionEvidence.builder()
+			.request("Add the portable token-usage projection")
+			.status(CompletionStatus.SUCCESS)
+			.response("Implemented Usage.toPortableMap()")
 			.build());
 	}
 
 	private static Verdict compositeVerdict() {
-		Jury<JudgmentContext> successful = SimpleJury.<JudgmentContext>builder()
+		Jury<CompletionEvidence> successful = SimpleJury.<CompletionEvidence>builder()
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
 			.judge(Judges.named(context -> Judgment.pass("Semantic fallback accepted"), "semantic-check"))
 			.build();
-		Jury<JudgmentContext> cascade = CascadedJury.<JudgmentContext>builder()
+		Jury<CompletionEvidence> cascade = CascadedJury.<CompletionEvidence>builder()
 			.tier("broken-check", throwingJury(new IllegalStateException("/home/alice/.ssh/id_ed25519")),
 					TierPolicy.REJECT_ON_ANY_FAIL)
 			.tier("semantic-check", successful, TierPolicy.FINAL_TIER)
 			.build();
-		Jury<JudgmentContext> meta = Juries.meta(new ConsensusStrategy(), new NamedJury<JudgmentContext>("pipeline", cascade),
-				new NamedJury<JudgmentContext>("audit", throwingJury(new IllegalArgumentException("token=opaque-secret"))));
-		return meta.vote(JudgmentContext.builder().goal("Verify the corrected composite result").build());
+		Jury<CompletionEvidence> meta = Juries.meta(new ConsensusStrategy(),
+				new NamedJury<CompletionEvidence>("pipeline", cascade), new NamedJury<CompletionEvidence>("audit",
+						throwingJury(new IllegalArgumentException("token=opaque-secret"))));
+		return meta.vote(CompletionEvidence.builder().request("Verify the corrected composite result").build());
 	}
 
-	private static Jury<JudgmentContext> throwingJury(RuntimeException failure) {
-		return new Jury<JudgmentContext>() {
+	private static Jury<CompletionEvidence> throwingJury(RuntimeException failure) {
+		return new Jury<CompletionEvidence>() {
 			@Override
-			public List<Judge<JudgmentContext>> getJudges() {
+			public List<Judge<CompletionEvidence>> getJudges() {
 				return List.of();
 			}
 
@@ -586,7 +591,7 @@ class NormalizedJudgmentConformanceTest {
 			}
 
 			@Override
-			public Verdict vote(JudgmentContext context) {
+			public Verdict vote(CompletionEvidence context) {
 				throw failure;
 			}
 		};
@@ -666,10 +671,10 @@ class NormalizedJudgmentConformanceTest {
 	 * the point.
 	 * </p>
 	 */
-	private record ConditionalJudge(String name) implements JudgeWithMetadata<JudgmentContext> {
+	private record ConditionalJudge(String name) implements JudgeWithMetadata<CompletionEvidence> {
 
 		@Override
-		public Judgment judge(JudgmentContext context) {
+		public Judgment judge(CompletionEvidence context) {
 			return Judgment.builder()
 				.notApplicable()
 				.reasoning("The change set contains no Java sources, so the Java style rules do not apply")
@@ -733,8 +738,8 @@ class NormalizedJudgmentConformanceTest {
 		JsonNode pipeline = expected.at("/compositeAttempts/0/verdict");
 		JsonNode leaf = pipeline.at("/compositeAttempts/1/verdict");
 		JsonNode sole = leaf.at("/individual/0");
-		((com.fasterxml.jackson.databind.node.ObjectNode) leaf).set("aggregated", sole);
-		((com.fasterxml.jackson.databind.node.ObjectNode) pipeline).set("aggregated", sole);
+		((com.fasterxml.jackson.databind.node.ObjectNode) leaf).set("judgment", sole);
+		((com.fasterxml.jackson.databind.node.ObjectNode) pipeline).set("judgment", sole);
 		((com.fasterxml.jackson.databind.node.ArrayNode) expected.get("individual")).set(0, sole);
 		((com.fasterxml.jackson.databind.node.ObjectNode) expected.get("individualByName")).set("pipeline", sole);
 		return expected;
@@ -785,13 +790,13 @@ class NormalizedJudgmentConformanceTest {
 
 	private static List<Judgment> allJudgments() {
 		List<Judgment> judgments = new ArrayList<>(verdict().individual());
-		judgments.add(verdict().aggregated());
+		judgments.add(verdict().judgment());
 		return judgments;
 	}
 
 	private static List<JsonNode> allJudgmentNodes(JsonNode document) {
 		List<JsonNode> nodes = new ArrayList<>();
-		nodes.add(document.get("aggregated"));
+		nodes.add(document.get("judgment"));
 		document.get("individual").forEach(nodes::add);
 		return nodes;
 	}

@@ -5,7 +5,7 @@
 
 package io.github.markpollack.judge.jury.interpretation;
 
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 
 import java.util.List;
 import java.util.Map;
@@ -19,7 +19,7 @@ import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.jury.ConsensusStrategy;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import static io.github.markpollack.judge.jury.interpretation.Fixtures.A068E50A;
 import static io.github.markpollack.judge.jury.interpretation.Fixtures.A36A7598C;
@@ -35,7 +35,8 @@ import static io.github.markpollack.judge.jury.interpretation.Fixtures.stored;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * A3, A4 (stored), §7.7 items 2, 3 and 5, and the flat root: every stored shape in the archive.
+ * A3, A4 (stored), §7.7 items 2, 3 and 5, and the flat root: every stored shape in the
+ * archive.
  */
 @DisplayName("The stored shapes")
 class StoredShapesTest {
@@ -46,13 +47,13 @@ class StoredShapesTest {
 		Interpretation interpretation = Verdicts.interpret(stored(A068E50A));
 
 		assertThat(interpretation.sourceVersion()).isEqualTo(0);
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.REJECTED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
 		assertThat(interpretation.decidedBy()).as("the last-attempt-failed inference is not made").isNull();
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
 
 		assertThat(interpretation.stages()).extracting(Stage::stage).containsExactly("artifacts", "structure");
-		assertThat(interpretation.stages()).extracting(Stage::path).containsExactly(List.of("artifacts"),
-				List.of("structure"));
+		assertThat(interpretation.stages()).extracting(Stage::path)
+			.containsExactly(List.of("artifacts"), List.of("structure"));
 		assertThat(interpretation.stages()).extracting(Stage::policy).containsOnly("REJECT_ON_ANY_FAIL");
 		assertThat(interpretation.stages()).extracting(Stage::status).containsExactly("pass", "fail");
 		assertThat(interpretation.stages()).extracting(Stage::usedByParent).containsOnlyNulls();
@@ -76,11 +77,14 @@ class StoredShapesTest {
 	void a36a7598c() {
 		Interpretation interpretation = Verdicts.interpret(stored(A36A7598C));
 
-		assertThat(interpretation.reading()).as("stored today as passed: false; a propagated judge error is not a rejection")
-			.isEqualTo(VerdictReading.NOT_ASSESSED);
+		assertThat(interpretation.outcome())
+			.as("stored today as passed: false; a propagated judge error is not a rejection")
+			.isEqualTo(RequirementOutcome.NOT_ASSESSED);
 		assertThat(interpretation.decidedBy()).isNull();
-		assertThat(interpretation.readingSupport()).as("propagate with one error is an error").isEqualTo(ReadingSupport.SUPPORTED);
-		assertThat(interpretation.stages()).extracting(Stage::stage).containsExactly("artifacts", "structure", "quality");
+		assertThat(interpretation.readingSupport()).as("propagate with one error is an error")
+			.isEqualTo(ReadingSupport.SUPPORTED);
+		assertThat(interpretation.stages()).extracting(Stage::stage)
+			.containsExactly("artifacts", "structure", "quality");
 		assertThat(interpretation.stages().get(2).status()).isEqualTo("error");
 		assertThat(interpretation.stages().get(2).judges()).extracting(JudgeSeat::name, JudgeSeat::status)
 			.containsExactly(org.assertj.core.groups.Tuple.tuple("dddQuality", "error"),
@@ -101,7 +105,7 @@ class StoredShapesTest {
 	void budEval7e423de9() {
 		Interpretation interpretation = Verdicts.interpret(stored(BUD_EVAL_7E423DE9));
 
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.ACCEPTED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.SATISFIED);
 		assertThat(interpretation.sourceVersion()).isEqualTo(0);
 		assertThat(interpretation.decidedBy()).isNull();
 		assertThat(interpretation.stages()).hasSize(3);
@@ -121,7 +125,8 @@ class StoredShapesTest {
 	void aVerdictLessAttempt(String fixture) {
 		Interpretation interpretation = Verdicts.interpret(stored(fixture));
 
-		assertThat(interpretation.stages()).extracting(Stage::stage).containsExactly("review-produced", "review-quality");
+		assertThat(interpretation.stages()).extracting(Stage::stage)
+			.containsExactly("review-produced", "review-quality");
 		Stage failed = interpretation.stages().get(1);
 		assertThat(failed.failure()).isEqualTo("jury_execution_failed");
 		assertThat(failed.status()).isNull();
@@ -134,7 +139,7 @@ class StoredShapesTest {
 			.noneMatch(defect -> defect.path().startsWith("verdict.compositeAttempts[1]")
 					&& !defect.field().equals("disposition"));
 
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.NOT_ASSESSED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.NOT_ASSESSED);
 		assertThat(interpretation.root().judges()).isEmpty();
 		assertThat(interpretation.stages().get(0).status()).isEqualTo("pass");
 	}
@@ -142,7 +147,7 @@ class StoredShapesTest {
 	@Test
 	@DisplayName("a flat verdict with no composite container: the root carries it and stages is empty")
 	void aFlatRoot() {
-		Verdict flat = SimpleJury.<JudgmentContext>builder()
+		Verdict flat = SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> Judgment.pass("compiled"), "build"))
 			.judge(Judges.named(context -> Judgment.fail("two tests failed"), "tests"))
 			.votingStrategy(new ConsensusStrategy())
@@ -158,7 +163,7 @@ class StoredShapesTest {
 			assertThat(interpretation.root().evidence()).isNotNull();
 			assertThat(interpretation.decidedBy()).isNull();
 			assertThat(interpretation.defects()).isEmpty();
-			assertThat(interpretation.reading()).isEqualTo(VerdictReading.UNDECIDED);
+			assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.UNRESOLVED);
 		}
 	}
 
@@ -173,7 +178,7 @@ class StoredShapesTest {
 		assertThat(interpretation.stages()).isEmpty();
 		assertThat(interpretation.root().status()).isEqualTo("fail");
 		assertThat(interpretation.root().judges()).extracting(JudgeSeat::status).containsExactly("pass", "fail");
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.REJECTED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
 		assertThat(interpretation.defects()).noneMatch(defect -> defect.kind() == DefectKind.UNKNOWN_VOCABULARY);
 	}
 
@@ -192,7 +197,7 @@ class StoredShapesTest {
 
 		assertThat(interpretation.root().status()).isEqualTo("maybe");
 		assertThat(interpretation.root().reasonCode()).isEqualTo("gremlins");
-		assertThat(interpretation.reading()).as("no reading can be taken from an unknown status").isNull();
+		assertThat(interpretation.outcome()).as("no reading can be taken from an unknown status").isNull();
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.UNDETERMINED);
 		assertThat(interpretation.stages().get(0).disposition()).isEqualTo("sideways");
 		assertThat(interpretation.stages().get(0).usedByParent()).as("unknown is never read as used").isNull();
@@ -209,7 +214,7 @@ class StoredShapesTest {
 	void aWrongShapeDegrades() {
 		Interpretation interpretation = Verdicts.interpret(Map.of("something", "else"));
 
-		assertThat(interpretation.reading()).isNull();
+		assertThat(interpretation.outcome()).isNull();
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.UNDETERMINED);
 		assertThat(interpretation.root().judges()).isEmpty();
 		assertThat(interpretation.stages()).isEmpty();

@@ -5,7 +5,7 @@
 
 package io.github.markpollack.judge.consumer;
 
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -19,18 +19,18 @@ import org.junit.jupiter.api.io.TempDir;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.description.JuryDescription;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * R5: the same jury describes to the same bytes in separate JVMs, so a consumer can hash the
- * description.
+ * R5: the same jury describes to the same bytes in separate JVMs, so a consumer can hash
+ * the description.
  *
  * <p>
- * Each run is a fresh {@code java} process on this test's classpath. Hidden-class addresses and
- * {@code Map.of} iteration salts are chosen per process, so agreement between processes is the
- * property; agreement within one process would prove nothing.
+ * Each run is a fresh {@code java} process on this test's classpath. Hidden-class
+ * addresses and {@code Map.of} iteration salts are chosen per process, so agreement
+ * between processes is the property; agreement within one process would prove nothing.
  * </p>
  */
 @DisplayName("A jury description is byte-stable across JVM runs")
@@ -61,7 +61,8 @@ class CrossJvmDescriptionStabilityTest {
 	void theFixtureMatchesThePinnedFormatForThisDescriptionVersion() throws Exception {
 		String golden;
 		try (InputStream resource = getClass().getResourceAsStream(GOLDEN)) {
-			assertThat(resource).as("a golden description for descriptionVersion %d", JuryDescription.DESCRIPTION_VERSION)
+			assertThat(resource)
+				.as("a golden description for descriptionVersion %d", JuryDescription.DESCRIPTION_VERSION)
 				.isNotNull();
 			golden = new String(resource.readAllBytes(), StandardCharsets.UTF_8).strip();
 		}
@@ -74,7 +75,7 @@ class CrossJvmDescriptionStabilityTest {
 
 	@Test
 	void theRuntimeNamesTheDescriptionAvoidsAreReallyUnstable() {
-		Judge<JudgmentContext> lambda = ctx -> Judgment.pass("probe");
+		Judge<CompletionEvidence> lambda = ctx -> Judgment.pass("probe");
 
 		assertThat(lambda.getClass().getName()).contains("$$Lambda").contains("/0x");
 	}

@@ -5,8 +5,8 @@
 
 package io.github.markpollack.judge.llm;
 
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.judgment.Judgment;
 import org.springframework.ai.chat.client.ChatClient;
 
 /**
@@ -43,18 +43,19 @@ import org.springframework.ai.chat.client.ChatClient;
  * <p>
  * <strong>Best Practice:</strong> Combine with deterministic judges in a Jury for robust
  * evaluation. Use deterministic judges for objective criteria (file exists, build
- * succeeds) and CorrectnessJudge for subjective assessment (quality, helpfulness).
+ * succeeds) and CorrectnessJudge for subjective finding (quality, helpfulness).
  * </p>
  *
  * <p>
  * Example usage:
  * </p>
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0
  */
-public class CorrectnessJudge extends LLMJudge {
+public class CorrectnessJudge extends LLMJudge<CompletionEvidence> {
 
 	/**
 	 * Create a correctness judge with the given chat client builder.
@@ -65,14 +66,12 @@ public class CorrectnessJudge extends LLMJudge {
 	}
 
 	@Override
-	protected String buildPrompt(JudgmentContext context) {
-		String goal = context.goal();
-		String workspace = context.workspace() != null ? context.workspace().toString() : "Not specified";
-		String output = context.agentOutput().orElse("No output provided");
+	protected String buildPrompt(CompletionEvidence context) {
+		String goal = context.request();
+		String output = java.util.Optional.ofNullable(context.response()).orElse("No output provided");
 
 		return String.format("""
 				Goal: %s
-				Workspace: %s
 				Agent Output: %s
 
 				Did the agent accomplish the goal? Answer YES or NO, followed by your reasoning.
@@ -80,11 +79,11 @@ public class CorrectnessJudge extends LLMJudge {
 				Format your response as:
 				Answer: [YES or NO]
 				Reasoning: [Your explanation]
-				""", goal, workspace, output);
+				""", goal, output);
 	}
 
 	@Override
-	protected Judgment parseResponse(String response, JudgmentContext context) {
+	protected Judgment parseResponse(String response, CompletionEvidence context) {
 		// Extract YES/NO answer
 		boolean pass = response.toUpperCase().contains("YES");
 

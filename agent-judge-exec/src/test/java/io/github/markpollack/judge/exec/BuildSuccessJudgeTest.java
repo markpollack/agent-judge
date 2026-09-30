@@ -7,16 +7,12 @@ package io.github.markpollack.judge.exec;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -131,14 +127,8 @@ class BuildSuccessJudgeTest {
 		assertThat(judgment.reasoning()).contains("failed");
 	}
 
-	private JudgmentContext createContext() {
-		return JudgmentContext.builder()
-			.goal("Build project")
-			.workspace(tempDir)
-			.executionTime(Duration.ofSeconds(1))
-			.startedAt(Instant.now())
-			.status(ExecutionStatus.SUCCESS)
-			.build();
+	private Path createContext() {
+		return tempDir;
 	}
 
 	private void makeExecutable(Path file) throws IOException {

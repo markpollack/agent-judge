@@ -20,7 +20,7 @@ import io.github.markpollack.judge.JudgeTestFixtures;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.NamedJudge;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.description.CascadedJuryDescription;
 import io.github.markpollack.judge.description.ConfiguredJudge;
 import io.github.markpollack.judge.description.ImplementationIdentity;
@@ -55,7 +55,7 @@ import io.github.markpollack.judge.jury.TierPolicy;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.jury.VotingStrategy;
 import io.github.markpollack.judge.jury.WeightedAverageStrategy;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import static io.github.markpollack.judge.JudgeTestFixtures.simpleContext;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -64,7 +64,8 @@ import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * R1–R3 of the jury description, obtained only through public API from a package outside
- * {@code io.github.markpollack.judge.jury} and {@code io.github.markpollack.judge.description}.
+ * {@code io.github.markpollack.judge.jury} and
+ * {@code io.github.markpollack.judge.description}.
  */
 @DisplayName("A jury describes its configuration before it votes")
 class JuryDescriptionTest {
@@ -88,8 +89,8 @@ class JuryDescriptionTest {
 	@DisplayName("SimpleJury seats")
 	class SimpleJurySeats {
 
-		private SimpleJury<JudgmentContext> mixedJury() {
-			return SimpleJury.<JudgmentContext>builder()
+		private SimpleJury<CompletionEvidence> mixedJury() {
+			return SimpleJury.<CompletionEvidence>builder()
 				.judge(Judges.named(new KeywordJudge("done"), "keyword"), 2.0)
 				.judge(ctx -> Judgment.pass("unnamed lambda"))
 				.judge(Judges.named(ctx -> Judgment.fail("strict"), "strict", "a strict judge", JudgeType.LLM_POWERED),
@@ -108,9 +109,9 @@ class JuryDescriptionTest {
 						SeatDescription::weight)
 				.containsExactly(tuple(0, "keyword", KeySource.DECLARED, 2.0),
 						tuple(1, "Judge#2", KeySource.POSITIONAL, 1.0), tuple(2, "strict", KeySource.DECLARED, 0.5));
-			assertThat(description.strategy()).isEqualTo(new StrategyDescription("weightedAverage",
-					named(WeightedAverageStrategy.class), ErrorPolicy.IGNORE, NotApplicablePolicy.REFUSE, 0.6,
-					Map.of()));
+			assertThat(description.strategy())
+				.isEqualTo(new StrategyDescription("weightedAverage", named(WeightedAverageStrategy.class),
+						ErrorPolicy.IGNORE, NotApplicablePolicy.REFUSE, 0.6, Map.of()));
 		}
 
 		@Test
@@ -138,7 +139,7 @@ class JuryDescriptionTest {
 
 		@Test
 		void seatsJoinTheVerdictTheSameJuryReturns() {
-			SimpleJury<JudgmentContext> jury = mixedJury();
+			SimpleJury<CompletionEvidence> jury = mixedJury();
 			List<SeatDescription> seats = ((SimpleJuryDescription) jury.describe()).seats();
 
 			Verdict verdict = jury.vote(simpleContext("describe before voting"));
@@ -148,15 +149,16 @@ class JuryDescriptionTest {
 			for (SeatDescription seat : seats) {
 				assertThat(verdict.weights()).containsEntry(String.valueOf(seat.position()), seat.weight());
 			}
-			Map<?, ?> evidence = (Map<String, Object>) verdict.aggregated().metadata().get(Judgment.AGGREGATION_KEY);
+			Map<?, ?> evidence = (Map<String, Object>) verdict.judgment().metadata().get(Judgment.AGGREGATION_KEY);
 			assertThat(evidence.get(AggregationEvidence.INPUT_COUNT)).isEqualTo(seats.size());
 		}
 
 		@Test
 		void aDeduplicatedSeatStillShowsTheWrappedJudgesRealType() {
-			Judge<JudgmentContext> first = Judges.named(ctx -> Judgment.pass("first"), "check");
-			Judge<JudgmentContext> second = Judges.named(new KeywordJudge("x"), "check", "judged by a model", JudgeType.LLM_POWERED);
-			Jury<JudgmentContext> jury = Juries.fromJudges(new MajorityVotingStrategy(), first, second);
+			Judge<CompletionEvidence> first = Judges.named(ctx -> Judgment.pass("first"), "check");
+			Judge<CompletionEvidence> second = Judges.named(new KeywordJudge("x"), "check", "judged by a model",
+					JudgeType.LLM_POWERED);
+			Jury<CompletionEvidence> jury = Juries.fromJudges(new MajorityVotingStrategy(), first, second);
 
 			List<SeatDescription> seats = ((SimpleJuryDescription) jury.describe()).seats();
 
@@ -173,7 +175,8 @@ class JuryDescriptionTest {
 
 		@Test
 		void fromJudgesLeavesUnnamedJudgesPositional() {
-			Jury<JudgmentContext> jury = Juries.fromJudges(new ConsensusStrategy(), ctx -> Judgment.pass("a"), ctx -> Judgment.pass("b"));
+			Jury<CompletionEvidence> jury = Juries.fromJudges(new ConsensusStrategy(), ctx -> Judgment.pass("a"),
+					ctx -> Judgment.pass("b"));
 
 			assertThat(((SimpleJuryDescription) jury.describe()).seats())
 				.extracting(SeatDescription::verdictKey, SeatDescription::keySource)
@@ -182,8 +185,8 @@ class JuryDescriptionTest {
 
 		@Test
 		void libraryCombinatorsAreHidden() {
-			Judge<JudgmentContext> a = new KeywordJudge("a");
-			Judge<JudgmentContext> b = new KeywordJudge("b");
+			Judge<CompletionEvidence> a = new KeywordJudge("a");
+			Judge<CompletionEvidence> b = new KeywordJudge("b");
 
 			assertThat(List.of(Judges.and(a, b), Judges.or(a, b), Judges.allOf(a, b), Judges.anyOf(a, b),
 					Judges.alwaysPass("p"), Judges.alwaysFail("f")))
@@ -192,17 +195,19 @@ class JuryDescriptionTest {
 
 		@Test
 		void aWeightWithNoJsonRepresentationIsRefusedBeforeAJuryCanBeDescribed() {
-			// Until 0.17.0 the builder accepted NaN and infinite weights, and only describe()
+			// Until 0.17.0 the builder accepted NaN and infinite weights, and only
+			// describe()
 			// refused them. The seat description still refuses them; see
 			// aSeatDescriptionRefusesImpossibleSeats.
-			assertThatThrownBy(() -> SimpleJury.<JudgmentContext>builder().judge(ctx -> Judgment.pass("a"), Double.NaN))
+			assertThatThrownBy(
+					() -> SimpleJury.<CompletionEvidence>builder().judge(ctx -> Judgment.pass("a"), Double.NaN))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("Weight must be finite");
 		}
 
 		@Test
 		void aSeatWhoseMetadataIsNullCannotBeDescribed() {
-			SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+			SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 				.judge(Judges.named(new KeywordJudge("done"), "keyword"))
 				.judge(JudgeTestFixtures.nullMetadata(Judgment.pass("never kept")))
 				.votingStrategy(new MajorityVotingStrategy())
@@ -216,22 +221,25 @@ class JuryDescriptionTest {
 		@Test
 		void aSeatWhoseMetadataThrowsCannotBeDescribed() {
 			IllegalStateException failure = new IllegalStateException("registry offline");
-			SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+			SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 				.judge(JudgeTestFixtures.throwingMetadata(failure, Judgment.pass("never kept")))
 				.votingStrategy(new MajorityVotingStrategy())
 				.build();
 
 			assertThatThrownBy(jury::describe).isInstanceOf(IllegalArgumentException.class)
 				.hasMessageStartingWith("seats[0] ('Judge#1'): ")
-				.hasMessageContaining("metadata() threw " + IllegalStateException.class.getName() + ": registry offline")
+				.hasMessageContaining(
+						"metadata() threw " + IllegalStateException.class.getName() + ": registry offline")
 				.hasRootCause(failure);
 		}
 
 		@Test
 		void aNamedJudgeWrappingAJudgeWithNullMetadataCannotBeDescribed() {
-			// The wrapper's own name is readable, so the seat votes; the wrapped judge's metadata
-			// is not, and describing it as undeclared would misstate what the judge declares.
-			SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+			// The wrapper's own name is readable, so the seat votes; the wrapped judge's
+			// metadata
+			// is not, and describing it as undeclared would misstate what the judge
+			// declares.
+			SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 				.judge(Judges.named(JudgeTestFixtures.nullMetadata(Judgment.pass("kept")), "outer"))
 				.votingStrategy(new MajorityVotingStrategy())
 				.build();
@@ -247,30 +255,30 @@ class JuryDescriptionTest {
 	@DisplayName("CascadedJury tiers")
 	class Cascades {
 
-		private CascadedJury<JudgmentContext> threeTierCascade() {
-			Jury<JudgmentContext> gate = SimpleJury.<JudgmentContext>builder()
+		private CascadedJury<CompletionEvidence> threeTierCascade() {
+			Jury<CompletionEvidence> gate = SimpleJury.<CompletionEvidence>builder()
 				.judge(Judges.named(new KeywordJudge("BUILD SUCCESS"), "build"))
 				.votingStrategy(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_FAIL))
 				.parallel(false)
 				.build();
-			Jury<JudgmentContext> style = SimpleJury.<JudgmentContext>builder()
+			Jury<CompletionEvidence> style = SimpleJury.<CompletionEvidence>builder()
 				.judge(Judges.named(new KeywordJudge("style"), "style"))
 				.votingStrategy(new ConsensusStrategy(ErrorPolicy.TREAT_AS_ABSTAIN))
 				.parallel(false)
 				.build();
-			Jury<JudgmentContext> docs = SimpleJury.<JudgmentContext>builder()
+			Jury<CompletionEvidence> docs = SimpleJury.<CompletionEvidence>builder()
 				.judge(Judges.named(new KeywordJudge("docs"), "docs"))
 				.votingStrategy(new MedianVotingStrategy(0.4))
 				.parallel(false)
 				.build();
-			Jury<JudgmentContext> review = Juries.meta(new AverageVotingStrategy(0.7), new NamedJury<JudgmentContext>("style", style),
-					new NamedJury<JudgmentContext>("docs", docs));
-			Jury<JudgmentContext> last = SimpleJury.<JudgmentContext>builder()
+			Jury<CompletionEvidence> review = Juries.meta(new AverageVotingStrategy(0.7),
+					new NamedJury<CompletionEvidence>("style", style), new NamedJury<CompletionEvidence>("docs", docs));
+			Jury<CompletionEvidence> last = SimpleJury.<CompletionEvidence>builder()
 				.judge(Judges.named(new KeywordJudge("done"), "done"))
 				.votingStrategy(new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.IGNORE))
 				.parallel(false)
 				.build();
-			return CascadedJury.<JudgmentContext>builder()
+			return CascadedJury.<CompletionEvidence>builder()
 				.tier("gate", gate, TierPolicy.REJECT_ON_ANY_FAIL)
 				.tier("review", review, TierPolicy.ACCEPT_ON_ALL_PASS)
 				.tier("final", last, TierPolicy.FINAL_TIER)
@@ -331,13 +339,14 @@ class JuryDescriptionTest {
 
 		@Test
 		void anEarlyStopLeavesDescribedTiersWithoutAttempts() {
-			CascadedJury<JudgmentContext> cascade = threeTierCascade();
+			CascadedJury<CompletionEvidence> cascade = threeTierCascade();
 			CascadedJuryDescription description = (CascadedJuryDescription) cascade.describe();
 
 			Verdict verdict = cascade.vote(simpleContext("no build output"));
 
 			assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name).containsExactly("gate");
-			assertThat(description.tiers()).extracting(TierDescription::name).containsExactly("gate", "review", "final");
+			assertThat(description.tiers()).extracting(TierDescription::name)
+				.containsExactly("gate", "review", "final");
 		}
 
 	}
@@ -348,20 +357,22 @@ class JuryDescriptionTest {
 
 		@Test
 		void membersAndStrategyAreDescribedThoughGetJudgesIsEmpty() {
-			Jury<JudgmentContext> first = Juries.fromJudges(new ConsensusStrategy(), Judges.named(new KeywordJudge("a"), "a"));
-			Jury<JudgmentContext> second = SimpleJury.<JudgmentContext>builder()
+			Jury<CompletionEvidence> first = Juries.fromJudges(new ConsensusStrategy(),
+					Judges.named(new KeywordJudge("a"), "a"));
+			Jury<CompletionEvidence> second = SimpleJury.<CompletionEvidence>builder()
 				.judge(new KeywordJudge("b"), 3.0)
 				.votingStrategy(new WeightedAverageStrategy())
 				.build();
-			Jury<JudgmentContext> meta = Juries.meta(new MajorityVotingStrategy(), new NamedJury<JudgmentContext>("first", first),
-					new NamedJury<JudgmentContext>("second", second));
+			Jury<CompletionEvidence> meta = Juries.meta(new MajorityVotingStrategy(),
+					new NamedJury<CompletionEvidence>("first", first),
+					new NamedJury<CompletionEvidence>("second", second));
 
 			assertThat(meta.getJudges()).as("a meta-jury's public roster").isEmpty();
 
 			MetaJuryDescription description = (MetaJuryDescription) meta.describe();
-			assertThat(description.strategy()).isEqualTo(new StrategyDescription("majority",
-					named(MajorityVotingStrategy.class), ErrorPolicy.PROPAGATE, NotApplicablePolicy.REFUSE, null,
-					Map.of("tiePolicy", "FAIL")));
+			assertThat(description.strategy())
+				.isEqualTo(new StrategyDescription("majority", named(MajorityVotingStrategy.class),
+						ErrorPolicy.PROPAGATE, NotApplicablePolicy.REFUSE, null, Map.of("tiePolicy", "FAIL")));
 			assertThat(description.members()).extracting(MemberDescription::name).containsExactly("first", "second");
 			SimpleJuryDescription secondJury = (SimpleJuryDescription) description.members().get(1).jury();
 			assertThat(secondJury.seats()).singleElement().satisfies(seat -> {
@@ -372,7 +383,8 @@ class JuryDescriptionTest {
 
 			Map<String, Object> portable = description.toPortable();
 			assertThat(portable.get("kind")).isEqualTo("META");
-			assertThat((List<Object>) portable.get("members")).extracting(member -> ((Map<String, Object>) member).get("name"))
+			assertThat((List<Object>) portable.get("members"))
+				.extracting(member -> ((Map<String, Object>) member).get("name"))
 				.containsExactly("first", "second");
 		}
 
@@ -397,7 +409,8 @@ class JuryDescriptionTest {
 		@Test
 		void undeclaredAndDeclaredEmptyHaveUnequalPortableForms() throws Exception {
 			ImplementationIdentity same = named(KeywordJudge.class);
-			JudgeDescription undeclared = new JudgeDescription("j", JudgeType.DETERMINISTIC, null, null, null, same, null);
+			JudgeDescription undeclared = new JudgeDescription("j", JudgeType.DETERMINISTIC, null, null, null, same,
+					null);
 			JudgeDescription declaredEmpty = new JudgeDescription("j", JudgeType.DETERMINISTIC, null, null, null, same,
 					Map.of());
 
@@ -428,9 +441,9 @@ class JuryDescriptionTest {
 
 		@Test
 		void aWrapperDescribesTheDelegatesConfigurationAndBothLayersOfMetadata() {
-			ConfiguredJudge<JudgmentContext> rubric = new DeclaringJudge(Map.of("rubric", "v3"));
-			NamedJudge<JudgmentContext> inner = Judges.named(rubric, "rubric", null, JudgeType.LLM_POWERED);
-			NamedJudge<JudgmentContext> outer = Judges.named(inner, "rubric-2");
+			ConfiguredJudge<CompletionEvidence> rubric = new DeclaringJudge(Map.of("rubric", "v3"));
+			NamedJudge<CompletionEvidence> inner = Judges.named(rubric, "rubric", null, JudgeType.LLM_POWERED);
+			NamedJudge<CompletionEvidence> outer = Judges.named(inner, "rubric-2");
 
 			assertThat(outer.delegate()).isSameAs(inner);
 			JudgeDescription description = Judges.describe(outer);
@@ -465,7 +478,8 @@ class JuryDescriptionTest {
 
 		@Test
 		void aJuryThatDoesNotOverrideDescribeIsOpaqueButTruthful() {
-			Jury<JudgmentContext> custom = new FirstVoteJury(List.of(Judges.named(new KeywordJudge("a"), "a"), ctx -> Judgment.pass("b")),
+			Jury<CompletionEvidence> custom = new FirstVoteJury(
+					List.of(Judges.named(new KeywordJudge("a"), "a"), ctx -> Judgment.pass("b")),
 					new ConsensusStrategy(ErrorPolicy.IGNORE));
 
 			JuryDescription description = custom.describe();
@@ -488,7 +502,7 @@ class JuryDescriptionTest {
 
 		@Test
 		void anOpaqueJuryWithNoStrategySaysSo() {
-			Jury<JudgmentContext> custom = new FirstVoteJury(List.of(new KeywordJudge("a")), null);
+			Jury<CompletionEvidence> custom = new FirstVoteJury(List.of(new KeywordJudge("a")), null);
 
 			assertThat(custom.describe().toPortable().get("strategy")).isEqualTo(Map.of("declared", false));
 		}
@@ -517,10 +531,10 @@ class JuryDescriptionTest {
 
 		@Test
 		void aConsumerJuryCanDescribeItselfStructurally() {
-			Jury<JudgmentContext> inner = Juries.fromJudges(new ConsensusStrategy(), new KeywordJudge("a"));
-			Jury<JudgmentContext> wrapper = new Jury<JudgmentContext>() {
+			Jury<CompletionEvidence> inner = Juries.fromJudges(new ConsensusStrategy(), new KeywordJudge("a"));
+			Jury<CompletionEvidence> wrapper = new Jury<CompletionEvidence>() {
 				@Override
-				public List<Judge<JudgmentContext>> getJudges() {
+				public List<Judge<CompletionEvidence>> getJudges() {
 					return inner.getJudges();
 				}
 
@@ -530,7 +544,7 @@ class JuryDescriptionTest {
 				}
 
 				@Override
-				public Verdict vote(JudgmentContext context) {
+				public Verdict vote(CompletionEvidence context) {
 					return inner.vote(context);
 				}
 
@@ -580,10 +594,11 @@ class JuryDescriptionTest {
 		void portableValuesMergeErrorPolicyThresholdAndParametersInKeyOrder() throws Exception {
 			assertThat(JSON.writeValueAsString(
 					new MajorityVotingStrategy(TiePolicy.ABSTAIN, ErrorPolicy.IGNORE).describe().toPortable()))
-				.isEqualTo("{\"descriptionVersion\":2,\"name\":\"majority\",\"implementation\":{\"form\":\"NAMED\",\"className\":"
-						+ "\"io.github.markpollack.judge.jury.MajorityVotingStrategy\"},\"parameters\":{\"declared\":true,"
-						+ "\"values\":{\"errorPolicy\":\"ignore\",\"notApplicablePolicy\":\"refuse\","
-						+ "\"tiePolicy\":\"ABSTAIN\"}}}");
+				.isEqualTo(
+						"{\"descriptionVersion\":2,\"name\":\"majority\",\"implementation\":{\"form\":\"NAMED\",\"className\":"
+								+ "\"io.github.markpollack.judge.jury.MajorityVotingStrategy\"},\"parameters\":{\"declared\":true,"
+								+ "\"values\":{\"errorPolicy\":\"ignore\",\"notApplicablePolicy\":\"refuse\","
+								+ "\"tiePolicy\":\"ABSTAIN\"}}}");
 			assertThat(JSON.writeValueAsString(new AverageVotingStrategy().describe().toPortable()))
 				.endsWith("\"parameters\":{\"declared\":true,\"values\":{\"errorPolicy\":\"propagate\","
 						+ "\"notApplicablePolicy\":\"refuse\",\"threshold\":0.5}}}");
@@ -614,30 +629,30 @@ class JuryDescriptionTest {
 
 		@Test
 		void anAnonymousClassRecordsOnlyItsEnclosingTopLevelClass() {
-			Judge<JudgmentContext> anonymous = new Judge<JudgmentContext>() {
+			Judge<CompletionEvidence> anonymous = new Judge<CompletionEvidence>() {
 				@Override
-				public Judgment judge(JudgmentContext context) {
+				public Judgment judge(CompletionEvidence context) {
 					return Judgment.pass("anonymous");
 				}
 			};
 
 			assertThat(ImplementationIdentity.of(anonymous.getClass()))
 				.isEqualTo(new ImplementationIdentity(Form.ANONYMOUS, null, JuryDescriptionTest.class.getName()));
-			assertThat(ImplementationIdentity.of(anonymous.getClass()).toPortable())
-				.containsExactly(Map.entry("form", "ANONYMOUS"),
-						Map.entry("enclosingClassName", JuryDescriptionTest.class.getName()));
+			assertThat(ImplementationIdentity.of(anonymous.getClass()).toPortable()).containsExactly(
+					Map.entry("form", "ANONYMOUS"),
+					Map.entry("enclosingClassName", JuryDescriptionTest.class.getName()));
 		}
 
 		@Test
 		void aLocalClassAndAClassNestedInItRecordOnlyTheEnclosingTopLevelClass() {
-			class LocalJudge implements Judge<JudgmentContext> {
+			class LocalJudge implements Judge<CompletionEvidence> {
 
 				class Nested {
 
 				}
 
 				@Override
-				public Judgment judge(JudgmentContext context) {
+				public Judgment judge(CompletionEvidence context) {
 					return Judgment.pass("local");
 				}
 
@@ -658,7 +673,7 @@ class JuryDescriptionTest {
 
 		@Test
 		void aLambdaIsHiddenWithNoName() {
-			Judge<JudgmentContext> lambda = ctx -> Judgment.pass("lambda");
+			Judge<CompletionEvidence> lambda = ctx -> Judgment.pass("lambda");
 
 			assertThat(lambda.getClass().getName()).as("the name that must not leak").contains("$$Lambda");
 			assertThat(ImplementationIdentity.of(lambda.getClass()).toPortable()).isEqualTo(Map.of("form", "HIDDEN"));
@@ -707,7 +722,8 @@ class JuryDescriptionTest {
 			assertThatThrownBy(() -> new StrategyDescription("s", identity, ErrorPolicy.PROPAGATE, null, null, null))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("empty parameter map");
-			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, NotApplicablePolicy.EXCLUDE, null, null))
+			assertThatThrownBy(
+					() -> new StrategyDescription("s", identity, null, NotApplicablePolicy.EXCLUDE, null, null))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("empty parameter map");
 			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, null, 0.5, null))
@@ -722,7 +738,8 @@ class JuryDescriptionTest {
 					() -> new StrategyDescription("s", identity, null, null, null, Map.of("errorPolicy", "ignore")))
 				.isInstanceOf(IllegalArgumentException.class);
 			assertThatThrownBy(() -> new StrategyDescription("s", identity, null, null, null,
-					Map.of("notApplicablePolicy", "exclude"))).isInstanceOf(IllegalArgumentException.class);
+					Map.of("notApplicablePolicy", "exclude")))
+				.isInstanceOf(IllegalArgumentException.class);
 		}
 
 		@Test
@@ -750,8 +767,8 @@ class JuryDescriptionTest {
 
 		@Test
 		void descriptionsCopyTheListsTheyAreGiven() {
-			List<SeatDescription> seats = new ArrayList<>(List.of(new SeatDescription(0, "k", KeySource.DECLARED, 1.0,
-					Judges.describe(new KeywordJudge("k")))));
+			List<SeatDescription> seats = new ArrayList<>(List
+				.of(new SeatDescription(0, "k", KeySource.DECLARED, 1.0, Judges.describe(new KeywordJudge("k")))));
 			SimpleJuryDescription description = new SimpleJuryDescription(new ConsensusStrategy().describe(), seats,
 					false);
 
@@ -763,20 +780,23 @@ class JuryDescriptionTest {
 
 	}
 
-	/** A consumer jury that votes with its first judge only and does not override describe(). */
-	static final class FirstVoteJury implements Jury<JudgmentContext> {
+	/**
+	 * A consumer jury that votes with its first judge only and does not override
+	 * describe().
+	 */
+	static final class FirstVoteJury implements Jury<CompletionEvidence> {
 
-		private final List<Judge<JudgmentContext>> judges;
+		private final List<Judge<CompletionEvidence>> judges;
 
 		private final VotingStrategy strategy;
 
-		FirstVoteJury(List<Judge<JudgmentContext>> judges, VotingStrategy strategy) {
+		FirstVoteJury(List<Judge<CompletionEvidence>> judges, VotingStrategy strategy) {
 			this.judges = judges;
 			this.strategy = strategy;
 		}
 
 		@Override
-		public List<Judge<JudgmentContext>> getJudges() {
+		public List<Judge<CompletionEvidence>> getJudges() {
 			return this.judges;
 		}
 
@@ -786,9 +806,9 @@ class JuryDescriptionTest {
 		}
 
 		@Override
-		public Verdict vote(JudgmentContext context) {
+		public Verdict vote(CompletionEvidence context) {
 			Judgment first = this.judges.get(0).judge(context);
-			return Verdict.builder().aggregated(first).individual(List.of(first)).build();
+			return Verdict.builder().judgment(first).individual(List.of(first)).build();
 		}
 
 	}

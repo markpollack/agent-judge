@@ -39,7 +39,7 @@ class ReadingSupportTest {
 
 		Interpretation interpretation = Verdicts.interpret(damaged);
 
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.ACCEPTED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.SATISFIED);
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.CONTRADICTED);
 		assertDefect(interpretation.defects(), "verdict.aggregated", "status", DefectKind.INCONSISTENT);
 		assertThat(interpretation.defects()).filteredOn(d -> d.kind() == DefectKind.INCONSISTENT).hasSize(1);
@@ -54,9 +54,10 @@ class ReadingSupportTest {
 
 		Interpretation interpretation = Verdicts.interpret(damaged);
 
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.REJECTED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.CONTRADICTED);
-		assertThat(interpretation.defects()).anyMatch(d -> d.kind() == DefectKind.INCONSISTENT && d.field().equals("status"));
+		assertThat(interpretation.defects())
+			.anyMatch(d -> d.kind() == DefectKind.INCONSISTENT && d.field().equals("status"));
 	}
 
 	@Test
@@ -67,8 +68,9 @@ class ReadingSupportTest {
 
 		Interpretation interpretation = Verdicts.interpret(damaged);
 
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.REJECTED);
-		assertThat(interpretation.decidedBy()).isEqualTo(new DecidedBy("rubric", List.of("rubric"), "individual_rejection"));
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
+		assertThat(interpretation.decidedBy())
+			.isEqualTo(new DecidedBy("rubric", List.of("rubric"), "individual_rejection"));
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.CONTRADICTED);
 		assertThat(interpretation.defects()).filteredOn(d -> d.kind() == DefectKind.INCONSISTENT)
 			.hasSize(1)
@@ -87,8 +89,9 @@ class ReadingSupportTest {
 
 		Interpretation interpretation = Verdicts.interpret(damaged);
 
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.REJECTED);
-		assertThat(interpretation.decidedBy()).as("what the record says").isEqualTo(new DecidedBy("ghost", List.of("ghost"), "individual_rejection"));
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
+		assertThat(interpretation.decidedBy()).as("what the record says")
+			.isEqualTo(new DecidedBy("ghost", List.of("ghost"), "individual_rejection"));
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.CONTRADICTED);
 		assertDefect(interpretation.defects(), "verdict.decision", "tier", DefectKind.INCONSISTENT);
 	}
@@ -114,7 +117,7 @@ class ReadingSupportTest {
 
 		Interpretation interpretation = Verdicts.interpret(damaged);
 
-		assertThat(interpretation.reading()).isEqualTo(VerdictReading.ACCEPTED);
+		assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.SATISFIED);
 		assertThat(interpretation.readingSupport()).isEqualTo(ReadingSupport.CONTRADICTED);
 		assertDefect(interpretation.defects(), "verdict.decision", "kind", DefectKind.INCONSISTENT);
 	}

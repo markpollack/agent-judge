@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.markpollack.judge.description.StrategyDescription;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 /**
  * Gate strategy: every applicable judge must return {@code PASS}, and a mixed jury is a
@@ -18,9 +18,9 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  *
  * <p>
  * A status-counting strategy. It is the conjunction over <em>outcomes</em>, and it is the
- * companion to {@link ConjunctiveStrategy}, which is the conjunction over <em>scores</em>.
- * Reach for this one when the judges express Boolean requirements — a definition of done —
- * and for {@code ConjunctiveStrategy} when they measure a rubric.
+ * companion to {@link ConjunctiveStrategy}, which is the conjunction over
+ * <em>scores</em>. Reach for this one when the judges express Boolean requirements — a
+ * definition of done — and for {@code ConjunctiveStrategy} when they measure a rubric.
  * </p>
  *
  * <h2>Why this is not {@link ConsensusStrategy}</h2>
@@ -29,15 +29,31 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * </p>
  * <table border="1">
  * <caption>Applicable judgments to aggregate</caption>
- * <tr><th>Input</th><th>{@code ConsensusStrategy}</th><th>This strategy</th></tr>
- * <tr><td>all PASS</td><td>PASS</td><td>PASS</td></tr>
- * <tr><td>all FAIL</td><td>FAIL</td><td>FAIL</td></tr>
- * <tr><td><b>mixed PASS and FAIL</b></td><td><b>ABSTAIN</b> — the judges disagree</td><td><b>FAIL</b> — a requirement was not met</td></tr>
+ * <tr>
+ * <th>Input</th>
+ * <th>{@code ConsensusStrategy}</th>
+ * <th>This strategy</th>
+ * </tr>
+ * <tr>
+ * <td>all PASS</td>
+ * <td>PASS</td>
+ * <td>PASS</td>
+ * </tr>
+ * <tr>
+ * <td>all FAIL</td>
+ * <td>FAIL</td>
+ * <td>FAIL</td>
+ * </tr>
+ * <tr>
+ * <td><b>mixed PASS and FAIL</b></td>
+ * <td><b>ABSTAIN</b> — the judges disagree</td>
+ * <td><b>FAIL</b> — a requirement was not met</td>
+ * </tr>
  * </table>
  * <p>
- * Consensus reports a collective fact and deliberately leaves rejection to a gate; its own
- * implementation says so. This is that gate. A definition of done has no notion of its
- * requirements "disagreeing": one of them was not satisfied, so the work is not done.
+ * Consensus reports a collective fact and deliberately leaves rejection to a gate; its
+ * own implementation says so. This is that gate. A definition of done has no notion of
+ * its requirements "disagreeing": one of them was not satisfied, so the work is not done.
  * </p>
  *
  * <h2>Why this is not a threshold over {@code effectiveScore()}</h2>
@@ -46,17 +62,17 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * {@link Judgment#effectiveScore()}, which derives {@code 1.0} for {@code PASS} and
  * {@code 0.0} for {@code FAIL}. That works arithmetically and is the wrong expression: it
  * routes a status through a numeric channel and reintroduces the duplicate-representation
- * this library's result type exists to prevent. A judge that stored no score should not be
- * aggregated as though it had one.
+ * this library's result type exists to prevent. A judge that stored no score should not
+ * be judgment as though it had one.
  * </p>
  *
  * <h2>The empty case is load-bearing</h2>
  * <p>
  * With nothing eligible the result is {@code ABSTAIN}, never {@code PASS}. A hand-written
  * gate is usually {@code judgments.stream().allMatch(...)}, and {@code allMatch} over an
- * empty stream is {@code true} — so a definition of done that lost its requirements reports
- * that everything is done. That is the defect this strategy exists not to have, and the
- * reason the emptiness check is not left to the caller.
+ * empty stream is {@code true} — so a definition of done that lost its requirements
+ * reports that everything is done. That is the defect this strategy exists not to have,
+ * and the reason the emptiness check is not left to the caller.
  * </p>
  *
  * <p>
@@ -122,7 +138,8 @@ public class AllMustPassStrategy implements VotingStrategy {
 		}
 		if (population.isEmpty()) {
 			// Never PASS. An empty conjunction is vacuously true, and a gate that passes
-			// because it lost its requirements is the failure this class exists to prevent.
+			// because it lost its requirements is the failure this class exists to
+			// prevent.
 			return population.noResult(getName(), Map.of());
 		}
 
@@ -140,8 +157,7 @@ public class AllMustPassStrategy implements VotingStrategy {
 		boolean passed = failCount == 0;
 		int eligibleCount = population.eligible().size();
 		Judgment aggregate = (passed ? Judgment.builder().pass() : Judgment.builder().fail())
-			.reasoning(passed
-					? String.format("All %d applicable requirement(s) passed", eligibleCount)
+			.reasoning(passed ? String.format("All %d applicable requirement(s) passed", eligibleCount)
 					: String.format("%d of %d applicable requirement(s) failed", failCount, eligibleCount))
 			.build();
 

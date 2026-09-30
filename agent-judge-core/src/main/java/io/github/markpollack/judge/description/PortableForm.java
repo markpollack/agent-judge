@@ -13,8 +13,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 /**
  * The seam between description trees and the portable-value algebra.
@@ -22,14 +22,14 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * <p>
  * The algebra lives in the package-private {@code PortableValues} of the {@code result}
  * package, and {@link Judgment} is its only public entry: its constructor validates and
- * freezes {@code metadata}. A description tree is validated by carrying it as one metadata
- * entry of a throwaway judgment, so there is one set of rules and no second copy of them,
- * and {@code PortableValues} stays out of the public API.
+ * freezes {@code metadata}. A description tree is validated by carrying it as one
+ * metadata entry of a throwaway judgment, so there is one set of rules and no second copy
+ * of them, and {@code PortableValues} stays out of the public API.
  * </p>
  *
  * <p>
- * The algebra names a failing value by its path from {@code metadata}. The carrier's key is
- * the description's own root, so removing the {@code metadata.} prefix leaves the path
+ * The algebra names a failing value by its path from {@code metadata}. The carrier's key
+ * is the description's own root, so removing the {@code metadata.} prefix leaves the path
  * within the description.
  * </p>
  */
@@ -85,7 +85,8 @@ final class PortableForm {
 	 * ascending order at every depth.
 	 * <p>
 	 * A caller's map type decides its iteration order, and {@code Map.of} iterates in a
-	 * different order in each JVM. Ordering here keeps a description byte-stable across runs.
+	 * different order in each JVM. Ordering here keeps a description byte-stable across
+	 * runs.
 	 * </p>
 	 * @param values the caller-supplied values
 	 * @param root the name the values are reported under in a diagnostic

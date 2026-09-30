@@ -27,7 +27,7 @@ public final class ModernFixtureExpectations {
 			}
 			// The frozen N/A vocabulary had a label. It remains historical evidence in
 			// the
-			// original fixture, but the modern live N/A contract forbids any assessment.
+			// original fixture, but the modern live N/A contract forbids any finding.
 			if (object.has("label")) {
 				if (!object.path("status").asText().equals("not_applicable")) {
 					throw new IllegalArgumentException("fixture contains a classification");
@@ -35,15 +35,20 @@ public final class ModernFixtureExpectations {
 				object.remove("label");
 			}
 			object.set("producerStatus", object.remove("status"));
-			object.put("schemaVersion", 2);
+			object.put("schemaVersion", 3);
 		}
 		if (node.isObject() && node.has("aggregated")) {
 			ObjectNode object = (ObjectNode) node;
-			object.put("schemaVersion", 2);
-			boolean meta = node.path("compositeAttempts").size() > 0 && node.path("compositeAttempts").get(0).path("relation").asText().equals("meta_member");
+			object.set("judgment", object.remove("aggregated"));
+			if (object.has("decision"))
+				object.set("provenance", object.remove("decision"));
+			object.put("schemaVersion", 3);
+			boolean meta = node.path("compositeAttempts").size() > 0
+					&& node.path("compositeAttempts").get(0).path("relation").asText().equals("meta_member");
 			object.put("declaredCardinality", meta ? node.path("compositeAttempts").size() : node.path("seats").size());
 		}
-		if (node.isObject() && node.has("verdictKey")) ((ObjectNode) node).put("execution", "RETURNED");
+		if (node.isObject() && node.has("verdictKey"))
+			((ObjectNode) node).put("execution", "RETURNED");
 		node.elements().forEachRemaining(ModernFixtureExpectations::rewrite);
 	}
 

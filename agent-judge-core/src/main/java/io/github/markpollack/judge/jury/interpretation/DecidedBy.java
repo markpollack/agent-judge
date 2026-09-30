@@ -13,16 +13,17 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * Which stage decided the verdict, as the record says.
  *
- * <p>Found by following the recorded decision chain from the root: while a decision adopts a
- * named tier's outcome ({@code tier_outcome}), move into that tier; stop at a jury's own
- * reduction, at an undecided verdict, or at a tier reached by an individual rejection. The stage
- * is then the tier the stopping decision names, or the last edge followed. A root that decided
- * itself names no stage, and a record without a decision reports {@code null} together with an
- * {@link DefectKind#ABSENT} defect — never a guess.
+ * <p>
+ * Found by following the recorded provenance chain from the root: while a provenance
+ * adopts a named tier's outcome ({@code tier_outcome}), move into that tier; stop at a
+ * jury's own reduction, at an undecided verdict, or at a tier reached by an individual
+ * rejection. The stage is then the tier the stopping provenance names, or the last edge
+ * followed. A root that decided itself names no stage, and a record without a provenance
+ * reports {@code null} together with an {@link DefectKind#ABSENT} defect — never a guess.
  *
  * @param stage the deciding stage's configured name
- * @param path the deciding stage's full path from the root, the same value as the matching
- * {@link Stage#path()}
+ * @param path the deciding stage's full path from the root, the same value as the
+ * matching {@link Stage#path()}
  * @param basis how the stage decided: the wire token {@code tier_outcome} or
  * {@code individual_rejection}, or an unrecognised token carried as recorded
  * @author Mark Pollack

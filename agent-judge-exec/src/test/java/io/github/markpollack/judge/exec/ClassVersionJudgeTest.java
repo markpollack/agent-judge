@@ -7,18 +7,14 @@ package io.github.markpollack.judge.exec;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,13 +30,13 @@ class ClassVersionJudgeTest {
 	@TempDir
 	Path workspace;
 
-	private final ClassVersionJudge judge = new ClassVersionJudge();
+	private final ClassVersionJudge judge = new ClassVersionJudge(61);
 
 	@Test
 	void correctVersionReturnsPass() throws IOException {
 		writeClassFile(workspace.resolve("target/classes/com/example/Foo.class"), 61);
 
-		Judgment judgment = judge.judge(contextWithVersion(61));
+		Judgment judgment = judge.judge(workspace);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.checks()).hasSize(1);
@@ -51,7 +47,7 @@ class ClassVersionJudgeTest {
 	void wrongVersionReturnsFail() throws IOException {
 		writeClassFile(workspace.resolve("target/classes/com/example/Foo.class"), 55);
 
-		Judgment judgment = judge.judge(contextWithVersion(61));
+		Judgment judgment = judge.judge(workspace);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.reasoning()).contains("55").contains("61");
@@ -64,7 +60,7 @@ class ClassVersionJudgeTest {
 		writeClassFile(workspace.resolve("target/classes/com/example/Foo.class"), 61);
 		writeClassFile(workspace.resolve("target/classes/com/example/Bar.class"), 61);
 
-		Judgment judgment = judge.judge(contextWithVersion(61));
+		Judgment judgment = judge.judge(workspace);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.checks()).hasSize(2);
@@ -76,7 +72,7 @@ class ClassVersionJudgeTest {
 		writeClassFile(workspace.resolve("target/classes/com/example/Good.class"), 61);
 		writeClassFile(workspace.resolve("target/classes/com/example/Bad.class"), 52);
 
-		Judgment judgment = judge.judge(contextWithVersion(61));
+		Judgment judgment = judge.judge(workspace);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.reasoning()).contains("1 of 2");
@@ -86,25 +82,17 @@ class ClassVersionJudgeTest {
 	void noClassFilesReturnsAbstain() throws IOException {
 		Files.createDirectories(workspace.resolve("target/classes"));
 
-		Judgment judgment = judge.judge(contextWithVersion(61));
+		Judgment judgment = judge.judge(workspace);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 	}
 
 	@Test
 	void noTargetClassesDirReturnsAbstain() {
-		Judgment judgment = judge.judge(contextWithVersion(61));
+		Judgment judgment = judge.judge(workspace);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(judgment.reasoning()).contains("No target/classes");
-	}
-
-	@Test
-	void noMetadataReturnsAbstain() {
-		Judgment judgment = judge.judge(contextWithMetadata(Map.of()));
-
-		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
-		assertThat(judgment.reasoning()).contains("No targetClassVersion");
 	}
 
 	@Test
@@ -115,37 +103,22 @@ class ClassVersionJudgeTest {
 		Files.write(classes.resolve("Truncated.class"), new byte[] { (byte) 0xca, (byte) 0xfe });
 		Files.write(classes.resolve("Invalid.class"), new byte[] { 0, 0, 0, 0, 0, 0, 0, 61 });
 
-		Judgment judgment = judge.judge(contextWithVersion(61));
+		Judgment judgment = judge.judge(workspace);
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(judgment.assessment()).isNull();
+		assertThat(judgment.finding()).isNull();
 		assertThat(judgment.reasoning()).contains("2 of 4", "Truncated.class", "Invalid.class");
 		assertThat(judgment.checks()).hasSize(4);
-		Map<String, JudgmentStatus> statuses = judgment.checks().stream()
+		Map<String, JudgmentStatus> statuses = judgment.checks()
+			.stream()
 			.collect(java.util.stream.Collectors.toMap(check -> check.id(), check -> check.judgment().status()));
-		assertThat(statuses).containsExactlyInAnyOrderEntriesOf(Map.of("Good.class", JudgmentStatus.PASS,
-				"Mismatch.class", JudgmentStatus.FAIL, "Truncated.class", JudgmentStatus.ERROR,
-				"Invalid.class", JudgmentStatus.ERROR));
+		assertThat(statuses).containsExactlyInAnyOrderEntriesOf(
+				Map.of("Good.class", JudgmentStatus.PASS, "Mismatch.class", JudgmentStatus.FAIL, "Truncated.class",
+						JudgmentStatus.ERROR, "Invalid.class", JudgmentStatus.ERROR));
 		assertThat(judgment.checks()).allSatisfy(check -> assertThat(check.judgment().checks()).isEmpty());
 	}
 
 	// ==================== Helpers ====================
-
-	private JudgmentContext contextWithVersion(int version) {
-		return contextWithMetadata(Map.of("targetClassVersion", version));
-	}
-
-	private JudgmentContext contextWithMetadata(Map<String, Object> metadata) {
-		return JudgmentContext.builder()
-			.goal("Test migration")
-			.workspace(workspace)
-			.agentOutput("output")
-			.status(ExecutionStatus.SUCCESS)
-			.startedAt(Instant.now())
-			.executionTime(Duration.ofSeconds(1))
-			.metadata(metadata)
-			.build();
-	}
 
 	/**
 	 * Write a minimal valid .class file with the given major version.

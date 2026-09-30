@@ -7,15 +7,15 @@ package io.github.markpollack.judge.consumer;
 
 import java.util.Map;
 
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.description.ConfiguredJudge;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * A consumer judge that opts in to declaring configuration, returning whatever map it was
  * given — including, in tests, maps a description must refuse.
  */
-public class DeclaringJudge implements ConfiguredJudge<JudgmentContext> {
+public class DeclaringJudge implements ConfiguredJudge<CompletionEvidence> {
 
 	private final Map<String, Object> configuration;
 
@@ -29,7 +29,7 @@ public class DeclaringJudge implements ConfiguredJudge<JudgmentContext> {
 	}
 
 	@Override
-	public Judgment judge(JudgmentContext context) {
+	public Judgment judge(CompletionEvidence context) {
 		return Judgment.pass("declared");
 	}
 

@@ -7,7 +7,7 @@ package io.github.markpollack.judge.jury.interpretation;
 
 import java.util.List;
 import java.util.Objects;
-import io.github.markpollack.judge.jury.Decision;
+import io.github.markpollack.judge.jury.VerdictProvenance;
 
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import org.jspecify.annotations.Nullable;
@@ -46,7 +46,7 @@ import org.jspecify.annotations.Nullable;
  * produced no verdict
  * @param judgment complete semantic view, absent when unavailable
  * @param declaredCardinality recorded declaredCardinality, absent in historical records
- * @param decision recorded decision, absent in historical records
+ * @param provenance recorded provenance, absent in historical records
  * @author Mark Pollack
  * @since 0.17.0
  */
@@ -56,7 +56,7 @@ public record Stage(@Nullable String stage, List<String> path, @Nullable String 
 		@Nullable String disposition, @Nullable String reason, @Nullable String failure, @Nullable Boolean usedByParent,
 		@Nullable String status, @Nullable String reasonCode, @Nullable String reasoning, @Nullable Evidence evidence,
 		List<JudgeSeat> judges, @Nullable JudgmentView judgment, @Nullable Integer declaredCardinality,
-		@Nullable Decision decision) {
+		@Nullable VerdictProvenance provenance) {
 
 	/**
 	 * Construct a historical semantic view with absent execution structure.

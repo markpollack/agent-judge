@@ -8,12 +8,12 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.jury.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,7 +29,7 @@ class SpringAiEvaluatorTest {
 
 	@Test
 	void shouldEvaluateWithSingleJudge() {
-		Judge<JudgmentContext> judge = (JudgmentContext ctx) -> Judgment.pass("Output is correct");
+		Judge<CompletionEvidence> judge = (CompletionEvidence ctx) -> Judgment.pass("Output is correct");
 
 		Judgment result = SpringAiEvaluator.evaluate("Summarize", this::mockResponse, judge);
 
@@ -38,11 +38,11 @@ class SpringAiEvaluatorTest {
 
 	@Test
 	void shouldEvaluateWithJury() {
-		Judge<JudgmentContext> passJudge = (JudgmentContext ctx) -> Judgment.pass("Good");
-		Judge<JudgmentContext> failJudge = (JudgmentContext ctx) -> Judgment.fail("Bad");
-		Judge<JudgmentContext> passJudge2 = (JudgmentContext ctx) -> Judgment.pass("Fine");
+		Judge<CompletionEvidence> passJudge = (CompletionEvidence ctx) -> Judgment.pass("Good");
+		Judge<CompletionEvidence> failJudge = (CompletionEvidence ctx) -> Judgment.fail("Bad");
+		Judge<CompletionEvidence> passJudge2 = (CompletionEvidence ctx) -> Judgment.pass("Fine");
 
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
 			.judge(passJudge)
 			.judge(failJudge)
 			.judge(passJudge2)
@@ -51,7 +51,7 @@ class SpringAiEvaluatorTest {
 
 		Verdict verdict = SpringAiEvaluator.evaluate("Summarize", this::mockResponse, jury);
 
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individual()).hasSize(3);
 	}
 

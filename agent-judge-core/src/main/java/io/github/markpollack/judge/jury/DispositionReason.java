@@ -13,11 +13,11 @@ import com.fasterxml.jackson.annotation.JsonValue;
  *
  * <p>
  * Required exactly when the disposition is {@link AttemptDisposition#STAGE_FAILED}. Each
- * constant has a fixed, documented meaning, and <em>that meaning is the explanation</em>: the
- * parent adds no free text of its own, because a note restating the enum would duplicate one
- * fact in two places that could then disagree. Where a parent does author a new aggregate — a
- * cascade stopping on an individual rejection — that aggregate carries reasoning, because it is
- * a new claim rather than a restatement.
+ * constant has a fixed, documented meaning, and <em>that meaning is the explanation</em>:
+ * the parent adds no free text of its own, because a note restating the enum would
+ * duplicate one fact in two places that could then disagree. Where a parent does author a
+ * new aggregate — a cascade stopping on an individual rejection — that aggregate carries
+ * reasoning, because it is a new claim rather than a restatement.
  * </p>
  *
  * @author Mark Pollack
@@ -30,22 +30,25 @@ public enum DispositionReason {
 	 */
 	EXECUTION_FAILED("execution_failed"),
 
-	/** The assessment tier violated its single-seat identity or policy contract. */
+	/** The finding tier violated its single-seat identity or policy contract. */
 	INVALID_TIER_RESULT("invalid_tier_result"),
 
 	/**
-	 * The stage returned a verdict whose decision is {@link DecisionKind#UNDECIDED}: it ran, and
-	 * determined nothing. The actual verdict is kept on the attempt.
+	 * The stage returned a verdict whose provenance is
+	 * {@link VerdictProvenanceKind#UNDECIDED}: it ran, and determined nothing. The actual
+	 * verdict is kept on the attempt.
 	 */
 	CHILD_UNDECIDED("child_undecided"),
 
 	/**
-	 * The stage returned a {@link io.github.markpollack.judge.result.JudgmentStatus#NOT_APPLICABLE}
+	 * The stage returned a
+	 * {@link io.github.markpollack.judge.judgment.JudgmentStatus#NOT_APPLICABLE}
 	 * aggregate without having declared that its aggregate may be excluded.
 	 * <p>
-	 * A jury cannot acquire the right to shrink a denominator by being nested inside something.
-	 * The child's actual verdict is kept unchanged on the attempt, so the claim it made stays
-	 * visible and countable — including when a later stage succeeds and the item passes.
+	 * A jury cannot acquire the right to shrink a denominator by being nested inside
+	 * something. The child's actual verdict is kept unchanged on the attempt, so the
+	 * claim it made stays visible and countable — including when a later stage succeeds
+	 * and the item passes.
 	 * </p>
 	 */
 	UNDECLARED_NOT_APPLICABLE("undeclared_not_applicable");

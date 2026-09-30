@@ -2,7 +2,7 @@ package io.github.markpollack.judge.springai;
 
 /**
  * Public constants for Spring AI metadata keys stored in
- * {@code JudgmentContext.metadata()}.
+ * {@code CompletionEvidence.metadata()}.
  *
  * @author Mark Pollack
  * @since 0.10.0
@@ -33,7 +33,9 @@ public final class SpringAiMetadataKeys {
 	/** Whether the response contains tool call requests. */
 	public static final String HAS_TOOL_CALLS = "springai.hasToolCalls";
 
-	/** List of tool calls requested by the model (best-effort, not full execution trace). */
+	/**
+	 * List of tool calls requested by the model (best-effort, not full execution trace).
+	 */
 	public static final String TOOL_CALLS = "springai.toolCalls";
 
 	private SpringAiMetadataKeys() {

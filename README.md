@@ -1,137 +1,186 @@
-# Agent Judge
+# Agent Eval
 
-Agent Judge is the portable verification layer for JVM agent systems.
-It evaluates agent output and workspace evidence with the same judges, juries, and policies whether the result came from Spring AI, LangChain4j, Koog, AgentClient, or a custom runtime.
+Evaluate evidence against requirements with typed Java judges, compose them into juries, and assert what their conclusions establish.
 
-Judges answer one question: did this execution satisfy its goal, and what evidence supports that conclusion?
+Start with an ordinary deterministic assertion:
 
-## Research foundations
+```java
+import static org.assertj.core.api.Assertions.assertThat;
 
-Agent Judge evaluates whether work satisfies an explicit definition of done, using executable evidence and independent checks—not whether it resembles one reference answer.
+assertThat(calculator.add(2, 2))
+    .isEqualTo(4);
+```
 
-[Read the research foundations](https://lab.pollack.ai/docs/agent-judge/research-foundations) for the motivating migration experiment, five design principles, their current implementation in Agent Judge, and the complete source map.
+Do not use AI for a property ordinary deterministic code can establish.
 
-## Result model
+Now change the subject to a response: **“Two pairs make a group of four.”** Arithmetic alone does not establish what that sentence communicates. State the requirement and give its judge the text:
 
-Every `Judgment` records a required outcome—`PASS`, `FAIL`, `ABSTAIN`, `NOT_APPLICABLE`, or `ERROR`—plus an optional normalized score, an optional classification label, and an optional countable reason code.
-These are independent facts: an abstention is not a failing vote, an error is not a negative finding, and a status-only pass does not manufacture a stored score.
+```java
+import static io.github.markpollack.judge.assertj.Assertions.assertThat;
+import io.github.markpollack.judge.requirement.Requirement;
 
-The difference between the last three outcomes is what a denominator does with them.
-`ABSTAIN` means the question applied and has no answer yet; `NOT_APPLICABLE` means the question should not have been asked, so the criterion is excluded from the denominator and counted separately; `ERROR` means the instrument never reached a finding.
-A judge may only exclude a subject where it declared in advance that it can—an undeclared exclusion is contained as an error rather than honoured.
+Requirement<String> TWO_PLUS_TWO_REQUIREMENT = Requirement.text(
+    "two-plus-two", "1",
+    "The response correctly communicates that 2 + 2 equals 4.");
 
-Every `ERROR` carries a `JudgmentReasonCode`, because an instrument failure nobody can count is a failure nobody fixes.
-A failure the library's own machinery produced is never converted into a rejection of the subject, under any error policy.
+String response = "Two pairs make a group of four.";
 
-Result metadata is recursively immutable and restricted to ordinary JSON-compatible values.
-Token usage preserves independently reported input, output, reasoning, cache-creation, cache-read, and total quantities; pricing is a downstream derivation.
+assertThat(TWO_PLUS_TWO_REQUIREMENT)
+    .judgedBy(TWO_PLUS_TWO_RESPONSE_JUDGE)
+    .withEvidence(response)
+    .isSatisfied();
+```
 
-A `Verdict` records where each judgment sat (`seats`) and what produced its aggregate (`decision`), so a stored composite result can be read correctly without knowing how the jury was built.
-Composite juries return complete ordered execution evidence in `Verdict.compositeAttempts()`.
-Each named attempt says whether its parent could use what the stage returned, and contains exactly one returned child verdict or one stable code-only failure, so
-callers can distinguish a negative finding from a stage that did not execute successfully—even when a later stage succeeds.
-`CompositePaths.flatten(verdict)` derives deterministic RFC 6901 paths across nested meta-juries and
-cascades without placing paths or runtime exceptions in the wire result.
+`TWO_PLUS_TWO_RESPONSE_JUDGE` is a `Judge<String>` configured to evaluate that requirement. A Judge evaluates evidence and returns a Judgment. The requirement says what must be true; the response is the evidence. Neither needs to carry an application acceptance policy.
 
-## Modules
+With deterministic assertions, what counts as acceptable is usually built into the assertion itself. With AI evaluation, a judgment may carry uncertainty, abstention, or richer probabilistic information, so Agent Eval lets you make “what counts as acceptable” explicit when you need to, without forcing that complexity into the simple case.
 
-| Module | Responsibility |
+```java
+import io.github.markpollack.judge.acceptance.AcceptanceAction;
+import io.github.markpollack.judge.acceptance.AcceptanceDecision;
+import io.github.markpollack.judge.acceptance.AcceptancePolicy;
+
+AcceptancePolicy explainedJudgment = judgment -> judgment.reasoning().isBlank()
+    ? new AcceptanceDecision(AcceptanceAction.ABSTAIN, "An explanation is required")
+    : new AcceptanceDecision(AcceptanceAction.RELY, "The judgment includes an explanation");
+
+assertThat(TWO_PLUS_TWO_REQUIREMENT)
+    .judgedBy(TWO_PLUS_TWO_RESPONSE_JUDGE)
+    .withEvidence(response)
+    .withAcceptancePolicy(explainedJudgment)
+    .isSatisfied();
+```
+
+This illustrative policy checks for an explanation; it makes no confidence or calibration claim. `RELY` means rely on the Judgment as rendered, including a negative Judgment. Relying on a negative Judgment still fails `isSatisfied()`. `ABSTAIN` and `ESCALATE` withhold reliance; escalation records a request for the caller to act.
+
+The default policy is `RELY`, with no confidence threshold. No policy identity, revision or digest is required. Applications that need durable policy provenance can attach it separately with `Policies.recorded(...)`.
+
+## Configure a textual Judge
+
+An ordinary Judge can be a lambda. A model-backed Judge adds explicit evidence rendering and response classification:
+
+```java
+import java.util.Map;
+import io.github.markpollack.judge.Judge;
+import io.github.markpollack.judge.ai.JudgmentClassifiers;
+import io.github.markpollack.judge.ai.ModelBackedJudge;
+import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
+
+// judgeModel is a configured JudgeModel backend supplied by your application.
+Judge<String> TWO_PLUS_TWO_RESPONSE_JUDGE = ModelBackedJudge.<String>builder()
+    .name("two-plus-two-response")
+    .promptTemplate(JudgePromptTemplate.fromString("two-plus-two", """
+        Requirement: {{requirement}}
+        Response: {{response}}
+        Does the response satisfy the requirement? Reply satisfied, violated, or unknown.
+        """))
+    .variables(text -> Map.of("requirement", TWO_PLUS_TWO_REQUIREMENT.text(), "response", text))
+    .model(judgeModel)
+    .judgmentClassifier(JudgmentClassifiers.passFail("satisfied", "violated"))
+    .build();
+```
+
+The classifier returns an abstention for an unrecognized answer. Backend completion failure remains an instrument error. This example teaches the API, not the accuracy of a particular model or prompt. The [five executable API examples](agent-judge-assertj/src/test/java/io/github/markpollack/judge/assertj/AssertJApiExperienceTest.java) use a local judging stub and need no credentials.
+
+## Compose a Jury
+
+A Jury combines Judgments and produces a Verdict. The Verdict contains its collective `judgment()`, individual Judgments and composition history.
+
+```java
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.jury.AllMustPassStrategy;
+import io.github.markpollack.judge.jury.Jury;
+import io.github.markpollack.judge.jury.SimpleJury;
+
+Judge<String> nonemptyResponseJudge = text -> text.isBlank()
+    ? Judgment.fail("The response is empty") : Judgment.pass("The response has text");
+
+Jury<String> jury = SimpleJury.<String>builder()
+    .judge(nonemptyResponseJudge)
+    .judge(TWO_PLUS_TWO_RESPONSE_JUDGE)
+    .votingStrategy(new AllMustPassStrategy())
+    .build();
+
+assertThat(TWO_PLUS_TWO_REQUIREMENT)
+    .judgedBy(jury)
+    .withEvidence(response)
+    .isSatisfied();
+```
+
+Final acceptance runs after the Jury completes. It preserves the Jury's voting rules, internal policies, tier routing and original Verdict.
+
+## Inspect a retained result
+
+```java
+import io.github.markpollack.judge.assertions.RequirementAssertions;
+
+var result = RequirementAssertions.relyingOnJudgment()
+    .evaluate(TWO_PLUS_TWO_REQUIREMENT, TWO_PLUS_TWO_RESPONSE_JUDGE, response, null);
+
+System.out.println(result.verdict().judgment().reasoning());
+System.out.println(result.interpretation().outcome());
+RequirementAssertions.requireSatisfied(result);
+```
+
+Interpretation describes what the Verdict establishes about the Requirement: `SATISFIED`, `VIOLATED`, `UNRESOLVED`, `NOT_APPLICABLE` or `NOT_ASSESSED`. Reading support separately records whether the retained facts justify that interpretation. `isSatisfied()` asserts over these facts and final acceptance; it is not a stored boolean.
+
+Asserting a retained result invokes no Judge, model or AcceptancePolicy. Calling the fluent `isSatisfied()` terminal again performs another evaluation.
+
+## Structured detail and evidence
+
+A Judgment is the Judge's conclusion. Findings are optional structured determinations supporting it. A deterministic PASS or FAIL needs no Finding. When available, `BooleanFinding`, `NumericFinding` and `CategoryFinding` retain producer detail. `Confidence` is metric-specific scalar support, not a general calibration guarantee. `ProbabilityDistribution` preserves probabilities over the declared domain.
+
+`Provenance` records a Judgment's origins. `VerdictProvenance` records how the Jury's collective Judgment was produced, including ordinary reduction, one-seat identity and adoption from a tier. Internal policy executions remain distinct from final application acceptance.
+
+Evidence is owned by the domain being evaluated:
+
+| Judge family | Evidence |
 |---|---|
-| `agent-judge-core` | Typed `Judge<E>` / `Jury<E>`, native requirements, `JudgmentContext`, results and voting strategies |
-| `agent-judge-ai-core` | Framework-neutral prompt, model, and classifier infrastructure for AI-backed judges |
-| `agent-judge-exec` | Command, build, class-version, and coverage judges |
-| `agent-judge-file` | Java, Maven, XML, and text semantic comparison |
-| `agent-judge-llm` | Spring AI-backed semantic judging |
-| `agent-judge-rag` | Faithfulness, contextual relevance, and hallucination judges |
-| `agent-judge-spring-ai` | Evaluated-side `ChatResponse` bridge |
-| `agent-judge-langchain4j` | Evaluated-side `Result<T>` bridge |
-| `agent-judge-koog` | Evaluated-side Koog `AIAgent` bridge |
-| `agent-judge-agent-client` | Evaluated-side AgentClient bridge and AgentClient judging backend |
-| `agent-judge-jev` | Typed Jev evidence and System One judging adapter |
-| `agent-judge-assertions` | Direct requirement evaluation, final application policy and retained-result assertions |
-| `agent-judge-assertj` | Optional staged, requirement-first AssertJ integration |
+| File existence/content, build/command, EARS/RFC2119 workspace audit | `Path` |
+| Directory/file comparison | `DirectoryComparison` / `FileComparison` |
+| Coverage comparison | `CoverageComparison` with a typed baseline |
+| Request/response runtime bridges | `CompletionEvidence` |
+| CLI AgentClient execution | `AgentExecutionEvidence` with workspace and completion |
+| RAG | `RagEvidence(question, retrievedContext, answer)` |
+| Jev | selected `JevEvidence` paired with the Requirement |
 
-`agent-judge-core` is framework-neutral, not dependency-free.
-It uses Jackson Databind, SLF4J API, and compile-scope JSpecify annotations; no core dependency is an agent framework, model provider, dependency-injection container, or hosted evaluation service.
+For example, `new FileExistsJudge("pom.xml").judge(workspace)` evaluates a `Path`; no execution context or metadata keys are needed. A Judge that needs the requirement itself uses `Judge<RequirementEvidence<S,E>>` and the explicit `judgedByRequirement(...)` stage. Ordinary `Judge<E>` implementations use `judgedBy(...)`.
 
-## Install
+## Build and dependencies
+
+This source line is **0.18.0-SNAPSHOT** and requires Java 21. These APIs deliberately revise the earlier candidate; the examples describe this source line. Build it locally with `./mvnw install`, then use matching versions:
 
 ```xml
 <dependency>
     <groupId>io.github.markpollack</groupId>
-    <artifactId>agent-judge-core</artifactId>
-    <version>0.14.0</version>
+    <artifactId>agent-judge-assertj</artifactId>
+    <version>0.18.0-SNAPSHOT</version>
+    <scope>test</scope>
+</dependency>
+<!-- Add for the model-backed example. -->
+<dependency>
+    <groupId>io.github.markpollack</groupId>
+    <artifactId>agent-judge-ai-core</artifactId>
+    <version>0.18.0-SNAPSHOT</version>
+    <scope>test</scope>
 </dependency>
 ```
 
-Add only the judge-family and runtime-bridge modules your application needs.
-All published modules use the same version.
+| Module | Responsibility |
+|---|---|
+| `agent-judge-core` | Requirements, typed Judge/Jury, Judgments, acceptance, provenance and composition |
+| `agent-judge-ai-core` | Generic model-backed judges, prompt rendering and classification |
+| `agent-judge-assertions` / `agent-judge-assertj` | Direct evaluation, retained assertions / staged AssertJ API |
+| `agent-judge-file` / `agent-judge-exec` | Filesystem comparisons / build, command, class-version and coverage judges |
+| `agent-judge-llm` / `agent-judge-rag` | Spring AI-backed judging / RAG judgments |
+| `agent-judge-jev` | Lossless Jev System One adapter |
+| `agent-judge-spring-ai` / `agent-judge-langchain4j` / `agent-judge-koog` | Runtime response bridges |
+| `agent-judge-agent-client` | CLI execution evidence and AgentClient judging backend |
 
-## Quick start
+Core uses Jackson, SLF4J API and JSpecify, with no agent framework or model provider dependency. Concrete filesystem judges live in `agent-judge-file`.
 
-This execution-oriented example uses the typed API in the current source line. The separate
-[Tutorial module 04](https://github.com/markpollack/agent-judge-tutorial/blob/main/module-04-simple-jury/src/main/java/io/github/markpollack/judge/tutorial/module04/SimpleJuryDemo.java)
-demonstrates the corresponding Jury concepts against its own dependency version.
-
-```java
-Path workspace = Path.of("test-workspace");
-String controllerPath = "src/main/java/com/example/HelloController.java";
-
-JudgmentContext context = JudgmentContext.builder()
-    .goal("Add a HelloController class")
-    .workspace(workspace)
-    .status(ExecutionStatus.SUCCESS)
-    .startedAt(Instant.now())
-    .executionTime(Duration.ofSeconds(5))
-    .build();
-
-Judge<JudgmentContext> fileExists = Judges.named(
-    new FileExistsJudge(controllerPath),
-    "file-exists", "Controller file created");
-
-Judge<JudgmentContext> hasMethod = Judges.named(
-    new FileContentJudge(controllerPath, "hello",
-        FileContentJudge.MatchMode.CONTAINS),
-    "has-method", "Contains hello method");
-
-Judge<JudgmentContext> hasPom = Judges.named(
-    new FileExistsJudge("pom.xml"),
-    "has-pom", "Maven project file exists");
-
-SimpleJury<JudgmentContext> majorityJury = SimpleJury.<JudgmentContext>builder()
-    .judge(fileExists, 1.0)
-    .judge(hasMethod, 1.0)
-    .judge(hasPom, 1.0)
-    .votingStrategy(new MajorityVotingStrategy())
-    .parallel(true)
-    .build();
-
-Verdict majorityVerdict = majorityJury.vote(context);
-
-System.out.println("Overall: " + majorityVerdict.aggregated().status());
-```
-
-For typed requirement assertions in the `0.18.0-SNAPSHOT` source line, see the
-[AssertJ guide and compiled examples](agent-judge-assertj/README.md) and
-[migration guide](MIGRATION_TYPED_EVIDENCE.md). The application chooses how to act on the
-completed evaluation; its final policy does not rewrite a Jury's internal policies.
-
-## Executable examples and documentation
-
-The [Agent Judge Tutorial](https://github.com/markpollack/agent-judge-tutorial) is the canonical executable sample repository.
-Its ten credential-free Maven modules cover core judging, composition, juries, custom judges, model-backed judges, Koog, and LangChain4j.
-
-The narrative guides—writing judges, describing juries, the normalized-`Judgment` handoff, and the migration guides—live on the documentation site.
-This repository keeps the code, the API Javadoc, and the release notes.
-
-- [Getting started](https://lab.pollack.ai/docs/agent-judge/getting-started)
-- [Documentation](https://lab.pollack.ai/docs/agent-judge)
-- [Tutorial source](https://github.com/markpollack/agent-judge-tutorial)
-- [0.17 release notes](RELEASE_NOTES_0.17.0.md)
-- [0.16 release notes](RELEASE_NOTES_0.16.0.md)
+Modern Judgment, Verdict and Interpretation records use **schemaVersion 3**. V2 is intentionally unsupported by the current typed reader. Historical tolerant interpretation remains available for unversioned records. See the [wire contract](portable-results-v3.md), [migration guide](MIGRATION_TYPED_EVIDENCE.md), [AssertJ guide](agent-judge-assertj/README.md) and [Jev guide](agent-judge-jev/README.md).
 
 ## License
 
-The current source tree is licensed under the Business Source License 1.1 with the project-specific terms in [LICENSE](LICENSE).
-Releases through 0.9.1, published under the former `org.springaicommunity` coordinates, were licensed under [Apache License 2.0](LICENSE-APACHE.txt); 0.9.2 is the first release under the Business Source License.
-Previously published Apache-licensed releases retain their original terms; `LICENSE-APACHE.txt` is preserved only as that release-history record and is not a second license for the current source tree.
+The current source tree uses the Business Source License 1.1 with the project-specific terms in [LICENSE](LICENSE). Releases through 0.9.1 under the former `org.springaicommunity` coordinates retain their [Apache License 2.0](LICENSE-APACHE.txt) terms. That file records release history and is not a second license for current source.

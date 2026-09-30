@@ -5,7 +5,6 @@ import com.github.javaparser.ParseResult;
 import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.ImportDeclaration;
-import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.comments.Comment;
 import com.github.javaparser.ast.expr.*;
@@ -39,6 +38,7 @@ public class JavaSemanticComparator {
 
 	/**
 	 * Result of a semantic comparison.
+	 *
 	 * @param equivalent whether both compilation units are semantically equivalent
 	 * @param differences human-readable differences
 	 */

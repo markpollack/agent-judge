@@ -6,9 +6,8 @@ import io.github.markpollack.judge.DeterministicJudge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Check;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Check;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -24,7 +23,7 @@ import java.nio.file.Path;
  * <li>Comments</li>
  * </ul>
  */
-public class JavaSemanticJudge extends DeterministicJudge {
+public class JavaSemanticJudge extends DeterministicJudge<FileComparison> {
 
 	private static final Logger logger = LoggerFactory.getLogger(JavaSemanticJudge.class);
 
@@ -36,10 +35,10 @@ public class JavaSemanticJudge extends DeterministicJudge {
 	}
 
 	@Override
-	public Judgment judge(JudgmentContext context) {
-		String filePath = (String) context.metadata().get("filePath");
-		Path expectedFile = (Path) context.metadata().get("expectedFile");
-		Path actualFile = (Path) context.metadata().get("actualFile");
+	public Judgment judge(FileComparison evidence) {
+		String filePath = evidence.relativePath();
+		Path expectedFile = evidence.expectedFile();
+		Path actualFile = evidence.actualFile();
 
 		try {
 			String expected = Files.readString(expectedFile);
@@ -52,14 +51,16 @@ public class JavaSemanticJudge extends DeterministicJudge {
 			ComparisonResult result = comparator.compare(expected, actual);
 
 			if (result.equivalent()) {
-				return Judgment.builder().pass()
+				return Judgment.builder()
+					.pass()
 					.reasoning("Java semantically matches")
 					.check(Check.pass(filePath))
 					.build();
 			}
 
 			String diff = String.join("\n", result.differences());
-			return Judgment.builder().fail()
+			return Judgment.builder()
+				.fail()
 				.reasoning("Java semantic differences: " + diff)
 				.check(Check.fail(filePath, diff))
 				.build();

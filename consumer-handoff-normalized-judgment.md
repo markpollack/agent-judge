@@ -1,3 +1,5 @@
+> Historical normalized-Judgment migration guide. Current 0.18 APIs use the [domain migration guide](MIGRATION_TYPED_EVIDENCE.md) and [V3 wire contract](portable-results-v3.md).
+
 <!--
 Copyright (c) 2024-2026 Mark Pollack
 See LICENSE in the repository root for project-specific Business Source License terms.

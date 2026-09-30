@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.markpollack.judge.description.StrategyDescription;
-import io.github.markpollack.judge.result.Judgment;
+import io.github.markpollack.judge.judgment.Judgment;
 
 /**
  * Average voting strategy: the mean of the applicable judges' assessments.
@@ -22,24 +22,25 @@ import io.github.markpollack.judge.result.Judgment;
  *
  * <p>
  * Abstentions leave the population entirely — excluded from both the numerator and the
- * denominator, because "no assessment" is not the assessment zero. Errors are governed by
+ * denominator, because "no assessment" is not the finding zero. Errors are governed by
  * {@link ErrorPolicy} (default {@code PROPAGATE}) and exclusions by
- * {@link NotApplicablePolicy} (default {@code REFUSE}). If nothing is eligible the result is
- * {@code ABSTAIN} rather than a manufactured failing score, or {@code NOT_APPLICABLE} when
- * every input was an exclusion this strategy was configured to honour.
+ * {@link NotApplicablePolicy} (default {@code REFUSE}). If nothing is eligible the result
+ * is {@code ABSTAIN} rather than a manufactured failing score, or {@code NOT_APPLICABLE}
+ * when every input was an exclusion this strategy was configured to honour.
  * </p>
  *
  * <p>
  * The judgment passes if the mean reaches the configured threshold, which defaults to
- * {@link #DEFAULT_THRESHOLD}. That default is a convention rather than a derivation: it knows
- * nothing about the scale your judges score on. Prefer a bar derived from the rubric that
- * produced the scores.
+ * {@link #DEFAULT_THRESHOLD}. That default is a convention rather than a derivation: it
+ * knows nothing about the scale your judges score on. Prefer a bar derived from the
+ * rubric that produced the scores.
  * </p>
  *
  * <p>
  * Example usage:
  * </p>
- * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
  *
  * @author Mark Pollack
  * @since 0.1.0
@@ -50,9 +51,10 @@ public class AverageVotingStrategy implements VotingStrategy {
 	 * The acceptance bar applied when the caller does not state one.
 	 * <p>
 	 * 0.5 is the convention across the evaluation ecosystem and is retained as the
-	 * default so existing behaviour is unchanged. It is a convention, not a derivation: it
-	 * knows nothing about the scale your judges score on. Prefer a threshold derived from
-	 * the rubric that produced the scores, supplied through the threshold constructor.
+	 * default so existing behaviour is unchanged. It is a convention, not a derivation:
+	 * it knows nothing about the scale your judges score on. Prefer a threshold derived
+	 * from the rubric that produced the scores, supplied through the threshold
+	 * constructor.
 	 * </p>
 	 *
 	 * @since 0.16.0
@@ -113,8 +115,7 @@ public class AverageVotingStrategy implements VotingStrategy {
 	 * {@code [0.0, 1.0]}, or if either policy is null
 	 * @since 0.17.0
 	 */
-	public AverageVotingStrategy(double threshold, ErrorPolicy errorPolicy,
-			NotApplicablePolicy notApplicablePolicy) {
+	public AverageVotingStrategy(double threshold, ErrorPolicy errorPolicy, NotApplicablePolicy notApplicablePolicy) {
 		if (notApplicablePolicy == null) {
 			throw new IllegalArgumentException("notApplicablePolicy must not be null");
 		}
@@ -181,8 +182,7 @@ public class AverageVotingStrategy implements VotingStrategy {
 	 */
 	@Override
 	public StrategyDescription describe() {
-		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, this.threshold,
-				Map.of());
+		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, this.threshold, Map.of());
 	}
 
 	/** {@inheritDoc} */
@@ -190,6 +190,5 @@ public class AverageVotingStrategy implements VotingStrategy {
 	public NotApplicablePolicy notApplicablePolicy() {
 		return this.notApplicablePolicy;
 	}
-
 
 }

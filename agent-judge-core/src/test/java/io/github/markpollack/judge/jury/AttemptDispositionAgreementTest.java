@@ -13,10 +13,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.description.KeySource;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -26,19 +26,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * A disposition reason must describe the stage the attempt actually holds.
  *
  * <p>
- * The attempt checked only that a verdict was <em>present</em>, so a stage that passed with its
- * own reduction could be recorded {@code CHILD_UNDECIDED} or {@code UNDECLARED_NOT_APPLICABLE},
- * and a {@code USED} attempt could hold a child that decided nothing. Those are not merely
- * unhelpful labels — a downstream reader counts boundary dispositions by reason and classifies
- * items by following the decision chain, and it trusts these markers because it cannot
- * re-derive them. A marker that can be false is worse than one that is absent: absence says
- * "not recorded", and a reader can act on that.
+ * The attempt checked only that a verdict was <em>present</em>, so a stage that passed
+ * with its own reduction could be recorded {@code CHILD_UNDECIDED} or
+ * {@code UNDECLARED_NOT_APPLICABLE}, and a {@code USED} attempt could hold a child that
+ * decided nothing. Those are not merely unhelpful labels — a downstream reader counts
+ * boundary dispositions by reason and classifies items by following the provenance chain,
+ * and it trusts these markers because it cannot re-derive them. A marker that can be
+ * false is worse than one that is absent: absence says "not recorded", and a reader can
+ * act on that.
  * </p>
  *
  * <p>
- * So the check is on the content, not the presence, and it lives in the compact constructor —
- * the one place every factory, every Jackson read, and every hand-built D1 copy has to pass
- * through.
+ * So the check is on the content, not the presence, and it lives in the compact
+ * constructor — the one place every factory, every Jackson read, and every hand-built D1
+ * copy has to pass through.
  * </p>
  */
 @DisplayName("Attempt disposition agreement")
@@ -56,11 +57,11 @@ class AttemptDispositionAgreementTest {
 	/** A child whose reduction broke, so it determined nothing. */
 	private static Verdict undecided() {
 		return Verdict.builder()
-			.aggregated(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
+			.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
 			.individual(List.of(FAILING))
 			.individualByName(Map.of("strict", FAILING))
 			.seats(List.of(new Seat(0, "strict", KeySource.DECLARED)))
-			.decision(Decision.undecided())
+			.provenance(VerdictProvenance.undecided())
 			.build();
 	}
 
@@ -81,8 +82,8 @@ class AttemptDispositionAgreementTest {
 		@Test
 		@DisplayName("CHILD_UNDECIDED over a child that decided is refused")
 		void childUndecidedRequiresAnUndecidedChild() {
-			assertThatThrownBy(() -> attempt(AttemptDisposition.STAGE_FAILED, DispositionReason.CHILD_UNDECIDED,
-					decided()))
+			assertThatThrownBy(
+					() -> attempt(AttemptDisposition.STAGE_FAILED, DispositionReason.CHILD_UNDECIDED, decided()))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("CHILD_UNDECIDED");
 
@@ -145,13 +146,13 @@ class AttemptDispositionAgreementTest {
 		@Test
 		@DisplayName("a determined D1 child is a legitimate USED member, since it decided")
 		void aDeterminedRejectionIsUsable() {
-			Verdict rejecting = CascadedJury.<JudgmentContext>builder()
+			Verdict rejecting = CascadedJury.<CompletionEvidence>builder()
 				.tier("rubric", ContainmentTest.returning(excluded()), TierPolicy.REJECT_ON_ANY_FAIL)
 				.tier("semantic", ContainmentTest.returning(decided()), TierPolicy.FINAL_TIER)
 				.build()
-				.vote(JudgmentContext.builder().goal("reject on an established violation").build());
+				.vote(CompletionEvidence.builder().request("reject on an established violation").build());
 
-			assertThat(rejecting.decision().basis()).isEqualTo(DecisionBasis.INDIVIDUAL_REJECTION);
+			assertThat(rejecting.provenance().basis()).isEqualTo(VerdictProvenanceBasis.INDIVIDUAL_REJECTION);
 			assertThatCode(() -> CompositeAttempt.used("member", CompositeRelation.META_MEMBER, null, rejecting))
 				.doesNotThrowAnyException();
 		}
@@ -165,9 +166,9 @@ class AttemptDispositionAgreementTest {
 		@Test
 		@DisplayName("a false reason in stored data is refused where it is read")
 		void aFalseReasonIsRefusedOnRead() throws Exception {
-			String honest = MAPPER.writeValueAsString(CompositeAttempt.stageFailed("rubric",
-					CompositeRelation.CASCADE_TIER, TierPolicy.REJECT_ON_ANY_FAIL,
-					DispositionReason.UNDECLARED_NOT_APPLICABLE, excluded()));
+			String honest = MAPPER
+				.writeValueAsString(CompositeAttempt.stageFailed("rubric", CompositeRelation.CASCADE_TIER,
+						TierPolicy.REJECT_ON_ANY_FAIL, DispositionReason.UNDECLARED_NOT_APPLICABLE, excluded()));
 			String swapped = honest.replace("\"undeclared_not_applicable\"", "\"child_undecided\"");
 
 			assertThat(swapped).isNotEqualTo(honest);

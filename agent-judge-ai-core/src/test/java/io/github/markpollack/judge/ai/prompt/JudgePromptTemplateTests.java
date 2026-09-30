@@ -6,8 +6,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
-import io.github.markpollack.judge.context.ExecutionStatus;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.completion.CompletionStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,13 +19,13 @@ class JudgePromptTemplateTests {
 	void renderSubstitutesVariables() {
 		var template = JudgePromptTemplate.fromString("test", "Goal: {{goal}}\nOutput: {{output}}");
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("summarize")
-			.agentOutput("A summary.")
-			.status(ExecutionStatus.SUCCESS)
+		CompletionEvidence context = CompletionEvidence.builder()
+			.request("summarize")
+			.response("A summary.")
+			.status(CompletionStatus.SUCCESS)
 			.build();
 
-		String rendered = template.render(context);
+		String rendered = template.render(CompletionVariables.from(context));
 
 		assertThat(rendered).isEqualTo("Goal: summarize\nOutput: A summary.");
 	}
@@ -34,13 +34,13 @@ class JudgePromptTemplateTests {
 	void renderMetadataVariables() {
 		var template = JudgePromptTemplate.fromString("test", "Ref: {{metadata.reference}}");
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test")
-			.status(ExecutionStatus.SUCCESS)
+		CompletionEvidence context = CompletionEvidence.builder()
+			.request("test")
+			.status(CompletionStatus.SUCCESS)
 			.metadata("reference", "expected answer")
 			.build();
 
-		String rendered = template.render(context);
+		String rendered = template.render(CompletionVariables.from(context));
 
 		assertThat(rendered).isEqualTo("Ref: expected answer");
 	}
@@ -49,12 +49,13 @@ class JudgePromptTemplateTests {
 	void strictPolicyRejectsUnresolvedPlaceholders() {
 		var template = JudgePromptTemplate.fromString("test", "{{goal}} and {{unknown}}");
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test")
-			.status(ExecutionStatus.SUCCESS)
+		CompletionEvidence context = CompletionEvidence.builder()
+			.request("test")
+			.status(CompletionStatus.SUCCESS)
 			.build();
 
-		assertThatThrownBy(() -> template.render(context)).isInstanceOf(IllegalStateException.class)
+		assertThatThrownBy(() -> template.render(CompletionVariables.from(context)))
+			.isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("unknown");
 	}
 
@@ -66,12 +67,12 @@ class JudgePromptTemplateTests {
 			.missingVariablePolicy(JudgePromptTemplate.MissingVariablePolicy.EMPTY_STRING)
 			.build();
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test")
-			.status(ExecutionStatus.SUCCESS)
+		CompletionEvidence context = CompletionEvidence.builder()
+			.request("test")
+			.status(CompletionStatus.SUCCESS)
 			.build();
 
-		assertThat(template.render(context)).isEqualTo("test and ");
+		assertThat(template.render(CompletionVariables.from(context))).isEqualTo("test and ");
 	}
 
 	@Test
@@ -82,12 +83,12 @@ class JudgePromptTemplateTests {
 			.missingVariablePolicy(JudgePromptTemplate.MissingVariablePolicy.LEAVE_PLACEHOLDER)
 			.build();
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test")
-			.status(ExecutionStatus.SUCCESS)
+		CompletionEvidence context = CompletionEvidence.builder()
+			.request("test")
+			.status(CompletionStatus.SUCCESS)
 			.build();
 
-		assertThat(template.render(context)).isEqualTo("test and {{unknown}}");
+		assertThat(template.render(CompletionVariables.from(context))).isEqualTo("test and {{unknown}}");
 	}
 
 	@Test
@@ -98,13 +99,14 @@ class JudgePromptTemplateTests {
 			.requiredVariables("goal", "metadata.reference")
 			.build();
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test")
-			.agentOutput("output")
-			.status(ExecutionStatus.SUCCESS)
+		CompletionEvidence context = CompletionEvidence.builder()
+			.request("test")
+			.response("output")
+			.status(CompletionStatus.SUCCESS)
 			.build();
 
-		assertThatThrownBy(() -> template.render(context)).isInstanceOf(IllegalStateException.class)
+		assertThatThrownBy(() -> template.render(CompletionVariables.from(context)))
+			.isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("metadata.reference");
 	}
 
@@ -112,13 +114,13 @@ class JudgePromptTemplateTests {
 	void classpathResourceLoads() {
 		var template = JudgePromptTemplate.fromClasspath("judges/test-relevance.md");
 
-		JudgmentContext context = JudgmentContext.builder()
-			.goal("test goal")
-			.agentOutput("test output")
-			.status(ExecutionStatus.SUCCESS)
+		CompletionEvidence context = CompletionEvidence.builder()
+			.request("test goal")
+			.response("test output")
+			.status(CompletionStatus.SUCCESS)
 			.build();
 
-		String rendered = template.render(context);
+		String rendered = template.render(CompletionVariables.from(context));
 
 		assertThat(rendered).contains("test goal");
 		assertThat(rendered).contains("test output");
@@ -134,7 +136,8 @@ class JudgePromptTemplateTests {
 			.hasMessageContaining("not found");
 	}
 
-	// ==================== Template loading is thread-context independent ====================
+	// ==================== Template loading is thread-context independent
+	// ====================
 	//
 	// Regression guards for the defect where a classpath template resolved lazily through
 	// the thread context classloader. A parallel SimpleJury renders on a common-pool
@@ -146,26 +149,29 @@ class JudgePromptTemplateTests {
 	void classpathTemplateRendersOnAThreadWhoseContextClassLoaderCannotSeeIt() throws Exception {
 		var template = JudgePromptTemplate.fromClasspath("judges/test-relevance.md");
 
-		String rendered = withoutApplicationContextClassLoader(() -> template.render(renderContext()));
+		String rendered = withoutApplicationContextClassLoader(
+				() -> template.render(CompletionVariables.from(renderContext())));
 
 		assertThat(rendered).contains("test goal").contains("test output").doesNotContain("{{");
 	}
 
 	@Test
 	void classpathTemplateResolvesWithoutTheContextClassLoaderAtAll() throws Exception {
-		// Constructed as well as rendered with a blinded TCCL: resolution must not consult
+		// Constructed as well as rendered with a blinded TCCL: resolution must not
+		// consult
 		// it, rather than merely consulting it at a luckier moment.
 		String rendered = withoutApplicationContextClassLoader(
-				() -> JudgePromptTemplate.fromClasspath("judges/test-relevance.md").render(renderContext()));
+				() -> JudgePromptTemplate.fromClasspath("judges/test-relevance.md")
+					.render(CompletionVariables.from(renderContext())));
 
 		assertThat(rendered).contains("test goal").contains("test output");
 	}
 
-	private static JudgmentContext renderContext() {
-		return JudgmentContext.builder()
-			.goal("test goal")
-			.agentOutput("test output")
-			.status(ExecutionStatus.SUCCESS)
+	private static CompletionEvidence renderContext() {
+		return CompletionEvidence.builder()
+			.request("test goal")
+			.response("test output")
+			.status(CompletionStatus.SUCCESS)
 			.build();
 	}
 
@@ -178,8 +184,9 @@ class JudgePromptTemplateTests {
 			FutureTask<T> task = new FutureTask<>(() -> {
 				// Guard against the test going vacuous if this loader ever gains sight of
 				// the resource.
-				assertThat(Thread.currentThread().getContextClassLoader().getResourceAsStream(
-						"judges/test-relevance.md")).isNull();
+				assertThat(
+						Thread.currentThread().getContextClassLoader().getResourceAsStream("judges/test-relevance.md"))
+					.isNull();
 				return action.call();
 			});
 			Thread thread = new Thread(task, "blind-context-classloader");

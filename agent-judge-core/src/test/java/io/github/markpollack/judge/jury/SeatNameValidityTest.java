@@ -16,10 +16,10 @@ import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.completion.CompletionEvidence;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -29,30 +29,32 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * A name a seat cannot be built from never reaches the seat.
  *
  * <p>
- * A blank judge name is not a naming preference, it is a jury that cannot say who voted. The
- * seat rejects it — correctly — but rejecting it <em>after</em> every judge has already run puts
- * the exception outside containment, and one such seat then discards every other judge's result
- * and collapses the enclosing cascade tier. That is exactly the invariant a jury exists to hold:
- * it must never vote with fewer judges than it lists.
+ * A blank judge name is not a naming preference, it is a jury that cannot say who voted.
+ * The seat rejects it — correctly — but rejecting it <em>after</em> every judge has
+ * already run puts the exception outside containment, and one such seat then discards
+ * every other judge's result and collapses the enclosing cascade tier. That is exactly
+ * the invariant a jury exists to hold: it must never vote with fewer judges than it
+ * lists.
  * </p>
  *
  * <p>
- * So the name is refused where it is made, before anything is spent. A judge that builds its
- * metadata lazily cannot be caught that early, and for it the existing unreadable-metadata
- * containment applies unchanged: the seat is an {@code ERROR judge_metadata_unreadable} under
- * its positional key, the judge does not run, and every other judge is untouched.
+ * So the name is refused where it is made, before anything is spent. A judge that builds
+ * its metadata lazily cannot be caught that early, and for it the existing
+ * unreadable-metadata containment applies unchanged: the seat is an
+ * {@code ERROR judge_metadata_unreadable} under its positional key, the judge does not
+ * run, and every other judge is untouched.
  * </p>
  */
 @DisplayName("Seat name validity")
 class SeatNameValidityTest {
 
-	private static final JudgmentContext CONTEXT = JudgmentContext.builder().goal("name the seats").build();
+	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder().request("name the seats").build();
 
 	/** A judge whose metadata is only built when it is asked for. */
-	private record LazilyNamed(String name, Judgment judgment) implements JudgeWithMetadata<JudgmentContext> {
+	private record LazilyNamed(String name, Judgment judgment) implements JudgeWithMetadata<CompletionEvidence> {
 
 		@Override
-		public Judgment judge(JudgmentContext context) {
+		public Judgment judge(CompletionEvidence context) {
 			return this.judgment;
 		}
 
@@ -63,8 +65,8 @@ class SeatNameValidityTest {
 
 	}
 
-	private static SimpleJury<JudgmentContext> juryWith(Judge<JudgmentContext> blankNamed, boolean parallel) {
-		return SimpleJury.<JudgmentContext>builder()
+	private static SimpleJury<CompletionEvidence> juryWith(Judge<CompletionEvidence> blankNamed, boolean parallel) {
+		return SimpleJury.<CompletionEvidence>builder()
 			.judge(Judges.named(context -> Judgment.pass("the build succeeded"), "healthy"))
 			.judge(blankNamed)
 			.votingStrategy(new MajorityVotingStrategy(TiePolicy.FAIL, ErrorPolicy.TREAT_AS_ABSTAIN))
@@ -88,7 +90,7 @@ class SeatNameValidityTest {
 		@Test
 		@DisplayName("a blank name is refused by the naming wrapper, before any jury is assembled")
 		void namedRefusesABlankName() {
-			Judge<JudgmentContext> judge = context -> Judgment.pass("ok");
+			Judge<CompletionEvidence> judge = context -> Judgment.pass("ok");
 
 			assertThatThrownBy(() -> Judges.named(judge, "   ")).isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("name must be non-blank");
@@ -116,10 +118,11 @@ class SeatNameValidityTest {
 		@Test
 		@DisplayName("a blank-named judge leaves every other result intact, sequentially")
 		void aBlankNameIsContainedSequentially() {
-			assertContained(juryWith(new LazilyNamed("   ", Judgment.pass("a judgment the jury must not keep")), false));
+			assertContained(
+					juryWith(new LazilyNamed("   ", Judgment.pass("a judgment the jury must not keep")), false));
 		}
 
-		private static void assertContained(SimpleJury<JudgmentContext> jury) {
+		private static void assertContained(SimpleJury<CompletionEvidence> jury) {
 			Verdict verdict = jury.vote(CONTEXT);
 
 			assertThat(verdict.individual()).as("every configured judge is represented").hasSize(2);
@@ -133,14 +136,14 @@ class SeatNameValidityTest {
 
 			assertThat(verdict.individualByName().keySet()).containsExactly("healthy", "Judge#2");
 			assertThat(verdict.seats().get(1).verdictKey()).isEqualTo("Judge#2");
-			assertThat(verdict.aggregated().status()).as("the jury still reaches a verdict")
+			assertThat(verdict.judgment().status()).as("the jury still reaches a verdict")
 				.isEqualTo(JudgmentStatus.PASS);
 		}
 
 		@Test
 		@DisplayName("the jury still builds, and describing it fails loudly naming the seat")
 		void buildAndDescribeAgreeWithTheVote() {
-			SimpleJury<JudgmentContext> jury = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
+			SimpleJury<CompletionEvidence> jury = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
 
 			assertThatThrownBy(jury::describe).isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("seats[1]")
@@ -156,14 +159,16 @@ class SeatNameValidityTest {
 		@Test
 		@DisplayName("a blank-named seat does not collapse its tier")
 		void aBlankNameDoesNotCollapseItsTier() {
-			Jury<JudgmentContext> tier = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
+			Jury<CompletionEvidence> tier = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
 
-			Verdict verdict = CascadedJury.<JudgmentContext>builder()
+			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
 				.tier("gate", tier, TierPolicy.REJECT_ON_ANY_FAIL)
-				.tier("final", SimpleJury.<JudgmentContext>builder()
-					.judge(Judges.named(context -> Judgment.pass("also fine"), "backstop"))
-					.votingStrategy(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN))
-					.build(), TierPolicy.FINAL_TIER)
+				.tier("final",
+						SimpleJury.<CompletionEvidence>builder()
+							.judge(Judges.named(context -> Judgment.pass("also fine"), "backstop"))
+							.votingStrategy(new AllMustPassStrategy(ErrorPolicy.TREAT_AS_ABSTAIN))
+							.build(),
+						TierPolicy.FINAL_TIER)
 				.build()
 				.vote(CONTEXT);
 

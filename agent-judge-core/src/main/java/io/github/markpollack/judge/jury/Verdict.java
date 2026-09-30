@@ -17,20 +17,21 @@ import java.util.Set;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import io.github.markpollack.judge.internal.StrictIntegerDeserializer;
+import io.github.markpollack.judge.serialization.StrictIntegerDeserializer;
 
 import io.github.markpollack.judge.description.KeySource;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentReasonCode;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentReasonCode;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 
 /**
- * Immutable result from a jury of judges.
+ * The Jury's complete conclusion: its collective Judgment, individual Judgments and
+ * the composition history explaining how that conclusion was reached.
  *
  * <p>
- * The first four components describe the root result. {@code seats} records where each
+ * The judgment and individual values describe the root result. {@code seats} records where each
  * judgment sat and under what key, so the ordered list and the keyed map can be joined
- * without guessing. {@code decision} says what produced the aggregate.
+ * without guessing. {@code provenance} says how the collective Judgment was produced.
  * {@code compositeAttempts} contains the complete ordered evidence for each direct stage
  * entered by a composite jury; a leaf verdict has an empty attempt list.
  * </p>
@@ -38,68 +39,68 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * <h2>Reading a composite verdict</h2>
  * <p>
  * A cascade copies its aggregate from the tier that stopped it, so counting the root
- * <em>and</em> the tiers counts that tier twice. {@link #decision()} is what makes the
- * copy visible: follow a {@link DecisionKind#TIER} decision into the attempt it names
- * rather than counting the root as a reduction of its own.
+ * <em>and</em> the tiers counts that tier twice. {@link #provenance()} is what makes the
+ * copy visible: follow a {@link VerdictProvenanceKind#TIER} provenance into the attempt
+ * it names rather than counting the root as a reduction of its own.
  * </p>
  *
- * @param schemaVersion wire version, always 2
+ * @param schemaVersion wire version, always 3
  * @param declaredCardinality original configured population, before any failed or
  * excluded input
- * @param aggregated the final aggregated judgment
- * @param individual the ordered judgments aggregated at this root
+ * @param judgment the final judgment judgment
+ * @param individual the ordered judgments judgment at this root
  * @param individualByName those judgments keyed by configured identity in insertion order
  * @param weights the configured weights in insertion order, keyed by configured position
  * @param seats one seat per entry of {@code individual}, joining position to verdict key
- * @param decision what produced {@code aggregated}
+ * @param provenance what produced {@code judgment}
  * @param compositeAttempts complete ordered direct composite attempts
  * @author Mark Pollack
  * @since 0.1.0
  */
-@JsonPropertyOrder({ "schemaVersion", "declaredCardinality", "aggregated", "individual", "individualByName", "weights",
-		"seats", "decision", "compositeAttempts" })
+@JsonPropertyOrder({ "schemaVersion", "declaredCardinality", "judgment", "individual", "individualByName", "weights",
+		"seats", "provenance", "compositeAttempts" })
 public record Verdict(
 		@JsonProperty(required = true) @JsonDeserialize(using = StrictIntegerDeserializer.class) int schemaVersion,
-		Judgment aggregated, List<Judgment> individual, Map<String, Judgment> individualByName,
-		Map<String, Double> weights, List<Seat> seats, Decision decision, List<CompositeAttempt> compositeAttempts,
-		@JsonProperty(required = true) @JsonDeserialize(
+		Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
+		Map<String, Double> weights, List<Seat> seats, VerdictProvenance provenance,
+		List<CompositeAttempt> compositeAttempts, @JsonProperty(required = true) @JsonDeserialize(
 				using = StrictIntegerDeserializer.class) int declaredCardinality) {
 
 	/**
-	 * Construct a version-2 verdict declaring exactly the supplied seat population.
-	 * @param aggregated aggregate
+	 * Construct a version-3 verdict declaring exactly the supplied seat population.
+	 * @param judgment aggregate
 	 * @param individual ordered inputs
 	 * @param individualByName named inputs
 	 * @param weights weights
 	 * @param seats seats
-	 * @param decision decision
+	 * @param provenance provenance
 	 * @param compositeAttempts attempts
 	 */
-	public Verdict(Judgment aggregated, List<Judgment> individual, Map<String, Judgment> individualByName,
-			Map<String, Double> weights, List<Seat> seats, Decision decision,
+	public Verdict(Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
+			Map<String, Double> weights, List<Seat> seats, VerdictProvenance provenance,
 			List<CompositeAttempt> compositeAttempts) {
-		this(2, aggregated, individual, individualByName, weights, seats, decision, compositeAttempts, seats.size());
+		this(3, judgment, individual, individualByName, weights, seats, provenance, compositeAttempts, seats.size());
 	}
 
 	/** Validate, bound, and defensively copy all verdict components. */
 	public Verdict {
-		if (schemaVersion != 2)
-			throw new IllegalArgumentException("Verdict schemaVersion must be 2");
+		if (schemaVersion != 3)
+			throw new IllegalArgumentException("Verdict schemaVersion must be 3");
 		if (declaredCardinality < 0)
 			throw new IllegalArgumentException("negative declaredCardinality");
-		Objects.requireNonNull(aggregated, "aggregated judgment must not be null");
+		Objects.requireNonNull(judgment, "aggregated judgment must not be null");
 		individual = List.copyOf(Objects.requireNonNull(individual, "individual must not be null"));
 		individualByName = immutableLinkedMap(
 				Objects.requireNonNull(individualByName, "individualByName must not be null"));
 		weights = immutableLinkedMap(Objects.requireNonNull(weights, "weights must not be null"));
 		Objects.requireNonNull(seats, "seats must not be null");
 		seats = List.copyOf(seats);
-		Objects.requireNonNull(decision, "decision must not be null");
+		Objects.requireNonNull(provenance, "provenance must not be null");
 		Objects.requireNonNull(compositeAttempts, "compositeAttempts must not be null");
 		compositeAttempts = List.copyOf(compositeAttempts);
 		CompositeExecutionScope.validateTree(compositeAttempts);
 		requireCoherentSeats(individual, individualByName, seats);
-		requireCoherentDecision(aggregated, individual, individualByName, weights, seats, decision, compositeAttempts);
+		requireCoherentDecision(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts);
 	}
 
 	/**
@@ -142,38 +143,38 @@ public record Verdict(
 	}
 
 	/**
-	 * Enforce what each decision kind claims.
+	 * Enforce what each provenance kind claims.
 	 * <p>
-	 * A decision is a claim about where the aggregate came from, and a reader counts on
+	 * A provenance is a claim about where the aggregate came from, and a reader counts on
 	 * it without being able to check it. So each claim is checked here, once, against the
 	 * evidence the verdict itself carries.
 	 * </p>
-	 * @param aggregated the aggregate
+	 * @param judgment the aggregate
 	 * @param individual the ordered judgments
 	 * @param individualByName the keyed judgments
 	 * @param weights the configured weights
 	 * @param seats the seats
-	 * @param decision the decision
+	 * @param provenance the provenance
 	 * @param attempts the direct attempts
 	 */
-	private static void requireCoherentDecision(Judgment aggregated, List<Judgment> individual,
-			Map<String, Judgment> individualByName, Map<String, Double> weights, List<Seat> seats, Decision decision,
-			List<CompositeAttempt> attempts) {
-		if (decision.kind() == DecisionKind.UNDECIDED) {
-			JudgmentReasonCode code = aggregated.operationalReasonCode();
-			if (aggregated.status() != JudgmentStatus.ERROR || code == null
+	private static void requireCoherentDecision(Judgment judgment, List<Judgment> individual,
+			Map<String, Judgment> individualByName, Map<String, Double> weights, List<Seat> seats,
+			VerdictProvenance provenance, List<CompositeAttempt> attempts) {
+		if (provenance.kind() == VerdictProvenanceKind.UNDECIDED) {
+			JudgmentReasonCode code = judgment.operationalReasonCode();
+			if (judgment.status() != JudgmentStatus.ERROR || code == null
 					|| code.originFamily() != JudgmentReasonCode.OriginFamily.MACHINERY) {
 				throw new IllegalArgumentException("an UNDECIDED verdict reports that the instrument reached no "
 						+ "outcome, so its aggregate must be an ERROR with a machinery reason code, but was "
-						+ aggregated.status() + " / " + code);
+						+ judgment.status() + " / " + code);
 			}
 			return;
 		}
-		if (decision.kind() != DecisionKind.TIER) {
+		if (provenance.kind() != VerdictProvenanceKind.TIER) {
 			return;
 		}
 
-		String name = Objects.requireNonNull(decision.tier());
+		String name = Objects.requireNonNull(provenance.tier());
 		CompositeAttempt attempt = attempts.stream()
 			.filter(candidate -> candidate.relation() == CompositeRelation.CASCADE_TIER
 					&& candidate.name().equals(name))
@@ -186,30 +187,30 @@ public record Verdict(
 					"decision names tier '" + name + "', which returned no verdict to determine an outcome from");
 		}
 
-		if (decision.basis() == DecisionBasis.TIER_OUTCOME) {
+		if (provenance.basis() == VerdictProvenanceBasis.TIER_OUTCOME) {
 			if (attempt.disposition() != AttemptDisposition.USED) {
 				throw new IllegalArgumentException("TIER_OUTCOME adopts a tier's own determination, so tier '" + name
 						+ "' must be USED, but was " + attempt.disposition());
 			}
-			if (!aggregated.equals(tierVerdict.aggregated())) {
+			if (!judgment.equals(tierVerdict.judgment())) {
 				throw new IllegalArgumentException(
 						"TIER_OUTCOME copies tier '" + name + "' exactly, but the aggregate differs");
 			}
 		}
 		else {
-			requireIndividualRejection(aggregated, name, attempt, tierVerdict);
+			requireIndividualRejection(judgment, name, attempt, tierVerdict);
 		}
 		requireCopiedFrom(name, individual, individualByName, weights, seats, tierVerdict);
 	}
 
 	/**
 	 * Enforce the preconditions of a stop on an individual rejection.
-	 * @param aggregated the root aggregate
+	 * @param judgment the root aggregate
 	 * @param name the tier's name
 	 * @param attempt the tier's attempt
 	 * @param tierVerdict the tier's verdict
 	 */
-	private static void requireIndividualRejection(Judgment aggregated, String name, CompositeAttempt attempt,
+	private static void requireIndividualRejection(Judgment judgment, String name, CompositeAttempt attempt,
 			Verdict tierVerdict) {
 		DispositionReason reason = attempt.dispositionReason();
 		if (attempt.disposition() != AttemptDisposition.STAGE_FAILED || reason == DispositionReason.EXECUTION_FAILED) {
@@ -222,12 +223,14 @@ public record Verdict(
 			throw new IllegalArgumentException("only REJECT_ON_ANY_FAIL stops on an individual rejection, but tier '"
 					+ name + "' uses " + attempt.policy());
 		}
-		if (tierVerdict.individual().stream().noneMatch(judgment -> judgment.status() == JudgmentStatus.FAIL)) {
+		if (tierVerdict.individual()
+			.stream()
+			.noneMatch(individualJudgment -> individualJudgment.status() == JudgmentStatus.FAIL)) {
 			throw new IllegalArgumentException("INDIVIDUAL_REJECTION requires a genuine FAIL among tier '" + name
 					+ "' individuals; a broken stage on its own justifies nothing");
 		}
 		if (reason == DispositionReason.CHILD_UNDECIDED) {
-			if (!aggregated.equals(tierVerdict.aggregated())) {
+			if (!judgment.equals(tierVerdict.judgment())) {
 				throw new IllegalArgumentException("a CHILD_UNDECIDED rejection keeps the child's own machinery error "
 						+ "as the root aggregate, but tier '" + name + "' differs");
 			}
@@ -238,10 +241,9 @@ public record Verdict(
 		// so the root cannot be a copy of it. The parent authors a machinery error
 		// instead, and
 		// the child's verdict stays unchanged on its attempt.
-		if (aggregated.operationalReasonCode() != JudgmentReasonCode.STAGE_FAILED) {
+		if (judgment.operationalReasonCode() != JudgmentReasonCode.STAGE_FAILED) {
 			throw new IllegalArgumentException("a rejection on a boundary-refused exclusion builds a parent-authored "
-					+ "ERROR stage_failed root, but tier '" + name + "' produced "
-					+ aggregated.operationalReasonCode());
+					+ "ERROR stage_failed root, but tier '" + name + "' produced " + judgment.operationalReasonCode());
 		}
 	}
 
@@ -291,11 +293,11 @@ public record Verdict(
 		if (name.isBlank()) {
 			throw new IllegalArgumentException("name must be non-blank");
 		}
-		return builder().aggregated(judgment)
+		return builder().judgment(judgment)
 			.individual(List.of(judgment))
 			.individualByName(Map.of(name, judgment))
 			.seats(List.of(new Seat(0, name, KeySource.DECLARED)))
-			.decision(Decision.own())
+			.provenance(VerdictProvenance.own())
 			.build();
 	}
 
@@ -303,10 +305,11 @@ public record Verdict(
 	 * Create the complete verdict of a jury whose judges all declared a distinct name.
 	 * <p>
 	 * This is the ordinary hand-built case: one judgment per declared name, seated in the
-	 * order the map hands them over, aggregated by this jury itself. The ordered
+	 * order the map hands them over, judgment by this jury itself. The ordered
 	 * {@link #individual()} list is the map's values in encounter order, seat <em>i</em>
-	 * keys the <em>i</em>-th entry as {@link KeySource#DECLARED}, and the decision is
-	 * {@link Decision#own()}. It produces exactly what the full builder call produces:
+	 * keys the <em>i</em>-th entry as {@link KeySource#DECLARED}, and the provenance is
+	 * {@link VerdictProvenance#own()}. It produces exactly what the full builder call
+	 * produces:
 	 * </p>
 	 * <pre>{@code
 	 * Map<String, Judgment> byName = new LinkedHashMap<>();
@@ -317,12 +320,12 @@ public record Verdict(
 	 *
 	 * // the same verdict, written out
 	 * Verdict.builder()
-	 *     .aggregated(aggregate)
+	 *     .judgment(aggregate)
 	 *     .individual(List.of(styleResult, coverageResult))
 	 *     .individualByName(byName)
 	 *     .seats(List.of(new Seat(0, "style", KeySource.DECLARED),
 	 *                    new Seat(1, "coverage", KeySource.DECLARED)))
-	 *     .decision(Decision.own())
+	 *     .provenance(VerdictProvenance.own())
 	 *     .build();
 	 * }</pre>
 	 * <p>
@@ -342,15 +345,15 @@ public record Verdict(
 	 * Those verdicts are built with {@link #builder()} and explicit seats. For a
 	 * one-judge jury, {@link #single} says so more directly.
 	 * </p>
-	 * @param aggregated the jury's own aggregate of the given judgments
+	 * @param judgment the jury's own aggregate of the given judgments
 	 * @param individualByName one judgment per declared judge name, in seating order
 	 * @return a complete multi-judgment verdict
 	 * @throws NullPointerException if either argument, a key, or a judgment is null
 	 * @throws IllegalArgumentException if the map is empty or any key is blank
 	 * @since 0.17.0
 	 */
-	public static Verdict of(Judgment aggregated, Map<String, Judgment> individualByName) {
-		Objects.requireNonNull(aggregated, "aggregated judgment must not be null");
+	public static Verdict of(Judgment judgment, Map<String, Judgment> individualByName) {
+		Objects.requireNonNull(judgment, "aggregated judgment must not be null");
 		Objects.requireNonNull(individualByName, "individualByName must not be null");
 		if (individualByName.isEmpty()) {
 			throw new IllegalArgumentException("individualByName must hold at least one judgment; "
@@ -367,18 +370,18 @@ public record Verdict(
 				.add(Objects.requireNonNull(entry.getValue(), "the judgment for '" + name + "' must not be null"));
 			seats.add(new Seat(seats.size(), name, KeySource.DECLARED));
 		}
-		return builder().aggregated(aggregated)
+		return builder().judgment(judgment)
 			.individual(individual)
 			.individualByName(individualByName)
 			.seats(seats)
-			.decision(Decision.own())
+			.provenance(VerdictProvenance.own())
 			.build();
 	}
 
 	/** Builder for {@link Verdict}. */
 	public static class Builder {
 
-		private Judgment aggregated;
+		private Judgment judgment;
 
 		private List<Judgment> individual = new ArrayList<>();
 
@@ -388,7 +391,7 @@ public record Verdict(
 
 		private List<Seat> seats = new ArrayList<>();
 
-		private Decision decision;
+		private VerdictProvenance provenance;
 
 		private Integer declaredCardinality;
 
@@ -399,12 +402,12 @@ public record Verdict(
 		}
 
 		/**
-		 * Set the aggregated judgment.
-		 * @param aggregated aggregated judgment
+		 * Set the judgment judgment.
+		 * @param judgment judgment judgment
 		 * @return this builder
 		 */
-		public Builder aggregated(Judgment aggregated) {
-			this.aggregated = Objects.requireNonNull(aggregated, "aggregated judgment must not be null");
+		public Builder judgment(Judgment judgment) {
+			this.judgment = Objects.requireNonNull(judgment, "aggregated judgment must not be null");
 			return this;
 		}
 
@@ -451,12 +454,12 @@ public record Verdict(
 
 		/**
 		 * Set what produced the aggregate.
-		 * @param decision the decision
+		 * @param provenance the provenance
 		 * @return this builder
 		 * @since 0.17.0
 		 */
-		public Builder decision(Decision decision) {
-			this.decision = Objects.requireNonNull(decision, "decision must not be null");
+		public Builder provenance(VerdictProvenance provenance) {
+			this.provenance = Objects.requireNonNull(provenance, "provenance must not be null");
 			return this;
 		}
 
@@ -483,17 +486,17 @@ public record Verdict(
 		/**
 		 * Build the verdict.
 		 * <p>
-		 * A decision is required. There is no default, because every default would be a
+		 * A provenance is required. There is no default, because every default would be a
 		 * claim about where the aggregate came from that nobody made.
 		 * </p>
 		 * @return immutable verdict
 		 */
 		public Verdict build() {
-			if (decision == null) {
+			if (provenance == null) {
 				throw new IllegalStateException("a verdict must say what produced its aggregate; "
-						+ "set a decision (Decision.own() for an ordinary reduction)");
+						+ "set a decision (VerdictProvenance.own() for an ordinary reduction)");
 			}
-			return new Verdict(2, aggregated, individual, individualByName, weights, seats, decision, compositeAttempts,
+			return new Verdict(3, judgment, individual, individualByName, weights, seats, provenance, compositeAttempts,
 					declaredCardinality == null ? seats.size() : declaredCardinality);
 		}
 

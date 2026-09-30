@@ -5,7 +5,7 @@
 
 package io.github.markpollack.judge.jev;
 
-import io.github.markpollack.judge.result.ArtifactRef;
+import io.github.markpollack.judge.provenance.ArtifactRef;
 
 /**
  * Caller-owned protected artifact storage. Implementations must be thread safe, bounded

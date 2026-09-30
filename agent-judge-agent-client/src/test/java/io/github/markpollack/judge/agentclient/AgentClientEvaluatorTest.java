@@ -10,12 +10,11 @@ import io.github.markpollack.agents.model.AgentGenerationMetadata;
 import io.github.markpollack.agents.model.AgentResponse;
 import io.github.markpollack.agents.model.AgentResponseMetadata;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.jury.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.SimpleJury;
 import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.result.Judgment;
-import io.github.markpollack.judge.result.JudgmentStatus;
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,10 +35,10 @@ class AgentClientEvaluatorTest {
 
 	@Test
 	void shouldEvaluateWithSingleJudge() {
-		Judge<JudgmentContext> judge = (JudgmentContext ctx) -> Judgment.pass("Output looks good");
+		Judge<AgentExecutionEvidence> judge = (AgentExecutionEvidence ctx) -> Judgment.pass("Output looks good");
 
-		Judgment result = AgentClientEvaluator.evaluate("Build a REST API", Path.of("/tmp/project"),
-				this::mockResponse, judge);
+		Judgment result = AgentClientEvaluator.evaluate("Build a REST API", Path.of("/tmp/project"), this::mockResponse,
+				judge);
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(result.reasoning()).isEqualTo("Output looks good");
@@ -47,21 +46,21 @@ class AgentClientEvaluatorTest {
 
 	@Test
 	void shouldEvaluateWithJury() {
-		Judge<JudgmentContext> passJudge = (JudgmentContext ctx) -> Judgment.pass("Looks good");
-		Judge<JudgmentContext> failJudge = (JudgmentContext ctx) -> Judgment.fail("Missing tests");
-		Judge<JudgmentContext> passJudge2 = (JudgmentContext ctx) -> Judgment.pass("Compiles fine");
+		Judge<AgentExecutionEvidence> passJudge = (AgentExecutionEvidence ctx) -> Judgment.pass("Looks good");
+		Judge<AgentExecutionEvidence> failJudge = (AgentExecutionEvidence ctx) -> Judgment.fail("Missing tests");
+		Judge<AgentExecutionEvidence> passJudge2 = (AgentExecutionEvidence ctx) -> Judgment.pass("Compiles fine");
 
-		SimpleJury<JudgmentContext> jury = SimpleJury.<JudgmentContext>builder()
+		SimpleJury<AgentExecutionEvidence> jury = SimpleJury.<AgentExecutionEvidence>builder()
 			.judge(passJudge)
 			.judge(failJudge)
 			.judge(passJudge2)
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		Verdict verdict = AgentClientEvaluator.evaluate("Build a REST API", Path.of("/tmp/project"),
-				this::mockResponse, jury);
+		Verdict verdict = AgentClientEvaluator.evaluate("Build a REST API", Path.of("/tmp/project"), this::mockResponse,
+				jury);
 
-		assertThat(verdict.aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individual()).hasSize(3);
 	}
 
