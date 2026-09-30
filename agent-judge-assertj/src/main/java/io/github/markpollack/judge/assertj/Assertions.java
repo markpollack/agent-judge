@@ -9,24 +9,32 @@ import java.util.function.Function;
 import org.assertj.core.api.AbstractAssert;
 import org.jspecify.annotations.Nullable;
 import io.github.markpollack.judge.Judge;
+import io.github.markpollack.judge.assertions.AssertionResult;
+import io.github.markpollack.judge.assertions.RequirementAssertions;
+import io.github.markpollack.judge.assertions.SemanticAssertionError;
+import io.github.markpollack.judge.assertions.SemanticAssertions;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.requirement.RequirementEvidence;
 import io.github.markpollack.judge.result.PolicyBinding;
-import io.github.markpollack.judge.assertions.*;
 
 /**
  * Optional AssertJ entry for the requirement, judge, evidence, application-policy,
  * satisfaction progression. Static use selects the immutable USE_ASSESSMENT assertion
  * default; {@link #using(RequirementAssertions)} selects an application's fixture instead.
- * No evaluation occurs until isSatisfied. Repeating that terminal evaluates again;
- * forgetting it performs no assertion. Retained results use SemanticAssertions directly.
+ * The final application policy acts on the completed evaluation, preserving configured
+ * Judge/Jury internal policies and the complete Verdict and authoritative Interpretation.
+ * No evaluation occurs until {@link SatisfactionStage#isSatisfied()}. Repeating that
+ * terminal evaluates again; forgetting it performs no assertion. Retained results use
+ * {@link SemanticAssertions#requireSatisfied(AssertionResult)} directly.
  */
 public final class Assertions {
     private Assertions() {}
 
     /**
-     * Start with the original Requirement as the AssertJ actual.
+     * Start with the original Requirement as the AssertJ actual. The immutable static
+     * default is versioned, content-addressed USE_ASSESSMENT with no confidence threshold.
+     * An associated requirement policy or explicit terminal-stage override takes priority.
      * @param <S> native specification
      * @param requirement original requirement
      * @return judge-selection stage
@@ -59,27 +67,76 @@ public final class Assertions {
         }
     }
 
-    /** Requirement stage; evidence type is selected by the evaluator. @param <S> native specification */
+    /**
+     * Requirement stage; evidence type is selected by the evaluator.
+     * @param <S> native specification
+     */
     public interface RequirementStage<S> {
-        /** @param <E> evidence type @param judge evaluator @return evidence stage */
+        /**
+         * Select a Judge without invoking it. Evaluation preserves its configured internal
+         * policy through a normal one-seat Jury; final application policy runs separately
+         * after that evaluation.
+         * @param <E> evidence type
+         * @param judge evaluator over the exact Requirement and Evidence pair
+         * @return evidence stage
+         */
         <E> EvidenceStage<E> judgedBy(Judge<RequirementEvidence<Requirement<S>, E>> judge);
-        /** @param <E> evidence type @param jury full jury @return evidence stage */
+
+        /**
+         * Select a Jury without invoking or reconfiguring it. Evaluation retains the
+         * original complete Verdict, individual Judgments and internal policy applications,
+         * seats, attempts and authoritative Interpretation. Final application policy never
+         * replaces configured voting, reduction or cascade routing.
+         * @param <E> evidence type
+         * @param jury configured Jury over the exact Requirement and Evidence pair
+         * @return evidence stage
+         */
         <E> EvidenceStage<E> judgedBy(Jury<RequirementEvidence<Requirement<S>, E>> jury);
-        /** @param description assertion description @param arguments format values @return this stage */
+
+        /**
+         * Set the ordinary AssertJ description for a later assertion failure.
+         * @param description assertion description
+         * @param arguments format values
+         * @return this stage
+         */
         RequirementStage<S> as(String description, Object... arguments);
     }
 
-    /** Evidence stage with no premature terminal. @param <E> evidence type */
+    /**
+     * Evidence stage with no premature terminal.
+     * @param <E> evidence type
+     */
     public interface EvidenceStage<E> {
-        /** @param evidence exact snapshot @return satisfaction stage */
+        /**
+         * Supply the original evidence without invoking the evaluator.
+         * @param evidence exact stable snapshot
+         * @return satisfaction stage
+         */
         SatisfactionStage withEvidence(E evidence);
     }
 
     /** Ready for an optional application override and the eager assertion. */
     public interface SatisfactionStage {
-        /** @param policy explicit application override @return new terminal stage */
+        /**
+         * Select an explicit final application policy, overriding the requirement association
+         * and configured default. It runs after the unchanged Judge/Jury evaluation and its
+         * result is recorded separately with EXPLICIT provenance. It never replaces internal
+         * seat or tier policies. Final ABSTAIN or ESCALATE withholds satisfaction without
+         * changing the Verdict or Interpretation; ESCALATE invokes no additional tier.
+         * @param policy explicit final application override
+         * @return new terminal stage
+         */
         SatisfactionStage withAcceptancePolicy(PolicyBinding policy);
-        /** Evaluate once and require supported acceptance; semantic failure is retained as the error cause. */
+
+        /**
+         * Evaluate once and require a SUPPORTED, ACCEPTED retained Interpretation plus a
+         * successful final USE_ASSESSMENT application. Final withholding is inconclusive;
+         * final policy failure is an application instrument failure. Evaluation failure,
+         * non-applicability and unsupported readings cannot be repaired by final policy.
+         * Each invocation evaluates again. Semantic failure is retained as the AssertJ
+         * error's cause, including the complete evaluation and final application decision.
+         * @throws AssertionError if satisfaction is not established
+         */
         void isSatisfied();
     }
 

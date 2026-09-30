@@ -10,6 +10,7 @@ import java.util.Objects;
 
 /**
  * A jury paired with its stable configured composite-member identity.
+ * @param <E> evidence type
  * @param name unique sibling identity
  * @param jury configured jury
  * @since 0.14.0

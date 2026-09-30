@@ -66,15 +66,15 @@ class AssertionDiagnosticsTest {
 		var error = catchThrowableOfType(() -> SemanticAssertions.requireSatisfied(result),
 				SemanticAssertionError.Inconclusive.class);
 		Judgment withheld = result.verdict().aggregated();
-		assertThat(withheld).usingRecursiveComparison().ignoringFields("policyApplication").isEqualTo(raw);
-		assertThat(withheld.status()).isEqualTo(JudgmentStatus.ABSTAIN);
-		assertThat(((AppliedPolicy) withheld.policyApplication()).action()).isEqualTo(action);
+		assertThat(withheld).isSameAs(raw);
+		assertThat(withheld.status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(((AppliedPolicy) result.applicationDecision().application()).action()).isEqualTo(action);
 		assertThat(json.writeValueAsBytes(raw)).isEqualTo(before);
 		assertThat(error.result()).isSameAs(result);
 		assertThat(error.getMessage()).contains("INCONCLUSIVE", LOCKS.text(), "producer=PASS", "category=satisfied",
 				"jev.choice.confidence:v1=0.57", "jev.choice.distribution:v1", "p(satisfied)=0.71",
 				"independent-confirmation@1", action.name(), "original assessment unchanged",
-				"Operational result: ABSTAIN", "Interpretation: UNDECIDED", "reading support=SUPPORTED",
+				"Operational result: PASS", "Interpretation: ACCEPTED", "reading support=SUPPORTED",
 				"structural, not model confidence", "Response: retained-response");
 		assertThat(error.getMessage().length()).isLessThan(1600);
 		if (action == AcceptanceAction.ESCALATE) {
@@ -101,7 +101,7 @@ class AssertionDiagnosticsTest {
 		var error = catchThrowableOfType(() -> SemanticAssertions.requireSatisfied(result),
 				SemanticAssertionError.InstrumentFailure.class);
 		assertThat(error.getMessage()).contains("producer=ERROR; no assessment", "Support: none (producer ERROR)",
-				"no application (producer ERROR bypasses policy)", "Operational result: ERROR",
+				"no application (bypassed: NOT_ASSESSED)", "Operational result: ERROR",
 				"Interpretation: NOT_ASSESSED", "invalid protocol", "Response: retained-response");
 		assertThat(error.getMessage()).doesNotContain("0.25", "jev.choice.confidence", "USE_ASSESSMENT");
 		assertThat(error.result().verdict().aggregated().metadata()).containsEntry("invalidNativeConfidence", 0.25);
@@ -113,7 +113,7 @@ class AssertionDiagnosticsTest {
 		Judgment failed = Policies.apply(raw, POLICY, j -> {
 			throw new IllegalStateException("policy unavailable");
 		});
-		var result = new AssertionResult(LOCKS, POLICY, AssertionResult.PolicySource.DEFAULT,
+		var result = AssertionResult.applyPolicy(LOCKS, binding(AcceptanceAction.USE_ASSESSMENT), AssertionResult.PolicySource.DEFAULT,
 				Verdict.single("retained", failed));
 		var error = catchThrowableOfType(() -> SemanticAssertions.requireSatisfied(result),
 				SemanticAssertionError.InstrumentFailure.class);
@@ -142,7 +142,7 @@ class AssertionDiagnosticsTest {
 		var provenance = new EvaluationProvenance(huge, huge, "b".repeat(64), List.of(RESPONSE), RESPONSE, List.of());
 		Judgment raw = new Judgment(JudgmentStatus.ERROR, null, null, null, JudgmentReasonCode.JUDGE_REPORTED, huge,
 				List.of(), provenance, null, Map.of("payload", "EVIDENCE_BODY_MUST_NOT_BE_DUMPED"));
-		var result = new AssertionResult(requirement, POLICY, AssertionResult.PolicySource.DEFAULT,
+		var result = AssertionResult.applyPolicy(requirement, binding(AcceptanceAction.USE_ASSESSMENT), AssertionResult.PolicySource.DEFAULT,
 				Verdict.single("one", raw));
 		var error = catchThrowableOfType(() -> SemanticAssertions.requireSatisfied(result),
 				SemanticAssertionError.InstrumentFailure.class);
@@ -159,7 +159,7 @@ class AssertionDiagnosticsTest {
 		Verdict incomplete = Verdict.of(Judgment.pass("unjustified"), Map.of("one", Judgment.fail("violated")));
 		var json = new ObjectMapper();
 		Verdict reopened = json.readValue(json.writeValueAsBytes(incomplete), Verdict.class);
-		var result = new AssertionResult(LOCKS, POLICY, AssertionResult.PolicySource.DEFAULT, reopened);
+		var result = AssertionResult.applyPolicy(LOCKS, binding(AcceptanceAction.USE_ASSESSMENT), AssertionResult.PolicySource.DEFAULT, reopened);
 		assertThat(result.interpretation().readingSupport()).isNotEqualTo(ReadingSupport.SUPPORTED);
 		assertThatThrownBy(() -> SemanticAssertions.requireSatisfied(result))
 			.isInstanceOf(SemanticAssertionError.UnsupportedReading.class)
@@ -168,9 +168,12 @@ class AssertionDiagnosticsTest {
 	}
 
 	private static AssertionResult result(Judgment raw, AcceptanceAction action) {
-		Judgment applied = Policies.apply(raw, POLICY, j -> new Acceptance(action, "Explicit fixture policy"));
-		return new AssertionResult(LOCKS, POLICY, AssertionResult.PolicySource.DEFAULT,
-				Verdict.single("retained", applied));
+		return AssertionResult.applyPolicy(LOCKS, binding(action), AssertionResult.PolicySource.DEFAULT,
+				Verdict.single("retained", raw));
+	}
+
+	private static PolicyBinding binding(AcceptanceAction action) {
+		return new PolicyBinding(POLICY, j -> new Acceptance(action, "Explicit fixture policy"));
 	}
 
 	private static Judgment choice(JudgmentStatus status, String selected) {

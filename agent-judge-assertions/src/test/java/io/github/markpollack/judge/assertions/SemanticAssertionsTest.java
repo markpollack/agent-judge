@@ -84,8 +84,9 @@ class SemanticAssertionsTest {
 		assertThat(error.result().policy()).isEqualTo(named.acceptancePolicy().reference());
 		var j = error.result().verdict().aggregated();
 		assertThat(j.producerStatus()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(j.status()).isEqualTo(JudgmentStatus.ABSTAIN);
-		assertThat(((AppliedPolicy) j.policyApplication()).action()).isEqualTo(action);
+		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(error.interpretation().reading()).isEqualTo(VerdictReading.REJECTED);
+		assertThat(((AppliedPolicy) error.result().applicationDecision().application()).action()).isEqualTo(action);
 		assertThat(REQUIREMENT.acceptancePolicy()).isNull();
 	}
 
@@ -191,8 +192,9 @@ class SemanticAssertionsTest {
 				var result = results.get(i).get();
 				assertThat(result.requirement().id()).isEqualTo("r-" + i);
 				assertThat(result.verdict().aggregated().reasoning()).isEqualTo("r-" + i);
-				assertThat(result.verdict().aggregated().status())
-					.isEqualTo(i % 2 == 0 ? JudgmentStatus.PASS : JudgmentStatus.ABSTAIN);
+				assertThat(result.verdict().aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+				assertThat(((AppliedPolicy) result.applicationDecision().application()).action())
+					.isEqualTo(i % 2 == 0 ? AcceptanceAction.USE_ASSESSMENT : AcceptanceAction.ESCALATE);
 			}
 		}
 	}
@@ -212,7 +214,7 @@ class SemanticAssertionsTest {
 			.decision(Decision.own())
 			.build();
 		for (var verdict : List.of(undetermined, contradicted)) {
-			var result = new AssertionResult(REQUIREMENT, policy(AcceptanceAction.USE_ASSESSMENT).reference(),
+			var result = AssertionResult.applyPolicy(REQUIREMENT, policy(AcceptanceAction.USE_ASSESSMENT),
 					AssertionResult.PolicySource.DEFAULT, verdict);
 			assertThat(result.interpretation().readingSupport()).isNotEqualTo(ReadingSupport.SUPPORTED);
 			var error = catchThrowableOfType(() -> SemanticAssertions.requireSatisfied(result),

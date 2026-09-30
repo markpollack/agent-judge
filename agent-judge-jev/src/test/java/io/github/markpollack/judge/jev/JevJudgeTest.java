@@ -8,7 +8,7 @@ package io.github.markpollack.judge.jev;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.net.httpserver.HttpServer;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.requirement.RequirementEvidence;
 import io.github.markpollack.judge.result.*;
 import io.github.markpollack.judge.jury.*;
 import io.github.markpollack.judge.jury.interpretation.*;
@@ -97,18 +97,14 @@ class JevJudgeTest {
 				this::capture);
 	}
 
-	static JudgmentContext context() {
-		return context(GOAL, EVIDENCE, true);
+	static RequirementEvidence<String, JevEvidence> input() {
+		return input(GOAL, EVIDENCE, true);
 	}
 
-	static JudgmentContext context(String goal, String evidence, boolean complete) {
-		return JudgmentContext.builder()
-			.goal(goal)
-			.agentOutput("UNSELECTED-SECRET")
-			.metadata(JevEvidence.CONTEXT_KEY, new JevEvidence(evidence,
-					ArtifactRef.ofBytes("protected:bundle", evidence.getBytes(StandardCharsets.UTF_8), null), MANIFEST,
-					ArtifactRef.ofBytes("requirement", goal.getBytes(StandardCharsets.UTF_8), null).sha256(), complete))
-			.build();
+	static RequirementEvidence<String, JevEvidence> input(String requirement, String evidence, boolean complete) {
+		return new RequirementEvidence<>(requirement, new JevEvidence(evidence,
+				ArtifactRef.ofBytes("protected:bundle", evidence.getBytes(StandardCharsets.UTF_8), null), MANIFEST,
+				ArtifactRef.ofBytes("requirement", requirement.getBytes(StandardCharsets.UTF_8), null).sha256(), complete));
 	}
 
 	static byte[] fixture(String name) {
@@ -157,17 +153,17 @@ class JevJudgeTest {
 		response.set(fixture(fixture));
 		JevQuestion q = fixture.startsWith("score") ? score(true)
 				: fixture.startsWith("choice") || fixture.equals("confidence-out-of-range") ? choice() : NOUL;
-		Judgment j = judge(q).judge(context());
+		Judgment j = judge(q).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(j.assessment()).isNull();
 		assertThat(calls).hasValue(1);
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
-		assertThat(j.reasoning()).doesNotContain("fake-key", "UNSELECTED-SECRET");
+		assertThat(j.reasoning()).doesNotContain("fake-key");
 	}
 
 	@Test
 	void noulRetainsFalseProbabilityWithoutInventingCertainty() {
-		Judgment j = judge(NOUL).judge(context());
+		Judgment j = judge(NOUL).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(j.assessment().proposition().value()).isFalse();
 		assertThat(j.certainty()).isNull();
@@ -177,13 +173,13 @@ class JevJudgeTest {
 		assertThat(j.provenance().calibrationClaims().getFirst().signalIds())
 			.containsExactly("jev.noul.probability-of-true:v1");
 		assertThat(new String(requests.get("request-1"), StandardCharsets.UTF_8)).contains(GOAL, EVIDENCE)
-			.doesNotContain("UNSELECTED-SECRET", "protected:manifest");
+			.doesNotContain("protected:manifest");
 	}
 
 	@Test
 	void choiceConfidenceIsNotWinningMass() {
 		response.set(fixture("choice-valid"));
-		Judgment j = judge(choice()).judge(context());
+		Judgment j = judge(choice()).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(j.certainty().value()).isEqualTo(.8);
 		assertThat(j.distribution().masses()).contains(new ProbabilityMass("violated", .9));
@@ -193,7 +189,7 @@ class JevJudgeTest {
 	@Test
 	void scorePreservesFractionalOrdinalAndReviewedLegend() {
 		response.set(fixture("score-valid"));
-		Judgment j = judge(score(true)).judge(context());
+		Judgment j = judge(score(true)).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(j.assessment().numeric().value()).isEqualTo(1.7);
 		assertThat(j.assessment().numeric().kind()).isEqualTo(NumericKind.ORDINAL_EXPECTATION);
@@ -210,12 +206,12 @@ class JevJudgeTest {
 			.set(new String(fixture(primitive + "-valid"), StandardCharsets.UTF_8).replace("jev-1.13.0", "jev-1.13.1")
 				.getBytes(StandardCharsets.UTF_8));
 		JevQuestion q = primitive.equals("noul") ? NOUL : primitive.equals("choice") ? choice() : score(true);
-		Judgment j = judge(q).judge(context());
-		Verdict verdict = SimpleJury.<JudgmentContext>builder()
+		Judgment j = judge(q).judge(input());
+		Verdict verdict = SimpleJury.<RequirementEvidence<String, JevEvidence>>builder()
 			.judge(c -> j)
 			.votingStrategy(new ConsensusStrategy())
 			.build()
-			.vote(context());
+			.vote(input());
 		assertThat(verdict.aggregated()).isEqualTo(j);
 		Verdict restored = Checks.JSON.readValue(Checks.JSON.writeValueAsBytes(verdict), Verdict.class);
 		assertThat(restored).isEqualTo(verdict);
@@ -263,7 +259,7 @@ class JevJudgeTest {
 		response.set(Checks.json(body));
 		assertThat(response.get().length).isLessThanOrEqualTo(65536);
 		Judgment j = new JevJudge("fake-key", "jev-1.13.0", endpoint(), Duration.ofSeconds(3), 24576, 65536,
-				NOUL, http, this::capture).judge(context());
+				NOUL, http, this::capture).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(j.provenance()).isNotNull();
 		assertThat(j.assessment().proposition().value()).isFalse();
@@ -278,9 +274,9 @@ class JevJudgeTest {
 		PolicyRef policy = new PolicyRef("use", "1", MANIFEST.sha256());
 		Judgment applied = Policies.apply(j, policy,
 				input -> new Acceptance(AcceptanceAction.USE_ASSESSMENT, "Use retained assessment"));
-		var verdict = io.github.markpollack.judge.jury.SimpleJury.<JudgmentContext>builder().judge(context -> applied)
+		var verdict = io.github.markpollack.judge.jury.SimpleJury.<RequirementEvidence<String, JevEvidence>>builder().judge(input -> applied)
 			.votingStrategy(new io.github.markpollack.judge.jury.AverageVotingStrategy()).build()
-			.vote(context());
+			.vote(input());
 		assertThat(verdict.aggregated()).isEqualTo(applied);
 		assertThat(applied.provenance()).isEqualTo(j.provenance());
 		assertThat(applied.assessment()).isEqualTo(j.assessment());
@@ -307,7 +303,7 @@ class JevJudgeTest {
 		List<Future<Judgment>> futures = new ArrayList<>();
 		for (int i = 0; i < 24; i++) {
 			int index = i;
-			futures.add(executor.submit(() -> judge.judge(context("requirement-" + index, "evidence-" + index, true))));
+			futures.add(executor.submit(() -> judge.judge(input("requirement-" + index, "evidence-" + index, true))));
 		}
 		Set<String> ids = new HashSet<>();
 		for (int i = 0; i < futures.size(); i++) {
@@ -327,7 +323,7 @@ class JevJudgeTest {
 	void noRetryOnRateLimitAndErrorEchoOnlyInProtectedArtifact() {
 		code.set(429);
 		response.set("fake-key UNSELECTED-SECRET".getBytes(StandardCharsets.UTF_8));
-		Judgment j = judge(NOUL).judge(context());
+		Judgment j = judge(NOUL).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(calls).hasValue(1);
 		assertThat(j.reasoning()).doesNotContain("fake-key", "UNSELECTED-SECRET");
@@ -341,7 +337,7 @@ class JevJudgeTest {
 		for (var s : List.of(candidate, withReview(candidate, new JevQuestion.Review("stale", "a", "b", true, REVIEW)),
 				withReview(candidate, new JevQuestion.Review(candidate.configurationDigest(), "a", "b", false, REVIEW)),
 				withReview(candidate, new JevQuestion.Review(candidate.configurationDigest(), "a", "a", true, REVIEW))))
-			assertThat(judge(s).judge(context()).status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(judge(s).judge(input()).status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(calls).hasValue(0);
 	}
 
@@ -352,15 +348,18 @@ class JevJudgeTest {
 				QualityDirection.DECREASING, 0, 1, null);
 		var reviewed = withReview(candidate,
 				new JevQuestion.Review(candidate.configurationDigest(), "a", "b", true, REVIEW));
-		assertThat(judge(reviewed).judge(context()).status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(judge(reviewed).judge(input()).status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(calls).hasValue(0);
 	}
 
 	@Test
 	void rejectsMissingEvidenceAndIncompleteBinaryWithoutCalls() {
-		assertThat(judge(NOUL).judge(JudgmentContext.builder().goal(GOAL).build()).status())
-			.isEqualTo(JudgmentStatus.ERROR);
-		assertThat(judge(NOUL).judge(context(GOAL, EVIDENCE, false)).status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThatNullPointerException().isThrownBy(() -> new RequirementEvidence<String, JevEvidence>(GOAL, null))
+			.withMessage("evidence");
+		assertThatNullPointerException().isThrownBy(() -> new RequirementEvidence<>(null, input().evidence()))
+			.withMessage("requirement");
+		assertThat(judge(NOUL).judge(null).status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(judge(NOUL).judge(input(GOAL, EVIDENCE, false)).status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(calls).hasValue(0);
 	}
 
@@ -368,7 +367,7 @@ class JevJudgeTest {
 	void oversizedEvidenceHasNoCallOrTruncation() {
 		var j = new JevJudge("fake-key", "jev-1.13.0", endpoint(), Duration.ofSeconds(3), 10, 32000, NOUL, http,
 				this::capture);
-		assertThat(j.judge(context()).status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(j.judge(input()).status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(calls).hasValue(0);
 	}
 
@@ -383,11 +382,8 @@ class JevJudgeTest {
 
 	@Test
 	void evidenceCompletenessCannotTransferToAnotherRequirement() {
-		var original = context();
-		JudgmentContext changed = JudgmentContext.builder()
-			.goal("Unrelated requirement")
-			.metadata(original.metadata())
-			.build();
+		var original = input();
+		var changed = new RequirementEvidence<>("Unrelated requirement", original.evidence());
 		assertThat(judge(NOUL).judge(changed).status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(calls).hasValue(0);
 	}
@@ -401,7 +397,7 @@ class JevJudgeTest {
 		response.set(
 				"{\"model\":\"jev-1.13.0\",\"answers\":{\"q\":{\"type\":\"score\",\"score\":1,\"confidence\":0.9,\"legend\":{\"0\":{\"clauses\":0,\"meaning\":\"none\"},\"1\":{\"clauses\":3,\"meaning\":\"all\"}},\"probabilities\":{\"0\":0,\"1\":1}}},\"usage\":{\"input_tokens\":12,\"output_tokens\":2}}"
 					.getBytes(StandardCharsets.UTF_8));
-		assertThat(judge(reviewed).judge(context()).status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(judge(reviewed).judge(input()).status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	@Test
@@ -410,7 +406,7 @@ class JevJudgeTest {
 			ObjectNode body = (ObjectNode) Checks.parse(fixture("noul-valid"));
 			((ObjectNode) body.path("answers").path("q")).put("noul", p);
 			response.set(Checks.json(body));
-			Judgment j = judge(NOUL).judge(context());
+			Judgment j = judge(NOUL).judge(input());
 			assertThat(j.status())
 				.isEqualTo(p == .5 ? JudgmentStatus.ABSTAIN : p == 0 ? JudgmentStatus.FAIL : JudgmentStatus.PASS);
 			assertThat(j.assessment().proposition().value()).isEqualTo(p == .5 ? null : p == 1);
@@ -426,12 +422,12 @@ class JevJudgeTest {
 		answer.set("probabilities",
 				Checks.JSON.valueToTree(Map.of("satisfied", 0, "violated", 0, "insufficient_evidence", 1)));
 		response.set(Checks.json(body));
-		assertThat(judge(choice()).judge(context()).status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(judge(choice()).judge(input()).status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		answer.put("choice", "satisfied");
 		answer.set("probabilities",
 				Checks.JSON.valueToTree(Map.of("satisfied", .5, "violated", .5, "insufficient_evidence", 0)));
 		response.set(Checks.json(body));
-		assertThat(judge(choice()).judge(context()).status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(judge(choice()).judge(input()).status()).isEqualTo(JudgmentStatus.ABSTAIN);
 	}
 
 	@Test
@@ -443,7 +439,7 @@ class JevJudgeTest {
 		answer.put("choice", "a");
 		answer.set("probabilities", Checks.JSON.valueToTree(Map.of("a", .5, "b", .5)));
 		response.set(Checks.json(body));
-		assertThat(judge(q).judge(context()).status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(judge(q).judge(input()).status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	@Test
@@ -462,7 +458,7 @@ class JevJudgeTest {
 			answer.set("probabilities",
 					Checks.JSON.valueToTree(Map.of("0", index == 0 ? 1 : 0, "1", 0, "2", index == 2 ? 1 : 0)));
 			response.set(Checks.json(body));
-			Judgment j = judge(q).judge(context());
+			Judgment j = judge(q).judge(input());
 			assertThat(j.status()).isEqualTo(index == 0 ? JudgmentStatus.PASS : JudgmentStatus.FAIL);
 			assertThat(j.assessment().numeric().value()).isEqualTo(index);
 			assertThat(j.assessment().numeric().qualityScore().orElseThrow()).isEqualTo(index == 0 ? 1 : 0);
@@ -504,7 +500,7 @@ class JevJudgeTest {
 		if (kind.equals("trailing"))
 			bytes = (text + "{}").getBytes(StandardCharsets.UTF_8);
 		response.set(bytes);
-		Judgment j = judge(choice()).judge(context());
+		Judgment j = judge(choice()).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(calls).hasValue(1);
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(bytes);
@@ -513,7 +509,7 @@ class JevJudgeTest {
 	@Test
 	void oversizedResponseIsAnInstrumentError() {
 		response.set(new byte[33000]);
-		Judgment j = judge(NOUL).judge(context());
+		Judgment j = judge(NOUL).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(j.assessment()).isNull();
 		assertThat(calls).hasValue(1);
@@ -526,7 +522,7 @@ class JevJudgeTest {
 		})) {
 			var j = new JevJudge("fake-key", "jev-1.13.0", endpoint(), Duration.ofSeconds(1), 16000, 32000, NOUL, http,
 					sink)
-				.judge(context());
+				.judge(input());
 			assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(j.reasoning()).doesNotContain("sensitive");
 		}
@@ -544,7 +540,7 @@ class JevJudgeTest {
 						Duration.ofSeconds(1), 16000, 32000, NOUL, http, this::capture),
 				new JevJudge("fake-key", "jev-1.13.0", endpoint(), Duration.ZERO, 16000, 32000, NOUL, http,
 						this::capture)))
-			assertThat(j.judge(context()).status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(j.judge(input()).status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(calls).hasValue(0);
 	}
 
@@ -599,7 +595,7 @@ class JevJudgeTest {
 	@Test
 	void malformedAssessmentRetainsValidatedRequestUsageOnce() {
 		response.set(fixture("score-changed-legend"));
-		Judgment j = judge(score(true)).judge(context());
+		Judgment j = judge(score(true)).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(j.metadata().get("usage")).isEqualTo(Map.of("inputTokens", 120, "outputTokens", 12));
 		assertThat(j.checks()).isEmpty();
@@ -611,7 +607,7 @@ class JevJudgeTest {
 		ObjectNode body = (ObjectNode) Checks.parse(fixture("noul-valid"));
 		body.put("model", "echoed SECRET");
 		response.set(Checks.json(body));
-		Judgment j = judge(NOUL).judge(context());
+		Judgment j = judge(NOUL).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(Checks.JSON.valueToTree(j).toString()).doesNotContain("SECRET");
 	}
@@ -632,7 +628,7 @@ class JevJudgeTest {
 				new JevQuestion.Review(review.path("configurationDigest").asText(), review.path("author").asText(),
 						review.path("reviewer").asText(), review.path("approved").asBoolean(), record));
 		response.set(fixture("score-valid"));
-		Judgment result = judge(approved).judge(context());
+		Judgment result = judge(approved).judge(input());
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.provenance().evidence()).contains(record);
 		assertThat(calls).hasValue(1);
@@ -644,15 +640,15 @@ class JevJudgeTest {
 		ObjectNode body = (ObjectNode) Checks.parse(fixture("choice-valid"));
 		((ObjectNode) body.path("usage")).put("input_tokens", count);
 		response.set(Checks.json(body));
-		Judgment j = judge(choice()).judge(context());
+		Judgment j = judge(choice()).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		Judgment restored = Checks.JSON.readValue(Checks.JSON.writeValueAsBytes(j), Judgment.class);
 		assertThat(restored).isEqualTo(j);
-		var verdict = SimpleJury.<JudgmentContext>builder()
+		var verdict = SimpleJury.<RequirementEvidence<String, JevEvidence>>builder()
 			.judge(c -> j)
 			.votingStrategy(new ConsensusStrategy())
 			.build()
-			.vote(context());
+			.vote(input());
 		var decoded = Checks.JSON.readValue(Checks.JSON.writeValueAsBytes(verdict), Verdict.class);
 		assertThat(decoded).isEqualTo(verdict);
 		assertThat(Verdicts.interpret(decoded).root().judgment().metadata()).isEqualTo(j.metadata());
@@ -682,7 +678,7 @@ class JevJudgeTest {
 	void gatewayRetainsNativeSupportAndRoutingWithoutInventingVersion() throws Exception {
 		ObjectNode body = gatewayResponse("choice-valid");
 		response.set(Checks.json(body));
-		Judgment j = gatewayJudge(choice()).judge(context());
+		Judgment j = gatewayJudge(choice()).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(j.certainty().value()).isEqualTo(.8);
 		assertThat(j.distribution().masses()).contains(new ProbabilityMass("violated", .9));
@@ -705,7 +701,7 @@ class JevJudgeTest {
 		ObjectNode body = gatewayResponse("choice-valid");
 		body.remove("provider_metadata");
 		response.set(Checks.json(body));
-		Judgment j = gatewayJudge(choice()).judge(context());
+		Judgment j = gatewayJudge(choice()).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(trace(j).has("providerMetadata")).isFalse();
 		assertThat(trace(j).path("underlyingModelVersion").asText()).isEqualTo("unknown");
@@ -719,7 +715,7 @@ class JevJudgeTest {
 		((ObjectNode) body.at("/provider_metadata/gateway")).set("cost",
 				Checks.parse(nativeCost.getBytes(StandardCharsets.UTF_8)));
 		response.set(Checks.json(body));
-		Judgment j = gatewayJudge(choice()).judge(context());
+		Judgment j = gatewayJudge(choice()).judge(input());
 		double expected = new java.math.BigDecimal(nativeCost.replace("\"", "")).doubleValue();
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(j.certainty().value()).isEqualTo(.8);
@@ -737,7 +733,7 @@ class JevJudgeTest {
 		assertThat(j.checks()).isEmpty();
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
 		assertThat(Checks.JSON.readValue(Checks.json(j), Judgment.class)).isEqualTo(j);
-		var verdict = SimpleJury.<JudgmentContext>builder().judge(c -> j).votingStrategy(new ConsensusStrategy()).build().vote(context());
+		var verdict = SimpleJury.<RequirementEvidence<String, JevEvidence>>builder().judge(c -> j).votingStrategy(new ConsensusStrategy()).build().vote(input());
 		var reopened = Checks.JSON.readValue(Checks.json(verdict), Verdict.class);
 		assertThat(reopened).isEqualTo(verdict);
 		assertThat(Verdicts.interpret(reopened).root().judgment().metadata()).isEqualTo(j.metadata());
@@ -750,7 +746,7 @@ class JevJudgeTest {
 	void gatewayCostInvalidValuesStayUnknownWithoutChangingAssessment(String nativeCost) {
 		String body = new String(Checks.json(gatewayResponse("choice-valid")), StandardCharsets.UTF_8);
 		response.set(body.replace("\"cost\":\"0\"", "\"cost\":" + nativeCost).getBytes(StandardCharsets.UTF_8));
-		Judgment j = gatewayJudge(choice()).judge(context());
+		Judgment j = gatewayJudge(choice()).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(j.certainty().value()).isEqualTo(.8);
 		assertThat(j.metadata().get("usage")).isEqualTo(Map.of("inputTokens", 120, "outputTokens", 12));
@@ -764,13 +760,13 @@ class JevJudgeTest {
 		ObjectNode body = gatewayResponse("choice-valid");
 		((ObjectNode) body.at("/provider_metadata/gateway")).remove("cost");
 		response.set(Checks.json(body));
-		Judgment missing = gatewayJudge(choice()).judge(context());
+		Judgment missing = gatewayJudge(choice()).judge(input());
 		assertThat(missing.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat((Map<?, ?>) missing.metadata().get("usage")).hasSize(2);
 		body.put("model", "jev-1.13.0");
 		((ObjectNode) body.at("/provider_metadata/gateway")).put("cost", "0.000182742");
 		response.set(Checks.json(body));
-		Judgment direct = judge(choice()).judge(context());
+		Judgment direct = judge(choice()).judge(input());
 		assertThat(direct.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat((Map<?, ?>) direct.metadata().get("usage")).hasSize(2);
 		assertThat(trace(direct).path("usage").has("cost")).isFalse();
@@ -789,7 +785,7 @@ class JevJudgeTest {
 		((ObjectNode) body.at("/provider_metadata/gateway")).put("cost", "0.000182742");
 		response.set(Checks.json(body));
 		JevQuestion question = fixture.startsWith("noul") ? NOUL : fixture.startsWith("score") ? score(true) : choice();
-		Judgment j = gatewayJudge(question).judge(context());
+		Judgment j = gatewayJudge(question).judge(input());
 		JudgmentStatus expected = switch (fixture) {
 			case "choice-not-maximum" -> JudgmentStatus.ERROR;
 			case "noul-valid" -> JudgmentStatus.FAIL;
@@ -816,7 +812,7 @@ class JevJudgeTest {
 		else
 			((ObjectNode) body.path("answers").path("q")).remove(field);
 		response.set(Checks.json(body));
-		Judgment j = gatewayJudge(choice()).judge(context());
+		Judgment j = gatewayJudge(choice()).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(j.assessment()).isNull();
 		assertThat(j.certainty()).isNull();
@@ -828,7 +824,7 @@ class JevJudgeTest {
 	@ValueSource(strings = { "score-valid", "score-missing-legend", "score-reversed-legend", "score-changed-legend" })
 	void gatewayScoreKeepsExistingLegendValidation(String fixture) {
 		response.set(Checks.json(gatewayResponse(fixture)));
-		Judgment j = gatewayJudge(score(true)).judge(context());
+		Judgment j = gatewayJudge(score(true)).judge(input());
 		assertThat(j.status()).isEqualTo(fixture.equals("score-valid") ? JudgmentStatus.ABSTAIN : JudgmentStatus.ERROR);
 		assertThat(calls).hasValue(1);
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
@@ -847,13 +843,13 @@ class JevJudgeTest {
 						"typesafe-ai/jev", "https://ai-gateway.vercel.sh.evil.invalid/typesafe/v1/systemone" })) {
 			var judge = new JevJudge("fake-key", pair[0], URI.create(pair[1]), Duration.ofSeconds(1), 16000, 32000,
 					choice(), http, this::capture);
-			assertThat(judge.judge(context()).status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(judge.judge(input()).status()).isEqualTo(JudgmentStatus.ERROR);
 		}
 		assertThat(calls).hasValue(0);
 		response.set(Checks.json(gatewayResponse("choice-valid")));
-		assertThat(judge(choice()).judge(context()).status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(judge(choice()).judge(input()).status()).isEqualTo(JudgmentStatus.ERROR);
 		response.set(fixture("choice-valid"));
-		Judgment versioned = gatewayJudge(choice()).judge(context());
+		Judgment versioned = gatewayJudge(choice()).judge(input());
 		assertThat(versioned.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(trace(versioned).path("reportedModel").asText()).isEqualTo("jev-1.13.0");
 		assertThat(trace(versioned).path("underlyingModelVersion").asText()).isEqualTo("1.13.0");
@@ -862,11 +858,11 @@ class JevJudgeTest {
 
 	@Test
 	void configurationDigestIncludesExactEndpoint() {
-		Judgment first = judge(NOUL).judge(context());
+		Judgment first = judge(NOUL).judge(input());
 		URI alternate = URI.create("http://localhost:" + server.getAddress().getPort() + "/v1/systemone");
 		Judgment second = new JevJudge("fake-key", "jev-1.13.0", alternate, Duration.ofSeconds(3), 16000, 32000, NOUL,
 				http, this::capture)
-			.judge(context());
+			.judge(input());
 		assertThat(second.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(first.provenance().configurationDigest()).isNotEqualTo(second.provenance().configurationDigest());
 	}
@@ -877,7 +873,7 @@ class JevJudgeTest {
 				"https://ai-gateway.vercel.sh/typesafe/v1/systemone?api_key=sentinel-secret")) {
 			Judgment j = new JevJudge("fake-key", "typesafe-ai/jev", URI.create(url), Duration.ofSeconds(1), 16000,
 					32000, choice(), http, this::capture)
-				.judge(context());
+				.judge(input());
 			assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(trace(j).has("endpoint")).isFalse();
 			assertThat(trace(j).path("route").asText()).isEqualTo("unvalidated");
@@ -896,7 +892,7 @@ class JevJudgeTest {
 		assertThat(response.get().length).isLessThanOrEqualTo(65536);
 		Judgment j = new JevJudge("fake-key", "typesafe-ai/jev", gatewayEndpoint(), Duration.ofSeconds(3), 24576, 65536,
 				choice(), http, this::capture)
-			.judge(context());
+			.judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(j.provenance()).isNotNull();
 		assertThat(j.assessment().category().selected()).isEqualTo("violated");
@@ -934,7 +930,7 @@ class JevJudgeTest {
 		assertThat(response.get().length).isLessThanOrEqualTo(65536);
 		Judgment j = new JevJudge("fake-key", "typesafe-ai/jev", gatewayEndpoint(), Duration.ofSeconds(3), 24576, 65536,
 				choice(), http, this::capture)
-			.judge(context());
+			.judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(j.provenance()).isNotNull();
 		assertThat(j.assessment()).isNull();
@@ -952,7 +948,7 @@ class JevJudgeTest {
 		ObjectNode body = gatewayResponse("choice-valid");
 		body.putNull("provider_metadata");
 		response.set(Checks.json(body));
-		Judgment j = gatewayJudge(choice()).judge(context());
+		Judgment j = gatewayJudge(choice()).judge(input());
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(trace(j).has("providerMetadata")).isTrue();
 		assertThat(providerMetadata(j).isNull()).isTrue();

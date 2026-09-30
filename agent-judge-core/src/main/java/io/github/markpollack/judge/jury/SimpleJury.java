@@ -5,8 +5,6 @@
 
 package io.github.markpollack.judge.jury;
 
-import io.github.markpollack.judge.result.PolicyBinding;
-import io.github.markpollack.judge.PolicyJudges;
 
 
 import io.github.markpollack.judge.Judge;
@@ -76,6 +74,7 @@ import org.slf4j.LoggerFactory;
  * evidence. Configuration and exclusion guards still apply. Failed invocations remain
  * contained inputs to the configured error reduction; they are not identity results.
  *
+ * @param <E> evidence type
  * @author Mark Pollack
  * @since 0.1.0
  */
@@ -128,20 +127,6 @@ public class SimpleJury<E> implements Jury<E> {
 		}
 	}
 
-    private SimpleJury(SimpleJury<E> original, PolicyBinding policy) {
-        this.judges = original.judges.stream()
-            .map(judge -> PolicyJudges.apply(judge, policy.reference(), policy.policy())).toList();
-        this.votingStrategy = original.votingStrategy;
-        this.weights = original.weights;
-        this.parallel = original.parallel;
-        this.executor = original.executor;
-        this.deduplicatedPositions = original.deduplicatedPositions;
-        this.declaredCapabilities = original.declaredCapabilities;
-    }
-
-    SimpleJury<E> withPolicy(PolicyBinding policy) {
-        return new SimpleJury<>(this, policy);
-    }
 
 	/**
 	 * Read every seat's declared exclusion capability.
@@ -528,6 +513,7 @@ public class SimpleJury<E> implements Jury<E> {
 
 	/**
 	 * Create a new builder for SimpleJury.
+	 * @param <E> evidence type
 	 * @return builder instance
 	 */
 	public static <E> Builder<E> builder() {
@@ -535,7 +521,8 @@ public class SimpleJury<E> implements Jury<E> {
 	}
 
 	/**
-	 * Builder<E> for SimpleJury.
+	 * {@code Builder<E>} for SimpleJury.
+	 * @param <E> evidence type
 	 */
 	public static class Builder<E> {
 

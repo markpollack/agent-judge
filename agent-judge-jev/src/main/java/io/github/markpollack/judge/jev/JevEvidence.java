@@ -24,9 +24,6 @@ import java.util.Objects;
 public record JevEvidence(String text, ArtifactRef bundle, ArtifactRef manifest, String requirementSha256,
 		boolean complete) {
 
-	/** Key used to supply this immutable input in JudgmentContext metadata. */
-	public static final String CONTEXT_KEY = "jev.evidence";
-
 	/** Validate the exact evidence binding. */
 	public JevEvidence {
 		Objects.requireNonNull(text);

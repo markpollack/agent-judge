@@ -37,7 +37,7 @@ cascades without placing paths or runtime exceptions in the wire result.
 
 | Module | Responsibility |
 |---|---|
-| `agent-judge-core` | `JudgmentContext`, `Judgment`, judges, juries, verdicts, and voting strategies |
+| `agent-judge-core` | Typed `Judge<E>` / `Jury<E>`, native requirements, `JudgmentContext`, results and voting strategies |
 | `agent-judge-ai-core` | Framework-neutral prompt, model, and classifier infrastructure for AI-backed judges |
 | `agent-judge-exec` | Command, build, class-version, and coverage judges |
 | `agent-judge-file` | Java, Maven, XML, and text semantic comparison |
@@ -47,6 +47,9 @@ cascades without placing paths or runtime exceptions in the wire result.
 | `agent-judge-langchain4j` | Evaluated-side `Result<T>` bridge |
 | `agent-judge-koog` | Evaluated-side Koog `AIAgent` bridge |
 | `agent-judge-agent-client` | Evaluated-side AgentClient bridge and AgentClient judging backend |
+| `agent-judge-jev` | Typed Jev evidence and System One judging adapter |
+| `agent-judge-assertions` | Direct requirement evaluation, final application policy and retained-result assertions |
+| `agent-judge-assertj` | Optional staged, requirement-first AssertJ integration |
 
 `agent-judge-core` is framework-neutral, not dependency-free.
 It uses Jackson Databind, SLF4J API, and compile-scope JSpecify annotations; no core dependency is an agent framework, model provider, dependency-injection container, or hosted evaluation service.
@@ -66,7 +69,9 @@ All published modules use the same version.
 
 ## Quick start
 
-This example is maintained as compiled source in [Tutorial module 04](https://github.com/markpollack/agent-judge-tutorial/blob/main/module-04-simple-jury/src/main/java/io/github/markpollack/judge/tutorial/module04/SimpleJuryDemo.java):
+This execution-oriented example uses the typed API in the current source line. The separate
+[Tutorial module 04](https://github.com/markpollack/agent-judge-tutorial/blob/main/module-04-simple-jury/src/main/java/io/github/markpollack/judge/tutorial/module04/SimpleJuryDemo.java)
+demonstrates the corresponding Jury concepts against its own dependency version.
 
 ```java
 Path workspace = Path.of("test-workspace");
@@ -80,20 +85,20 @@ JudgmentContext context = JudgmentContext.builder()
     .executionTime(Duration.ofSeconds(5))
     .build();
 
-Judge fileExists = Judges.named(
+Judge<JudgmentContext> fileExists = Judges.named(
     new FileExistsJudge(controllerPath),
     "file-exists", "Controller file created");
 
-Judge hasMethod = Judges.named(
+Judge<JudgmentContext> hasMethod = Judges.named(
     new FileContentJudge(controllerPath, "hello",
         FileContentJudge.MatchMode.CONTAINS),
     "has-method", "Contains hello method");
 
-Judge hasPom = Judges.named(
+Judge<JudgmentContext> hasPom = Judges.named(
     new FileExistsJudge("pom.xml"),
     "has-pom", "Maven project file exists");
 
-SimpleJury majorityJury = SimpleJury.builder()
+SimpleJury<JudgmentContext> majorityJury = SimpleJury.<JudgmentContext>builder()
     .judge(fileExists, 1.0)
     .judge(hasMethod, 1.0)
     .judge(hasPom, 1.0)
@@ -105,6 +110,11 @@ Verdict majorityVerdict = majorityJury.vote(context);
 
 System.out.println("Overall: " + majorityVerdict.aggregated().status());
 ```
+
+For typed requirement assertions in the `0.18.0-SNAPSHOT` source line, see the
+[AssertJ guide and compiled examples](agent-judge-assertj/README.md) and
+[migration guide](MIGRATION_TYPED_EVIDENCE.md). The application chooses how to act on the
+completed evaluation; its final policy does not rewrite a Jury's internal policies.
 
 ## Executable examples and documentation
 

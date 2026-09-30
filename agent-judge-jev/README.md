@@ -1,6 +1,6 @@
 # Jev adapter
 
-`JevJudge` implements the ordinary `Judge` contract with TypeSafe's System One API,
+`JevJudge` implements `Judge<RequirementEvidence<String, JevEvidence>>` with TypeSafe's System One API,
 using `io.github.gudcks0305:jev-typesafe:0.2.0`. It has no Spring or generative-model runtime.
 The caller supplies a model, credential, HTTP client, explicit question/projection,
 deadline, byte bounds and a protected `ArtifactCapture`. The HTTP client must disable
@@ -11,9 +11,16 @@ requires `typesafe-ai/jev`; an alias response leaves the underlying version unkn
 HTTP loopback endpoints with the corresponding paths are allowed for tests.
 No environment credentials are read.
 
-The adapter sends exactly `context.goal()` as `state.requirement` and the text from a
-`JevEvidence` value in `context.metadata().get(JevEvidence.CONTEXT_KEY)` as `state.evidence`.
-Workspace, agent output, other metadata and the evidence manifest are not sent. Evidence
+The direct typed adapter sends exactly the pair's String requirement as `state.requirement`
+and its `JevEvidence` text as `state.evidence`. For a native `Requirement<S>`,
+`jev.bind(requirement, renderer)` captures the provider rendering once and returns an ordinary
+`Judge<RequirementEvidence<Requirement<S>, JevEvidence>>`. Evaluation verifies the bound
+requirement's identity, revision, native specification and source before sending; a mismatch
+returns an instrument error. An application policy association is not part of that semantic
+binding. Native requirement structure remains in the original envelope.
+
+The adapter consumes typed pairs only. Workspace, agent output, execution-context metadata and
+the evidence manifest are not sent. Evidence
 must carry its exact UTF-8 bundle digest, retained manifest reference, exact requirement
 SHA-256 and a caller-declared sufficiency flag. The declaration cannot transfer to a
 different requirement. The caller owns manifest contents, review and artifact availability;

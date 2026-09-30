@@ -28,6 +28,7 @@ import io.github.markpollack.judge.result.Judgment;
  * </p>
  * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
+ * @param <E> evidence type
  * @author Mark Pollack
  * @since 0.1.0
  * @see Judge

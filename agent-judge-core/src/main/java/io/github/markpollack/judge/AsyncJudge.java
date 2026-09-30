@@ -7,11 +7,10 @@ package io.github.markpollack.judge;
 
 import java.util.concurrent.CompletableFuture;
 
-import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.Judgment;
 
 /**
- * Asynchronous interface for judging agent execution results.
+ * Asynchronous interface for judging typed evidence.
  *
  * <p>
  * This interface is completely separate from {@link Judge} following Spring's pattern of
@@ -36,6 +35,7 @@ import io.github.markpollack.judge.result.Judgment;
  * </p>
  * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
+ * @param <E> evidence accepted by this evaluator
  * @author Mark Pollack
  * @since 0.1.0
  * @see Judge
@@ -43,9 +43,8 @@ import io.github.markpollack.judge.result.Judgment;
 public interface AsyncJudge<E> {
 
 	/**
-	 * Asynchronously evaluate an agent execution result.
-	 * @param context the judgment context containing all information about the agent
-	 * execution
+	 * Asynchronously evaluate the supplied evidence.
+	 * @param context typed evidence for this evaluation
 	 * @return a CompletableFuture that will complete with the judgment
 	 */
 	CompletableFuture<Judgment> judgeAsync(E context);

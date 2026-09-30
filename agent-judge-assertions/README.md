@@ -1,8 +1,12 @@
 # Ordinary semantic assertions
 
-Configure an immutable `SemanticAssertions` with an explicit requirement-to-`Judge` route and
+Configure an immutable `SemanticAssertions` with an explicit requirement-to-`Judge<JudgmentContext>` route and
 `PolicyBinding`. The judge makes a finding; the application policy decides whether to use it.
 `USE_ASSESSMENT` accepts the finding, including a negative one. It does not mean the subject passes.
+
+The optional [AssertJ module](../agent-judge-assertj/README.md) also provides the typed,
+requirement-first progression. This evidence-first facade and its retained-result terminal remain
+available and use the same separation between internal policy and final application policy.
 
 ## Configure once, then assert
 
@@ -15,8 +19,8 @@ import java.nio.charset.StandardCharsets;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.assertions.AssertionResult;
-import io.github.markpollack.judge.assertions.PolicyBinding;
-import io.github.markpollack.judge.assertions.Requirement;
+import io.github.markpollack.judge.result.PolicyBinding;
+import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.assertions.SemanticAssertionError;
 import io.github.markpollack.judge.assertions.SemanticAssertions;
 import io.github.markpollack.judge.context.JudgmentContext;
@@ -31,7 +35,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ResponseAssertionsTest {
-    private static final Requirement READY = new Requirement(
+    private static final Requirement<String> READY = Requirement.text(
         "response-ready", "1", "The response is exactly READY");
 
     private final PolicyBinding defaultPolicy = policy(
@@ -44,7 +48,7 @@ class ResponseAssertionsTest {
         raw -> new Acceptance(AcceptanceAction.ESCALATE,
             "Independent confirmation is required before acting; none is retained"));
 
-    private final Judge judge = context ->
+    private final Judge<JudgmentContext> judge = context ->
         "READY".equals(context.agentOutput().orElse(""))
             ? Judgment.pass("Response is exactly READY")
             : Judgment.fail("Response differs from READY");
@@ -92,12 +96,13 @@ unchanged. String requirements, such as `.satisfies("The response is exactly REA
 configured default policy. No threshold is inferred. A fixture may expose its own one-line
 `assertThat(evidence)` method delegating to the configured facade.
 
-`evaluate` invokes the configured judge and applies the selected policy where applicable;
-producer ERROR and NOT_APPLICABLE bypass policy. **It does not assert**.
+`evaluate` invokes the configured judge through a normal one-seat Jury and then applies the
+selected final policy where applicable. NOT_ASSESSED, NOT_APPLICABLE and unsupported readings
+bypass final policy; raw aggregate ERROR/N/A also bypasses it. **It does not assert**.
 Calling it after `satisfies`, or calling `satisfies` after it, evaluates again and may incur another
 provider call. To retain and assert one evaluation, use `evaluate` followed by the public static
 `SemanticAssertions.requireSatisfied(result)`. This terminal reads the retained authoritative
-Interpretation; it invokes no route, judge, provider or policy function, and does not mutate the
+Interpretation and separate final application decision; it invokes no route, judge, provider or policy function, and does not mutate the
 result or replace its policy. Calling it again asserts the same facts.
 
 Resolve evidence, provider resources and policy during caller setup. The exact context goal must
@@ -108,25 +113,35 @@ fixtures may explicitly map a reviewed text alias to a named source requirement.
 
 ## Findings, policy and assertion outcomes
 
-The path remains `Judge → Judgment → Jury → Verdict → Interpretation`. Evaluation composes the
-judge with `PolicyJudges`, invokes a normal one-seat `SimpleJury`, and reads its verdict through
-`Verdicts.interpret`. This preserves the judge's finding separately from the policy decision.
-Only a SUPPORTED ACCEPTED reading passes either assertion terminal.
+The path remains `Judge → Judgment → Jury → Verdict → Interpretation`. Evaluation invokes the
+configured Judge unchanged in a normal one-seat `SimpleJury` and reads its Verdict through
+`Verdicts.interpret`. Internal policies configured by the caller with `PolicyJudges.apply(...)`
+remain part of that evaluation. The assertion's selected policy runs afterwards, with its result
+recorded separately in `ApplicationDecision`; it never replaces an internal application.
 
-| Finding and policy | Authoritative reading | Assertion outcome |
+Internal policy and final application policy use the same `AcceptancePolicy` abstraction in
+different scopes. Both are application-owned. The final callback receives the raw aggregate
+Judgment view, without an earlier policy application; it receives no seat roster. Its output
+cannot repair the retained determination. Satisfaction requires SUPPORTED ACCEPTED plus a
+successful final USE_ASSESSMENT application.
+
+| Evaluation and final policy | Retained authoritative reading | Assertion outcome |
 |---|---|---|
 | PASS, USE_ASSESSMENT | ACCEPTED | Passes |
 | FAIL, USE_ASSESSMENT | REJECTED | `SemanticAssertionError.Rejected` |
-| PASS or FAIL, ABSTAIN or ESCALATE | UNDECIDED; raw finding retained | `SemanticAssertionError.Inconclusive` |
+| PASS or FAIL, final ABSTAIN or ESCALATE | ACCEPTED or REJECTED, unchanged | `SemanticAssertionError.Inconclusive` |
 | Producer ABSTAIN, any valid policy action | UNDECIDED | `SemanticAssertionError.Inconclusive` |
-| Judge, policy or invocation failure | NOT_ASSESSED | `SemanticAssertionError.InstrumentFailure` |
+| Internal withholding or escalation, final USE | UNDECIDED | `SemanticAssertionError.Inconclusive` |
+| Judge, internal policy or invocation failure | NOT_ASSESSED; final policy bypassed | `SemanticAssertionError.InstrumentFailure` |
+| Final application policy failure | Original reading unchanged | `SemanticAssertionError.InstrumentFailure` |
 | Declared NOT_APPLICABLE | NOT_APPLICABLE | `SemanticAssertionError.NotApplicable` |
 | Unsupported/contradicted reading, or absent reading | No usable supported determination | `SemanticAssertionError.UnsupportedReading` |
 
 The critical policy above deliberately requires independent confirmation that the single judge
 does not supply; it sets no numerical threshold. Its ESCALATE action withholds the finding and
 requests follow-up. This facade does not run another judge or perform human escalation. The original
-PASS remains in `producerStatus`; the operational status is ABSTAIN. Undeclared non-applicability
+PASS and the original operational status remain in the Verdict; ESCALATE is recorded separately
+as the final application action. Undeclared non-applicability
 is contained as an instrument failure. No uncertain/error outcome becomes a subject FAIL or JUnit skip.
 
 For a deliberately negative fixture, assert the specific error:
@@ -141,8 +156,8 @@ AssertionResult retained = violation.result();
 
 This succeeds only for a supported rejection. ABSTAIN, escalation and instrument failures do not
 count as a demonstrated violation. Errors expose `category()`, `result()` and `interpretation()`;
-failure messages briefly connect requirement, producer assessment, named support metric, policy,
-operational result and Interpretation. Long fields and artifact identifiers are abbreviated;
+failure messages briefly connect requirement, producer assessment, named support metric, internal
+policy, final application policy, operational result and Interpretation. Long fields and artifact identifiers are abbreviated;
 the complete result and interpretation summary remain available through those accessors.
 SUPPORTED describes structural coherence of the retained reading, not model confidence or proof
 that a model's finding is correct. Choice confidence and its distribution keep their own metric
@@ -151,24 +166,26 @@ ERROR has no valid assessment/support; a policy failure retains the original pro
 
 ## Retained and stored results
 
-`AssertionResult` is a runtime value, not another wire contract. Its `Requirement` may contain a
-policy function. Retain requirement identity/text and resolved policy reference/source separately
-from the existing portable Verdict/Interpretation contracts; do not serialize the function.
+`AssertionResult` is a runtime value, not another wire contract. Its native `Requirement` may contain
+an associated policy function. Retain the requirement's identity/revision/specification/source and
+the separate `ApplicationDecision` alongside the existing portable Verdict/Interpretation contracts;
+do not serialize the function. The final decision holds the resolved reference/source plus an
+application action/reason or failure, or an explicit bypass.
 
 Where a supported version-2 storage path reconstructs a typed `Verdict` and the original requirement
-and policy facts, `new AssertionResult(requirement, policyRef, policySource, verdict)` reconstructs
+and final application facts, `new AssertionResult(requirement, applicationDecision, verdict)` reconstructs
 the authoritative reading without evaluation. The constructor checks retained policy/source
 coherence; supply the facts actually recorded. Then `SemanticAssertions.requireSatisfied(result)`
 asserts that reading without a new judge or policy call. This does not establish a new persistence
 format or general historical deserialization support.
 
-`PolicySource.REQUIREMENT` requires an override with the exact resolved `PolicyRef` (including its
-configuration digest); `DEFAULT` requires no override. Any retained root `AppliedPolicy` or
-`PolicyFailure` must identify that same policy. A root with no application remains valid: ERROR/N/A
-bypass it, invocation failures may be contained, and composed Juries can retain different policies
-on contributing judgments while deriving an aggregate without one. The constructor does not
-require every contributing seat to share a policy, and a declared reference is not proof that
-policy executed. Unsupported Verdicts remain eligible for `UnsupportedReading` diagnostics.
+`PolicySource.ASSOCIATED` requires a requirement association with the exact resolved `PolicyRef`
+(including its configuration digest); `DEFAULT` requires no association. `EXPLICIT` records a caller
+override independently of any association. The final application must name its resolved policy;
+an internal root or seat application can name a different one. Internal policy applications and
+full Jury composition are retained unchanged. The constructor checks the final decision/bypass
+against the original authoritative Interpretation; a reference alone does not prove policy ran.
+Unsupported Verdicts remain eligible for `UnsupportedReading` diagnostics.
 The caller remains responsible for associating the correct requirement/evidence with the Verdict;
 these consistency checks cannot authenticate that pairing.
 
@@ -189,14 +206,16 @@ Here `Verdicts`, `ReadingSupport` and `VerdictReading` are from
 `io.github.markpollack.judge.jury.interpretation`. Require REJECTED instead for an intentionally
 negative stored case. Check the requirement's own verdict, not a separate agreement-scoring verdict.
 
-Applying a different policy is a separate explicit operation: core `Policies.apply` returns a new
-Judgment over the retained producer facts. It executes the new policy, but no judge, and leaves the
-original result unchanged. Keep the original and new policy identities/results separately; asserting
-an existing `AssertionResult` never performs this replacement implicitly.
+Applying a different final policy is a separate explicit operation:
+`AssertionResult.applyPolicy(requirement, binding, source, verdict)` retains the complete original
+Verdict and creates a separate final decision, without a Judge call. Keep both decisions when comparing
+policies; `requireSatisfied` never applies a policy implicitly. Core `Policies.apply` remains useful
+for explicitly producing a new policy-bearing Judgment; do not insert that replacement into a retained
+Jury and claim that its original decision/routing is unchanged.
 
-Compatibility: eager `void satisfies(...)` signatures are unchanged. The public retained-result
-terminal is additive. `AssertionResult` constructor validation is stricter and can reject previously
-constructible incoherent requirement/policy/source combinations. Failure-message text has changed;
+Compatibility: eager `void satisfies(...)` timing and the public retained-result terminal remain.
+Typed Judge/Requirement migration and the separate final-decision constructor require a coordinated
+recompile; see the [migration guide](../MIGRATION_TYPED_EVIDENCE.md). Failure-message text has changed;
 use structured categories and result accessors rather than parsing messages. Production dependencies
 remain core, OpenTest4J and JSpecify; JUnit, AssertJ and Jev are test-scoped.
 

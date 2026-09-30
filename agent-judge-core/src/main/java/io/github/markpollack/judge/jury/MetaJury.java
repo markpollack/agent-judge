@@ -5,7 +5,6 @@
 
 package io.github.markpollack.judge.jury;
 
-import io.github.markpollack.judge.result.PolicyBinding;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -84,10 +83,6 @@ class MetaJury<E> implements Jury<E> {
 		}
 	}
 
-    MetaJury<E> withPolicy(PolicyBinding policy) {
-        return new MetaJury<>(members.stream().map(member -> new NamedJury<>(member.name(),
-            Juries.withAcceptancePolicy(member.jury(), policy))).toList(), metaStrategy);
-    }
 
 	@Override
 	public List<Judge<E>> getJudges() {

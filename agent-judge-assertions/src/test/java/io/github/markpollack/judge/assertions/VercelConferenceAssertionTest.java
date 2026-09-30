@@ -62,7 +62,8 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 		});
 		server.start();
 		http = HttpClient.newHttpClient();
-		facade = fixture.facade(fixture.judge("FAKE-LOCAL-KEY",
+		facade = new RequirementAssertions(fixture.binding);
+		judge = fixture.bind(fixture.judge("FAKE-LOCAL-KEY",
 				URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/typesafe/v1/systemone"), http,
 				output));
 	}
@@ -72,8 +73,8 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 	void exactConferenceChoiceAndPortableProvenance(String label) throws Exception {
 		choice.set(label);
 		int index = label.equals("satisfied") ? 1 : 0;
-		var evidence = fixture.context(index);
-		var result = facade.evaluate(evidence, fixture.requirement(index));
+		var evidence = fixture.evidence(index);
+		var result = evaluate(evidence, fixture.requirement(index));
 		Judgment j = result.verdict().aggregated();
 		assertEquals(label, j.assessment().category().selected());
 		assertEquals(.8, j.certainty().value());
@@ -81,8 +82,8 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 		assertEquals(1, calls.get());
 		JsonNode request = ConferenceFixture.JSON.readTree(requests.getFirst());
 		assertEquals("typesafe-ai/jev", request.path("model").asText());
-		assertEquals(evidence.goal(), request.at("/state/requirement").asText());
-		assertEquals(((JevEvidence) evidence.metadata().get(JevEvidence.CONTEXT_KEY)).text(),
+		assertEquals(fixture.requirement(index).text(), request.at("/state/requirement").asText());
+		assertEquals(evidence.text(),
 				request.at("/state/evidence").asText());
 		assertEquals(fixture.configuration.path("instructions"), request.at("/questions/q/instructions"));
 		assertEquals(fixture.configuration.path("criteria"), request.at("/questions/q/criteria"));
@@ -113,7 +114,7 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 			else
 				((ObjectNode) body.at("/answers/q")).remove(field);
 		};
-		var result = facade.evaluate(fixture.context(0), fixture.requirement(0));
+		var result = evaluate(fixture.evidence(0), fixture.requirement(0));
 		Judgment j = result.verdict().aggregated();
 		assertEquals(JudgmentStatus.ERROR, j.status());
 		assertNull(j.assessment());
@@ -127,7 +128,7 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 	@Test
 	void optionalProviderMetadataAbsenceIsNotInvented() throws Exception {
 		changeResponse = body -> body.remove("provider_metadata");
-		var result = facade.evaluate(fixture.context(0), fixture.requirement(0));
+		var result = evaluate(fixture.evidence(0), fixture.requirement(0));
 		assertEquals(JudgmentStatus.FAIL, result.verdict().aggregated().status());
 		assertFalse(trace(result.verdict().aggregated()).has("providerMetadata"));
 		assertEquals("unknown", trace(result.verdict().aggregated()).path("underlyingModelVersion").asText());

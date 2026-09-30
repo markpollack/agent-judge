@@ -21,8 +21,8 @@ import io.github.markpollack.judge.JudgeType;
  *
  * <p>
  * Subclasses implement the
- * {@link #judge(io.github.markpollack.judge.context.JudgmentContext)} method with their
- * specific evaluation logic.
+ * {@link Judge#judge(Object)} method for {@link JudgmentContext} with their specific
+ * evaluation logic.
  * </p>
  *
  * <p>

@@ -10,6 +10,7 @@ import java.util.Objects;
 /**
  * Configuration for a single tier within a {@link CascadedJury}.
  *
+ * @param <E> evidence type
  * @param name human-readable tier name for diagnostics (e.g., "deterministic")
  * @param jury the jury implementation for this tier
  * @param policy cascade control flow policy

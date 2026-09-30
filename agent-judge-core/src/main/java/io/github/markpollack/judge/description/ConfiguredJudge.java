@@ -37,6 +37,7 @@ import io.github.markpollack.judge.JudgeWithMetadata;
  * Key order does not matter; the description orders keys.
  * </p>
  *
+ * @param <E> evidence type
  * @author Mark Pollack
  * @since 0.17.0
  * @see io.github.markpollack.judge.Judges#describe(Judge)

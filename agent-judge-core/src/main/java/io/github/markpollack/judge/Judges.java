@@ -97,6 +97,7 @@ public final class Judges {
 	 * Useful for lambda judges that need identifiable names for logging, monitoring, or
 	 * display purposes.
 	 * </p>
+	 * @param <E> evidence type
 	 * @param judge the judge to wrap
 	 * @param name the judge name; must be non-blank, since a jury stores the judgment under it
 	 * @return named judge with metadata
@@ -108,6 +109,7 @@ public final class Judges {
 
 	/**
 	 * Wrap a judge with name and description.
+	 * @param <E> evidence type
 	 * @param judge the judge to wrap
 	 * @param name the judge name; must be non-blank, since a jury stores the judgment under it
 	 * @param description the judge description
@@ -120,6 +122,7 @@ public final class Judges {
 
 	/**
 	 * Wrap a judge with complete metadata.
+	 * @param <E> evidence type
 	 * @param judge the judge to wrap
 	 * @param name the judge name; must be non-blank, since a jury stores the judgment under it
 	 * @param description the judge description
@@ -135,6 +138,7 @@ public final class Judges {
 
 	/**
 	 * Create a judge that always passes with the given reasoning.
+	 * @param <E> evidence type
 	 * @param reasoning the reasoning to include in judgment
 	 * @return judge that always passes
 	 */
@@ -144,6 +148,7 @@ public final class Judges {
 
 	/**
 	 * Create a judge that always fails with the given reasoning.
+	 * @param <E> evidence type
 	 * @param reasoning the reasoning to include in judgment
 	 * @return judge that always fails
 	 */
@@ -311,6 +316,7 @@ public final class Judges {
 	 * Example usage:
 	 * </p>
 	 * See the Agent Judge Tutorial for compiled composition examples.
+	 * @param <E> evidence type
 	 * @param first the first judge to execute
 	 * @param second the second judge to execute (only if first passes)
 	 * @return composed judge with AND logic
@@ -335,6 +341,7 @@ public final class Judges {
 	 * Example usage:
 	 * </p>
 	 * See the Agent Judge Tutorial for compiled composition examples.
+	 * @param <E> evidence type
 	 * @param first the first judge to execute
 	 * @param second the second judge to execute (only if the first does not pass)
 	 * @return composed judge with OR logic
@@ -357,6 +364,7 @@ public final class Judges {
 	 * Example usage:
 	 * </p>
 	 * See the Agent Judge Tutorial for compiled composition examples.
+	 * @param <E> evidence type
 	 * @param judges the judges to compose (varargs)
 	 * @return composed judge with AND logic
 	 */
@@ -385,6 +393,7 @@ public final class Judges {
 	 * Example usage:
 	 * </p>
 	 * See the Agent Judge Tutorial for compiled composition examples.
+	 * @param <E> evidence type
 	 * @param judges the judges to compose (varargs)
 	 * @return composed judge with OR logic
 	 */

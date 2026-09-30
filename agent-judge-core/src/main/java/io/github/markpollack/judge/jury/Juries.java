@@ -5,7 +5,6 @@
 
 package io.github.markpollack.judge.jury;
 
-import io.github.markpollack.judge.result.PolicyBinding;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.JudgeType;
@@ -40,29 +39,6 @@ public final class Juries {
 		// Utility class - no instantiation
 	}
 
-    /**
-     * Configure an application policy on every leaf of a built-in jury. The original jury
-     * is unchanged. Seats, order, weights, executor, exclusion declarations and tier
-     * strategies are retained; voting still uses the real engine. Policy runs on each
-     * leaf's producer facts before reduction/routing, not on a discarded aggregate.
-     * Custom jury implementations require an explicit application-owned policy route.
-     * @param <E> evidence type
-     * @param jury built-in jury
-     * @param policy application consequence
-     * @return configured jury preserving its full structure
-     * @throws IllegalArgumentException for an opaque or subclassed engine implementation
-     */
-    public static <E> Jury<E> withAcceptancePolicy(Jury<E> jury, PolicyBinding policy) {
-        java.util.Objects.requireNonNull(jury, "jury");
-        java.util.Objects.requireNonNull(policy, "policy");
-        if (jury.getClass() == SimpleJury.class && jury instanceof SimpleJury<E> simple)
-            return simple.withPolicy(policy);
-        if (jury.getClass() == MetaJury.class && jury instanceof MetaJury<E> meta)
-            return meta.withPolicy(policy);
-        if (jury.getClass() == CascadedJury.class && jury instanceof CascadedJury<E> cascade)
-            return cascade.withPolicy(policy);
-        throw new IllegalArgumentException("Application policy composition requires a built-in Jury; opaque wrappers cannot bypass engine guards");
-    }
 
 	/**
 	 * Create a jury from judges with automatic naming and unique identity preservation.
@@ -72,6 +48,7 @@ public final class Juries {
 	 * names are detected, suffixes "-2", "-3", etc. are added deterministically to ensure
 	 * uniqueness.
 	 * </p>
+	 * @param <E> evidence type
 	 * @param strategy the voting strategy
 	 * @param judges the judges to include
 	 * @return a simple jury with named judges
@@ -123,6 +100,7 @@ public final class Juries {
 
 	/**
 	 * Combine two juries into a meta-jury.
+	 * @param <E> evidence type
 	 * @param first the first jury
 	 * @param second the second jury
 	 * @param metaStrategy the voting strategy for aggregating jury verdicts
@@ -139,6 +117,7 @@ public final class Juries {
 
 	/**
 	 * Create a meta-jury from multiple juries.
+	 * @param <E> evidence type
 	 * @param strategy the voting strategy for aggregating jury verdicts
 	 * @param juries the juries to combine
 	 * @return a meta-jury combining all juries
@@ -158,6 +137,7 @@ public final class Juries {
 
 	/**
 	 * Create a meta-jury from explicitly named members.
+	 * @param <E> evidence type
 	 * @param strategy strategy that aggregates successful member aggregates
 	 * @param members named members in execution order
 	 * @return configured named meta-jury

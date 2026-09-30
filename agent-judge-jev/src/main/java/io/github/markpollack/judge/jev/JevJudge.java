@@ -10,7 +10,6 @@ import io.github.gudcks0305.jev.typesafe.TypeSafeJevClient;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.requirement.RequirementEvidence;
-import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.result.*;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -21,8 +20,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Immutable, concurrently reusable Judge. Sends only context.goal (the declared
- * requirement) and the explicitly supplied JevEvidence. Uses the released Java SDK with
+ * Immutable, concurrently reusable Judge. Sends only the declared requirement and
+ * explicitly supplied JevEvidence from the typed input pair. Uses the released Java SDK with
  * exactly one HTTP attempt. Caller owns HTTP client lifecycle and protected artifact
  * storage. No environment credentials, implicit retrieval, truncation, live calibration
  * guarantee or acceptance policy.
@@ -110,22 +109,6 @@ public final class JevJudge implements Judge<RequirementEvidence<String, JevEvid
             }
             return judge(new RequirementEvidence<>(rendered, input.evidence()));
         };
-    }
-
-    /**
-     * Explicit migration bridge for execution-context callers. New callers supply typed
-     * requirement/evidence directly. No metadata field is read on the typed path.
-     * @param context old execution context carrying the selected Jev evidence
-     * @return assessment or an instrument error for missing input
-     * @deprecated use the typed input or bind a native requirement
-     */
-    @Deprecated(since = "0.18.0")
-    public Judgment judge(JudgmentContext context) {
-        Object supplied = context == null ? null : context.metadata().get(JevEvidence.CONTEXT_KEY);
-        if (!(supplied instanceof JevEvidence evidence) || context.goal() == null)
-            return Judgment.error(io.github.markpollack.judge.result.JudgmentReasonCode.JUDGE_REPORTED,
-                "Explicit evidence required");
-        return judge(new RequirementEvidence<>(context.goal(), evidence));
     }
 
 	@Override

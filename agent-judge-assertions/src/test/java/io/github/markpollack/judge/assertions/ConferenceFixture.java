@@ -9,7 +9,7 @@ import io.github.markpollack.judge.result.PolicyBinding;
 
 import com.fasterxml.jackson.databind.*;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
+import io.github.markpollack.judge.requirement.RequirementEvidence;
 import io.github.markpollack.judge.jev.*;
 import io.github.markpollack.judge.result.*;
 import java.net.URI;
@@ -106,12 +106,12 @@ final class ConferenceFixture {
 		Files.write(output.resolve("composed-configuration.json"), JSON.writeValueAsBytes(configuration));
 	}
 
-	Requirement<?> requirement(int index) {
+	Requirement<String> requirement(int index) {
 		var b = bindings.path("bindings").get(index);
 		return Requirement.text(b.path("id").asText(), b.path("revision").asText(), b.path("text").asText());
 	}
 
-	JudgmentContext context(int index) throws Exception {
+	JevEvidence evidence(int index) throws Exception {
 		var b = bindings.path("bindings").get(index);
 		var ref = b.path("bundle");
 		byte[] bytes = resource(ref.path("path").asText());
@@ -120,36 +120,23 @@ final class ConferenceFixture {
 		String goal = requirement(index).text();
 		if (!sha(goal.getBytes(StandardCharsets.UTF_8)).equals(b.path("textSha256").asText()))
 			throw new IllegalStateException("Changed exact goal");
-		return JudgmentContext.builder()
-			.goal(goal)
-			.agentOutput("UNSELECTED-AGENT-OUTPUT")
-			.metadata(JevEvidence.CONTEXT_KEY,
-					new JevEvidence(new String(bytes, StandardCharsets.UTF_8),
-							ArtifactRef.ofBytes(ref.path("path").asText(), bytes, null),
-							ArtifactRef.ofBytes("assertions/v1/bindings.json", resource("assertions/v1/bindings.json"),
-									null),
-							b.path("textSha256").asText(), true))
-			.build();
-	}
+		return new JevEvidence(new String(bytes, StandardCharsets.UTF_8),
+                ArtifactRef.ofBytes(ref.path("path").asText(), bytes, null),
+                ArtifactRef.ofBytes("assertions/v1/bindings.json", resource("assertions/v1/bindings.json"), null),
+                b.path("textSha256").asText(), true);
+    }
 
-	SemanticAssertions facade(JevJudge judge) {
-		return facade(judge::judge);
-	}
-
-	SemanticAssertions facade(Judge<JudgmentContext> judge) {
-		// Both named identity and exact string identity select only the reviewed text.
-		return new SemanticAssertions(r -> {
-			for (int i = 0; i < 2; i++) {
-				var known = requirement(i);
-				boolean named = r.id().equals(known.id()) && r.revision().equals(known.revision());
-				boolean string = r.id().equals("text:sha256:" + sha(r.text().getBytes(StandardCharsets.UTF_8)))
-						&& r.revision().equals("1");
-				if (r.text().equals(known.text()) && (named || string))
-					return judge::judge;
-			}
-			throw new IllegalArgumentException("Requirement<?> does not match a reviewed binding");
-		}, binding);
-	}
+    Judge<RequirementEvidence<Requirement<String>, JevEvidence>> bind(JevJudge judge) {
+        var first = judge.bind(requirement(0), java.util.function.Function.identity());
+        var second = judge.bind(requirement(1), java.util.function.Function.identity());
+        return pair -> {
+            // Select the reviewed native binding; the production binder validates its
+            // revision, native specification and source before sending any request.
+            if (pair.requirement().id().equals(requirement(0).id())) return first.judge(pair);
+            if (pair.requirement().id().equals(requirement(1).id())) return second.judge(pair);
+            return Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "Requirement has no reviewed binding");
+        };
+    }
 
 	JevJudge judge(String key, URI endpoint, HttpClient http, Path output) {
 		return new JevJudge(key, configuration.path("requestedModel").asText(), endpoint,
@@ -174,8 +161,8 @@ final class ConferenceFixture {
 		JSON.writerWithDefaultPrettyPrinter()
 			.writeValue(output.resolve("resolution.json").toFile(),
 					Map.of("origin", origin, "requirement",
-							Map.of("id", req.id(), "revision", req.revision(), "text", req.text()), "policy",
-							result.policy(), "policySource", result.policySource()));
+							Map.of("id", req.id(), "revision", req.revision(), "text", req.text()),
+                            "applicationDecision", result.applicationDecision()));
 		JSON.writerWithDefaultPrettyPrinter()
 			.writeValue(output.resolve("judgment.json").toFile(), result.verdict().aggregated());
 		JSON.writerWithDefaultPrettyPrinter().writeValue(output.resolve("verdict.json").toFile(), result.verdict());

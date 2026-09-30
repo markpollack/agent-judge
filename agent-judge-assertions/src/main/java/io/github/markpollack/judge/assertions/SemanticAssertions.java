@@ -13,18 +13,18 @@ import java.util.Objects;
 import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.PolicyJudges;
 import io.github.markpollack.judge.context.JudgmentContext;
-import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.AllMustPassStrategy;
-import io.github.markpollack.judge.jury.ErrorPolicy;
-import io.github.markpollack.judge.jury.NotApplicablePolicy;
 import io.github.markpollack.judge.jury.interpretation.ReadingSupport;
 import io.github.markpollack.judge.result.ArtifactRef;
+import io.github.markpollack.judge.result.AcceptanceAction;
+import io.github.markpollack.judge.result.AppliedPolicy;
+import io.github.markpollack.judge.result.PolicyFailure;
+import io.github.markpollack.judge.jury.interpretation.VerdictReading;
 
 /**
  * Evaluates requirements through a configured Judge and application policy, then asserts
- * the resulting Verdict's authoritative Interpretation. Configure one instance in a test
+ * the original Verdict's authoritative Interpretation together with a separate final
+ * application decision. Configure one instance in a test
  * fixture and call {@link #assertThat(JudgmentContext)} to bind evidence. Its
  * {@code satisfies} terminal evaluates eagerly;
  * {@link #evaluate(JudgmentContext, Requirement)} instead returns the result for
@@ -91,14 +91,9 @@ public final class SemanticAssertions {
 			throw new IllegalArgumentException(
 					"Evidence goal must exactly match requirement text; rebinding is forbidden");
 		Judge<JudgmentContext> judge = Objects.requireNonNull(route.apply(requirement), "route returned no judge");
-		var jury = SimpleJury.<JudgmentContext>builder()
-			.judge(PolicyJudges.apply(judge, binding.reference(), binding.policy()))
-			.votingStrategy(new AllMustPassStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
-			.parallel(false)
-			.build();
-		return new AssertionResult(requirement, binding.reference(),
+		return AssertionResult.applyPolicy(requirement, binding,
 				override == null ? AssertionResult.PolicySource.DEFAULT : AssertionResult.PolicySource.ASSOCIATED,
-				jury.vote(evidence));
+				RequirementAssertions.singleJudgeVerdict(judge, evidence));
 	}
 
 	Requirement<?> stringRequirement(String text) {
@@ -112,7 +107,8 @@ public final class SemanticAssertions {
 	/**
 	 * Assert an existing result without running evaluation again. Only a
 	 * {@link ReadingSupport#SUPPORTED SUPPORTED} Interpretation with an ACCEPTED reading
-	 * returns normally. This deterministic check invokes no Judge, provider or policy,
+	 * and a successful final USE_ASSESSMENT application returns normally. Final policy
+	 * never rewrites the Jury's retained Interpretation. This check invokes no Judge, provider or policy,
 	 * and does not modify the result or its retained producer assessment.
 	 *
 	 * <p>
@@ -123,8 +119,10 @@ public final class SemanticAssertions {
 	 * ABSTAIN/ERROR outcomes stay distinct from subject violations.
 	 * @param result existing result with its authoritative Interpretation
 	 * @throws SemanticAssertionError.Rejected for supported REJECTED
-	 * @throws SemanticAssertionError.Inconclusive for supported UNDECIDED
-	 * @throws SemanticAssertionError.InstrumentFailure for supported NOT_ASSESSED
+	 * @throws SemanticAssertionError.Inconclusive for supported UNDECIDED or final
+	 * ABSTAIN/ESCALATE
+	 * @throws SemanticAssertionError.InstrumentFailure for supported NOT_ASSESSED or
+	 * final policy failure
 	 * @throws SemanticAssertionError.NotApplicable for supported NOT_APPLICABLE
 	 * @throws SemanticAssertionError.UnsupportedReading for absent, contradicted or
 	 * undetermined reading support
@@ -136,8 +134,19 @@ public final class SemanticAssertions {
 		var reading = result.interpretation();
 		if (reading.readingSupport() != ReadingSupport.SUPPORTED || reading.reading() == null)
 			throw new SemanticAssertionError.UnsupportedReading(result);
+		if (reading.reading() == VerdictReading.NOT_APPLICABLE)
+			throw new SemanticAssertionError.NotApplicable(result);
+		if (reading.reading() == VerdictReading.NOT_ASSESSED)
+			throw new SemanticAssertionError.InstrumentFailure(result);
+		var application = result.applicationDecision().application();
+		if (application instanceof PolicyFailure)
+			throw new SemanticAssertionError.InstrumentFailure(result);
+		if (application instanceof AppliedPolicy applied && applied.action() != AcceptanceAction.USE_ASSESSMENT)
+			throw new SemanticAssertionError.Inconclusive(result);
 		switch (reading.reading()) {
 			case ACCEPTED -> {
+				if (!(application instanceof AppliedPolicy))
+					throw new SemanticAssertionError.UnsupportedReading(result);
 			}
 			case REJECTED -> throw new SemanticAssertionError.Rejected(result);
 			case UNDECIDED -> throw new SemanticAssertionError.Inconclusive(result);

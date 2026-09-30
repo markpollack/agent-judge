@@ -25,6 +25,7 @@ public final class PolicyJudges {
 	 * Wrap a judge, invoking it exactly once per evaluation before applying policy. Judge
 	 * exceptions/null results remain invocation failures; only policy failures become
 	 * PolicyFailure. Effective exclusion capability and metadata are retained.
+	 * @param <E> evidence type
 	 * @param judge raw judge
 	 * @param reference explicit policy identity
 	 * @param policy acceptance function

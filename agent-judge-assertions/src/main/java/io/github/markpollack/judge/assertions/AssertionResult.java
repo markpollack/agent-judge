@@ -2,96 +2,118 @@
  * Copyright (c) 2024-2026 Mark Pollack
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
-
 package io.github.markpollack.judge.assertions;
 
-import io.github.markpollack.judge.requirement.Requirement;
-import io.github.markpollack.judge.result.PolicyBinding;
-
 import java.util.Objects;
-import io.github.markpollack.judge.result.PolicyRef;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.jury.interpretation.Interpretation;
 import io.github.markpollack.judge.jury.interpretation.Verdicts;
+import io.github.markpollack.judge.requirement.Requirement;
+import io.github.markpollack.judge.result.PolicyBinding;
+import io.github.markpollack.judge.result.PolicyRef;
 
 /**
- * An evaluation ready for inspection or assertion without invoking its Judge again. It
- * keeps the requirement and resolved policy context beside the normal Verdict and its
- * authoritative Interpretation. Pass it to
- * {@link SemanticAssertions#requireSatisfied(AssertionResult)} to assert that reading.
+ * Complete original evaluation and the separate final application decision. Constructors
+ * and {@link SemanticAssertions#requireSatisfied(AssertionResult)} invoke no Judge or
+ * policy. Reconstructing a result requires the recorded final decision; a policy reference
+ * or an internal seat policy is not evidence of final application.
  *
- * <p>
- * The constructor checks policy-source consistency and, when present, the root's retained
- * policy identity. It does not require a root policy application: a composed Jury may
- * apply different policies to its contributing judgments and derive an aggregate without
- * one. A declared policy reference alone is not proof that a policy ran. Producer ERROR
- * and NOT_APPLICABLE bypass policy; contained failures and unsupported readings remain
- * representable for diagnostic assertion failures.
- *
- * <p>
- * The caller is responsible for pairing the correct requirement and evidence with a
- * retained Verdict. This record cannot authenticate that pairing. It is not a new wire
- * contract: persist requirement identity/text, policy reference/source, and the existing
- * portable Verdict/Interpretation separately, never the policy function.
- *
- * @param requirement resolved requirement
- * @param policy resolved policy identity
- * @param policySource where the policy came from
- * @param verdict complete normal jury result
- * @param interpretation authoritative reading, checked against the verdict
+ * <p>The caller owns the correct Requirement/evidence pairing; these coherence checks do
+ * not authenticate it. Persist requirement identity, final application and the existing
+ * portable Verdict/Interpretation separately, never the executable policy function. The
+ * original Judgment/Verdict wire contract is unchanged.
+ * @param requirement exact evaluated requirement
+ * @param applicationDecision resolved final application, separate from internal policies
+ * @param verdict complete unchanged Jury result
+ * @param interpretation authoritative reading of that original result
  */
-public record AssertionResult(Requirement<?> requirement, PolicyRef policy, PolicySource policySource, Verdict verdict,
-		Interpretation interpretation) {
+public record AssertionResult(Requirement<?> requirement, ApplicationDecision applicationDecision, Verdict verdict,
+        Interpretation interpretation) {
 
-	/**
-	 * Validate the supplied context against the facts this result can establish.
-	 * @throws IllegalArgumentException if the policy source/override or retained root
-	 * policy contradicts the resolved policy, or the Interpretation differs from the
-	 * authoritative reading of the Verdict
-	 * @throws NullPointerException if a required component is null
-	 */
-	public AssertionResult {
-		Objects.requireNonNull(requirement, "requirement");
-		Objects.requireNonNull(policy, "policy");
-		Objects.requireNonNull(policySource, "policySource");
-		Objects.requireNonNull(verdict, "verdict");
-		Objects.requireNonNull(interpretation, "interpretation");
-		PolicyBinding override = requirement.acceptancePolicy();
-		if (policySource == PolicySource.ASSOCIATED && (override == null || !policy.equals(override.reference()))) {
-			throw new IllegalArgumentException("ASSOCIATED requires an override matching the resolved policy");
-		}
-		if (policySource == PolicySource.DEFAULT && override != null) {
-			throw new IllegalArgumentException("DEFAULT cannot accompany a requirement policy override");
-		}
-		var application = verdict.aggregated().policyApplication();
-		if (application != null && !policy.equals(application.policy())) {
-			throw new IllegalArgumentException("Retained root policy must match the resolved policy");
-		}
-		if (!Verdicts.interpret(verdict).equals(interpretation))
-			throw new IllegalArgumentException("Reading must be authoritative for this verdict");
-	}
-	/** Policy resolution source. */
-	public enum PolicySource {
+    /**
+     * Validate resolution, final application/bypass, and authoritative reading coherence.
+     * @throws IllegalArgumentException if supplied facts contradict each other
+     * @throws NullPointerException if any component is null
+     */
+    public AssertionResult {
+        Objects.requireNonNull(requirement, "requirement");
+        Objects.requireNonNull(applicationDecision, "applicationDecision");
+        Objects.requireNonNull(verdict, "verdict");
+        Objects.requireNonNull(interpretation, "interpretation");
+        validateResolution(requirement, applicationDecision.policy(), applicationDecision.source());
+        if (!Verdicts.interpret(verdict).equals(interpretation)) {
+            throw new IllegalArgumentException("Reading must be authoritative for this verdict");
+        }
+        if (applicationDecision.bypass() != ApplicationDecision.requiredBypass(verdict, interpretation)) {
+            throw new IllegalArgumentException("Final policy application/bypass must match the retained evaluation");
+        }
+    }
 
-		/** Explicit Requirement.under binding. */
-		ASSOCIATED,
-		/** Explicit application override at the assertion. */
-		EXPLICIT,
-		/** Explicit configured facade default. */
-		DEFAULT
+    /** Final application policy resolution source. */
+    public enum PolicySource {
+        /** Explicit application association using Requirement.under. */
+        ASSOCIATED,
+        /** Explicit application override at the assertion. */
+        EXPLICIT,
+        /** Configured assertion/application default. */
+        DEFAULT
+    }
 
-	}
+    /**
+     * Reopen a complete result without any policy or Judge execution.
+     * @param requirement exact evaluated requirement
+     * @param applicationDecision recorded final application or bypass
+     * @param verdict unchanged complete evaluation
+     */
+    public AssertionResult(Requirement<?> requirement, ApplicationDecision applicationDecision, Verdict verdict) {
+        this(requirement, applicationDecision, verdict, Verdicts.interpret(verdict));
+    }
 
-	/**
-	 * Retain the authoritative reading of a normal jury result.
-	 * @param requirement resolved requirement
-	 * @param policy resolved policy identity
-	 * @param policySource resolution source
-	 * @param verdict normal jury result
-	 * @throws IllegalArgumentException if policy/source facts contradict one another
-	 * @throws NullPointerException if a required component is null
-	 */
-	public AssertionResult(Requirement<?> requirement, PolicyRef policy, PolicySource policySource, Verdict verdict) {
-		this(requirement, policy, policySource, verdict, Verdicts.interpret(verdict));
-	}
+    /**
+     * Apply final application policy to a completed evaluation, without invoking its Jury.
+     * The policy receives the raw aggregate view under its existing contract. Only its
+     * application is retained separately; it cannot change the original Verdict or promote
+     * its Interpretation. Unsupported, failed and N/A evaluations bypass execution.
+     * Policy exceptions/null decisions become a retained policy failure.
+     * @param requirement exact evaluated requirement
+     * @param binding resolved application policy
+     * @param source resolution source
+     * @param verdict complete original evaluation
+     * @return original evaluation plus its separate final policy decision
+     * @throws IllegalArgumentException if resolution contradicts the requirement association
+     * @throws NullPointerException if a required argument is null
+     */
+    public static AssertionResult applyPolicy(Requirement<?> requirement, PolicyBinding binding, PolicySource source,
+            Verdict verdict) {
+        Objects.requireNonNull(requirement, "requirement");
+        Objects.requireNonNull(binding, "binding");
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(verdict, "verdict");
+        validateResolution(requirement, binding.reference(), source);
+        var interpretation = Verdicts.interpret(verdict);
+        return new AssertionResult(requirement, ApplicationDecision.evaluate(verdict, interpretation, binding, source),
+            verdict, interpretation);
+    }
+
+    /**
+     * Return the resolved final application policy identity.
+     * @return final application policy identity, not a seat's internal policy
+     */
+    public PolicyRef policy() { return applicationDecision.policy(); }
+
+    /**
+     * Return how the final application policy was resolved.
+     * @return final application resolution source
+     */
+    public PolicySource policySource() { return applicationDecision.source(); }
+
+    private static void validateResolution(Requirement<?> requirement, PolicyRef policy, PolicySource source) {
+        var associated = requirement.acceptancePolicy();
+        if (source == PolicySource.ASSOCIATED && (associated == null || !policy.equals(associated.reference()))) {
+            throw new IllegalArgumentException("ASSOCIATED requires an override matching the resolved policy");
+        }
+        if (source == PolicySource.DEFAULT && associated != null) {
+            throw new IllegalArgumentException("DEFAULT cannot accompany a requirement policy override");
+        }
+    }
 }

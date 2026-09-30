@@ -17,6 +17,7 @@ import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
 import io.github.markpollack.judge.result.PolicyFailure;
 import io.github.markpollack.judge.result.PolicyRef;
+import io.github.markpollack.judge.result.PolicyApplication;
 
 /**
  * Renders a bounded explanation; the error's structured result remains the full record.
@@ -36,8 +37,13 @@ final class AssertionDiagnostics {
 				+ text(requirement.text(), 240));
 		lines.add("Assessment (root): producer=" + root.producerStatus() + "; " + assessment(root.assessment()));
 		lines.add("Support: " + support(root));
-		lines.add(
-				"Policy: " + reference(result.policy()) + " (resolved " + result.policySource() + "); " + policy(root));
+		var finalDecision = result.applicationDecision();
+		lines.add("Final application policy: " + reference(result.policy()) + " (resolved " + result.policySource()
+				+ "); " + (finalDecision.application() == null ? "no application (bypassed: " + finalDecision.bypass() + ")"
+						: policy(finalDecision.application())));
+		if (root.policyApplication() != null) {
+			lines.add("Internal aggregate policy: " + reference(root.policyApplication().policy()) + "; " + policy(root));
+		}
 		lines.add("Operational result: " + root.status() + "; Interpretation: "
 				+ (interpretation.reading() == null ? "unavailable" : interpretation.reading()) + "; reading support="
 				+ interpretation.readingSupport() + " (structural, not model confidence)");
@@ -107,6 +113,15 @@ final class AssertionDiagnostics {
 
 	private static String policy(Judgment judgment) {
 		var application = judgment.policyApplication();
+		if (application != null) return policy(application);
+		if (judgment.producerStatus() == JudgmentStatus.ERROR
+				|| judgment.producerStatus() == JudgmentStatus.NOT_APPLICABLE) {
+			return "no application (producer " + judgment.producerStatus() + " bypasses policy)";
+		}
+		return "no root application retained; configured identity does not prove policy execution";
+	}
+
+	private static String policy(PolicyApplication application) {
 		if (application instanceof AppliedPolicy applied) {
 			String consequence = switch (applied.action()) {
 				case USE_ASSESSMENT -> "use original assessment";
@@ -118,11 +133,7 @@ final class AssertionDiagnostics {
 		if (application instanceof PolicyFailure failure) {
 			return "FAILED; producer assessment retained; " + text(failure.reason(), 160);
 		}
-		if (judgment.producerStatus() == JudgmentStatus.ERROR
-				|| judgment.producerStatus() == JudgmentStatus.NOT_APPLICABLE) {
-			return "no application (producer " + judgment.producerStatus() + " bypasses policy)";
-		}
-		return "no root application retained; configured identity does not prove policy execution";
+		throw new IllegalArgumentException("Unknown policy application");
 	}
 
 	private static void provenance(Judgment judgment, List<String> lines) {

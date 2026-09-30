@@ -6,13 +6,12 @@
 package io.github.markpollack.judge.jury;
 
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.context.JudgmentContext;
 import io.github.markpollack.judge.description.JuryDescription;
 
 import java.util.List;
 
 /**
- * Jury of multiple judges that vote on agent execution.
+ * Jury of judges evaluating the same typed evidence.
  *
  * <p>
  * A Jury is a separate abstraction from Judge that aggregates judgments from multiple
@@ -32,6 +31,7 @@ import java.util.List;
  * </p>
  * Executable examples are maintained in the Agent Judge Tutorial: https://github.com/markpollack/agent-judge-tutorial.
  *
+ * @param <E> evidence accepted by every participating judge
  * @author Mark Pollack
  * @since 0.1.0
  * @see SimpleJury
@@ -54,7 +54,7 @@ public interface Jury<E> {
 
 	/**
 	 * Execute all judges and aggregate their judgments into a verdict.
-	 * @param context the judgment context
+	 * @param context typed evidence for this evaluation
 	 * @return verdict with aggregated and individual judgments
 	 */
 	Verdict vote(E context);

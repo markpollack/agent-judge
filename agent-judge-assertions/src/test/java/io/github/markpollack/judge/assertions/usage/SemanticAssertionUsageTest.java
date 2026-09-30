@@ -25,7 +25,6 @@ import io.github.markpollack.judge.result.AppliedPolicy;
 import io.github.markpollack.judge.result.ArtifactRef;
 import io.github.markpollack.judge.result.Judgment;
 import io.github.markpollack.judge.result.JudgmentStatus;
-import io.github.markpollack.judge.result.Policies;
 import io.github.markpollack.judge.result.PolicyRef;
 import org.junit.jupiter.api.Test;
 
@@ -129,9 +128,9 @@ class SemanticAssertionUsageTest {
 		assertEquals(AssertionResult.PolicySource.ASSOCIATED, result.policySource());
 		assertEquals(criticalPolicy.reference(), result.policy());
 		assertEquals(JudgmentStatus.PASS, result.verdict().aggregated().producerStatus());
-		assertEquals(JudgmentStatus.ABSTAIN, result.verdict().aggregated().status());
+		assertEquals(JudgmentStatus.PASS, result.verdict().aggregated().status());
 		assertEquals(AcceptanceAction.ESCALATE, applied(result).action());
-		assertEquals(VerdictReading.UNDECIDED, result.interpretation().reading());
+		assertEquals(VerdictReading.ACCEPTED, result.interpretation().reading());
 		assertEquals(0, result.verdict().compositeAttempts().size());
 
 		var repeated = assertThrows(SemanticAssertionError.Inconclusive.class,
@@ -147,9 +146,8 @@ class SemanticAssertionUsageTest {
 		var originalReading = original.interpretation();
 		Judgment originalJudgment = originalVerdict.aggregated();
 
-		Judgment withheld = Policies.apply(originalJudgment, criticalPolicy.reference(), criticalPolicy.policy());
-		AssertionResult reconsidered = new AssertionResult(READY.under(criticalPolicy), criticalPolicy.reference(),
-				AssertionResult.PolicySource.ASSOCIATED, Verdict.single("retained-response", withheld));
+		AssertionResult reconsidered = AssertionResult.applyPolicy(READY.under(criticalPolicy), criticalPolicy,
+				AssertionResult.PolicySource.ASSOCIATED, originalVerdict);
 		assertCalls(1, 1, 1, 1);
 
 		SemanticAssertions.requireSatisfied(original);
@@ -163,9 +161,8 @@ class SemanticAssertionUsageTest {
 		assertEquals(AcceptanceAction.USE_ASSESSMENT, applied(original).action());
 		assertEquals(AcceptanceAction.ESCALATE, applied(reconsidered).action());
 		assertEquals(JudgmentStatus.PASS, originalJudgment.status());
-		assertEquals(JudgmentStatus.PASS, withheld.producerStatus());
-		assertEquals(JudgmentStatus.ABSTAIN, withheld.status());
-		assertEquals(originalJudgment.reasoning(), withheld.reasoning());
+		assertSame(originalVerdict, reconsidered.verdict());
+		assertEquals(originalReading, reconsidered.interpretation());
 	}
 
 	private static JudgmentContext evidence(String response) {
@@ -178,7 +175,7 @@ class SemanticAssertionUsageTest {
 	}
 
 	private static AppliedPolicy applied(AssertionResult result) {
-		return assertInstanceOf(AppliedPolicy.class, result.verdict().aggregated().policyApplication());
+		return assertInstanceOf(AppliedPolicy.class, result.applicationDecision().application());
 	}
 
 	private void assertCalls(int routes, int judges, int defaults, int critical) {

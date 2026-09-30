@@ -5,7 +5,6 @@
 
 package io.github.markpollack.judge.jury;
 
-import io.github.markpollack.judge.result.PolicyBinding;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -31,6 +30,7 @@ import io.github.markpollack.judge.result.JudgmentStatus;
  * semantics. Every entered tier in a returned result is represented by one complete
  * {@link CompositeAttempt}.
  *
+ * @param <E> evidence type
  * @author Mark Pollack
  * @since 0.9.0
  * @see TierPolicy
@@ -58,10 +58,6 @@ public class CascadedJury<E> implements Jury<E> {
 		this.assessmentCascade = tiers.stream().anyMatch(tier -> tier.policy() == TierPolicy.STOP_ON_USABLE_ASSESSMENT);
 	}
 
-    CascadedJury<E> withPolicy(PolicyBinding policy) {
-        return new CascadedJury<>(tiers.stream().map(tier -> new TierConfig<>(tier.name(),
-            Juries.withAcceptancePolicy(tier.jury(), policy), tier.policy())).toList());
-    }
 
 	@Override
 	public List<Judge<E>> getJudges() {
@@ -346,13 +342,17 @@ public class CascadedJury<E> implements Jury<E> {
 
 	/**
 	 * Create a new builder for CascadedJury.
+	 * @param <E> evidence type
 	 * @return builder instance
 	 */
 	public static <E> Builder<E> builder() {
 		return new Builder<E>();
 	}
 
-	/** Builder<E> for {@link CascadedJury}. */
+	/**
+	 * {@code Builder<E>} for {@link CascadedJury}.
+	 * @param <E> evidence type
+	 */
 	public static class Builder<E> {
 
 		private final List<TierConfig<E>> tiers = new ArrayList<>();

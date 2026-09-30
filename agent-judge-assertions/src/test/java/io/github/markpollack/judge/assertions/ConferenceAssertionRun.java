@@ -40,7 +40,7 @@ public final class ConferenceAssertionRun {
 		if (apiKey.isBlank())
 			throw new IllegalArgumentException("Explicit nonblank credential required");
 		var fixture = new ConferenceFixture(vercel);
-		var contexts = List.of(fixture.context(0), fixture.context(1));
+		var evidence = List.of(fixture.evidence(0), fixture.evidence(1));
 		Files.createDirectory(output);
 		fixture.saveRouting(output);
 		URI endpoint = URI
@@ -49,8 +49,9 @@ public final class ConferenceAssertionRun {
 		try (var http = HttpClient.newHttpClient()) {
 			for (int i = 0; i < 2; i++) {
 				Path caseOutput = output.resolve(i == 0 ? "rule-4" : "uc6-ac8");
-				var assertions = fixture.facade(fixture.judge(apiKey, endpoint, http, caseOutput));
-				var result = assertions.evaluate(contexts.get(i), fixture.requirement(i));
+				var assertions = new RequirementAssertions(fixture.binding);
+				var judge = fixture.bind(fixture.judge(apiKey, endpoint, http, caseOutput));
+				var result = assertions.evaluate(fixture.requirement(i), judge, evidence.get(i), null);
 				ConferenceFixture.save(result, caseOutput, "LIVE explicitly invoked; inspect actual outcome");
 				String outcome = "PASSED";
 				try {

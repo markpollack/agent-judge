@@ -74,8 +74,9 @@ class RequirementAssertionTest {
         assertThat((Object) explicitResult.requirement()).isSameAs(associated);
         assertThat(explicitResult.policy()).isEqualTo(ESCALATE.reference());
         assertThat(explicitResult.verdict().aggregated().producerStatus()).isEqualTo(JudgmentStatus.PASS);
-        assertThat(explicitResult.verdict().aggregated().status()).isEqualTo(JudgmentStatus.ABSTAIN);
-        assertThat(explicitResult.interpretation().reading()).isEqualTo(VerdictReading.UNDECIDED);
+        assertThat(explicitResult.verdict().aggregated().status()).isEqualTo(JudgmentStatus.PASS);
+        assertThat(explicitResult.interpretation().reading()).isEqualTo(VerdictReading.ACCEPTED);
+        assertThat(((AppliedPolicy) explicitResult.applicationDecision().application()).action()).isEqualTo(AcceptanceAction.ESCALATE);
     }
 
     @Test
@@ -125,7 +126,8 @@ class RequirementAssertionTest {
         var failing = new PolicyBinding(USE.reference(), j -> { throw new IllegalStateException("policy failed"); });
         var result = new RequirementAssertions(failing).evaluate(REQUIREMENT, PASS, EVIDENCE, null);
         assertThat(result.verdict().aggregated().producerStatus()).isEqualTo(JudgmentStatus.PASS);
-        assertThat(result.verdict().aggregated().policyApplication()).isInstanceOf(PolicyFailure.class);
+        assertThat(result.applicationDecision().application()).isInstanceOf(PolicyFailure.class);
+        assertThat(result.verdict().aggregated().policyApplication()).isNull();
         assertThatThrownBy(() -> SemanticAssertions.requireSatisfied(result)).isInstanceOf(SemanticAssertionError.InstrumentFailure.class);
     }
 
@@ -160,7 +162,7 @@ class RequirementAssertionTest {
     @Test
     void cascadeRetainsAttemptsAndSkipsFallbackOnDecisiveFirstTier() {
         var laterCalls = new AtomicInteger();
-        var first = SimpleJury.<RequirementEvidence<Requirement<String>, String>>builder().judge(PASS).votingStrategy(new AllMustPassStrategy()).parallel(false).build();
+        var first = SimpleJury.<RequirementEvidence<Requirement<String>, String>>builder().judge(PolicyJudges.apply(PASS, USE.reference(), USE.policy())).votingStrategy(new AllMustPassStrategy()).parallel(false).build();
         var later = SimpleJury.<RequirementEvidence<Requirement<String>, String>>builder()
             .judge(input -> { laterCalls.incrementAndGet(); return Judgment.pass("fallback"); }).votingStrategy(new AllMustPassStrategy()).parallel(false).build();
         var cascade = CascadedJury.<RequirementEvidence<Requirement<String>, String>>builder()
@@ -172,9 +174,10 @@ class RequirementAssertionTest {
         assertThat(result.verdict().compositeAttempts()).hasSize(1);
         assertThat(result.verdict().decision().tier()).isEqualTo("deterministic");
         var escalated = new RequirementAssertions(ESCALATE).evaluate(REQUIREMENT, cascade, EVIDENCE, null);
-        assertThat(laterCalls.get()).isEqualTo(1);
-        assertThat(escalated.verdict().compositeAttempts()).hasSize(2);
-        assertThat(escalated.interpretation().reading()).isEqualTo(VerdictReading.UNDECIDED);
+        assertThat(laterCalls.get()).isZero();
+        assertThat(escalated.verdict().compositeAttempts()).hasSize(1);
+        assertThat(escalated.interpretation().reading()).isEqualTo(VerdictReading.ACCEPTED);
+        assertThatThrownBy(() -> SemanticAssertions.requireSatisfied(escalated)).isInstanceOf(SemanticAssertionError.Inconclusive.class);
     }
 
     @Test
@@ -188,7 +191,7 @@ class RequirementAssertionTest {
         var result = new RequirementAssertions(binding).evaluate(REQUIREMENT, judge, EVIDENCE, null);
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
         var restored = mapper.readValue(mapper.writeValueAsBytes(result.verdict()), Verdict.class);
-        var reopened = new AssertionResult(REQUIREMENT, binding.reference(), AssertionResult.PolicySource.DEFAULT, restored);
+        var reopened = new AssertionResult(REQUIREMENT, result.applicationDecision(), restored);
         SemanticAssertions.requireSatisfied(reopened);
         SemanticAssertions.requireSatisfied(reopened);
         assertThat(calls.get()).isEqualTo(1);

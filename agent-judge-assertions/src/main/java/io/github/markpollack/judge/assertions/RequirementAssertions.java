@@ -8,7 +8,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.PolicyJudges;
 import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.requirement.RequirementEvidence;
 import io.github.markpollack.judge.result.*;
@@ -57,20 +56,18 @@ public final class RequirementAssertions {
             @Nullable PolicyBinding override) {
         var resolution = resolve(requirement, override);
         var pair = new RequirementEvidence<>(requirement, evidence);
-        var jury = SimpleJury.<RequirementEvidence<Requirement<S>, E>>builder()
-            .judge(PolicyJudges.apply(Objects.requireNonNull(judge), resolution.binding().reference(), resolution.binding().policy()))
-            .votingStrategy(new AllMustPassStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
-            .parallel(false).build();
-        return new AssertionResult(requirement, resolution.binding().reference(), resolution.source(), jury.vote(pair));
+        return AssertionResult.applyPolicy(requirement, resolution.binding(), resolution.source(),
+            singleJudgeVerdict(Objects.requireNonNull(judge), pair));
     }
 
     /**
-     * Evaluate a built-in Jury once, applying application policy at its leaf boundaries.
-     * Retains all individual judgments, identities, attempts, decisions and the full Verdict.
+     * Evaluate the supplied Jury once with its internal policies unchanged, then apply
+     * final application policy separately. Retains every individual judgment, internal
+     * policy, identity, attempt, decision and the original complete Verdict/Interpretation.
      * @param <S> native specification
      * @param <E> evidence type
      * @param requirement exact requirement
-     * @param jury complete built-in jury
+     * @param jury complete configured jury
      * @param evidence exact evidence
      * @param override explicit application override, or null
      * @return complete authoritative result
@@ -78,9 +75,14 @@ public final class RequirementAssertions {
     public <S, E> AssertionResult evaluate(Requirement<S> requirement,
             Jury<RequirementEvidence<Requirement<S>, E>> jury, E evidence, @Nullable PolicyBinding override) {
         var resolution = resolve(requirement, override);
-        var configured = Juries.withAcceptancePolicy(jury, resolution.binding());
-        return new AssertionResult(requirement, resolution.binding().reference(), resolution.source(),
-            configured.vote(new RequirementEvidence<>(requirement, evidence)));
+        return AssertionResult.applyPolicy(requirement, resolution.binding(), resolution.source(),
+            Objects.requireNonNull(jury).vote(new RequirementEvidence<>(requirement, evidence)));
+    }
+
+    static <E> Verdict singleJudgeVerdict(Judge<E> judge, E evidence) {
+        return SimpleJury.<E>builder().judge(judge)
+            .votingStrategy(new AllMustPassStrategy(ErrorPolicy.PROPAGATE, NotApplicablePolicy.EXCLUDE))
+            .parallel(false).build().vote(evidence);
     }
 
     private Resolution resolve(Requirement<?> requirement, @Nullable PolicyBinding override) {
