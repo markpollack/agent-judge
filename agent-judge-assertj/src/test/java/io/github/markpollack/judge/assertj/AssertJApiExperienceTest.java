@@ -31,49 +31,53 @@ class AssertJApiExperienceTest {
 
 	@Test
 	void ordinaryCheck() {
-		Judge<Integer> positive = n -> n > 0 ? Judgment.pass("positive") : Judgment.fail("not positive");
-		assertThatEvidence(42).judgedBy(positive).isPassed();
+		Judge positive = () -> 42 > 0 ? Judgment.pass("positive") : Judgment.fail("not positive");
+		assertThat(positive).isPassed();
 	}
 
 	@Test
 	void nativeRequirement() {
-		var api = new Requirement<ApiLimit>("api", "1", "No breaking changes", new ApiLimit(0),
+		var api = new io.github.markpollack.judge.requirement.GeneralRequirement<ApiLimit>("api", "1",
+				"No breaking changes", new ApiLimit(0),
 				Requirement.text("source", "1", "Maximum breaking changes: 0").source());
-		RequirementJudge<ApiLimit, Integer> compatible = (r,
-				count) -> count <= r.specification().maximumBreakingChanges() ? Judgment.pass("compatible")
-						: Judgment.fail("breaking change");
+		io.github.markpollack.judge.construction.JudgeRecipe<ApiLimit, Integer> compatible = io.github.markpollack.judge.assertj.TestRecipes
+			.judge((r, count) -> count <= r.specification().maximumBreakingChanges() ? Judgment.pass("compatible")
+					: Judgment.fail("breaking change"));
 		assertThat(api).judgedBy(compatible).withEvidence(0).isSatisfied();
 	}
 
 	@Test
 	void completeMixedAssignmentsAndExplicitSelectors() {
 		var security = Requirement.text("security", "1", "No critical vulnerabilities");
-		var compatibility = new Requirement<ApiLimit>("compatibility", "1", "No breaking changes", new ApiLimit(0),
+		var compatibility = new io.github.markpollack.judge.requirement.GeneralRequirement<ApiLimit>("compatibility",
+				"1", "No breaking changes", new ApiLimit(0),
 				Requirement.text("source", "1", "Maximum breaking changes: 0").source());
 		var observability = Requirement.text("observability", "1", "Required metrics exist");
-		var readiness = new Requirement<AllOf>("readiness", "1", "Ready to deploy",
-				new AllOf(List.of(security, compatibility, observability)),
+		var readiness = new io.github.markpollack.judge.requirement.GeneralRequirement<AllOf>("readiness", "1",
+				"Ready to deploy", new AllOf(List.of(security, compatibility, observability)),
 				Requirement.text("source", "1", "security AND compatibility AND observability").source());
-		RequirementJury<String, String> opinions = RequirementJuries.voting(new MajorityVotingStrategy(),
-				List.of((r, e) -> Judgment.pass("scanner A"), (r, e) -> Judgment.pass("scanner B"),
-						(r, e) -> Judgment.fail("dissent")));
-		RequirementJudge<ApiLimit, Integer> compatible = (r,
-				count) -> count <= r.specification().maximumBreakingChanges() ? Judgment.pass("compatible")
-						: Judgment.fail("breaking");
-		RequirementJudge<String, Boolean> observable = (r, present) -> present ? Judgment.pass("metrics exist")
-				: Judgment.fail("metrics missing");
+		io.github.markpollack.judge.construction.JuryRecipe<String, String> opinions = TestRecipes.voting(
+				new MajorityVotingStrategy(),
+				List.of(TestRecipes.<String, String>judge((r, e) -> Judgment.pass("scanner A")),
+						TestRecipes.<String, String>judge((r, e) -> Judgment.pass("scanner B")),
+						TestRecipes.<String, String>judge((r, e) -> Judgment.fail("dissent"))));
+		io.github.markpollack.judge.construction.JudgeRecipe<ApiLimit, Integer> compatible = io.github.markpollack.judge.assertj.TestRecipes
+			.judge((r, count) -> count <= r.specification().maximumBreakingChanges() ? Judgment.pass("compatible")
+					: Judgment.fail("breaking"));
+		io.github.markpollack.judge.construction.JudgeRecipe<String, Boolean> observable = io.github.markpollack.judge.assertj.TestRecipes
+			.judge((r, present) -> present ? Judgment.pass("metrics exist") : Judgment.fail("metrics missing"));
 		var prepared = Assignments.<ReleaseEvidence>forRequirement(readiness)
 			.jury(security, ReleaseEvidence::securityReport, opinions)
 			.judge(compatibility, ReleaseEvidence::breakingChanges, compatible)
 			.judge(observability, ReleaseEvidence::observable, observable)
 			.validate();
-		var verdict = prepared.vote(new ReleaseEvidence(0, false, "scan"));
+		var verdict = prepared.evidence(new ReleaseEvidence(0, false, "scan")).build().vote();
 		var result = Evaluations.apply(verdict, v -> new PolicyDecision(PolicyAction.RELY, "Trust this rejection"));
 		assertThat(result).hasConclusion(Verdict.Conclusion.FAIL);
 		assertThat(result.verdict().compositeAttempts().getFirst().verdict().individual()).hasSize(3);
 		assertThat(result.verdict().compositeAttempts()).extracting(a -> a.verdict().conclusion())
 			.containsExactly(Verdict.Conclusion.PASS, Verdict.Conclusion.PASS, Verdict.Conclusion.FAIL);
-		assertThatThrownBy(() -> assertThat(result).isSatisfied()).isInstanceOf(RequirementAssertionError.class);
+		assertThatThrownBy(() -> assertThat(result).isPassed()).isInstanceOf(RequirementAssertionError.class);
 		var codec = new VerdictCodec(Map.of("apiLimit", ApiLimit.class));
 		var reopened = codec.readEvaluation(codec.write(result));
 		assertThat(reopened).isEqualTo(result);
@@ -84,22 +88,29 @@ class AssertJApiExperienceTest {
 	void nestedAllOfRetainsParentAndChildAssociations() {
 		var a = Requirement.text("a", "1", "A");
 		var b = Requirement.text("b", "1", "B");
-		var inner = new Requirement<AllOf>("inner", "1", "Both", new AllOf(List.of(a, b)),
-				Requirement.text("source", "1", "A AND B").source());
-		var outer = new Requirement<AllOf>("outer", "1", "Inner", new AllOf(List.of(inner)),
-				Requirement.text("source", "1", "Inner required").source());
-		RequirementJudge<String, String> check = (r, e) -> Judgment.pass(r.specification());
+		var inner = new io.github.markpollack.judge.requirement.GeneralRequirement<AllOf>("inner", "1", "Both",
+				new AllOf(List.of(a, b)), Requirement.text("source", "1", "A AND B").source());
+		var outer = new io.github.markpollack.judge.requirement.GeneralRequirement<AllOf>("outer", "1", "Inner",
+				new AllOf(List.of(inner)), Requirement.text("source", "1", "Inner required").source());
+		io.github.markpollack.judge.construction.JudgeRecipe<String, String> check = io.github.markpollack.judge.assertj.TestRecipes
+			.judge((r, e) -> Judgment.pass(r.specification()));
 		// The nested evaluator prepares against the actual child supplied by the outer
 		// parent.
-		RequirementJury<AllOf, String> child = (actual, evidence) -> Assignments.<String>forRequirement(actual)
+		io.github.markpollack.judge.construction.JuryRecipe<AllOf, String> child = actual -> Assignments
+			.<String>forRequirement(actual)
 			.judge(a, check)
 			.judge(b, check)
+			.validate();
+		var verdict = Assignments.<String>forRequirement(outer)
+			.jury(inner, child)
 			.validate()
-			.vote(evidence);
-		var verdict = Assignments.<String>forRequirement(outer).jury(inner, child).validate().vote("evidence");
+			.evidence("evidence")
+			.build()
+			.vote();
 		assertThat(verdict).hasConclusion(Verdict.Conclusion.PASS);
-		assertThat(verdict.requirement()).isSameAs(outer);
-		assertThat(verdict.compositeAttempts().getFirst().verdict().requirement()).isSameAs(inner);
+		org.assertj.core.api.Assertions.assertThat(verdict.requirement()).isSameAs(outer);
+		org.assertj.core.api.Assertions.assertThat(verdict.compositeAttempts().getFirst().verdict().requirement())
+			.isSameAs(inner);
 		assertThat(VerdictReport.of(verdict).attempts()).hasSize(3);
 		assertThat(new VerdictCodec().read(new VerdictCodec().write(verdict))).isEqualTo(verdict);
 	}
@@ -118,19 +129,16 @@ class AssertJApiExperienceTest {
 			return new io.github.markpollack.judge.ai.model.JudgeModelResponse("satisfied", "local-protocol-stub", null,
 					Map.of());
 		};
-		RequirementJudge<String, String> meaning = (actual, response) -> io.github.markpollack.judge.ai.ModelBackedJudge
-			.<String>builder()
+		var meaning = io.github.markpollack.judge.ai.ModelBackedJudge.<String>builder()
 			.name("meaning")
 			.promptTemplate(io.github.markpollack.judge.ai.prompt.JudgePromptTemplate.fromString("meaning", """
 					Requirement: {{requirement}}
 					Response: {{response}}
 					Reply satisfied, violated, or unknown.
 					"""))
-			.variables(text -> Map.of("requirement", actual.specification(), "response", text))
+			.variables(text -> Map.of("response", text))
 			.model(judgeModel)
-			.judgmentClassifier(io.github.markpollack.judge.ai.JudgmentClassifiers.passFail("satisfied", "violated"))
-			.build()
-			.judge(response);
+			.judgmentClassifier(io.github.markpollack.judge.ai.JudgmentClassifiers.passFail("satisfied", "violated"));
 		var arithmetic = Requirement.text("arithmetic", "1", "The response communicates that 2 + 2 equals 4.");
 		assertThat(arithmetic).judgedBy(meaning).withEvidence("Two pairs make a group of four.").isSatisfied();
 		assertThat(calls).hasValue(1);

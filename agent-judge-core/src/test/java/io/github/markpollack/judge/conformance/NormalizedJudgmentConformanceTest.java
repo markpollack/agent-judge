@@ -88,7 +88,7 @@ class NormalizedJudgmentConformanceTest {
 
 	private static final String GOLDEN_RESOURCE = "/conformance/normalized-judgment-0.14.json";
 
-	private static final String COMPOSITE_GOLDEN_RESOURCE = "/conformance/composite-verdict-0.17.json";
+	private static final String COMPOSITE_GOLDEN_RESOURCE = "/conformance/composite-verdict-v5.json";
 
 	/**
 	 * The 0.14 composite document, frozen. It is no longer a projection of anything this
@@ -178,7 +178,7 @@ class NormalizedJudgmentConformanceTest {
 			for (JsonNode judgment : allJudgmentNodes(fixtureTree())) {
 				List<String> declared = List.of("schemaVersion", "producerStatus", "finding", "confidence",
 						"probabilityDistribution", "reasonCode", "reasoning", "checks", "provenance",
-						"policyApplication", "metadata");
+						"policyApplication", "metadata", "requirement", "invocations", "invocationIds");
 				assertThat(fieldNames(judgment))
 					.containsExactlyElementsOf(declared.stream().filter(judgment::has).toList());
 			}
@@ -253,7 +253,7 @@ class NormalizedJudgmentConformanceTest {
 			for (JsonNode verdictNode : allVerdictNodes(compositeFixtureTree())) {
 				assertThat(fieldNames(verdictNode)).containsExactly("schemaVersion", "judgment", "individual",
 						"individualByName", "weights", "seats", "provenance", "compositeAttempts",
-						"declaredCardinality");
+						"declaredCardinality", "roster", "invocations");
 			}
 
 			Set<String> attemptProperties = new LinkedHashSet<>();
@@ -266,7 +266,7 @@ class NormalizedJudgmentConformanceTest {
 			assertThat(attemptProperties).containsExactlyInAnyOrderElementsOf(componentNames(CompositeAttempt.class));
 			assertThat(componentNames(CompositeFailure.class)).containsExactly("code", "cause");
 			assertThat(Arrays.stream(CompositeRelation.values()).map(CompositeRelation::wireName))
-				.containsExactlyInAnyOrder("cascade_tier", "meta_member", "CONSTITUENT");
+				.containsExactlyInAnyOrder("cascade_tier", "meta_member", "CONSTITUENT", "roster_item");
 		}
 
 		@Test
@@ -387,7 +387,7 @@ class NormalizedJudgmentConformanceTest {
 			allJudgmentNodes(fixtureTree()).forEach(judgment -> present.addAll(fieldNames(judgment)));
 
 			assertThat(present).containsExactlyInAnyOrder("schemaVersion", "producerStatus", "finding", "reasonCode",
-					"reasoning", "checks", "metadata");
+					"reasoning", "checks", "metadata", "invocations", "invocationIds");
 			// Modern-only optional components are exercised by ModernResultValuesTest.
 		}
 
@@ -395,7 +395,8 @@ class NormalizedJudgmentConformanceTest {
 		@DisplayName("every Verdict record component appears in the fixture")
 		void coversEveryVerdictComponent() {
 			assertThat(fieldNames(fixtureTree())).containsExactlyInAnyOrder("schemaVersion", "judgment", "individual",
-					"individualByName", "weights", "seats", "provenance", "compositeAttempts", "declaredCardinality");
+					"individualByName", "weights", "seats", "provenance", "compositeAttempts", "declaredCardinality",
+					"roster", "invocations");
 			assertThat(componentNames(Verdict.class)).doesNotContain("schemaVersion").contains("requirement");
 		}
 
@@ -472,7 +473,7 @@ class NormalizedJudgmentConformanceTest {
 				assertThat(declaredNullable).as("Judgment.%s nullability declaration", component.getName())
 					.isEqualTo(List
 						.of("finding", "confidence", "probabilityDistribution", "reasonCode", "provenance",
-								"policyApplication")
+								"policyApplication", "requirement")
 						.contains(component.getName()));
 			}
 
@@ -547,44 +548,39 @@ class NormalizedJudgmentConformanceTest {
 	 * implementation does not reach.
 	 */
 	private static Verdict verdict() {
-		Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
+		Jury jury = SimpleJury.builder()
 			.votingStrategy(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE))
 			.parallel(false)
-			.judge(Judges.named(context -> buildSuccess(), "build-success"))
-			.judge(Judges.named(context -> modelBackedCorrectness(), MODEL_BACKED_JUDGE))
-			.judge(Judges.named(context -> securityScan(), "security-scan"))
-			.judge(new ConditionalJudge("java-style"))
-			.judge(Judges.named(context -> licenceAudit(), "licence-audit"))
+			.judge(Judges.named(() -> buildSuccess(), "build-success"))
+			.judge(Judges.named(() -> modelBackedCorrectness(), MODEL_BACKED_JUDGE))
+			.judge(Judges.named(() -> securityScan(), "security-scan"))
+			.seat(declared(new ConditionalJudge("java-style")))
+			.judge(Judges.named(() -> licenceAudit(), "licence-audit"))
 			.build();
 
-		return jury.vote(CompletionEvidence.builder()
-			.request("Add the portable token-usage projection")
-			.status(CompletionStatus.SUCCESS)
-			.response("Implemented Usage.toPortableMap()")
-			.build());
+		return jury.vote();
 	}
 
 	private static Verdict compositeVerdict() {
-		Jury<CompletionEvidence> successful = SimpleJury.<CompletionEvidence>builder()
+		Jury successful = SimpleJury.builder()
 			.votingStrategy(new ConsensusStrategy())
 			.parallel(false)
-			.judge(Judges.named(context -> Judgment.pass("Semantic fallback accepted"), "semantic-check"))
+			.judge(Judges.named(() -> Judgment.pass("Semantic fallback accepted"), "semantic-check"))
 			.build();
-		Jury<CompletionEvidence> cascade = CascadedJury.<CompletionEvidence>builder()
+		Jury cascade = CascadedJury.builder()
 			.tier("broken-check", throwingJury(new IllegalStateException("/home/alice/.ssh/id_ed25519")),
-					RoutingRule.REJECT_ON_ANY_FAIL)
+					RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic-check", successful, RoutingRule.FINAL_TIER)
 			.build();
-		Jury<CompletionEvidence> meta = Juries.meta(new ConsensusStrategy(),
-				new NamedJury<CompletionEvidence>("pipeline", cascade), new NamedJury<CompletionEvidence>("audit",
-						throwingJury(new IllegalArgumentException("token=opaque-secret"))));
-		return meta.vote(CompletionEvidence.builder().request("Verify the corrected composite result").build());
+		Jury meta = Juries.meta(new ConsensusStrategy(), new NamedJury("pipeline", cascade),
+				new NamedJury("audit", throwingJury(new IllegalArgumentException("token=opaque-secret"))));
+		return meta.vote();
 	}
 
-	private static Jury<CompletionEvidence> throwingJury(RuntimeException failure) {
-		return new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
+	private static Jury throwingJury(RuntimeException failure) {
+		return new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
-			public List<Judge<CompletionEvidence>> getJudges() {
+			public List<Judge> getJudges() {
 				return List.of();
 			}
 
@@ -594,7 +590,7 @@ class NormalizedJudgmentConformanceTest {
 			}
 
 			@Override
-			public Verdict vote(CompletionEvidence context) {
+			public Verdict vote() {
 				throw failure;
 			}
 		};
@@ -674,10 +670,10 @@ class NormalizedJudgmentConformanceTest {
 	 * the point.
 	 * </p>
 	 */
-	private record ConditionalJudge(String name) implements JudgeWithMetadata<CompletionEvidence> {
+	private record ConditionalJudge(String name) implements JudgeWithMetadata {
 
 		@Override
-		public Judgment judge(CompletionEvidence context) {
+		public Judgment judge() {
 			return Judgment.builder()
 				.notApplicable()
 				.reasoning("The change set contains no Java sources, so the Java style rules do not apply")
@@ -737,18 +733,7 @@ class NormalizedJudgmentConformanceTest {
 
 	/** Explicit live identity expectation; the immutable 0.17 bytes remain historical. */
 	private static JsonNode modernCompositeIdentityExpectation() {
-		JsonNode expected = ModernFixtureExpectations.statusOnly(compositeGoldenTree());
-		JsonNode pipeline = expected.at("/compositeAttempts/0/verdict");
-		JsonNode leaf = pipeline.at("/compositeAttempts/1/verdict");
-		JsonNode sole = leaf.at("/individual/0");
-		((com.fasterxml.jackson.databind.node.ObjectNode) leaf).set("judgment", sole);
-		((com.fasterxml.jackson.databind.node.ObjectNode) pipeline).set("judgment", sole);
-		((com.fasterxml.jackson.databind.node.ArrayNode) expected.get("individual")).set(0, sole);
-		((com.fasterxml.jackson.databind.node.ObjectNode) expected.get("individualByName")).set("pipeline", sole);
-		((com.fasterxml.jackson.databind.node.ObjectNode) expected.at("/seats/0")).put("participation", "NOT_REDUCED");
-		((com.fasterxml.jackson.databind.node.ObjectNode) pipeline.at("/seats/0")).put("participation", "IDENTITY");
-		((com.fasterxml.jackson.databind.node.ObjectNode) leaf.at("/seats/0")).put("participation", "IDENTITY");
-		return expected;
+		return compositeGoldenTree();
 	}
 
 	private static JsonNode compositeGoldenTree() {
@@ -930,6 +915,12 @@ class NormalizedJudgmentConformanceTest {
 			assertThat(Math.abs(number)).as("%s must be an interoperable integer", path)
 				.isLessThanOrEqualTo(9007199254740991L);
 		}
+	}
+
+	private static io.github.markpollack.judge.jury.JudgeSeat declared(io.github.markpollack.judge.Judge producer) {
+		return io.github.markpollack.judge.jury.JudgeSeat
+			.named(((io.github.markpollack.judge.JudgeWithMetadata) producer).metadata().name(), producer)
+			.notApplicableWhen(io.github.markpollack.judge.Judges.notApplicableCapability(producer).orElseThrow());
 	}
 
 }

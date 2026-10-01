@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.serialization.diagnostics;
 
 import io.github.markpollack.judge.completion.CompletionEvidence;
@@ -22,8 +27,8 @@ class V3InterpretationTest {
 		Map<String, Object> wire = mapper.convertValue(Verdict.single("seat", Judgment.pass("ok")),
 				new TypeReference<>() {
 				});
-		assertThat(wire).containsEntry("schemaVersion", 4);
-		assertThat(((Map<?, ?>) wire.get("judgment")).get("schemaVersion")).isEqualTo(4);
+		assertThat(wire).containsEntry("schemaVersion", 5);
+		assertThat(((Map<?, ?>) wire.get("judgment")).get("schemaVersion")).isEqualTo(5);
 	}
 
 	@Test
@@ -33,18 +38,18 @@ class V3InterpretationTest {
 		StoredReading reading = StoredVerdicts.interpret(Verdict.single("seat", judgment));
 		assertThat(reading.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
 		assertThat(reading.schemaVersion()).isEqualTo(3);
-		assertThat(reading.sourceVersion()).isEqualTo(4);
+		assertThat(reading.sourceVersion()).isEqualTo(5);
 		assertThat(reading.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
 	}
 
 	@Test
 	void forgedReductionCannotContradictAllRetainedInputs() {
-		var jury = io.github.markpollack.judge.jury.SimpleJury.<CompletionEvidence>builder()
-			.judge(c -> Judgment.pass("a"))
-			.judge(c -> Judgment.pass("b"))
+		var jury = io.github.markpollack.judge.jury.SimpleJury.builder()
+			.judge(() -> Judgment.pass("a"))
+			.judge(() -> Judgment.pass("b"))
 			.votingStrategy(new io.github.markpollack.judge.jury.ConsensusStrategy())
 			.build();
-		var v = jury.vote(io.github.markpollack.judge.completion.CompletionEvidence.builder().request("test").build());
+		var v = jury.vote();
 		Map<String, Object> wire = mapper.convertValue(v, new TypeReference<>() {
 		});
 		var fail = mapper.convertValue(Judgment.fail("contradiction"), new TypeReference<Map<String, Object>>() {

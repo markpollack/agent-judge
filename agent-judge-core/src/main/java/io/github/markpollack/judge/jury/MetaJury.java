@@ -29,11 +29,11 @@ import io.github.markpollack.judge.judgment.JudgmentReasonCode;
  * members remain stage failures; one survivor among multiple declared members is not
  * identity.
  */
-class MetaJury<E> implements VotingJury<E> {
+class MetaJury implements VotingJury {
 
 	private static final Logger logger = LoggerFactory.getLogger(MetaJury.class);
 
-	private final List<NamedJury<E>> members;
+	private final List<NamedJury> members;
 
 	private final VotingStrategy metaStrategy;
 
@@ -44,11 +44,10 @@ class MetaJury<E> implements VotingJury<E> {
 	 */
 	@Override
 	public boolean aggregateMayBeNotApplicable() {
-		return (members.size() == 1 || metaStrategy.exclusionHandling() == ExclusionHandling.EXCLUDE)
-				&& members.stream().anyMatch(member -> member.jury().aggregateMayBeNotApplicable());
+		return describe().aggregateMayBeNotApplicable();
 	}
 
-	MetaJury(List<NamedJury<E>> members, VotingStrategy metaStrategy) {
+	MetaJury(List<NamedJury> members, VotingStrategy metaStrategy) {
 		if (members == null || members.isEmpty()) {
 			throw new IllegalArgumentException("At least one named jury is required");
 		}
@@ -56,7 +55,7 @@ class MetaJury<E> implements VotingJury<E> {
 			throw new IllegalArgumentException("Meta voting strategy is required");
 		}
 		Set<String> names = new HashSet<>();
-		for (NamedJury<E> member : members) {
+		for (NamedJury member : members) {
 			if (member == null) {
 				throw new IllegalArgumentException("Named jury must not be null");
 			}
@@ -67,7 +66,7 @@ class MetaJury<E> implements VotingJury<E> {
 		this.members = List.copyOf(members);
 		this.metaStrategy = metaStrategy;
 		if (metaStrategy.exclusionHandling() == ExclusionHandling.REFUSE) {
-			for (NamedJury<E> member : this.members) {
+			for (NamedJury member : this.members) {
 				if (member.jury().aggregateMayBeNotApplicable()) {
 					throw new IllegalArgumentException("member '" + member.name()
 							+ "' declares that its aggregate may be NOT_APPLICABLE, but strategy '"
@@ -80,7 +79,7 @@ class MetaJury<E> implements VotingJury<E> {
 	}
 
 	@Override
-	public List<Judge<E>> getJudges() {
+	public List<Judge> getJudges() {
 		return List.of();
 	}
 
@@ -102,7 +101,7 @@ class MetaJury<E> implements VotingJury<E> {
 	@Override
 	public JuryDescription describe() {
 		List<MemberDescription> described = new ArrayList<>(members.size());
-		for (NamedJury<E> member : members) {
+		for (NamedJury member : members) {
 			try {
 				described.add(new MemberDescription(member.name(), member.jury().describe()));
 			}
@@ -110,15 +109,15 @@ class MetaJury<E> implements VotingJury<E> {
 				throw new IllegalArgumentException("member '" + member.name() + "': " + ex.getMessage(), ex);
 			}
 		}
-		return new MetaJuryDescription(metaStrategy.describe(), described, aggregateMayBeNotApplicable());
+		return new MetaJuryDescription(metaStrategy.describe(), described);
 	}
 
 	@Override
-	public Verdict vote(E context) {
-		return CompositeExecutionScope.withinCompositeVote(() -> execute(context));
+	public Verdict vote() {
+		return CompositeExecutionScope.withinCompositeVote(() -> execute());
 	}
 
-	private Verdict execute(E context) {
+	private Verdict execute() {
 		List<CompositeAttempt> attempts = new ArrayList<>();
 		List<Judgment> successful = new ArrayList<>();
 		Map<String, Judgment> successfulByName = new LinkedHashMap<>();
@@ -126,10 +125,10 @@ class MetaJury<E> implements VotingJury<E> {
 		boolean anyStageFailed = false;
 
 		for (int position = 0; position < members.size(); position++) {
-			NamedJury<E> member = members.get(position);
+			NamedJury member = members.get(position);
 			Verdict verdict;
 			try {
-				verdict = CompositeExecutionScope.invokeChild(member.name(), () -> member.jury().vote(context));
+				verdict = CompositeExecutionScope.invokeChild(member.name(), () -> member.jury().vote());
 			}
 			catch (CompositeLimitExceededException ex) {
 				throw ex;
@@ -144,7 +143,19 @@ class MetaJury<E> implements VotingJury<E> {
 				continue;
 			}
 
+			// validate returned records while retaining invalid originals on attempts.
+			try {
+				verdict.conclusion();
+			}
+			catch (IllegalArgumentException ex) {
+				attempts.add(CompositeAttempt.stageFailed(member.name(), CompositeRelation.META_MEMBER, null,
+						DispositionReason.INVALID_TIER_RESULT, verdict));
+				anyStageFailed = true;
+				continue;
+			}
 			DispositionReason reason = NotApplicableGuard.stageFailure(member.jury(), verdict);
+			if (members.size() == 1 && reason == DispositionReason.CHILD_UNDECIDED)
+				reason = null;
 			if (reason != null) {
 				// The member's own verdict is kept exactly as it came back. The parent
 				// records
@@ -202,7 +213,10 @@ class MetaJury<E> implements VotingJury<E> {
 			.individual(successful)
 			.individualByName(successfulByName)
 			.seats(seats)
-			.provenance(identity ? VerdictProvenance.own() : AggregationBoundary.decisionFor(aggregate))
+			.provenance(identity
+					? (attempts.get(0).verdict().provenance().kind() == VerdictProvenanceKind.UNDECIDED
+							? VerdictProvenance.undecided() : VerdictProvenance.own())
+					: AggregationBoundary.decisionFor(aggregate))
 			.compositeAttempts(attempts)
 			.build();
 	}

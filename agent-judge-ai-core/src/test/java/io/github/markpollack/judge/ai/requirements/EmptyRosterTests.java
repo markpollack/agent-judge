@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai.requirements;
 
 import java.io.IOException;
@@ -48,31 +53,29 @@ class EmptyRosterTests {
 	private static final JudgeModel MODEL = request -> new JudgeModelResponse("", "stub", null, Map.of());
 
 	@Test
-	@DisplayName("an empty criteria list is refused at construction, before any judge runs")
 	void earsRefusesAnEmptyRosterAtConstruction() {
-		assertThatThrownBy(() -> EarsJudge.create("audit", List.of(), MODEL))
-			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("at least one acceptance criterion");
-		assertThatCode(() -> EarsJudge.create("audit",
-				List.of(new EarsCriterion("UC1-AC1", "first", "The system shall do it.")), MODEL))
-			.doesNotThrowAnyException();
+		assertThatThrownBy(() -> EarsJury.builder().runtime(MODEL).requirements(List.of()))
+			.isInstanceOf(IllegalArgumentException.class);
+		assertThatCode(() -> EarsJury.builder()
+			.runtime(MODEL)
+			.requirements(List.of(EarsRequirement.of("UC1-AC1", "test", "first", "The system shall do it.", null)))
+			.build()).doesNotThrowAnyException();
 	}
 
 	@Test
-	@DisplayName("an empty constraints list is refused at construction, before any judge runs")
 	void rfcRefusesAnEmptyRosterAtConstruction() {
-		assertThatThrownBy(() -> Rfc2119Judge.create("audit", List.of(), MODEL))
-			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("at least one constraint");
-		assertThatCode(() -> Rfc2119Judge.create("audit",
-				List.of(new Rfc2119Constraint("RULE-1", "MUST", "do it", "because")), MODEL))
-			.doesNotThrowAnyException();
+		assertThatThrownBy(() -> Rfc2119Jury.builder().runtime(MODEL).requirements(List.of()))
+			.isInstanceOf(IllegalArgumentException.class);
+		assertThatCode(() -> Rfc2119Jury.builder()
+			.runtime(MODEL)
+			.requirements(List.of(Rfc2119Requirement.of("RULE-1", "test", "MUST", "do it", "because", null)))
+			.build()).doesNotThrowAnyException();
 	}
 
 	@Test
 	@DisplayName("an empty criteria roster reaching the rollup is an error, never a pass and never an exclusion")
 	void earsRefusesAnEmptyRosterInTheRollup() {
-		Judgment judgment = EarsJudge.rollupFor(List.of(), answer("anything at all"));
+		Judgment judgment = EarsParser.rollupFor(List.of(), answer("anything at all"));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.status()).isNotEqualTo(JudgmentStatus.PASS);
@@ -86,7 +89,7 @@ class EmptyRosterTests {
 	@Test
 	@DisplayName("an empty constraints roster reaching the rollup is an error, never a pass and never an exclusion")
 	void rfcRefusesAnEmptyRosterInTheRollup() {
-		Judgment judgment = Rfc2119Judge.rollupFor(List.of(), answer("anything at all"));
+		Judgment judgment = Rfc2119Parser.rollupFor(List.of(), answer("anything at all"));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.status()).isNotEqualTo(JudgmentStatus.PASS);
@@ -109,11 +112,11 @@ class EmptyRosterTests {
 	@Test
 	@DisplayName("\"all not applicable\" means a non-empty roster in which every criterion was excluded")
 	void allNotApplicableRequiresANonEmptyRoster() {
-		Judgment excluded = EarsJudge.rollupFor(
+		Judgment excluded = EarsParser.rollupFor(
 				List.of(new EarsCriterion("UC1-AC1", "first", "The system shall use prepared statements.",
 						"the change set contains Java sources")),
 				answer("UC1-AC1: NOT_APPLICABLE - the change set contains no Java sources"));
-		Judgment empty = EarsJudge.rollupFor(List.of(), answer("UC1-AC1: NOT_APPLICABLE - nothing"));
+		Judgment empty = EarsParser.rollupFor(List.of(), answer("UC1-AC1: NOT_APPLICABLE - nothing"));
 
 		assertThat(excluded.status()).as("one criterion, excluded: nothing applied")
 			.isEqualTo(JudgmentStatus.NOT_APPLICABLE);
@@ -124,13 +127,13 @@ class EmptyRosterTests {
 	@Test
 	@DisplayName("the same holds for constraints")
 	void allNotApplicableRequiresANonEmptyConstraintRoster() {
-		Judgment excluded = Rfc2119Judge.rollupFor(
+		Judgment excluded = Rfc2119Parser.rollupFor(
 				List.of(new Rfc2119Constraint("RULE-1", "MUST", "use prepared statements", "injection",
 						"the service has a persistence layer")),
 				answer("RULE-1: NOT_APPLICABLE - the service has no persistence layer"));
 
 		assertThat(excluded.status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
-		assertThat(Rfc2119Judge.rollupFor(List.of(), answer("RULE-1: NOT_APPLICABLE - nothing")).status())
+		assertThat(Rfc2119Parser.rollupFor(List.of(), answer("RULE-1: NOT_APPLICABLE - nothing")).status())
 			.isEqualTo(JudgmentStatus.ERROR);
 	}
 

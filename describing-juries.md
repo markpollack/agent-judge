@@ -11,7 +11,7 @@ lists.
 ```java
 Jury jury = SimpleJury.builder()
     .judge(Judges.named(new BuildJudge(), "build"), 2.0)
-    .judge(ctx -> Judgment.pass("smoke"))
+    .judge(() -> Judgment.pass("smoke"))
     .votingStrategy(new WeightedAverageStrategy(0.7, ErrorHandling.IGNORE))
     .build();
 
@@ -27,7 +27,7 @@ For a single judge, call `Judges.describe(judge)`. For a single strategy, call
 same configuration gives the same JSON bytes in every JVM run. The library does not hash it;
 hash the JSON the way your store needs.
 
-Every description returned by `toPortable()` starts with `"descriptionVersion": 1`
+Every description returned by `toPortable()` starts with `"descriptionVersion": 3`
 (`JuryDescription.DESCRIPTION_VERSION`). Hash it along with the rest. Juries nested inside tiers
 and members do not repeat it.
 
@@ -50,7 +50,7 @@ description of the instrument, not a change of format.
 For the jury above:
 
 ```json
-{"descriptionVersion": 1,
+{"descriptionVersion": 3,
  "kind": "SIMPLE",
  "strategy": {"name": "weightedAverage",
               "implementation": {"form": "NAMED", "className": "io.github.markpollack.judge.jury.WeightedAverageStrategy"},
@@ -91,23 +91,25 @@ the template text, its missing-variable policy and its classifier. It declares n
 a `JudgeModel` does not say which model it will call. The model a call actually used is in
 `JudgeModelResponse.model()`.
 
+One valid declared seat/member is semantic identity, including a valid UNDECIDED child. It retains the complete original without adding a reduction evidence block. Derive exclusion permission and `routingOpinionBound` from the structured description; Judge-seat permissions are local declarations. Explicit RFC2119/EARS and AllOf audits declare KNOWN_NONE opinions.
+
 ## What to count
 
 - **Simple jury:** compare `seats.size()` with the aggregate's `aggregation.inputCount`.
 - **Cascade:** ⚠️ **count per tier, and never also count the top-level aggregate.** A cascade's
-  top-level `aggregated`, `individual` and `weights` are copied from the tier that stopped it.
+  top-level `judgment`, `individual` and `weights` are copied from the tier that stopped it.
   Compare each `tiers[i]` with the `compositeAttempts` entry of the same name, and count that
   tier's verdict once. Counting the top-level verdict as well counts the stopping tier twice. A
   tier with no attempt was never entered, which means the cascade stopped early.
-- **Meta-jury:** compare `members` with `compositeAttempts`. `Jury.getJudges()` is empty for a
-  meta-jury, so the description is its only roster. A member that failed to execute makes the
+- **Meta-jury:** compare `members` with `compositeAttempts`. `VotingJury.getJudges()` is a voting-only view; a meta-jury
+  retains its own member description. A member that failed to execute makes the
   aggregate a bare `ERROR` judgment with no aggregation block. Take the member count from the
   description, not from the evidence.
 
 ## Declaring a judge's configuration
 
 ```java
-public final class RubricJudge implements ConfiguredJudge<String> {
+public final class RubricJudge implements Judge, ConfiguredJudge {
 
     @Override
     public Map<String, Object> configuration() {
@@ -115,7 +117,7 @@ public final class RubricJudge implements ConfiguredJudge<String> {
     }
 
     @Override
-    public Judgment judge(String response) { ... }
+    public Judgment judge() { /* evaluates this judge's configured evidence */ ... }
 }
 ```
 

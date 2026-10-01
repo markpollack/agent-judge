@@ -60,7 +60,7 @@ class ModelBackedJudgeCapabilityTests {
 	}
 
 	private static ModelBackedJudge judge(String name, String notApplicableWhen, String answer) {
-		ModelBackedJudge.Builder builder = ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
+		ModelBackedJudge.Builder<CompletionEvidence> builder = ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
 			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
 			.name(name)
 			.description("a model-backed judge")
@@ -71,7 +71,11 @@ class ModelBackedJudgeCapabilityTests {
 		if (notApplicableWhen != null) {
 			builder.notApplicableWhen(notApplicableWhen);
 		}
-		return builder.build();
+		return builder
+			.evidence(io.github.markpollack.judge.completion.CompletionEvidence.builder()
+				.request("capability fixture")
+				.build())
+			.build();
 	}
 
 	@Test
@@ -81,10 +85,8 @@ class ModelBackedJudgeCapabilityTests {
 
 		assertThat(unconditional.metadata().notApplicableWhen()).isNull();
 		assertThat(Judges.notApplicableCapability(unconditional)).isEmpty();
-		assertThatCode(() -> SimpleJury.<CompletionEvidence>builder()
-			.judge(unconditional)
-			.votingStrategy(new ConsensusStrategy())
-			.build()).doesNotThrowAnyException();
+		assertThatCode(() -> SimpleJury.builder().judge(unconditional).votingStrategy(new ConsensusStrategy()).build())
+			.doesNotThrowAnyException();
 	}
 
 	@Test
@@ -95,13 +97,13 @@ class ModelBackedJudgeCapabilityTests {
 		assertThat(Judges.notApplicableCapability(conditional)).contains(CONDITION);
 		assertThat(Judges.describe(conditional).notApplicableWhen()).isEqualTo(CONDITION);
 
-		Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
-			.judge(conditional)
+		Jury jury = SimpleJury.builder()
+			.seat(io.github.markpollack.judge.jury.JudgeSeat.named("rubric", conditional).notApplicableWhen(CONDITION))
 			.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 			.build();
 
 		assertThat(jury.aggregateMayBeNotApplicable()).isTrue();
-		Verdict verdict = jury.vote(CompletionEvidence.builder().request("assess the implementation").build());
+		Verdict verdict = jury.vote();
 		assertThat(verdict.individualByName().get("rubric").status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
 		assertThat(verdict.judgment().status()).as("every criterion was excluded, so the aggregate is too")
 			.isEqualTo(JudgmentStatus.NOT_APPLICABLE);
@@ -110,11 +112,14 @@ class ModelBackedJudgeCapabilityTests {
 	@Test
 	@DisplayName("the deduplicating rename keeps the declaration on the judge it wraps")
 	void deduplicationPreservesTheDeclaration() {
-		Judge<CompletionEvidence> first = judge("rubric", CONDITION, "excluded");
-		Judge<CompletionEvidence> second = judge("rubric", CONDITION, "excluded");
+		Judge first = judge("rubric", CONDITION, "excluded");
+		Judge second = judge("rubric", CONDITION, "excluded");
 
-		Jury<CompletionEvidence> jury = Juries
-			.fromJudges(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE), first, second);
+		Jury jury = SimpleJury.builder()
+			.seat(io.github.markpollack.judge.jury.JudgeSeat.named("rubric", first).notApplicableWhen(CONDITION))
+			.seat(io.github.markpollack.judge.jury.JudgeSeat.named("rubric-2", second).notApplicableWhen(CONDITION))
+			.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
+			.build();
 
 		SimpleJuryDescription description = (SimpleJuryDescription) jury.describe();
 		assertThat(description.seats())

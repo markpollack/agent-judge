@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai;
 
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
@@ -95,7 +100,7 @@ class LabelJudgmentClassifierTests {
 		// projection.
 		// An unreported category is omitted rather than carried as a null.
 		assertThat(judgment.metadata()).containsEntry("usage",
-				Map.of("inputTokens", 10L, "outputTokens", 5L, "reportedTotalTokens", 15L));
+				Map.of("inputTokens", 10, "outputTokens", 5, "reportedTotalTokens", 15));
 	}
 
 	/**
@@ -117,8 +122,8 @@ class LabelJudgmentClassifierTests {
 
 		Judgment judgment = classifier.classify(resp);
 
-		assertThat(judgment.metadata().get("usage")).isEqualTo(Map.of("inputTokens", 10L, "outputTokens", 5L,
-				"reasoningTokens", 4L, "cacheCreationTokens", 3L, "cacheReadTokens", 2L));
+		assertThat(judgment.metadata().get("usage")).isEqualTo(Map.of("inputTokens", 10, "outputTokens", 5,
+				"reasoningTokens", 4, "cacheCreationTokens", 3, "cacheReadTokens", 2));
 	}
 
 	@Test

@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai.requirements;
 
 import java.util.ArrayList;
@@ -30,48 +35,54 @@ class ModernRequirementRosterTests {
 
 	private static final String COMPLETE = "R-1: PASS - verified\nR-2: PASS - verified\nR-3: PASS - verified";
 
-	private static ModelBackedJudge configured(Kind kind, List<String> ids, JudgeModel model) {
+	private static io.github.markpollack.judge.jury.Jury configured(Kind kind, List<String> ids, JudgeModel model) {
 		return kind == Kind.RFC
-				? Rfc2119Judge.create("requirements",
-						ids.stream()
-							.map(id -> new Rfc2119Constraint(id, "MUST", "requirement", "rationale",
-									id.equals("R-3") ? "has storage" : null))
-							.toList(),
-						model)
-				: EarsJudge.create("requirements", ids.stream()
-					.map(id -> new EarsCriterion(id, "title", "requirement", id.equals("R-3") ? "has storage" : null))
-					.toList(), model);
+				? Rfc2119Jury.builder()
+					.runtime(model)
+					.requirements(ids.stream()
+						.map(id -> Rfc2119Requirement.of(id, "test", "MUST", "requirement", "rationale",
+								id.equals("R-3") ? "has storage" : null))
+						.toList())
+					.build()
+				: EarsJury.builder()
+					.runtime(model)
+					.requirements(ids.stream()
+						.map(id -> EarsRequirement.of(id, "test", "title", "requirement",
+								id.equals("R-3") ? "has storage" : null))
+						.toList())
+					.build();
 	}
 
-	private static Judgment audit(Kind kind, String text) {
+	private static io.github.markpollack.judge.jury.Verdict audit(Kind kind, String text) {
 		return configured(kind, List.of("R-1", "R-2", "R-3"),
 				request -> new JudgeModelResponse(text, "stub", null, Map.of()))
-			.judge(CONTEXT);
+			.vote();
 	}
 
-	private static void roster(Judgment result, JudgmentStatus... statuses) {
-		assertThat(result.checks()).extracting(Check::id).containsExactly("R-1", "R-2", "R-3");
-		assertThat(result.checks()).extracting(c -> c.judgment().status()).containsExactly(statuses);
-		assertThat(result.checks()).allSatisfy(c -> assertThat(c.judgment().checks()).isEmpty());
-		assertThat(result.metadata()
-			.get(result.metadata().containsKey("constraintsTotal") ? "constraintsTotal" : "criteriaTotal"))
-			.isEqualTo(3);
+	private static void roster(io.github.markpollack.judge.jury.Verdict result, JudgmentStatus... statuses) {
+		assertThat(result.roster()).extracting(io.github.markpollack.judge.requirement.Requirement::id)
+			.containsExactly("R-1", "R-2", "R-3");
+		assertThat(result.compositeAttempts()).extracting(a -> a.verdict().individualByName().get(a.name()).status())
+			.containsExactly(statuses);
+		assertThat(result.invocations()).hasSize(1);
+		assertThat(result.individual()).isEmpty();
 	}
 
 	@ParameterizedTest
 	@EnumSource(Kind.class)
 	void uncertainAndExcludedRequirementsRetainTheirOwnOutcomes(Kind kind) {
-		Judgment result = audit(kind,
+		io.github.markpollack.judge.jury.Verdict result = audit(kind,
 				"R-1: FAIL - violated\nR-2: CANNOT_DETERMINE - insufficient evidence\nR-3: NOT_APPLICABLE - no storage");
-		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(result.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 		roster(result, JudgmentStatus.FAIL, JudgmentStatus.ABSTAIN, JudgmentStatus.NOT_APPLICABLE);
 	}
 
 	@ParameterizedTest
 	@EnumSource(Kind.class)
 	void missingResponseRemainsAnErrorCheckAlongsideEstablishedFacts(Kind kind) {
-		Judgment result = audit(kind, "R-1: FAIL - violated\nR-2: CANNOT_DETERMINE - insufficient evidence");
-		assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
+		io.github.markpollack.judge.jury.Verdict result = audit(kind,
+				"R-1: FAIL - violated\nR-2: CANNOT_DETERMINE - insufficient evidence");
+		assertThat(result.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 		roster(result, JudgmentStatus.FAIL, JudgmentStatus.ABSTAIN, JudgmentStatus.ERROR);
 	}
 
@@ -80,8 +91,10 @@ class ModernRequirementRosterTests {
 	void emptyAndFailedBackendResponsesKeepTheWholeRoster(Kind kind) {
 		for (JudgeModelResponse response : List.of(new JudgeModelResponse("", null, null, Map.of()),
 				new JudgeModelResponse("backend unavailable", null, null, Map.of(), false))) {
-			Judgment result = configured(kind, List.of("R-1", "R-2", "R-3"), request -> response).judge(CONTEXT);
-			assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
+			io.github.markpollack.judge.jury.Verdict result = configured(kind, List.of("R-1", "R-2", "R-3"),
+					request -> response)
+				.vote();
+			assertThat(result.judgment().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 			roster(result, JudgmentStatus.ERROR, JudgmentStatus.ERROR, JudgmentStatus.ERROR);
 		}
 	}
@@ -95,8 +108,8 @@ class ModernRequirementRosterTests {
 				COMPLETE.replace("R-1: PASS - verified", "R-1: PASS"),
 				COMPLETE.replace("R-1: PASS - verified", "R-1: PASS - "),
 				COMPLETE + "\nR-1 PASS - malformed duplicate")) {
-			Judgment result = audit(kind, text);
-			assertThat(result.status()).as(text).isEqualTo(JudgmentStatus.ERROR);
+			io.github.markpollack.judge.jury.Verdict result = audit(kind, text);
+			assertThat(result.judgment().status()).as(text).isEqualTo(JudgmentStatus.ABSTAIN);
 			roster(result, JudgmentStatus.ERROR, JudgmentStatus.PASS, JudgmentStatus.PASS);
 		}
 	}
@@ -104,10 +117,11 @@ class ModernRequirementRosterTests {
 	@ParameterizedTest
 	@EnumSource(Kind.class)
 	void unknownAnswerIdsAreErrorsButObservationsStayNonbinding(Kind kind) {
-		Judgment extra = audit(kind, COMPLETE + "\nR-4: PASS - invented requirement");
-		assertThat(extra.status()).isEqualTo(JudgmentStatus.ERROR);
+		io.github.markpollack.judge.jury.Verdict extra = audit(kind, COMPLETE + "\nR-4: PASS - invented requirement");
+		assertThat(extra.judgment().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		roster(extra, JudgmentStatus.PASS, JudgmentStatus.PASS, JudgmentStatus.PASS);
 		assertThat(audit(kind, COMPLETE + "\nOBSERVATION R-4: PASS - irrelevant\nOBSERVATION R-1: PASSENGER: prose")
+			.judgment()
 			.status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
@@ -127,22 +141,28 @@ class ModernRequirementRosterTests {
 	@ParameterizedTest
 	@EnumSource(Kind.class)
 	void configurationRosterIsSnapshottedBeforeInference(Kind kind) {
-		ModelBackedJudge judge;
+		io.github.markpollack.judge.jury.Jury judge;
 		if (kind == Kind.RFC) {
-			var source = new ArrayList<>(List.of(new Rfc2119Constraint("R-1", "MUST", "one", "why")));
-			judge = Rfc2119Judge.create("rules", source,
-					request -> new JudgeModelResponse("R-1: PASS - verified", null, null, Map.of()));
-			source.add(new Rfc2119Constraint("R-2", "MUST", "two", "why"));
+			var source = new ArrayList<>(List.of(Rfc2119Requirement.of("R-1", "test", "MUST", "one", "why", null)));
+			judge = Rfc2119Jury.builder()
+				.runtime((JudgeModel) request -> new JudgeModelResponse("R-1: PASS - verified", null, null, Map.of()))
+				.requirements(source)
+				.build();
+			source.add(Rfc2119Requirement.of("R-2", "test", "MUST", "two", "why", null));
 		}
 		else {
-			var source = new ArrayList<>(List.of(new EarsCriterion("R-1", "one", "one")));
-			judge = EarsJudge.create("criteria", source,
-					request -> new JudgeModelResponse("R-1: PASS - verified", null, null, Map.of()));
-			source.add(new EarsCriterion("R-2", "two", "two"));
+			var source = new ArrayList<>(List.of(EarsRequirement.of("R-1", "test", "one", "one", null)));
+			judge = EarsJury.builder()
+				.runtime((JudgeModel) request -> new JudgeModelResponse("R-1: PASS - verified", null, null, Map.of()))
+				.requirements(source)
+				.build();
+			source.add(EarsRequirement.of("R-2", "test", "two", "two", null));
 		}
-		Judgment result = judge.judge(CONTEXT);
-		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(result.checks()).extracting(Check::id).containsExactly("R-1");
+		var result = judge.vote();
+		assertThat(result.conclusion()).isEqualTo(io.github.markpollack.judge.jury.Verdict.Conclusion.PASS);
+		assertThat(result.roster()).extracting(io.github.markpollack.judge.requirement.Requirement::id)
+			.containsExactly("R-1");
+
 	}
 
 	@ParameterizedTest
@@ -151,8 +171,9 @@ class ModernRequirementRosterTests {
 		for (JudgeModel model : List.<JudgeModel>of(request -> null, request -> {
 			throw new IllegalStateException("transport unavailable");
 		})) {
-			Judgment result = configured(kind, List.of("R-1", "R-2", "R-3"), model).judge(CONTEXT);
-			assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
+			io.github.markpollack.judge.jury.Verdict result = configured(kind, List.of("R-1", "R-2", "R-3"), model)
+				.vote();
+			assertThat(result.judgment().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 			roster(result, JudgmentStatus.ERROR, JudgmentStatus.ERROR, JudgmentStatus.ERROR);
 		}
 	}
@@ -160,11 +181,13 @@ class ModernRequirementRosterTests {
 	@ParameterizedTest
 	@EnumSource(Kind.class)
 	void illegalAndUnexplainedExclusionsAreErrorChecks(Kind kind) {
-		Judgment illegal = audit(kind, COMPLETE.replace("R-1: PASS - verified", "R-1: NOT_APPLICABLE - inconvenient"));
-		assertThat(illegal.status()).isEqualTo(JudgmentStatus.ERROR);
-		roster(illegal, JudgmentStatus.ERROR, JudgmentStatus.PASS, JudgmentStatus.PASS);
-		Judgment unexplained = audit(kind, COMPLETE.replace("R-3: PASS - verified", "R-3: NOT_APPLICABLE"));
-		assertThat(unexplained.status()).isEqualTo(JudgmentStatus.ERROR);
+		io.github.markpollack.judge.jury.Verdict illegal = audit(kind,
+				COMPLETE.replace("R-1: PASS - verified", "R-1: NOT_APPLICABLE - inconvenient"));
+		assertThat(illegal.judgment().status()).isEqualTo(JudgmentStatus.ABSTAIN);
+		roster(illegal, JudgmentStatus.NOT_APPLICABLE, JudgmentStatus.PASS, JudgmentStatus.PASS);
+		io.github.markpollack.judge.jury.Verdict unexplained = audit(kind,
+				COMPLETE.replace("R-3: PASS - verified", "R-3: NOT_APPLICABLE"));
+		assertThat(unexplained.judgment().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		roster(unexplained, JudgmentStatus.PASS, JudgmentStatus.PASS, JudgmentStatus.ERROR);
 	}
 
@@ -175,7 +198,8 @@ class ModernRequirementRosterTests {
 			.stream()
 			.map(id -> configured(kind, List.of(id),
 					request -> new JudgeModelResponse(id + ": PASS - verified", null, null, Map.of()))
-				.judge(CONTEXT)
+				.vote()
+				.judgment()
 				.status())
 			.toList();
 		assertThat(outcomes).containsExactly(JudgmentStatus.PASS, JudgmentStatus.PASS, JudgmentStatus.PASS);

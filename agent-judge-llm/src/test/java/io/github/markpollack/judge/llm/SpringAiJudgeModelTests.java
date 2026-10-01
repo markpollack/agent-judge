@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.llm;
 
 import java.util.List;
@@ -25,7 +30,9 @@ class SpringAiJudgeModelTests {
 		ChatClient.CallResponseSpec callSpec = mock(ChatClient.CallResponseSpec.class);
 
 		given(chatClient.prompt()).willReturn(requestSpec);
-		given(requestSpec.user(any(String.class))).willReturn(requestSpec);
+		given(requestSpec
+			.messages(org.mockito.ArgumentMatchers.<org.springframework.ai.chat.messages.Message>anyList()))
+			.willReturn(requestSpec);
 		given(requestSpec.call()).willReturn(callSpec);
 
 		org.springframework.ai.chat.messages.AssistantMessage assistantMessage = new org.springframework.ai.chat.messages.AssistantMessage(
@@ -60,11 +67,12 @@ class SpringAiJudgeModelTests {
 		ChatClient.CallResponseSpec callSpec = mock(ChatClient.CallResponseSpec.class);
 
 		given(chatClient.prompt()).willReturn(requestSpec);
-		given(requestSpec.user(any(String.class))).willReturn(requestSpec);
+		given(requestSpec
+			.messages(org.mockito.ArgumentMatchers.<org.springframework.ai.chat.messages.Message>anyList()))
+			.willReturn(requestSpec);
 		given(requestSpec.call()).willReturn(callSpec);
 
-		Generation generation = new Generation(
-				new org.springframework.ai.chat.messages.AssistantMessage("relevant"));
+		Generation generation = new Generation(new org.springframework.ai.chat.messages.AssistantMessage("relevant"));
 		ChatResponseMetadata responseMeta = ChatResponseMetadata.builder()
 			.model("claude-opus-5")
 			.usage(new DefaultUsage(100, 50, 150, null, 40L, 60L))
@@ -89,7 +97,9 @@ class SpringAiJudgeModelTests {
 		ChatClient.CallResponseSpec callSpec = mock(ChatClient.CallResponseSpec.class);
 
 		given(chatClient.prompt()).willReturn(requestSpec);
-		given(requestSpec.user(any(String.class))).willReturn(requestSpec);
+		given(requestSpec
+			.messages(org.mockito.ArgumentMatchers.<org.springframework.ai.chat.messages.Message>anyList()))
+			.willReturn(requestSpec);
 		given(requestSpec.call()).willReturn(callSpec);
 
 		org.springframework.ai.chat.messages.AssistantMessage msg = new org.springframework.ai.chat.messages.AssistantMessage(

@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai.prompt;
 
 import java.net.URL;
@@ -65,18 +70,19 @@ class CommonPoolTemplateRenderingTests {
 		// worker, and the two template-backed judges below vanished from the vote.
 		var template = JudgePromptTemplate.fromClasspath(TEMPLATE);
 
-		Judge<CompletionEvidence> renders = context -> Judgment
+		CompletionEvidence context = renderContext();
+		Judge renders = () -> Judgment
 			.pass(blindContextClassLoader(() -> template.render(CompletionVariables.from(context))));
 
-		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
+		SimpleJury jury = SimpleJury.builder()
 			.judge(renders)
 			.judge(renders)
-			.judge(context -> Judgment.pass("no template"))
+			.judge(() -> Judgment.pass("no template"))
 			.votingStrategy(new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN))
 			.parallel(true)
 			.build();
 
-		Verdict verdict = jury.vote(renderContext());
+		Verdict verdict = jury.vote();
 
 		assertThat(verdict.individual()).hasSize(3);
 		assertThat(verdict.individual()).noneMatch(judgment -> judgment.status() == JudgmentStatus.ERROR);

@@ -48,13 +48,13 @@ class NullChildContainmentTest {
 		.request("contain a null child")
 		.build();
 
-	private static Jury<CompletionEvidence> silent() {
+	private static Jury silent() {
 		return returning(null);
 	}
 
-	private static Jury<CompletionEvidence> passing(String judgeName) {
-		return SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> Judgment.pass("all good"), judgeName))
+	private static Jury passing(String judgeName) {
+		return SimpleJury.builder()
+			.judge(Judges.named(() -> Judgment.pass("all good"), judgeName))
 			.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN))
 			.build();
 	}
@@ -66,11 +66,10 @@ class NullChildContainmentTest {
 		@Test
 		@DisplayName("is a stage failure, and every member that succeeded is kept")
 		void isAStageFailureThatKeepsItsOtherMembers() {
-			Jury<CompletionEvidence> meta = Juries.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
-					new NamedJury<CompletionEvidence>("healthy", passing("first")),
-					new NamedJury<CompletionEvidence>("silent", silent()));
+			Jury meta = Juries.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
+					new NamedJury("healthy", passing("first")), new NamedJury("silent", silent()));
 
-			Verdict verdict = meta.vote(CONTEXT);
+			Verdict verdict = meta.vote();
 
 			assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
@@ -95,11 +94,11 @@ class NullChildContainmentTest {
 		@Test
 		@DisplayName("a non-final tier that returns null still lets the final tier decide")
 		void aNonFinalNullTierReachesTheFinalTier() {
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("silent", silent(), RoutingRule.REJECT_ON_ANY_FAIL)
+			Verdict verdict = CascadedJury.builder()
+				.tier("silent", silent(), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 				.tier("backstop", passing("backstop"), RoutingRule.FINAL_TIER)
 				.build()
-				.vote(CONTEXT);
+				.vote();
 
 			assertThat(verdict.judgment().status()).as("the healthy final tier decided").isEqualTo(JudgmentStatus.PASS);
 			assertThat(verdict.provenance().kind()).isEqualTo(VerdictProvenanceKind.TIER);
@@ -114,10 +113,7 @@ class NullChildContainmentTest {
 		@Test
 		@DisplayName("a final tier that returns null is no_tier_decided, not an escaping exception")
 		void aFinalNullTierIsNoTierDecided() {
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("silent", silent(), RoutingRule.FINAL_TIER)
-				.build()
-				.vote(CONTEXT);
+			Verdict verdict = CascadedJury.builder().tier("silent", silent(), RoutingRule.FINAL_TIER).build().vote();
 
 			assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.NO_TIER_DECIDED);
@@ -136,28 +132,27 @@ class NullChildContainmentTest {
 		@Test
 		@DisplayName("a composite limit still escapes both parents")
 		void aCompositeLimitStillEscapes() {
-			Jury<CompletionEvidence> overLimit = ContainmentTest
+			Jury overLimit = ContainmentTest
 				.throwing(new CompositeLimitExceededException("Composite attempt limit of 64 exceeded"));
 
 			assertThatThrownBy(() -> Juries
 				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
-						new NamedJury<CompletionEvidence>("healthy", passing("first")),
-						new NamedJury<CompletionEvidence>("limit", overLimit))
-				.vote(CONTEXT)).isInstanceOf(CompositeLimitExceededException.class);
+						new NamedJury("healthy", passing("first")), new NamedJury("limit", overLimit))
+				.vote()).isInstanceOf(CompositeLimitExceededException.class);
 
-			assertThatThrownBy(() -> CascadedJury.<CompletionEvidence>builder()
-				.tier("limit", overLimit, RoutingRule.REJECT_ON_ANY_FAIL)
+			assertThatThrownBy(() -> CascadedJury.builder()
+				.tier("limit", overLimit, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 				.tier("backstop", passing("backstop"), RoutingRule.FINAL_TIER)
 				.build()
-				.vote(CONTEXT)).isInstanceOf(CompositeLimitExceededException.class);
+				.vote()).isInstanceOf(CompositeLimitExceededException.class);
 		}
 
 		@Test
 		@DisplayName("an Error still escapes both parents")
 		void anErrorStillEscapes() {
-			Jury<CompletionEvidence> broken = new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
+			Jury broken = new io.github.markpollack.judge.jury.VotingJury() {
 				@Override
-				public List<Judge<CompletionEvidence>> getJudges() {
+				public List<Judge> getJudges() {
 					return List.of();
 				}
 
@@ -167,20 +162,18 @@ class NullChildContainmentTest {
 				}
 
 				@Override
-				public Verdict vote(CompletionEvidence context) {
+				public Verdict vote() {
 					throw new StackOverflowError("no stack left to report on");
 				}
 			};
 
 			assertThatThrownBy(() -> Juries
-				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
-						new NamedJury<CompletionEvidence>("broken", broken))
-				.vote(CONTEXT)).isInstanceOf(StackOverflowError.class);
+				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN), new NamedJury("broken", broken))
+				.vote()).isInstanceOf(StackOverflowError.class);
 
-			assertThatThrownBy(() -> CascadedJury.<CompletionEvidence>builder()
-				.tier("broken", broken, RoutingRule.FINAL_TIER)
-				.build()
-				.vote(CONTEXT)).isInstanceOf(StackOverflowError.class);
+			assertThatThrownBy(
+					() -> CascadedJury.builder().tier("broken", broken, RoutingRule.FINAL_TIER).build().vote())
+				.isInstanceOf(StackOverflowError.class);
 		}
 
 	}

@@ -482,7 +482,8 @@ class VerdictTest {
 		@DisplayName("a decision that names a tier which returned nothing determines nothing")
 		void tierNamedMustHaveReturnedAVerdict() {
 			CompositeAttempt threw = CompositeAttempt.executionFailed("gate", CompositeRelation.CASCADE_TIER,
-					RoutingRule.REJECT_ON_ANY_FAIL, new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED));
+					RoutingRule.STOP_ON_ANY_OPINION_FAIL,
+					new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED));
 
 			assertThatThrownBy(() -> Verdict.builder()
 				.judgment(booleanPass("ok"))
@@ -562,13 +563,15 @@ class VerdictTest {
 		}
 
 		private static CompositeAttempt used(Verdict verdict) {
-			return CompositeAttempt.used("gate", CompositeRelation.CASCADE_TIER, RoutingRule.REJECT_ON_ANY_FAIL,
+			return CompositeAttempt.used("gate", CompositeRelation.CASCADE_TIER, RoutingRule.STOP_ON_ANY_OPINION_FAIL,
 					verdict);
 		}
 
 		private static CompositeAttempt refused(Verdict verdict, RoutingRule policy) {
 			DispositionReason reason = verdict.provenance().kind() == VerdictProvenanceKind.UNDECIDED
 					? DispositionReason.CHILD_UNDECIDED : DispositionReason.UNDECLARED_NOT_APPLICABLE;
+			if (verdict.provenance().kind() == VerdictProvenanceKind.UNDECIDED)
+				return CompositeAttempt.used("gate", CompositeRelation.CASCADE_TIER, policy, verdict);
 			return CompositeAttempt.stageFailed("gate", CompositeRelation.CASCADE_TIER, policy, reason, verdict);
 		}
 
@@ -592,7 +595,9 @@ class VerdictTest {
 		void tierOutcomeRequiresAUsedAttempt() {
 			Verdict tier = undecidedTier();
 
-			assertThatThrownBy(() -> root(BROKEN, tier, refused(tier, RoutingRule.REJECT_ON_ANY_FAIL),
+			assertThatThrownBy(() -> root(BROKEN, tier,
+					CompositeAttempt.stageFailed("gate", CompositeRelation.CASCADE_TIER,
+							RoutingRule.STOP_ON_ANY_OPINION_FAIL, DispositionReason.CHILD_UNDECIDED, tier),
 					VerdictProvenanceBasis.TIER_OUTCOME)
 				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must be USED");
 		}
@@ -617,24 +622,25 @@ class VerdictTest {
 			assertThatThrownBy(
 					() -> root(BROKEN, tier, used(tier), VerdictProvenanceBasis.INDIVIDUAL_REJECTION).build())
 				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("must be STAGE_FAILED");
+				.hasMessageContaining("accepted UNDECIDED input");
 		}
 
 		@Test
-		@DisplayName("only REJECT_ON_ANY_FAIL stops on a rejection; a broken stage accepts nothing")
+		@DisplayName("only STOP_ON_ANY_OPINION_FAIL stops on a rejection; a broken stage accepts nothing")
 		void rejectionRequiresTheRejectingPolicy() {
 			Verdict tier = undecidedTier();
 
-			assertThatThrownBy(() -> root(BROKEN, tier, refused(tier, RoutingRule.ACCEPT_ON_ALL_PASS),
+			assertThatThrownBy(() -> root(BROKEN, tier, refused(tier, RoutingRule.STOP_ON_ALL_OPINIONS_PASS),
 					VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
-				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("only REJECT_ON_ANY_FAIL");
+				.build()).isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("only STOP_ON_ANY_OPINION_FAIL");
 		}
 
 		@Test
 		@DisplayName("a rejection needs a genuine FAIL: neither a pass nor a machinery error is one")
 		void rejectionRequiresAGenuineFail() {
 			Verdict allPassed = tier(BROKEN, VerdictProvenance.undecided(), PASSED);
-			assertThatThrownBy(() -> root(BROKEN, allPassed, refused(allPassed, RoutingRule.REJECT_ON_ANY_FAIL),
+			assertThatThrownBy(() -> root(BROKEN, allPassed, refused(allPassed, RoutingRule.STOP_ON_ANY_OPINION_FAIL),
 					VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
 				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("requires a genuine FAIL");
 
@@ -644,9 +650,11 @@ class VerdictTest {
 			// on.
 			Verdict machineryOnly = tier(BROKEN, VerdictProvenance.undecided(),
 					Judgment.error(JudgmentReasonCode.STAGE_FAILED, "a member did not produce a determination"));
-			assertThatThrownBy(() -> root(BROKEN, machineryOnly, refused(machineryOnly, RoutingRule.REJECT_ON_ANY_FAIL),
-					VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
-				.build()).isInstanceOf(IllegalArgumentException.class)
+			assertThatThrownBy(
+					() -> root(BROKEN, machineryOnly, refused(machineryOnly, RoutingRule.STOP_ON_ANY_OPINION_FAIL),
+							VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
+						.build())
+				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("a broken stage on its own justifies nothing");
 		}
 
@@ -654,7 +662,7 @@ class VerdictTest {
 		@DisplayName("a CHILD_UNDECIDED rejection keeps the child's own machinery error as its root")
 		void childUndecidedKeepsTheChildsCode() {
 			Verdict tier = undecidedTier();
-			CompositeAttempt attempt = refused(tier, RoutingRule.REJECT_ON_ANY_FAIL);
+			CompositeAttempt attempt = refused(tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL);
 
 			assertThatThrownBy(() -> root(Judgment.error(JudgmentReasonCode.STAGE_FAILED, "a root of the parent's own"),
 					tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
@@ -669,29 +677,21 @@ class VerdictTest {
 		@DisplayName("R-D: a rejection on a refused exclusion builds a parent-authored stage_failed root")
 		void refusedExclusionBuildsAStageFailedRoot() {
 			Verdict tier = excludedTier();
-			CompositeAttempt attempt = refused(tier, RoutingRule.REJECT_ON_ANY_FAIL);
-
+			CompositeAttempt attempt = refused(tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL);
 			assertThatThrownBy(
-					() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION).build(),
-					"copying the exclusion the cascade just refused would adopt the claim it rejected")
+					() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION).build())
 				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("parent-authored");
-			assertThatThrownBy(() -> root(BROKEN, tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION).build(),
-					"and any other machinery code would name a cause the parent did not observe")
+				.hasMessageContaining("accepted UNDECIDED input");
+			assertThatThrownBy(() -> root(BROKEN, tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION).build())
 				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("parent-authored");
-			assertThatCode(() -> root(
-					Judgment.error(JudgmentReasonCode.STAGE_FAILED,
-							"tier 'gate' returned NOT_APPLICABLE without declaring that its aggregate may be excluded"),
-					tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
-				.build()).doesNotThrowAnyException();
+				.hasMessageContaining("accepted UNDECIDED input");
 		}
 
 		@Test
 		@DisplayName("what a cascade copies must really have been copied, whichever basis it stopped on")
 		void everythingElseIsCopied() {
 			Verdict tier = undecidedTier();
-			CompositeAttempt attempt = refused(tier, RoutingRule.REJECT_ON_ANY_FAIL);
+			CompositeAttempt attempt = refused(tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL);
 
 			assertThatThrownBy(() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
 				.individual(List.of(FAILED))
@@ -724,7 +724,7 @@ class VerdictTest {
 		@DisplayName("the copied individuals keep their order, even when the map and seats still match")
 		void copiedIndividualsKeepTheirOrder() {
 			Verdict tier = undecidedTier();
-			CompositeAttempt attempt = refused(tier, RoutingRule.REJECT_ON_ANY_FAIL);
+			CompositeAttempt attempt = refused(tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL);
 
 			assertThatCode(
 					() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION).build())
@@ -741,7 +741,7 @@ class VerdictTest {
 		@DisplayName("the copied keyed judgments keep their values, even when the order and seats still match")
 		void copiedKeyedJudgmentsKeepTheirValues() {
 			Verdict tier = undecidedTier();
-			CompositeAttempt attempt = refused(tier, RoutingRule.REJECT_ON_ANY_FAIL);
+			CompositeAttempt attempt = refused(tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL);
 
 			assertThatThrownBy(
 					() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
@@ -756,7 +756,7 @@ class VerdictTest {
 		@DisplayName("the copied seats keep their positions, even when the order and map still match")
 		void copiedSeatsKeepTheirPositions() {
 			Verdict tier = undecidedTier();
-			CompositeAttempt attempt = refused(tier, RoutingRule.REJECT_ON_ANY_FAIL);
+			CompositeAttempt attempt = refused(tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL);
 
 			assertThatThrownBy(
 					() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)

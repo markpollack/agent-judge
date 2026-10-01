@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.file;
 
 import io.github.markpollack.judge.DeterministicJudge;
@@ -18,13 +23,17 @@ public class TextFileJudge extends DeterministicJudge<FileComparison> {
 
 	private static final Logger logger = LoggerFactory.getLogger(TextFileJudge.class);
 
-	/** Create a whitespace-normalizing text-file judge. */
-	public TextFileJudge() {
-		super("TextFileJudge", "Compares text files using whitespace-normalized string comparison");
+	/**
+	 * Create a whitespace-normalizing text-file judge.
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
+	 */
+	public TextFileJudge(java.util.function.Supplier<? extends FileComparison> source) {
+		super(source, "TextFileJudge", "Compares text files using whitespace-normalized string comparison");
 	}
 
 	@Override
-	public Judgment judge(FileComparison evidence) {
+	protected Judgment evaluate(FileComparison evidence) {
 		String filePath = evidence.relativePath();
 		Path expectedFile = evidence.expectedFile();
 		Path actualFile = evidence.actualFile();
@@ -84,6 +93,14 @@ public class TextFileJudge extends DeterministicJudge<FileComparison> {
 		}
 
 		return diff.toString();
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<FileComparison> builder() {
+		return io.github.markpollack.judge.construction.EvidenceSteps.of(source -> new TextFileJudge(source));
 	}
 
 }

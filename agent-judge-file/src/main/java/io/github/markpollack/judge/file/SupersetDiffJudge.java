@@ -64,22 +64,28 @@ public class SupersetDiffJudge extends DeterministicJudge<DirectoryComparison> {
 
 	private final Set<String> excludes;
 
-	/** Create a judge with no excluded paths. */
-	public SupersetDiffJudge() {
-		this(Set.of());
+	/**
+	 * Create a judge with no excluded paths.
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
+	 */
+	public SupersetDiffJudge(java.util.function.Supplier<? extends DirectoryComparison> source) {
+		this(source, Set.of());
 	}
 
 	/**
 	 * Create a judge with excluded relative paths.
 	 * @param excludes paths excluded from comparison
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public SupersetDiffJudge(Set<String> excludes) {
-		super("SupersetDiffJudge", "Verifies output is a superset of the reference project");
+	public SupersetDiffJudge(java.util.function.Supplier<? extends DirectoryComparison> source, Set<String> excludes) {
+		super(source, "SupersetDiffJudge", "Verifies output is a superset of the reference project");
 		this.excludes = Set.copyOf(excludes);
 	}
 
 	@Override
-	public Judgment judge(DirectoryComparison evidence) {
+	protected Judgment evaluate(DirectoryComparison evidence) {
 		Path expectedDir = evidence.expectedDirectory();
 		if (!Files.isDirectory(expectedDir)) {
 			return Judgment.abstain("Reference directory does not exist: " + expectedDir);
@@ -146,6 +152,25 @@ public class SupersetDiffJudge extends DeterministicJudge<DirectoryComparison> {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<DirectoryComparison> builder() {
+		return io.github.markpollack.judge.construction.EvidenceSteps.of(source -> new SupersetDiffJudge(source));
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @param excludes producer configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<DirectoryComparison> builder(
+			Set<String> excludes) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new SupersetDiffJudge(source, excludes));
 	}
 
 }

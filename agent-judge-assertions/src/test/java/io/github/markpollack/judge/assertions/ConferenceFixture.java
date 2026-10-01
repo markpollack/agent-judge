@@ -7,7 +7,8 @@ package io.github.markpollack.judge.assertions;
 import io.github.markpollack.judge.requirement.Requirement;
 
 import com.fasterxml.jackson.databind.*;
-import io.github.markpollack.judge.RequirementJudge;
+import io.github.markpollack.judge.construction.*;
+import io.github.markpollack.judge.jev.JevRuntime;
 import io.github.markpollack.judge.evaluation.*;
 import io.github.markpollack.judge.policy.*;
 import io.github.markpollack.judge.serialization.VerdictCodec;
@@ -133,18 +134,19 @@ final class ConferenceFixture {
 				b.path("textSha256").asText(), true);
 	}
 
-	RequirementJudge<String, JevEvidence> bind(JevJudge judge) {
-		return (actual, evidence) -> {
-			// This frozen experiment admits only its reviewed roster. The production
-			// evaluator receives this actual requirement; it has no second binding.
+	JudgeRecipe<String, JevEvidence> bind(JevRuntime runtime) {
+		return actual -> {
+			Requirement.validate(actual);
 			if (!List.of(requirement(0), requirement(1)).contains(actual))
-				return Judgment.error("Requirement is outside this reviewed fixture roster");
-			return judge.judge(actual, evidence);
+				return EvidenceSteps
+					.of(evidence -> () -> Judgment.error("Requirement is outside this reviewed fixture roster")
+						.forRequirement(actual));
+			return JevJudge.builder().runtime(runtime).requirement(actual);
 		};
 	}
 
-	JevJudge judge(String key, URI endpoint, HttpClient http, Path output) {
-		return new JevJudge(key, configuration.path("requestedModel").asText(), endpoint,
+	JevRuntime judge(String key, URI endpoint, HttpClient http, Path output) {
+		return new JevRuntime(key, configuration.path("requestedModel").asText(), endpoint,
 				Duration.ofSeconds(configuration.path("timeoutSeconds").asLong()),
 				configuration.path("maxEvidenceBytes").asInt(), configuration.path("maxBodyBytes").asInt(), question,
 				http, (kind, bytes) -> {

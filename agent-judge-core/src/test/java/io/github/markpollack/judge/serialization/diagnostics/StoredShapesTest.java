@@ -147,12 +147,12 @@ class StoredShapesTest {
 	@Test
 	@DisplayName("a flat verdict with no composite container: the root carries it and stages is empty")
 	void aFlatRoot() {
-		Verdict flat = SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> Judgment.pass("compiled"), "build"))
-			.judge(Judges.named(context -> Judgment.fail("two tests failed"), "tests"))
+		Verdict flat = SimpleJury.builder()
+			.judge(Judges.named(() -> Judgment.pass("compiled"), "build"))
+			.judge(Judges.named(() -> Judgment.fail("two tests failed"), "tests"))
 			.votingStrategy(new ConsensusStrategy())
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		for (StoredReading interpretation : List.of(StoredVerdicts.interpret(flat),
 				StoredVerdicts.interpret(asMap(flat)))) {

@@ -31,9 +31,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>
  * The stored verdict was generated through the real jury, recorder and store. One tier,
- * {@code structure} ({@code REJECT_ON_ANY_FAIL}), two declared judges under consensus:
- * one passed, one failed, consensus of the two is {@code abstain}, and the cascade
- * adopted it.
+ * {@code structure} ({@code STOP_ON_ANY_OPINION_FAIL}), two declared judges under
+ * consensus: one passed, one failed, consensus of the two is {@code abstain}, and the
+ * cascade adopted it.
  */
 @DisplayName("Example one: the 0.17 cascade")
 class ExampleOneTest {
@@ -54,15 +54,17 @@ class ExampleOneTest {
 	 * tier never runs.
 	 */
 	static Verdict sameJury() {
-		return CascadedJury.<CompletionEvidence>builder()
-			.tier("structure", SimpleJury.<CompletionEvidence>builder()
-				.judge(Judges.named(context -> Judgment.pass("report present"), "structure:ddd-review.md"))
-				.judge(Judges.named(context -> Judgment.fail("report has no bounded contexts"), "reportStructure"))
-				.votingStrategy(new ConsensusStrategy())
-				.build(), RoutingRule.REJECT_ON_ANY_FAIL)
+		return CascadedJury.builder()
+			.tier("structure",
+					SimpleJury.builder()
+						.judge(Judges.named(() -> Judgment.pass("report present"), "structure:ddd-review.md"))
+						.judge(Judges.named(() -> Judgment.fail("report has no bounded contexts"), "reportStructure"))
+						.votingStrategy(new ConsensusStrategy())
+						.build(),
+					RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("quality", Fixtures.passingTier("expertRecall", "never reached"), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 	}
 
 	@Test
@@ -95,7 +97,7 @@ class ExampleOneTest {
 		StoredReading fromStore = StoredVerdicts.interpret(stored(EXAMPLE_ONE));
 		StoredReading fromJury = StoredVerdicts.interpret(sameJury());
 
-		assertThat(fromJury.sourceVersion()).isEqualTo(4);
+		assertThat(fromJury.sourceVersion()).isEqualTo(5);
 		assertThat(fromStore.sourceVersion()).isEqualTo(1);
 		assertThat(fromJury.outcome()).isEqualTo(fromStore.outcome());
 		assertThat(fromJury).isEqualTo(StoredVerdicts.interpret(Fixtures.asMap(sameJury())));

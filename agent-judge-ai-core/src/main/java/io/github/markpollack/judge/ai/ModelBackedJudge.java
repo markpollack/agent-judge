@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai;
 
 import java.nio.charset.StandardCharsets;
@@ -50,11 +55,25 @@ import io.github.markpollack.judge.judgment.Judgment;
  * @author Mark Pollack
  * @since 0.10.0
  */
-public final class ModelBackedJudge<E> implements JudgeWithMetadata<E>, ConfiguredJudge<E> {
+public final class ModelBackedJudge<E> implements JudgeWithMetadata, ConfiguredJudge {
+
+	/**
+	 * Final construction stage for a model producer.
+	 *
+	 * @param <E> evidence type captured during construction
+	 */
+	@FunctionalInterface
+	public interface Ready<E> extends io.github.markpollack.judge.construction.ReadyJudge {
+
+		@Override
+		ModelBackedJudge<E> build();
+
+	}
 
 	/**
 	 * Configuration key for the prompt template's {@linkplain JudgePromptTemplate#name()
 	 * name}.
+	 *
 	 * @since 0.17.0
 	 */
 	public static final String PROMPT_TEMPLATE_KEY = "promptTemplate";
@@ -62,6 +81,7 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata<E>, Configur
 	/**
 	 * Configuration key for the lowercase hexadecimal SHA-256 digest of the template
 	 * text, encoded as UTF-8, before rendering.
+	 *
 	 * @since 0.17.0
 	 */
 	public static final String PROMPT_TEMPLATE_SHA256_KEY = "promptTemplateSha256";
@@ -70,6 +90,7 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata<E>, Configur
 	 * Configuration key for the template's
 	 * {@linkplain JudgePromptTemplate#missingVariablePolicy() missing-variable policy},
 	 * as its constant name.
+	 *
 	 * @since 0.17.0
 	 */
 	public static final String MISSING_VARIABLE_POLICY_KEY = "missingVariablePolicy";
@@ -78,6 +99,7 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata<E>, Configur
 	 * Configuration key for the judgment classifier's implementation, in the portable
 	 * form of {@link ImplementationIdentity}, so a lambda classifier records no unstable
 	 * class name.
+	 *
 	 * @since 0.17.0
 	 */
 	public static final String JUDGMENT_CLASSIFIER_KEY = "judgmentClassifier";
@@ -92,20 +114,44 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata<E>, Configur
 
 	private final JudgeModel model;
 
+	private final java.util.function.Supplier<? extends E> evidence;
+
+	private final io.github.markpollack.judge.requirement.Requirement<?> requirement;
+
 	private ModelBackedJudge(JudgeMetadata metadata, JudgePromptTemplate promptTemplate, JudgmentClassifier classifier,
-			JudgeModel model, Function<? super E, Map<String, Object>> variables) {
+			JudgeModel model, Function<? super E, Map<String, Object>> variables,
+			java.util.function.Supplier<? extends E> evidence,
+			io.github.markpollack.judge.requirement.Requirement<?> requirement) {
 		this.metadata = metadata;
 		this.promptTemplate = promptTemplate;
 		this.classifier = classifier;
 		this.model = model;
 		this.variables = variables;
+		this.evidence = evidence;
+		this.requirement = requirement;
 	}
 
 	@Override
-	public Judgment judge(E evidence) {
-		String prompt = promptTemplate.render(variables.apply(evidence));
-		JudgeModelResponse response = model.generate(JudgeModelRequest.user(prompt));
-		return classifier.classify(response);
+	public Judgment judge() {
+		String prompt = promptTemplate
+			.render(variables.apply(java.util.Objects.requireNonNull(evidence.get(), "acquired evidence")));
+		var response = model.execute(JudgeModelRequest.user(prompt));
+		Judgment result;
+		try {
+			result = java.util.Objects.requireNonNull(classifier.classify(response.answer()),
+					"Classifier returned null");
+		}
+		catch (java.util.concurrent.CancellationException cancelled) {
+			throw cancelled;
+		}
+		catch (RuntimeException failure) {
+			if (Thread.currentThread().isInterrupted())
+				throw new java.util.concurrent.CancellationException("Classification interrupted");
+			result = Judgment.error("Answer classification failed: " + failure.getClass().getName() + ": "
+					+ java.util.Objects.toString(failure.getMessage(), ""));
+		}
+		result = result.withInvocation(response.invocation());
+		return requirement == null ? result : result.forRequirement(requirement);
 	}
 
 	@Override
@@ -128,6 +174,7 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata<E>, Configur
 	 * {@link JudgeModelResponse#model()}.
 	 * </p>
 	 * @return the declared configuration, in declaration order
+	 *
 	 * @since 0.17.0
 	 */
 	@Override
@@ -164,7 +211,8 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata<E>, Configur
 	 *
 	 * @param <E> evidence type
 	 */
-	public static class Builder<E> {
+	public static class Builder<E> implements io.github.markpollack.judge.construction.EvidenceStep<E>,
+			io.github.markpollack.judge.construction.JudgeRecipe<String, E> {
 
 		/** Create an empty builder. */
 		public Builder() {
@@ -183,6 +231,58 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata<E>, Configur
 		private String notApplicableWhen;
 
 		private Function<? super E, Map<String, Object>> variables;
+
+		@Override
+		public Ready<E> evidence(E value) {
+			Objects.requireNonNull(value);
+			return evidenceSupplier(() -> value);
+		}
+
+		@Override
+		public Ready<E> evidenceSupplier(java.util.function.Supplier<? extends E> provider) {
+			Objects.requireNonNull(provider);
+			Builder<E> captured = snapshot();
+			return () -> captured.build(provider, null);
+		}
+
+		@Override
+		public io.github.markpollack.judge.construction.EvidenceStep<E> requirement(
+				io.github.markpollack.judge.requirement.Requirement<String> actual) {
+			io.github.markpollack.judge.requirement.Requirement.validate(actual);
+			Builder<E> captured = snapshot();
+			return new io.github.markpollack.judge.construction.EvidenceStep<>() {
+				public Ready<E> evidence(E value) {
+					Objects.requireNonNull(value);
+					return evidenceSupplier(() -> value);
+				}
+
+				public Ready<E> evidenceSupplier(java.util.function.Supplier<? extends E> provider) {
+					Objects.requireNonNull(provider);
+					return () -> captured.build(provider, actual);
+				}
+			};
+		}
+
+		private Builder<E> snapshot() {
+			Builder<E> copy = new Builder<>();
+			copy.name = name;
+			copy.description = description;
+			copy.promptTemplate = promptTemplate;
+			copy.classifier = classifier;
+			copy.model = model;
+			copy.notApplicableWhen = notApplicableWhen;
+			copy.variables = variables;
+			return copy;
+		}
+
+		/**
+		 * Selects the native generated-answer runtime.
+		 * @param runtime native harness
+		 * @return this builder
+		 */
+		public Builder<E> runtime(JudgeModel runtime) {
+			return model(runtime);
+		}
 
 		/**
 		 * Define how this Judge renders its typed evidence, separately from model
@@ -257,6 +357,7 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata<E>, Configur
 		 * </p>
 		 * @param notApplicableWhen the condition; must be non-blank
 		 * @return this builder
+		 *
 		 * @since 0.17.0
 		 */
 		public Builder<E> notApplicableWhen(String notApplicableWhen) {
@@ -268,7 +369,8 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata<E>, Configur
 		 * Build the configured judge.
 		 * @return a model-backed judge
 		 */
-		public ModelBackedJudge<E> build() {
+		private ModelBackedJudge<E> build(java.util.function.Supplier<? extends E> evidence,
+				io.github.markpollack.judge.requirement.Requirement<?> requirement) {
 			if (name == null) {
 				throw new IllegalStateException("Judge name is required");
 			}
@@ -281,9 +383,29 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata<E>, Configur
 			if (model == null) {
 				throw new IllegalStateException("Judge model is required");
 			}
+			model.requireInput(io.github.markpollack.judge.ai.model.GeneratedInput.PREPARED_EVIDENCE);
 			JudgeMetadata metadata = new JudgeMetadata(name, description, JudgeType.LLM_POWERED, notApplicableWhen);
 			return new ModelBackedJudge<>(metadata, promptTemplate, classifier, model,
-					Objects.requireNonNull(variables, "evidence variables"));
+					requirementVariables(Objects.requireNonNull(variables, "evidence variables"), requirement),
+					evidence, requirement);
+		}
+
+		private Function<? super E, Map<String, Object>> requirementVariables(
+				Function<? super E, Map<String, Object>> projection,
+				io.github.markpollack.judge.requirement.Requirement<?> requirement) {
+			if (requirement == null)
+				return projection;
+			return value -> {
+				Map<String, Object> result = new LinkedHashMap<>(projection.apply(value));
+				Map<String, Object> owned = Map.of("requirement", requirement.specification(), "requirementId",
+						requirement.id(), "requirementRevision", requirement.revision());
+				owned.forEach((key, fact) -> {
+					if (result.containsKey(key))
+						throw new IllegalArgumentException("Evidence projection duplicates configured " + key);
+					result.put(key, fact);
+				});
+				return result;
+			};
 		}
 
 	}

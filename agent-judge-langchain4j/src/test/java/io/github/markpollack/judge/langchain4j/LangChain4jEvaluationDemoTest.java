@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.langchain4j;
 
 import java.util.List;
@@ -26,7 +31,7 @@ class LangChain4jEvaluationDemoTest {
 	void langchain4jResultEvaluatedWithJudge() {
 		// A simple judge that checks the answer is non-empty and mentions the question
 		// topic
-		Judge<CompletionEvidence> relevanceCheck = (CompletionEvidence ctx) -> {
+		java.util.function.Function<CompletionEvidence, Judge> relevanceCheck = (CompletionEvidence ctx) -> () -> {
 			String output = java.util.Optional.ofNullable(ctx.response()).orElse("");
 			boolean relevant = !output.isEmpty() && output.toLowerCase().contains("spring boot");
 			return (relevant ? Judgment.builder().pass() : Judgment.builder().fail())
@@ -48,7 +53,7 @@ class LangChain4jEvaluationDemoTest {
 
 	@Test
 	void langchain4jResultWithToolExecutionsPreservesMetadata() {
-		Judge<CompletionEvidence> anyJudge = (CompletionEvidence ctx) -> {
+		java.util.function.Function<CompletionEvidence, Judge> anyJudge = (CompletionEvidence ctx) -> () -> {
 			// Verify tool executions are accessible in metadata
 			@SuppressWarnings("unchecked")
 			List<ToolExecution> tools = (List<ToolExecution>) ctx.metadata().get("langchain4j.toolExecutions");

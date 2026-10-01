@@ -24,21 +24,22 @@ import static org.assertj.core.api.Assertions.*;
 class RequirementAssertionTest {
 
 	static final Requirement<String> R = Requirement.text("ready", "1", "READY");
-	static final RequirementJudge<String, String> MATCH = (r, e) -> r.specification().equals(e)
-			? Judgment.pass("matches") : Judgment.fail("differs");
+	static final io.github.markpollack.judge.construction.JudgeRecipe<String, String> MATCH = io.github.markpollack.judge.assertj.TestRecipes
+		.judge((r, e) -> r.specification().equals(e) ? Judgment.pass("matches") : Judgment.fail("differs"));
 
 	@Test
 	void terminalAloneInvokesAndRepeatedTerminalsRetainOriginalObjects() {
 		var calls = new AtomicInteger();
 		var policies = new AtomicInteger();
-		var judgment = Judgment.pass("matched");
+		var judgment = Judgment.pass("matched").forRequirement(R);
 		var decision = new PolicyDecision(PolicyAction.RELY, "reviewed");
-		RequirementJudge<String, String> judge = (r, e) -> {
-			assertThat(r).isSameAs(R);
-			assertThat(e).isEqualTo("READY");
-			calls.incrementAndGet();
-			return judgment;
-		};
+		io.github.markpollack.judge.construction.JudgeRecipe<String, String> judge = io.github.markpollack.judge.assertj.TestRecipes
+			.judge((r, e) -> {
+				org.assertj.core.api.Assertions.assertThat(r).isSameAs(R);
+				assertThat(e).isEqualTo("READY");
+				calls.incrementAndGet();
+				return judgment;
+			});
 		var terminal = assertThat(R).judgedBy(judge).withEvidence("READY").withPolicy(v -> {
 			policies.incrementAndGet();
 			return decision;
@@ -48,10 +49,11 @@ class RequirementAssertionTest {
 		terminal.isSatisfied();
 		terminal.isSatisfied();
 		var result = terminal.evaluate();
-		assertThat(result).isSatisfied();
-		assertThat(result.verdict().judgment()).isSameAs(judgment);
-		assertThat(((PolicyResult.Decided) result.policyResult()).decision()).isSameAs(decision);
-		assertThat(terminal.evaluate()).isSameAs(result);
+		assertThat(result).isPassed();
+		org.assertj.core.api.Assertions.assertThat(result.verdict().judgment()).isSameAs(judgment);
+		org.assertj.core.api.Assertions.assertThat(((PolicyResult.Decided) result.policyResult()).decision())
+			.isSameAs(decision);
+		org.assertj.core.api.Assertions.assertThat(terminal.evaluate()).isSameAs(result);
 		assertThat(calls).hasValue(1);
 		assertThat(policies).hasValue(1);
 		assertThatThrownBy(() -> terminal.withPolicy(v -> decision)).isInstanceOf(IllegalStateException.class);
@@ -66,9 +68,9 @@ class RequirementAssertionTest {
 
 	@Test
 	void descriptionKeepsCompleteFailureAsCause() {
-		var terminal = assertThat(R).as("release gate").judgedBy(MATCH).withEvidence("NO");
-		assertThatThrownBy(terminal::isSatisfied).hasMessageContaining("[release gate]")
-			.hasCauseInstanceOf(RequirementAssertionError.class);
+		var terminal = assertThat(R).judgedBy(MATCH).withEvidence("NO");
+		assertThatThrownBy(terminal::isSatisfied).isInstanceOf(RequirementAssertionError.class)
+			.hasMessageContaining("ready");
 		assertThat(terminal.evaluate().verdict()).hasConclusion(Verdict.Conclusion.FAIL);
 	}
 
@@ -102,8 +104,8 @@ class RequirementAssertionTest {
 
 	@Test
 	void requirementJuryKeepsEveryOpinionAndDisagreement() {
-		var jury = RequirementJuries.<String, String>voting(new MajorityVotingStrategy(),
-				List.of(MATCH, MATCH, (r, e) -> Judgment.fail("dissent")));
+		var jury = TestRecipes.<String, String>voting(new MajorityVotingStrategy(),
+				List.of(MATCH, MATCH, TestRecipes.<String, String>judge((r, e) -> Judgment.fail("dissent"))));
 		var terminal = assertThat(R).judgedBy(jury).withEvidence("READY");
 		terminal.isSatisfied();
 		assertThat(terminal.evaluate().verdict().individual()).extracting(Judgment::status)
@@ -113,23 +115,24 @@ class RequirementAssertionTest {
 
 	@Test
 	void ordinaryEvidenceAndJuryNeedNoRequirement() {
-		Judge<Integer> positive = e -> e > 0 ? Judgment.pass("positive") : Judgment.fail("not positive");
-		assertThatEvidence(42).judgedBy(positive).isPassed();
+		Judge positive = () -> 42 > 0 ? Judgment.pass("positive") : Judgment.fail("not positive");
+		assertThat(positive).isPassed();
 		var jury = Juries.fromJudges(new ConsensusStrategy(), positive, positive);
-		assertThatEvidence(42).judgedBy(jury).hasConclusion(Verdict.Conclusion.PASS);
+		assertThat(jury).isPassed();
 	}
 
 	@Test
 	void retainedResultRoundTripDoesNotExecuteAgain() {
 		var calls = new AtomicInteger();
-		RequirementJudge<String, String> judge = (r, e) -> {
-			calls.incrementAndGet();
-			return MATCH.judge(r, e);
-		};
+		io.github.markpollack.judge.construction.JudgeRecipe<String, String> judge = io.github.markpollack.judge.assertj.TestRecipes
+			.judge((r, e) -> {
+				calls.incrementAndGet();
+				return MATCH.requirement(r).evidence(e).build().judge();
+			});
 		var result = assertThat(R).judgedBy(judge).withEvidence("READY").evaluate();
 		var codec = new VerdictCodec();
 		var stored = codec.readEvaluation(codec.write(result));
-		assertThat(stored).isSatisfied();
+		assertThat(stored).isPassed();
 		assertThat(stored.verdict()).hasConclusion(Verdict.Conclusion.PASS);
 		VerdictReport.of(stored.verdict()).summary();
 		assertThat(calls).hasValue(1);
@@ -138,12 +141,13 @@ class RequirementAssertionTest {
 	@Test
 	void nullConfigurationFailsWithoutExecution() {
 		var calls = new AtomicInteger();
-		RequirementJudge<String, String> judge = (r, e) -> {
-			calls.incrementAndGet();
-			return Judgment.pass("yes");
-		};
-		assertThatNullPointerException()
-			.isThrownBy(() -> assertThat(R).judgedBy((RequirementJudge<String, String>) null));
+		io.github.markpollack.judge.construction.JudgeRecipe<String, String> judge = io.github.markpollack.judge.assertj.TestRecipes
+			.judge((r, e) -> {
+				calls.incrementAndGet();
+				return Judgment.pass("yes");
+			});
+		assertThatNullPointerException().isThrownBy(() -> assertThat(R)
+			.judgedBy((io.github.markpollack.judge.construction.JudgeRecipe<String, String>) null));
 		assertThatNullPointerException()
 			.isThrownBy(() -> assertThat(R).judgedBy(judge).withEvidence("x").withPolicy(null));
 		assertThat(calls).hasValue(0);

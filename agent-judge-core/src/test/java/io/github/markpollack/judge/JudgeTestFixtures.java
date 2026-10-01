@@ -46,8 +46,8 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return always-pass judge
 	 */
-	public static Judge<CompletionEvidence> alwaysPass(String name) {
-		return Judges.named(ctx -> Judgment.pass("Always passes"), name, null, JudgeType.DETERMINISTIC);
+	public static Judge alwaysPass(String name) {
+		return Judges.named(() -> Judgment.pass("Always passes"), name, null, JudgeType.DETERMINISTIC);
 	}
 
 	/**
@@ -55,8 +55,8 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return always-fail judge
 	 */
-	public static Judge<CompletionEvidence> alwaysFail(String name) {
-		return Judges.named(ctx -> Judgment.fail("Always fails"), name, null, JudgeType.DETERMINISTIC);
+	public static Judge alwaysFail(String name) {
+		return Judges.named(() -> Judgment.fail("Always fails"), name, null, JudgeType.DETERMINISTIC);
 	}
 
 	/**
@@ -64,8 +64,8 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return always-abstain judge
 	 */
-	public static Judge<CompletionEvidence> alwaysAbstain(String name) {
-		return Judges.named(ctx -> Judgment.abstain("Cannot evaluate"), name, null, JudgeType.DETERMINISTIC);
+	public static Judge alwaysAbstain(String name) {
+		return Judges.named(() -> Judgment.abstain("Cannot evaluate"), name, null, JudgeType.DETERMINISTIC);
 	}
 
 	/**
@@ -73,8 +73,8 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return always-error judge
 	 */
-	public static Judge<CompletionEvidence> alwaysError(String name) {
-		return Judges.named(ctx -> Judgment.error("Evaluation error"), name, null, JudgeType.DETERMINISTIC);
+	public static Judge alwaysError(String name) {
+		return Judges.named(() -> Judgment.error("Evaluation error"), name, null, JudgeType.DETERMINISTIC);
 	}
 
 	/**
@@ -83,8 +83,8 @@ public final class JudgeTestFixtures {
 	 * @param failure the exception the judge throws
 	 * @return always-throwing judge
 	 */
-	public static Judge<CompletionEvidence> alwaysThrows(String name, RuntimeException failure) {
-		return Judges.named(ctx -> {
+	public static Judge alwaysThrows(String name, RuntimeException failure) {
+		return Judges.named(() -> {
 			throw failure;
 		}, name, null, JudgeType.DETERMINISTIC);
 	}
@@ -94,8 +94,8 @@ public final class JudgeTestFixtures {
 	 * @param name judge name
 	 * @return judge returning null
 	 */
-	public static Judge<CompletionEvidence> returnsNothing(String name) {
-		return Judges.named(ctx -> null, name, null, JudgeType.DETERMINISTIC);
+	public static Judge returnsNothing(String name) {
+		return Judges.named(() -> null, name, null, JudgeType.DETERMINISTIC);
 	}
 
 	/**
@@ -104,10 +104,10 @@ public final class JudgeTestFixtures {
 	 * @param result judgment the judge would return if asked
 	 * @return judge whose {@code metadata()} returns null
 	 */
-	public static Judge<CompletionEvidence> nullMetadata(Judgment result) {
-		return new JudgeWithMetadata<CompletionEvidence>() {
+	public static Judge nullMetadata(Judgment result) {
+		return new JudgeWithMetadata() {
 			@Override
-			public Judgment judge(CompletionEvidence context) {
+			public Judgment judge() {
 				return result;
 			}
 
@@ -124,10 +124,10 @@ public final class JudgeTestFixtures {
 	 * @param result judgment the judge would return if asked
 	 * @return judge whose metadata cannot be read
 	 */
-	public static Judge<CompletionEvidence> throwingMetadata(RuntimeException failure, Judgment result) {
-		return new JudgeWithMetadata<CompletionEvidence>() {
+	public static Judge throwingMetadata(RuntimeException failure, Judgment result) {
+		return new JudgeWithMetadata() {
 			@Override
-			public Judgment judge(CompletionEvidence context) {
+			public Judgment judge() {
 				return result;
 			}
 
@@ -144,8 +144,8 @@ public final class JudgeTestFixtures {
 	 * @param score numerical score value
 	 * @return score-based judge
 	 */
-	public static Judge<CompletionEvidence> withScore(String name, double score) {
-		return Judges.named(ctx -> (score >= 0.5 ? Judgment.builder().pass() : Judgment.builder().fail()).score(score)
+	public static Judge withScore(String name, double score) {
+		return Judges.named(() -> (score >= 0.5 ? Judgment.builder().pass() : Judgment.builder().fail()).score(score)
 			.reasoning("Score: " + score)
 			.build(), name, null, JudgeType.DETERMINISTIC);
 	}
@@ -167,8 +167,8 @@ public final class JudgeTestFixtures {
 	 * @param result judgment to return
 	 * @return slow judge
 	 */
-	public static Judge<CompletionEvidence> slow(String name, long delayMillis, Judgment result) {
-		return Judges.named(ctx -> {
+	public static Judge slow(String name, long delayMillis, Judgment result) {
+		return Judges.named(() -> {
 			try {
 				Thread.sleep(delayMillis);
 			}
@@ -373,7 +373,7 @@ public final class JudgeTestFixtures {
 	/**
 	 * Judge that records all invocations for verification.
 	 */
-	public static class RecordingJudge implements Judge<CompletionEvidence>, JudgeWithMetadata<CompletionEvidence> {
+	public static class RecordingJudge implements Judge, JudgeWithMetadata {
 
 		private final JudgeMetadata metadata;
 
@@ -381,14 +381,21 @@ public final class JudgeTestFixtures {
 
 		private final List<CompletionEvidence> invocations = new ArrayList<>();
 
+		private final CompletionEvidence evidence;
+
 		public RecordingJudge(String name, Judgment result) {
+			this(name, result, CompletionEvidence.builder().request("recording fixture").build());
+		}
+
+		public RecordingJudge(String name, Judgment result, CompletionEvidence evidence) {
+			this.evidence = evidence;
 			this.metadata = new JudgeMetadata(name, "Recording judge", JudgeType.DETERMINISTIC);
 			this.result = result;
 		}
 
 		@Override
-		public Judgment judge(CompletionEvidence context) {
-			invocations.add(context);
+		public Judgment judge() {
+			invocations.add(evidence);
 			return result;
 		}
 

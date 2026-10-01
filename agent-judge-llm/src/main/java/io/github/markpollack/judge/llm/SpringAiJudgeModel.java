@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.llm;
 
 import java.util.HashMap;
@@ -29,12 +34,14 @@ public final class SpringAiJudgeModel implements JudgeModel {
 
 	private final ChatClient chatClient;
 
+	private final io.github.markpollack.judge.ai.model.NativeCapture<ChatResponse> capture;
+
 	/**
 	 * Create an adapter from an existing chat client.
 	 * @param chatClient chat client
 	 */
 	public SpringAiJudgeModel(ChatClient chatClient) {
-		this.chatClient = chatClient;
+		this(chatClient, io.github.markpollack.judge.ai.model.NativeCapture.json(1048576));
 	}
 
 	/**
@@ -42,22 +49,45 @@ public final class SpringAiJudgeModel implements JudgeModel {
 	 * @param chatClientBuilder chat client builder
 	 */
 	public SpringAiJudgeModel(ChatClient.Builder chatClientBuilder) {
-		this.chatClient = chatClientBuilder.build();
+		this(chatClientBuilder.build());
+	}
+
+	/**
+	 * Configures portable or protected native response capture.
+	 * @param client configured chat harness
+	 * @param capture original native response capture
+	 */
+	public SpringAiJudgeModel(ChatClient client,
+			io.github.markpollack.judge.ai.model.NativeCapture<ChatResponse> capture) {
+		this.chatClient = java.util.Objects.requireNonNull(client);
+		this.capture = java.util.Objects.requireNonNull(capture);
+	}
+
+	@Override
+	public void validateRequest(JudgeModelRequest request) {
+		java.util.Objects.requireNonNull(request);
+		if (request.options().timeout() != null || request.options().responseFormat() != null)
+			throw new IllegalArgumentException(
+					"Spring AI timeout/responseFormat must be configured on the native harness");
 	}
 
 	@Override
 	public JudgeModelResponse generate(JudgeModelRequest request) {
-		ChatClient.ChatClientRequestSpec spec = chatClient.prompt();
-
-		// Map messages by role
-		for (JudgeMessage message : request.messages()) {
-			if (message.role() == JudgeMessageRole.SYSTEM) {
-				spec = spec.system(message.content());
-			}
-			else if (message.role() == JudgeMessageRole.USER) {
-				spec = spec.user(message.content());
-			}
-		}
+		validateRequest(request);
+		java.util.List<org.springframework.ai.chat.messages.Message> messages = request.messages()
+			.stream().<org.springframework.ai.chat.messages.Message>map(message -> switch (message.role()) {
+				case SYSTEM -> new org.springframework.ai.chat.messages.SystemMessage(message.content());
+				case USER -> new org.springframework.ai.chat.messages.UserMessage(message.content());
+				case ASSISTANT -> new org.springframework.ai.chat.messages.AssistantMessage(message.content());
+			})
+			.toList();
+		ChatClient.ChatClientRequestSpec spec = chatClient.prompt().messages(messages);
+		var options = request.options();
+		if (options.model() != null || options.temperature() != null || options.maxTokens() != null)
+			spec = spec.options(org.springframework.ai.chat.prompt.ChatOptions.builder()
+				.model(options.model())
+				.temperature(options.temperature())
+				.maxTokens(options.maxTokens()));
 
 		ChatResponse chatResponse = spec.call().chatResponse();
 
@@ -81,7 +111,32 @@ public final class SpringAiJudgeModel implements JudgeModel {
 			usage = tokenUsage(responseMeta.getUsage());
 		}
 
-		return new JudgeModelResponse(text, model, usage, metadata);
+		String finish = chatResponse.getResult() == null ? null
+				: chatResponse.getResult().getMetadata().getFinishReason();
+		if (finish != null)
+			metadata.put("finishReason", finish);
+		boolean completed = chatResponse.getResult() != null && (finish == null || finish.isBlank()
+				|| java.util.Set.of("stop", "STOP", "SUCCESS", "COMPLETE").contains(finish));
+		Throwable captureFailure = null;
+		java.util.List<io.github.markpollack.judge.provenance.ArtifactRef> artifacts = java.util.List.of();
+		try {
+			var snapshot = capture.capture(chatResponse);
+			metadata.putAll(snapshot.facts());
+			artifacts = snapshot.artifacts();
+		}
+		catch (java.util.concurrent.CancellationException cancelled) {
+			throw cancelled;
+		}
+		catch (RuntimeException failure) {
+			if (Thread.currentThread().isInterrupted())
+				throw new java.util.concurrent.CancellationException("Native capture interrupted");
+			captureFailure = failure;
+			metadata.put("captureFailure",
+					failure.getClass().getName() + ": " + java.util.Objects.toString(failure.getMessage(), ""));
+			completed = false;
+		}
+		return new JudgeModelResponse(text == null ? "" : text, model, usage, metadata, completed, artifacts,
+				captureFailure);
 	}
 
 	/**

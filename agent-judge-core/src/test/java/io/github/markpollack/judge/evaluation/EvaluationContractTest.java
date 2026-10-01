@@ -1,9 +1,15 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.evaluation;
 
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicInteger;
 import io.github.markpollack.judge.*;
+import io.github.markpollack.judge.construction.*;
 import io.github.markpollack.judge.jury.*;
 import io.github.markpollack.judge.judgment.*;
 import io.github.markpollack.judge.requirement.*;
@@ -23,7 +29,8 @@ class EvaluationContractTest {
 	static final Requirement<String> OBSERVABILITY = Requirement.text("observability", "1", "Errors visible");
 
 	static Requirement<AllOf> parent(List<Requirement<?>> children) {
-		return new Requirement<>("readiness", "1", "Ready for production", new AllOf(children), SECURITY.source());
+		return new GeneralRequirement<>("readiness", "1", "Ready for production", new AllOf(children),
+				SECURITY.source());
 	}
 
 	static Judgment result(JudgmentStatus status) {
@@ -62,11 +69,12 @@ class EvaluationContractTest {
 	@Test
 	void ordinaryJudgeNeedsNeitherRequirementNorFindingNorPolicy() {
 		AtomicInteger calls = new AtomicInteger();
-		Judge<Integer> judge = n -> {
+		int n = 4;
+		Judge judge = () -> {
 			calls.incrementAndGet();
 			return n == 4 ? Judgment.pass("four") : Judgment.fail("different");
 		};
-		var result = Evaluations.evaluate(judge, 4);
+		var result = Evaluations.evaluate(judge);
 		assertThat(result.verdict().requirement()).isNull();
 		assertThat(result.verdict().judgment().finding()).isNull();
 		assertThat(result.verdict().conclusion()).isEqualTo(Verdict.Conclusion.PASS);
@@ -116,15 +124,16 @@ class EvaluationContractTest {
 	@Test
 	void mixedOpinionsAndDifferentConstituentsAreNeverFlattened() {
 		var readiness = parent(List.of(SECURITY, COMPATIBILITY, OBSERVABILITY));
-		List<RequirementJudge<String, String>> opinions = List.of((r, e) -> Judgment.pass("one"),
-				(r, e) -> Judgment.pass("two"), (r, e) -> Judgment.fail("dissent"));
-		var security = RequirementJuries.voting(new MajorityVotingStrategy(), opinions);
+		List<JudgeRecipe<String, String>> opinions = List.of(TestRecipes.judge((r, e) -> Judgment.pass("one")),
+				TestRecipes.judge((r, e) -> Judgment.pass("two")),
+				TestRecipes.judge((r, e) -> Judgment.fail("dissent")));
+		var security = TestRecipes.voting(new MajorityVotingStrategy(), opinions);
 		var prepared = Assignments.<String>forRequirement(readiness)
 			.jury(SECURITY, security)
-			.judge(COMPATIBILITY, (r, e) -> Judgment.pass("compatible"))
-			.judge(OBSERVABILITY, (r, e) -> Judgment.fail("logs absent"))
+			.judge(COMPATIBILITY, TestRecipes.judge((r, e) -> Judgment.pass("compatible")))
+			.judge(OBSERVABILITY, TestRecipes.judge((r, e) -> Judgment.fail("logs absent")))
 			.validate();
-		Verdict verdict = prepared.vote("release");
+		Verdict verdict = prepared.evidence("release").build().vote();
 		assertThat(verdict.conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
 		assertThat(verdict.requirement()).isSameAs(readiness);
 		assertThat(verdict.individual()).isEmpty();
@@ -146,10 +155,10 @@ class EvaluationContractTest {
 			"PASS,ERROR,INCONCLUSIVE", "PASS,NOT_APPLICABLE,INCONCLUSIVE", "ERROR,ERROR,INCONCLUSIVE" })
 	void allOfTruthTable(JudgmentStatus first, JudgmentStatus second, Verdict.Conclusion expected) {
 		var prepared = Assignments.<String>forRequirement(parent(List.of(SECURITY, COMPATIBILITY)))
-			.judge(SECURITY, (r, e) -> result(first))
-			.judge(COMPATIBILITY, (r, e) -> result(second))
+			.judge(SECURITY, TestRecipes.judge((r, e) -> result(first)))
+			.judge(COMPATIBILITY, TestRecipes.judge((r, e) -> result(second)))
 			.validate();
-		Verdict verdict = prepared.vote("case");
+		Verdict verdict = prepared.evidence("case").build().vote();
 		assertThat(verdict.conclusion()).isEqualTo(expected);
 		AtomicInteger calls = new AtomicInteger();
 		var evaluated = Evaluations.apply(verdict, v -> {
@@ -164,10 +173,10 @@ class EvaluationContractTest {
 	@Test
 	void invalidAssignmentsCannotExecuteAnythingAndValidatedPlanIsStable() {
 		AtomicInteger calls = new AtomicInteger();
-		RequirementJudge<String, String> judge = (r, e) -> {
+		JudgeRecipe<String, String> judge = TestRecipes.judge((r, e) -> {
 			calls.incrementAndGet();
 			return Judgment.pass("yes");
-		};
+		});
 		var roster = new ArrayList<Requirement<?>>(List.of(SECURITY, COMPATIBILITY));
 		var readiness = parent(roster);
 		roster.clear();
@@ -175,7 +184,7 @@ class EvaluationContractTest {
 		assertThatThrownBy(assignments::validate).hasMessageContaining("Missing assignment: compatibility");
 		assertThatThrownBy(() -> assignments.judge(SECURITY, judge)).hasMessageContaining("Duplicate");
 		assertThatThrownBy(() -> assignments.judge(OBSERVABILITY, judge)).hasMessageContaining("Unrelated");
-		assertThatThrownBy(() -> assignments.judge(COMPATIBILITY, (RequirementJudge<String, String>) null))
+		assertThatThrownBy(() -> assignments.judge(COMPATIBILITY, (JudgeRecipe<String, String>) null))
 			.isInstanceOf(NullPointerException.class);
 		assertThatThrownBy(() -> assignments.judge(Requirement.text("security", "2", "changed"), judge))
 			.hasMessageContaining("differs");
@@ -183,7 +192,7 @@ class EvaluationContractTest {
 			.hasMessageContaining("Ambiguous");
 		assertThat(calls.get()).isZero();
 		var prepared = assignments.judge(COMPATIBILITY, judge).validate();
-		assertThat(prepared.vote("release").conclusion()).isEqualTo(Verdict.Conclusion.PASS);
+		assertThat(prepared.evidence("release").build().vote().conclusion()).isEqualTo(Verdict.Conclusion.PASS);
 		assertThat(calls.get()).isEqualTo(2);
 	}
 
@@ -195,22 +204,22 @@ class EvaluationContractTest {
 
 	@Test
 	void typedSelectorsUseTheParentInstancesAndNativeSpecificationsRoundTrip() {
-		Requirement<ApiLimit> api = new Requirement<>("api", "7", "Max changed API count", new ApiLimit(2),
+		Requirement<ApiLimit> api = new GeneralRequirement<>("api", "7", "Max changed API count", new ApiLimit(2),
 				SECURITY.source());
 		var readiness = parent(List.of(api, OBSERVABILITY));
-		Requirement<ApiLimit> equalReference = new Requirement<>(api.id(), api.revision(), api.text(),
+		Requirement<ApiLimit> equalReference = new GeneralRequirement<>(api.id(), api.revision(), api.text(),
 				api.specification(), api.source());
-		RequirementJudge<ApiLimit, Integer> checker = (r, diff) -> {
+		JudgeRecipe<ApiLimit, Integer> checker = TestRecipes.judge((r, diff) -> {
 			assertThat(r).isSameAs(api);
 			return diff <= r.specification().maximum() ? Judgment.pass("within bound") : Judgment.fail("too many");
-		};
-		RequirementJury<String, String> logs = (r, e) -> Verdict.single("logs",
-				e.isEmpty() ? Judgment.fail("empty") : Judgment.pass("present"));
+		});
+		JuryRecipe<String, String> logs = TestRecipes
+			.jury((r, e) -> Verdict.single("logs", e.isEmpty() ? Judgment.fail("empty") : Judgment.pass("present")));
 		var prepared = Assignments.<ReleaseEvidence>forRequirement(readiness)
 			.judge(equalReference, ReleaseEvidence::apiDiff, checker)
 			.jury(OBSERVABILITY, ReleaseEvidence::logs, logs)
 			.validate();
-		Verdict verdict = prepared.vote(new ReleaseEvidence(1, "log"));
+		Verdict verdict = prepared.evidence(new ReleaseEvidence(1, "log")).build().vote();
 		assertThat(verdict.conclusion()).isEqualTo(Verdict.Conclusion.PASS);
 		assertThatThrownBy(() -> new VerdictCodec().write(verdict)).hasMessageContaining("No registered specification");
 		var codec = new VerdictCodec(Map.of("apiLimit", ApiLimit.class));
@@ -225,13 +234,13 @@ class EvaluationContractTest {
 		var prepared = Assignments.<ReleaseEvidence>forRequirement(parent(List.of(COMPATIBILITY, OBSERVABILITY)))
 			.judge(COMPATIBILITY, (ReleaseEvidence e) -> {
 				throw failure;
-			}, (RequirementJudge<String, Integer>) (r, e) -> {
+			}, TestRecipes.<String, Integer>judge((r, e) -> {
 				providerCalls.incrementAndGet();
 				return Judgment.pass("never");
-			})
-			.judge(OBSERVABILITY, ReleaseEvidence::logs, (r, e) -> Judgment.fail("logs inadequate"))
+			}))
+			.judge(OBSERVABILITY, ReleaseEvidence::logs, TestRecipes.judge((r, e) -> Judgment.fail("logs inadequate")))
 			.validate();
-		Verdict verdict = prepared.vote(new ReleaseEvidence(1, "log"));
+		Verdict verdict = prepared.evidence(new ReleaseEvidence(1, "log")).build().vote();
 		assertThat(verdict.conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
 		assertThat(verdict.compositeAttempts()).hasSize(2);
 		assertThat(verdict.compositeAttempts().getFirst().failure().cause()).isSameAs(failure);
@@ -243,33 +252,33 @@ class EvaluationContractTest {
 	@Test
 	void parentNonApplicabilityDoesNotMeanInconclusiveAndRunsNoChildren() {
 		var applicable = parent(List.of(SECURITY));
-		var parent = new Requirement<>(applicable.id(), applicable.revision(), applicable.text(),
+		var parent = new GeneralRequirement<>(applicable.id(), applicable.revision(), applicable.text(),
 				new AllOf(List.of(SECURITY), false), applicable.source());
-		var verdict = Assignments.<String>forRequirement(parent).judge(SECURITY, (r, e) -> {
+		var verdict = Assignments.<String>forRequirement(parent).judge(SECURITY, TestRecipes.judge((r, e) -> {
 			throw new AssertionError("must not run");
-		}).validate().vote("release");
+		})).validate().evidence("release").build().vote();
 		assertThat(verdict.conclusion()).isEqualTo(Verdict.Conclusion.NOT_APPLICABLE);
 		assertThat(verdict.compositeAttempts()).isEmpty();
 	}
 
 	@Test
 	void policySeesIndividualRejectionAndFailedStageDespiteCollectiveError() {
-		Jury<String> negative = SimpleJury.<String>builder()
-			.judge(e -> Judgment.fail("violation"))
+		Jury negative = SimpleJury.<String>builder()
+			.judge(() -> Judgment.fail("violation"))
 			.votingStrategy(new ConsensusStrategy())
 			.build();
-		Jury<String> broken = e -> {
+		Jury broken = () -> {
 			throw new IllegalStateException("instrument failed");
 		};
-		Jury<String> stage = Juries.meta(new ConsensusStrategy(), new NamedJury<>("negative", negative),
-				new NamedJury<>("broken", broken));
+		Jury stage = Juries.meta(new ConsensusStrategy(), new NamedJury("negative", negative),
+				new NamedJury("broken", broken));
 		Verdict v = CascadedJury.<String>builder()
-			.tier("gate", stage, RoutingRule.REJECT_ON_ANY_FAIL)
-			.tier("final", e -> {
+			.tier("gate", stage, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
+			.tier("final", () -> {
 				throw new AssertionError("must stop at rejection");
 			}, RoutingRule.FINAL_TIER)
 			.build()
-			.vote("case");
+			.vote();
 		assertThat(v.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(v.conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
 		var result = Evaluations.apply(v, complete -> {
@@ -284,14 +293,14 @@ class EvaluationContractTest {
 
 	@Test
 	void allFailedCascadeIsUsableAndPolicyStillRuns() {
-		Jury<String> broken = e -> {
+		Jury broken = () -> {
 			throw new IllegalStateException("down");
 		};
 		Verdict v = CascadedJury.<String>builder()
-			.tier("first", broken, RoutingRule.ACCEPT_ON_ALL_PASS)
+			.tier("first", broken, RoutingRule.STOP_ON_ALL_OPINIONS_PASS)
 			.tier("last", broken, RoutingRule.FINAL_TIER)
 			.build()
-			.vote("case");
+			.vote();
 		assertThat(v.conclusion()).isEqualTo(Verdict.Conclusion.INCONCLUSIVE);
 		AtomicInteger calls = new AtomicInteger();
 		Evaluations.apply(v, x -> {
@@ -331,7 +340,7 @@ class EvaluationContractTest {
 			calls.incrementAndGet();
 			return new PolicyDecision(PolicyAction.RELY, "yes");
 		};
-		for (String invalid : List.of(good.replace("\"schemaVersion\":4", "\"schemaVersion\":99"),
+		for (String invalid : List.of(good.replace("\"schemaVersion\":5", "\"schemaVersion\":99"),
 				good.replaceFirst("\"producerStatus\":\"pass\"", "\"producerStatus\":\"fail\""),
 				good.replace("\"declaredCardinality\":1", "\"declaredCardinality\":2")))
 			assertThatThrownBy(() -> Evaluations.apply(codec.read(invalid), policy))

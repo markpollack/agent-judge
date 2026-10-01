@@ -43,18 +43,23 @@ public class CoverageImprovementJudge extends DeterministicJudge<CoverageCompari
 	/**
 	 * Create with default max improvement of 50 percentage points and no minimum coverage
 	 * requirement.
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public CoverageImprovementJudge() {
-		this(DEFAULT_MAX_IMPROVEMENT, DEFAULT_MINIMUM_LINE_COVERAGE);
+	public CoverageImprovementJudge(java.util.function.Supplier<? extends CoverageComparison> source) {
+		this(source, DEFAULT_MAX_IMPROVEMENT, DEFAULT_MINIMUM_LINE_COVERAGE);
 	}
 
 	/**
 	 * Create with custom max improvement for normalization and no minimum coverage
 	 * requirement.
 	 * @param maxImprovement the improvement value that maps to score 1.0
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public CoverageImprovementJudge(double maxImprovement) {
-		this(maxImprovement, DEFAULT_MINIMUM_LINE_COVERAGE);
+	public CoverageImprovementJudge(java.util.function.Supplier<? extends CoverageComparison> source,
+			double maxImprovement) {
+		this(source, maxImprovement, DEFAULT_MINIMUM_LINE_COVERAGE);
 	}
 
 	/**
@@ -62,15 +67,18 @@ public class CoverageImprovementJudge extends DeterministicJudge<CoverageCompari
 	 * @param maxImprovement the improvement value that maps to score 1.0
 	 * @param minimumLineCoverage minimum required line coverage percentage (0–100); fails
 	 * if current coverage is below this value regardless of improvement
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public CoverageImprovementJudge(double maxImprovement, double minimumLineCoverage) {
-		super("CoverageImprovementJudge", "Measures test coverage improvement as a normalized score (0-1)");
+	public CoverageImprovementJudge(java.util.function.Supplier<? extends CoverageComparison> source,
+			double maxImprovement, double minimumLineCoverage) {
+		super(source, "CoverageImprovementJudge", "Measures test coverage improvement as a normalized score (0-1)");
 		this.maxImprovement = maxImprovement;
 		this.minimumLineCoverage = minimumLineCoverage;
 	}
 
 	@Override
-	public Judgment judge(CoverageComparison evidence) {
+	protected Judgment evaluate(CoverageComparison evidence) {
 		double baselineLineCoverage = evidence.baselineLineCoverage();
 
 		CoverageMetrics current = JaCoCoReportParser.parse(evidence.workspace());
@@ -142,6 +150,38 @@ public class CoverageImprovementJudge extends DeterministicJudge<CoverageCompari
 	 */
 	public double getMinimumLineCoverage() {
 		return minimumLineCoverage;
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<CoverageComparison> builder() {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new CoverageImprovementJudge(source));
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @param maxImprovement producer configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<CoverageComparison> builder(
+			double maxImprovement) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new CoverageImprovementJudge(source, maxImprovement));
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @param maxImprovement producer configuration
+	 * @param minimumLineCoverage producer configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<CoverageComparison> builder(
+			double maxImprovement, double minimumLineCoverage) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new CoverageImprovementJudge(source, maxImprovement, minimumLineCoverage));
 	}
 
 }

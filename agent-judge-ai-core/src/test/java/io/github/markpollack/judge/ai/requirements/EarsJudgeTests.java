@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai.requirements;
 
 import java.util.List;
@@ -179,7 +184,8 @@ class EarsJudgeTests {
 		// send the reader to look at the wrong thing.
 		JudgeModel model = request -> new JudgeModelResponse("No API credentials are configured for this backend",
 				"recorded", null, Map.of(), false);
-		Judgment judgment = EarsJudge.create("audit", THREE, model).judge(context());
+		Judgment judgment = EarsParser.rollupFor(THREE,
+				model.generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).isEqualTo("No API credentials are configured for this backend");
@@ -188,7 +194,8 @@ class EarsJudgeTests {
 	@Test
 	void aSilentlyUnsuccessfulBackendStillNamesItselfAsTheProblem() {
 		JudgeModel model = request -> new JudgeModelResponse("", "recorded", null, Map.of(), false);
-		Judgment judgment = EarsJudge.create("audit", THREE, model).judge(context());
+		Judgment judgment = EarsParser.rollupFor(THREE,
+				model.generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).isEqualTo("The judging agent did not complete its run");
@@ -307,7 +314,7 @@ class EarsJudgeTests {
 	void theRosterAndItsCountReachThePrompt() {
 		// The model is told how many answers it owes, and asked about each criterion by
 		// name.
-		String prompt = EarsJudge.templateFor("audit", THREE)
+		String prompt = EarsParser.templateFor("audit", THREE)
 			.render(java.util.Map.of("workspace", context().toString()));
 
 		assertThat(prompt).contains("Answer every one of the 3 criteria");
@@ -321,7 +328,8 @@ class EarsJudgeTests {
 
 	private static Judgment judge(String answers) {
 		JudgeModel model = request -> new JudgeModelResponse(answers, "stub", null, Map.of());
-		return EarsJudge.create("audit", THREE, model).judge(context());
+		return EarsParser.rollupFor(THREE,
+				model.generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
 	}
 
 	private static Path context() {

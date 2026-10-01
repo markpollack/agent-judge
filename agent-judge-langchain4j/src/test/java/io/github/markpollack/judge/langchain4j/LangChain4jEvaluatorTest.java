@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.langchain4j;
 
 import dev.langchain4j.model.output.FinishReason;
@@ -20,7 +25,8 @@ class LangChain4jEvaluatorTest {
 
 	@Test
 	void shouldEvaluateServiceCallWithJudge() {
-		Judge<CompletionEvidence> judge = (CompletionEvidence ctx) -> Judgment.pass("Output is correct");
+		java.util.function.Function<CompletionEvidence, Judge> judge = (
+				CompletionEvidence ctx) -> () -> Judgment.pass("Output is correct");
 
 		Judgment result = LangChain4jEvaluator.evaluate("Summarize",
 				goal -> Result.<String>builder().content("A concise summary").finishReason(FinishReason.STOP).build(),
@@ -31,18 +37,22 @@ class LangChain4jEvaluatorTest {
 
 	@Test
 	void shouldEvaluateServiceCallWithJury() {
-		Judge<CompletionEvidence> passJudge = (CompletionEvidence ctx) -> Judgment.pass("Good");
-		Judge<CompletionEvidence> failJudge = (CompletionEvidence ctx) -> Judgment.fail("Bad");
-		Judge<CompletionEvidence> passJudge2 = (CompletionEvidence ctx) -> Judgment.pass("Fine");
+		java.util.function.Function<CompletionEvidence, Judge> passJudge = (
+				CompletionEvidence ctx) -> () -> Judgment.pass("Good");
+		java.util.function.Function<CompletionEvidence, Judge> failJudge = (
+				CompletionEvidence ctx) -> () -> Judgment.fail("Bad");
+		java.util.function.Function<CompletionEvidence, Judge> passJudge2 = (
+				CompletionEvidence ctx) -> () -> Judgment.pass("Fine");
 
-		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
-			.judge(passJudge)
-			.judge(failJudge)
-			.judge(passJudge2)
+		java.util.function.Function<CompletionEvidence, io.github.markpollack.judge.jury.Jury> jury = ctx -> SimpleJury
+			.builder()
+			.judge(passJudge.apply(ctx))
+			.judge(failJudge.apply(ctx))
+			.judge(passJudge2.apply(ctx))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		Verdict verdict = LangChain4jEvaluator.evaluate("Summarize",
+		Verdict verdict = LangChain4jEvaluator.evaluateJury("Summarize",
 				goal -> Result.<String>builder().content("A summary").finishReason(FinishReason.STOP).build(), jury);
 
 		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);

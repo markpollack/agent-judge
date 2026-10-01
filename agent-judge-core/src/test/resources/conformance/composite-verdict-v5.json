@@ -1,0 +1,174 @@
+{
+  "schemaVersion" : 5,
+  "judgment" : {
+    "schemaVersion" : 5,
+    "producerStatus" : "error",
+    "reasonCode" : "stage_failed",
+    "reasoning" : "One or more jury members did not produce a usable determination, so this jury reduced nothing.",
+    "checks" : [ ],
+    "metadata" : { },
+    "invocations" : [ ],
+    "invocationIds" : [ ]
+  },
+  "individual" : [ {
+    "schemaVersion" : 5,
+    "producerStatus" : "pass",
+    "reasoning" : "Semantic fallback accepted",
+    "checks" : [ ],
+    "metadata" : { },
+    "invocations" : [ ],
+    "invocationIds" : [ ]
+  } ],
+  "individualByName" : {
+    "pipeline" : {
+      "schemaVersion" : 5,
+      "producerStatus" : "pass",
+      "reasoning" : "Semantic fallback accepted",
+      "checks" : [ ],
+      "metadata" : { },
+      "invocations" : [ ],
+      "invocationIds" : [ ]
+    }
+  },
+  "weights" : { },
+  "seats" : [ {
+    "position" : 0,
+    "verdictKey" : "pipeline",
+    "keySource" : "DECLARED",
+    "execution" : "RETURNED",
+    "participation" : "NOT_REDUCED"
+  } ],
+  "provenance" : {
+    "kind" : "undecided"
+  },
+  "compositeAttempts" : [ {
+    "name" : "pipeline",
+    "relation" : "meta_member",
+    "disposition" : "used",
+    "verdict" : {
+      "schemaVersion" : 5,
+      "judgment" : {
+        "schemaVersion" : 5,
+        "producerStatus" : "pass",
+        "reasoning" : "Semantic fallback accepted",
+        "checks" : [ ],
+        "metadata" : { },
+        "invocations" : [ ],
+        "invocationIds" : [ ]
+      },
+      "individual" : [ {
+        "schemaVersion" : 5,
+        "producerStatus" : "pass",
+        "reasoning" : "Semantic fallback accepted",
+        "checks" : [ ],
+        "metadata" : { },
+        "invocations" : [ ],
+        "invocationIds" : [ ]
+      } ],
+      "individualByName" : {
+        "semantic-check" : {
+          "schemaVersion" : 5,
+          "producerStatus" : "pass",
+          "reasoning" : "Semantic fallback accepted",
+          "checks" : [ ],
+          "metadata" : { },
+          "invocations" : [ ],
+          "invocationIds" : [ ]
+        }
+      },
+      "weights" : {
+        "0" : 1.0
+      },
+      "seats" : [ {
+        "position" : 0,
+        "verdictKey" : "semantic-check",
+        "keySource" : "DECLARED",
+        "execution" : "RETURNED",
+        "participation" : "IDENTITY"
+      } ],
+      "provenance" : {
+        "kind" : "tier",
+        "tier" : "semantic-check",
+        "basis" : "tier_outcome"
+      },
+      "compositeAttempts" : [ {
+        "name" : "broken-check",
+        "relation" : "cascade_tier",
+        "routingRule" : "STOP_ON_ANY_OPINION_FAIL",
+        "disposition" : "stage_failed",
+        "dispositionReason" : "execution_failed",
+        "failure" : {
+          "code" : "jury_execution_failed"
+        }
+      }, {
+        "name" : "semantic-check",
+        "relation" : "cascade_tier",
+        "routingRule" : "FINAL_TIER",
+        "disposition" : "used",
+        "verdict" : {
+          "schemaVersion" : 5,
+          "judgment" : {
+            "schemaVersion" : 5,
+            "producerStatus" : "pass",
+            "reasoning" : "Semantic fallback accepted",
+            "checks" : [ ],
+            "metadata" : { },
+            "invocations" : [ ],
+            "invocationIds" : [ ]
+          },
+          "individual" : [ {
+            "schemaVersion" : 5,
+            "producerStatus" : "pass",
+            "reasoning" : "Semantic fallback accepted",
+            "checks" : [ ],
+            "metadata" : { },
+            "invocations" : [ ],
+            "invocationIds" : [ ]
+          } ],
+          "individualByName" : {
+            "semantic-check" : {
+              "schemaVersion" : 5,
+              "producerStatus" : "pass",
+              "reasoning" : "Semantic fallback accepted",
+              "checks" : [ ],
+              "metadata" : { },
+              "invocations" : [ ],
+              "invocationIds" : [ ]
+            }
+          },
+          "weights" : {
+            "0" : 1.0
+          },
+          "seats" : [ {
+            "position" : 0,
+            "verdictKey" : "semantic-check",
+            "keySource" : "DECLARED",
+            "execution" : "RETURNED",
+            "participation" : "IDENTITY"
+          } ],
+          "provenance" : {
+            "kind" : "own"
+          },
+          "compositeAttempts" : [ ],
+          "declaredCardinality" : 1,
+          "roster" : [ ],
+          "invocations" : [ ]
+        }
+      } ],
+      "declaredCardinality" : 1,
+      "roster" : [ ],
+      "invocations" : [ ]
+    }
+  }, {
+    "name" : "audit",
+    "relation" : "meta_member",
+    "disposition" : "stage_failed",
+    "dispositionReason" : "execution_failed",
+    "failure" : {
+      "code" : "jury_execution_failed"
+    }
+  } ],
+  "declaredCardinality" : 2,
+  "roster" : [ ],
+  "invocations" : [ ]
+}

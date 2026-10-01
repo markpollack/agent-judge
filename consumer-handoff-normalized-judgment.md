@@ -5,6 +5,8 @@ Copyright (c) 2024-2026 Mark Pollack
 See LICENSE in the repository root for project-specific Business Source License terms.
 -->
 
+> Historical migration guide. The configured execution API and retained V5 format are documented in [README](README.md) and [the current storage contract](portable-results-v5.md).
+
 # Consumer migration handoff — normalized `Judgment` (0.13.0 → 0.14.0)
 
 > **Applies to**: any consumer of `io.github.markpollack:agent-judge-*`
@@ -383,7 +385,7 @@ It had no implementation, test, caller, or sample in the producing repository. I
 `Judge` directly:
 
 ```java
-Mono.fromCallable(() -> judge.judge(context)).subscribeOn(Schedulers.boundedElastic());
+Mono.fromCallable(() -> judge.judge()).subscribeOn(Schedulers.boundedElastic());
 ```
 
 A dedicated adapter can be added if a real consumer asks for one.

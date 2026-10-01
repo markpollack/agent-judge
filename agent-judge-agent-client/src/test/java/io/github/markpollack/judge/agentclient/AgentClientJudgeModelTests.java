@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.agentclient;
 
 import io.github.markpollack.agents.client.AgentClient;
@@ -25,7 +30,9 @@ class AgentClientJudgeModelTests {
 		given(clientResponse.getMetadata())
 			.willReturn(new AgentResponseMetadata("claude-sonnet-4-20250514", null, "session-abc", null));
 
-		AgentClientJudgeModel model = new AgentClientJudgeModel(agentClient);
+		AgentClientJudgeModel model = new AgentClientJudgeModel(agentClient,
+				response -> new io.github.markpollack.judge.ai.model.NativeSnapshot(
+						java.util.Map.of("fixture", "mock response"), java.util.List.of()));
 		JudgeModelResponse response = model.generate(JudgeModelRequest.user("Review this code for correctness"));
 
 		assertThat(response.text()).isEqualTo("The code is correct.");
@@ -44,7 +51,9 @@ class AgentClientJudgeModelTests {
 		given(clientResponse.isSuccessful()).willReturn(false);
 		given(clientResponse.getMetadata()).willThrow(new RuntimeException("no metadata"));
 
-		AgentClientJudgeModel model = new AgentClientJudgeModel(agentClient);
+		AgentClientJudgeModel model = new AgentClientJudgeModel(agentClient,
+				response -> new io.github.markpollack.judge.ai.model.NativeSnapshot(
+						java.util.Map.of("fixture", "mock response"), java.util.List.of()));
 		JudgeModelResponse response = model.generate(JudgeModelRequest.user("test"));
 
 		assertThat(response.text()).isEqualTo("output");
@@ -62,7 +71,9 @@ class AgentClientJudgeModelTests {
 		given(clientResponse.isSuccessful()).willReturn(false);
 		given(clientResponse.getMetadata()).willThrow(new RuntimeException("no metadata"));
 
-		AgentClientJudgeModel model = new AgentClientJudgeModel(agentClient);
+		AgentClientJudgeModel model = new AgentClientJudgeModel(agentClient,
+				response -> new io.github.markpollack.judge.ai.model.NativeSnapshot(
+						java.util.Map.of("fixture", "mock response"), java.util.List.of()));
 		JudgeModelResponse response = model.generate(JudgeModelRequest.user("test"));
 
 		assertThat(response.text()).isEmpty();

@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.rag;
 
 import java.util.Optional;
@@ -31,13 +36,17 @@ public class FaithfulnessJudge extends LLMJudge<RagEvidence> {
 	/**
 	 * Create a faithfulness judge.
 	 * @param chatClientBuilder Spring AI client used for judging
+	 * @param evidence fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public FaithfulnessJudge(ChatClient.Builder chatClientBuilder) {
-		super("Faithfulness", "Evaluates whether the answer is grounded in the provided context", chatClientBuilder);
+	public FaithfulnessJudge(java.util.function.Supplier<? extends RagEvidence> evidence,
+			ChatClient.Builder chatClientBuilder) {
+		super(evidence, "Faithfulness", "Evaluates whether the answer is grounded in the provided context",
+				chatClientBuilder);
 	}
 
 	@Override
-	public Judgment judge(RagEvidence context) {
+	protected Judgment evaluate(RagEvidence context) {
 		Optional<String> ctx = java.util.Optional.of(context.retrievedContext()).filter(value -> !value.isBlank());
 		Optional<String> ans = java.util.Optional.of(context.answer()).filter(value -> !value.isBlank());
 		if (ctx.isEmpty()) {
@@ -46,7 +55,7 @@ public class FaithfulnessJudge extends LLMJudge<RagEvidence> {
 		if (ans.isEmpty()) {
 			return Judgment.abstain("No answer provided — cannot evaluate faithfulness");
 		}
-		return super.judge(context);
+		return super.evaluate(context);
 	}
 
 	@Override
@@ -101,6 +110,17 @@ public class FaithfulnessJudge extends LLMJudge<RagEvidence> {
 			return text.substring(idx + marker.length()).trim();
 		}
 		return "";
+	}
+
+	/**
+	 * Configures native judging without acquiring evidence.
+	 * @param client Spring AI client configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<RagEvidence> builder(
+			ChatClient.Builder client) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(evidence -> new FaithfulnessJudge(evidence, client));
 	}
 
 }

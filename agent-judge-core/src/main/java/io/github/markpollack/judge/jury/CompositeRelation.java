@@ -22,7 +22,10 @@ public enum CompositeRelation {
 	CASCADE_TIER("cascade_tier"),
 
 	/** A named member entered by a meta-jury. */
-	META_MEMBER("meta_member");
+	META_MEMBER("meta_member"),
+
+	/** An item in an explicitly declared requirement roster. */
+	ROSTER_ITEM("roster_item");
 
 	private final String wireName;
 

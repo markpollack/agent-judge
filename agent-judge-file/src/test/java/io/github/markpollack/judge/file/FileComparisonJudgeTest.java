@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.file;
 
 import org.junit.jupiter.api.Test;
@@ -13,7 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class FileComparisonJudgeTest {
 
-	private final FileComparisonJudge judge = new FileComparisonJudge();
+	private final io.github.markpollack.judge.construction.EvidenceStep<DirectoryComparison> judge = FileComparisonJudge
+		.builder();
 
 	@Test
 	void matchingDirectoriesPass(@TempDir Path tempDir) throws IOException {
@@ -35,7 +41,7 @@ class FileComparisonJudgeTest {
 
 		DirectoryComparison context = new DirectoryComparison(expected, actual);
 
-		Judgment result = judge.judge(context);
+		Judgment result = judge.evidence(context).build().judge();
 		assertThat(result.pass()).isTrue();
 	}
 
@@ -65,7 +71,7 @@ class FileComparisonJudgeTest {
 
 		DirectoryComparison context = new DirectoryComparison(expected, actual);
 
-		Judgment result = judge.judge(context);
+		Judgment result = judge.evidence(context).build().judge();
 		assertThat(result.pass()).isFalse();
 	}
 
@@ -81,7 +87,7 @@ class FileComparisonJudgeTest {
 
 		DirectoryComparison context = new DirectoryComparison(expected, actual);
 
-		Judgment result = judge.judge(context);
+		Judgment result = judge.evidence(context).build().judge();
 		assertThat(result.pass()).isFalse();
 	}
 
@@ -114,7 +120,7 @@ class FileComparisonJudgeTest {
 
 		DirectoryComparison context = new DirectoryComparison(expected, actual);
 
-		Judgment result = judge.judge(context);
+		Judgment result = judge.evidence(context).build().judge();
 		assertThat(result.pass()).isTrue();
 	}
 
@@ -130,7 +136,7 @@ class FileComparisonJudgeTest {
 
 		DirectoryComparison context = new DirectoryComparison(expected, actual);
 
-		Judgment result = judge.judge(context);
+		Judgment result = judge.evidence(context).build().judge();
 		assertThat(result.pass()).isTrue();
 	}
 
@@ -144,7 +150,7 @@ class FileComparisonJudgeTest {
 		Files.createDirectory(actual.resolve("bad.xml"));
 		Files.writeString(expected.resolve("text.txt"), "expected");
 		Files.writeString(actual.resolve("text.txt"), "different");
-		var result = new FileComparisonJudge().judge(new DirectoryComparison(expected, actual));
+		var result = FileComparisonJudge.builder().evidence(new DirectoryComparison(expected, actual)).build().judge();
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(result.checks()).extracting(check -> check.judgment().status())
 			.contains(JudgmentStatus.ERROR, JudgmentStatus.FAIL);
@@ -154,8 +160,11 @@ class FileComparisonJudgeTest {
 	void emptyDirectoryHasNoEstablishedComparison(@TempDir Path tempDir) throws Exception {
 		Path expected = Files.createDirectories(tempDir.resolve("empty-expected"));
 		Path actual = Files.createDirectories(tempDir.resolve("empty-actual"));
-		assertThat(new FileComparisonJudge().judge(new DirectoryComparison(expected, actual)).status())
-			.isEqualTo(JudgmentStatus.ABSTAIN);
+		assertThat(FileComparisonJudge.builder()
+			.evidence(new DirectoryComparison(expected, actual))
+			.build()
+			.judge()
+			.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 	}
 
 }

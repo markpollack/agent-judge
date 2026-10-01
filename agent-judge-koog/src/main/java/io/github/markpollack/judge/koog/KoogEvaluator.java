@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.koog;
 
 import java.util.Map;
@@ -34,7 +39,8 @@ public final class KoogEvaluator {
 	 * @param judge the judge to evaluate the result
 	 * @return the judgment
 	 */
-	public static Judgment evaluate(AIAgent<String, String> agent, String input, Judge<CompletionEvidence> judge) {
+	public static Judgment evaluate(AIAgent<String, String> agent, String input,
+			java.util.function.Function<CompletionEvidence, Judge> judge) {
 		return evaluate(agent, input, judge, Map.of());
 	}
 
@@ -48,10 +54,10 @@ public final class KoogEvaluator {
 	 * run ID, experiment tag, dataset row index)
 	 * @return the judgment
 	 */
-	public static Judgment evaluate(AIAgent<String, String> agent, String input, Judge<CompletionEvidence> judge,
-			Map<String, Object> extraMetadata) {
+	public static Judgment evaluate(AIAgent<String, String> agent, String input,
+			java.util.function.Function<CompletionEvidence, Judge> judge, Map<String, Object> extraMetadata) {
 		CompletionEvidence context = KoogCompletionEvidenceBuilder.from(agent, input, extraMetadata);
-		return judge.judge(context);
+		return java.util.Objects.requireNonNull(judge.apply(context)).judge();
 	}
 
 	/**
@@ -61,8 +67,9 @@ public final class KoogEvaluator {
 	 * @param jury the jury to evaluate the result
 	 * @return the verdict
 	 */
-	public static Verdict evaluate(AIAgent<String, String> agent, String input, Jury<CompletionEvidence> jury) {
-		return evaluate(agent, input, jury, Map.of());
+	public static Verdict evaluateJury(AIAgent<String, String> agent, String input,
+			java.util.function.Function<CompletionEvidence, Jury> jury) {
+		return evaluateJury(agent, input, jury, Map.of());
 	}
 
 	/**
@@ -73,10 +80,10 @@ public final class KoogEvaluator {
 	 * @param extraMetadata additional metadata to attach to the CompletionEvidence
 	 * @return the verdict
 	 */
-	public static Verdict evaluate(AIAgent<String, String> agent, String input, Jury<CompletionEvidence> jury,
-			Map<String, Object> extraMetadata) {
+	public static Verdict evaluateJury(AIAgent<String, String> agent, String input,
+			java.util.function.Function<CompletionEvidence, Jury> jury, Map<String, Object> extraMetadata) {
 		CompletionEvidence context = KoogCompletionEvidenceBuilder.from(agent, input, extraMetadata);
-		return jury.vote(context);
+		return java.util.Objects.requireNonNull(jury.apply(context)).vote();
 	}
 
 }

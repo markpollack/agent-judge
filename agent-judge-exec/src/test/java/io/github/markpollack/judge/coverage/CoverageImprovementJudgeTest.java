@@ -28,14 +28,15 @@ class CoverageImprovementJudgeTest {
 	@TempDir
 	Path workspace;
 
-	private final CoverageImprovementJudge judge = new CoverageImprovementJudge();
+	private final io.github.markpollack.judge.construction.EvidenceStep<CoverageComparison> judge = CoverageImprovementJudge
+		.builder();
 
 	@Test
 	void significantImprovementReturnsHighScore() throws IOException {
 		writeJacocoReport(90, 10); // 90% current
 		CoverageMetrics baseline = new CoverageMetrics(60.0, 0, 0, 60, 100, 0, 0, 0, 0, "baseline");
 
-		Judgment judgment = judge.judge(contextWithBaseline(baseline));
+		Judgment judgment = judge.evidence(contextWithBaseline(baseline)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		double score = judgment.score();
@@ -48,7 +49,7 @@ class CoverageImprovementJudgeTest {
 		writeJacocoReport(60, 40); // 60% — same as baseline
 		CoverageMetrics baseline = new CoverageMetrics(60.0, 0, 0, 60, 100, 0, 0, 0, 0, "baseline");
 
-		Judgment judgment = judge.judge(contextWithBaseline(baseline));
+		Judgment judgment = judge.evidence(contextWithBaseline(baseline)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		double score = judgment.score();
@@ -60,7 +61,7 @@ class CoverageImprovementJudgeTest {
 		writeJacocoReport(50, 50); // 50% — below baseline
 		CoverageMetrics baseline = new CoverageMetrics(60.0, 0, 0, 60, 100, 0, 0, 0, 0, "baseline");
 
-		Judgment judgment = judge.judge(contextWithBaseline(baseline));
+		Judgment judgment = judge.evidence(contextWithBaseline(baseline)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		double score = judgment.score();
@@ -72,7 +73,7 @@ class CoverageImprovementJudgeTest {
 		writeJacocoReport(100, 0); // 100% current
 		CoverageMetrics baseline = new CoverageMetrics(50.0, 0, 0, 50, 100, 0, 0, 0, 0, "baseline");
 
-		Judgment judgment = judge.judge(contextWithBaseline(baseline));
+		Judgment judgment = judge.evidence(contextWithBaseline(baseline)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		double score = judgment.score();
@@ -84,7 +85,7 @@ class CoverageImprovementJudgeTest {
 	void noReportReturnsError() {
 		CoverageMetrics baseline = new CoverageMetrics(80.0, 0, 0, 80, 100, 0, 0, 0, 0, "baseline");
 
-		Judgment judgment = judge.judge(contextWithBaseline(baseline));
+		Judgment judgment = judge.evidence(contextWithBaseline(baseline)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).contains("No JaCoCo report");
@@ -98,10 +99,10 @@ class CoverageImprovementJudgeTest {
 	void missingReportErrorsWithoutScoreWhereMeasuredRegressionFailsAtZero() throws IOException {
 		CoverageMetrics baseline = new CoverageMetrics(60.0, 0, 0, 60, 100, 0, 0, 0, 0, "baseline");
 
-		Judgment withoutReport = judge.judge(contextWithBaseline(baseline));
+		Judgment withoutReport = judge.evidence(contextWithBaseline(baseline)).build().judge();
 
 		writeJacocoReport(50, 50); // 50% — below baseline, actually measured
-		Judgment withMeasuredRegression = judge.judge(contextWithBaseline(baseline));
+		Judgment withMeasuredRegression = judge.evidence(contextWithBaseline(baseline)).build().judge();
 
 		assertThat(withoutReport.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(withoutReport.score()).isNull();
@@ -114,18 +115,19 @@ class CoverageImprovementJudgeTest {
 		writeJacocoReport(80, 20); // 80% coverage — improvement from 70%
 		CoverageComparison context = new CoverageComparison(workspace, 70.0);
 
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	@Test
 	void customMaxImprovement() throws IOException {
-		CoverageImprovementJudge custom = new CoverageImprovementJudge(20.0);
+		io.github.markpollack.judge.construction.EvidenceStep<CoverageComparison> custom = CoverageImprovementJudge
+			.builder(20.0);
 		writeJacocoReport(80, 20); // 80% current
 		CoverageMetrics baseline = new CoverageMetrics(70.0, 0, 0, 70, 100, 0, 0, 0, 0, "baseline");
 
-		Judgment judgment = custom.judge(contextWithBaseline(baseline));
+		Judgment judgment = custom.evidence(contextWithBaseline(baseline)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		double score = judgment.score();
@@ -138,7 +140,7 @@ class CoverageImprovementJudgeTest {
 		writeJacocoReport(85, 15); // 85%
 		CoverageMetrics baseline = new CoverageMetrics(70.0, 0, 0, 70, 100, 0, 0, 0, 0, "baseline");
 
-		Judgment judgment = judge.judge(contextWithBaseline(baseline));
+		Judgment judgment = judge.evidence(contextWithBaseline(baseline)).build().judge();
 
 		assertThat(judgment.metadata()).containsEntry("baselineLineCoverage", 70.0);
 		assertThat(judgment.metadata().get("currentLineCoverage")).isNotNull();

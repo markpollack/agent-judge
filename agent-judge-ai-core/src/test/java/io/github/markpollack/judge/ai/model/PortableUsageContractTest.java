@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai.model;
 
 import java.lang.reflect.Constructor;
@@ -79,9 +84,9 @@ class PortableUsageContractTest {
 		void everyReportedCategoryReachesResultMetadata() {
 			Map<String, Object> projected = projectedUsage(usage(11L, 22L, 33L, 44L, 55L, 66L));
 
-			assertThat(projected).containsExactly(entry("inputTokens", 11L), entry("outputTokens", 22L),
-					entry("reasoningTokens", 33L), entry("cacheCreationTokens", 44L), entry("cacheReadTokens", 55L),
-					entry("reportedTotalTokens", 66L));
+			assertThat(projected).containsExactly(entry("inputTokens", 11), entry("outputTokens", 22),
+					entry("reasoningTokens", 33), entry("cacheCreationTokens", 44), entry("cacheReadTokens", 55),
+					entry("reportedTotalTokens", 66));
 		}
 
 		@Test
@@ -89,7 +94,7 @@ class PortableUsageContractTest {
 		void unreportedCategoriesAreOmitted() {
 			Map<String, Object> projected = projectedUsage(usage(11L, 22L, null, null, null, null));
 
-			assertThat(projected).containsExactly(entry("inputTokens", 11L), entry("outputTokens", 22L));
+			assertThat(projected).containsExactly(entry("inputTokens", 11), entry("outputTokens", 22));
 		}
 
 	}

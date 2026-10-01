@@ -6,6 +6,8 @@
 package io.github.markpollack.judge.jury;
 
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
+import io.github.markpollack.judge.judgment.Judgment;
 
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -47,12 +49,16 @@ import io.github.markpollack.judge.description.KeySource;
  * @param keySource where the verdict key came from
  * @author Mark Pollack
  * @since 0.17.0
+ * @param notApplicableWhen local configured exclusion permission, or null
+ * @param rejection separate ERROR treatment of the retained original, or null
  */
+@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({ "position", "verdictKey", "keySource", "execution", "participation" })
 public record Seat(
 		@JsonProperty(required = true) @JsonDeserialize(using = StrictIntegerDeserializer.class) int position,
 		String verdictKey, KeySource keySource, SeatExecution execution, Participation participation,
-		@com.fasterxml.jackson.annotation.JsonIgnore @org.jspecify.annotations.Nullable Throwable cause) {
+		@com.fasterxml.jackson.annotation.JsonIgnore @org.jspecify.annotations.Nullable Throwable cause,
+		@Nullable String notApplicableWhen, @Nullable Judgment rejection) {
 
 	/**
 	 * Construct a seat explicitly asserting a valid returned judgment.
@@ -72,23 +78,39 @@ public record Seat(
 	 * @param execution invocation outcome
 	 */
 	public Seat(int position, String verdictKey, KeySource keySource, SeatExecution execution) {
-		this(position, verdictKey, keySource, execution, Participation.NOT_RECORDED, null);
+		this(position, verdictKey, keySource, execution, Participation.NOT_RECORDED, null, null, null);
+	}
+
+	/**
+	 * Constructs an observation with explicit treatment and a memory-only cause.
+	 * @param position configured index
+	 * @param verdictKey local seat name
+	 * @param keySource naming declaration
+	 * @param execution observed invocation outcome
+	 * @param participation actual reduction treatment
+	 * @param cause original thrown failure, or null
+	 */
+	public Seat(int position, String verdictKey, KeySource keySource, SeatExecution execution,
+			Participation participation, @Nullable Throwable cause) {
+		this(position, verdictKey, keySource, execution, participation, cause, null, null);
 	}
 
 	Seat treated(Participation treatment) {
-		return new Seat(position, verdictKey, keySource, execution, treatment, cause);
+		return new Seat(position, verdictKey, keySource, execution, treatment, cause, notApplicableWhen, rejection);
 	}
 
 	/** Equality concerns portable seat facts; a live Throwable is diagnostic context. */
 	@Override
 	public boolean equals(Object other) {
 		return other instanceof Seat seat && position == seat.position && verdictKey.equals(seat.verdictKey)
-				&& keySource == seat.keySource && execution == seat.execution && participation == seat.participation;
+				&& keySource == seat.keySource && execution == seat.execution && participation == seat.participation
+				&& Objects.equals(notApplicableWhen, seat.notApplicableWhen)
+				&& Objects.equals(rejection, seat.rejection);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(position, verdictKey, keySource, execution, participation);
+		return Objects.hash(position, verdictKey, keySource, execution, participation, notApplicableWhen, rejection);
 	}
 
 	/**
@@ -97,6 +119,10 @@ public record Seat(
 	 * blank
 	 */
 	public Seat {
+		if (notApplicableWhen != null)
+			io.github.markpollack.judge.requirement.Requirement.requireText(notApplicableWhen);
+		if ((execution == SeatExecution.RETURNED_REJECTED) != (rejection != null))
+			throw new IllegalArgumentException("Rejected seat requires explicit treatment");
 		Objects.requireNonNull(execution, "execution must be explicit");
 		Objects.requireNonNull(participation, "participation must be explicit");
 		if (position < 0) {

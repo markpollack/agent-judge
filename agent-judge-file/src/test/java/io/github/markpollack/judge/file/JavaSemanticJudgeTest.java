@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.file;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -20,7 +25,7 @@ class JavaSemanticJudgeTest {
 	@TempDir
 	Path tempDir;
 
-	private JavaSemanticJudge judge;
+	private io.github.markpollack.judge.construction.EvidenceStep<FileComparison> judge;
 
 	private Path expectedFile;
 
@@ -28,7 +33,7 @@ class JavaSemanticJudgeTest {
 
 	@BeforeEach
 	void setUp() throws IOException {
-		judge = new JavaSemanticJudge();
+		judge = JavaSemanticJudge.builder();
 		expectedFile = tempDir.resolve("expected/Foo.java");
 		actualFile = tempDir.resolve("actual/Foo.java");
 		Files.createDirectories(expectedFile.getParent());
@@ -63,7 +68,7 @@ class JavaSemanticJudgeTest {
 		Files.writeString(actualFile, actual);
 
 		FileComparison context = createContext("Foo.java");
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 		assertThat(judgment.reasoning()).contains("semantically matches");
@@ -92,7 +97,7 @@ class JavaSemanticJudgeTest {
 		Files.writeString(actualFile, actual);
 
 		FileComparison context = createContext("Foo.java");
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.pass()).isFalse();
 		assertThat(judgment.reasoning()).contains("missing field");
@@ -105,7 +110,7 @@ class JavaSemanticJudgeTest {
 		// Don't create actual file
 
 		FileComparison context = createContext("Foo.java");
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.pass()).isFalse();
 		assertThat(judgment.reasoning()).contains("File missing");
@@ -135,7 +140,7 @@ class JavaSemanticJudgeTest {
 		Files.writeString(actualFile, actual);
 
 		FileComparison context = createContext("Foo.java");
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 	}
@@ -162,7 +167,7 @@ class JavaSemanticJudgeTest {
 		Files.writeString(actualFile, actual);
 
 		FileComparison context = createContext("Foo.java");
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 	}
@@ -182,7 +187,7 @@ class JavaSemanticJudgeTest {
 		Files.writeString(actualFile, actual);
 
 		FileComparison context = createContext("Foo.java");
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.pass()).isFalse();
 		assertThat(judgment.reasoning()).contains("annotation");

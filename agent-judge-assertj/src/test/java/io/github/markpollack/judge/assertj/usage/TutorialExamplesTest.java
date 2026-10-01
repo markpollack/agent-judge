@@ -20,11 +20,12 @@ class TutorialExamplesTest {
 
 	@Test
 	void deterministicAndTextualChecksUseTheirOwnInputs() {
-		Judge<Integer> arithmetic = value -> value == 4 ? Judgment.pass("correct") : Judgment.fail("incorrect");
-		assertThatEvidence(2 + 2).judgedBy(arithmetic).isPassed();
+		int value = 2 + 2;
+		Judge arithmetic = () -> value == 4 ? Judgment.pass("correct") : Judgment.fail("incorrect");
+		assertThat(arithmetic).isPassed();
 		var requirement = Requirement.text("answer", "1", "4");
-		RequirementJudge<String, String> equals = (r, e) -> r.specification().equals(e) ? Judgment.pass("matches")
-				: Judgment.fail("differs");
+		io.github.markpollack.judge.construction.JudgeRecipe<String, String> equals = io.github.markpollack.judge.assertj.TestRecipes
+			.judge((r, e) -> r.specification().equals(e) ? Judgment.pass("matches") : Judgment.fail("differs"));
 		assertThat(requirement).judgedBy(equals)
 			.withEvidence("4")
 			.withPolicy(v -> new PolicyDecision(PolicyAction.RELY, "checked"))

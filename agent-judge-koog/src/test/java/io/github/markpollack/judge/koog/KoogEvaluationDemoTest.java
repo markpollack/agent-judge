@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.koog;
 
 import ai.koog.agents.core.agent.AIAgent;
@@ -28,14 +33,15 @@ class KoogEvaluationDemoTest {
 		when(agent.getId()).thenReturn("docs-assistant");
 
 		// A simple judge that checks whether the output mentions the key concept
-		Judge<CompletionEvidence> containsKeyConceptJudge = (CompletionEvidence ctx) -> {
-			String output = java.util.Optional.ofNullable(ctx.response()).orElse("");
-			boolean mentionsDI = output.toLowerCase().contains("dependencies")
-					&& output.toLowerCase().contains("external");
-			return (mentionsDI ? Judgment.builder().pass() : Judgment.builder().fail())
-				.reasoning(mentionsDI ? "Answer correctly describes DI" : "Answer missing key DI concepts")
-				.build();
-		};
+		java.util.function.Function<CompletionEvidence, Judge> containsKeyConceptJudge = (
+				CompletionEvidence ctx) -> () -> {
+					String output = java.util.Optional.ofNullable(ctx.response()).orElse("");
+					boolean mentionsDI = output.toLowerCase().contains("dependencies")
+							&& output.toLowerCase().contains("external");
+					return (mentionsDI ? Judgment.builder().pass() : Judgment.builder().fail())
+						.reasoning(mentionsDI ? "Answer correctly describes DI" : "Answer missing key DI concepts")
+						.build();
+				};
 
 		// One-liner evaluation
 		Judgment judgment = KoogEvaluator.evaluate(agent, "Explain dependency injection", containsKeyConceptJudge);

@@ -30,7 +30,7 @@ class ArchitectureTest {
 			.resideInAnyPackage("org.springframework..", "io.github.markpollack.judge.ai..",
 					"io.github.markpollack.judge.llm..")
 			.check(classes);
-		assertThat(JevJudge.class.getInterfaces()).containsExactly(io.github.markpollack.judge.RequirementJudge.class);
+		assertThat(JevJudge.class.getInterfaces()).containsExactly(io.github.markpollack.judge.Judge.class);
 	}
 
 }

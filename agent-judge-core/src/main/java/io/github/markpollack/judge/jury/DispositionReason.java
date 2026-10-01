@@ -25,6 +25,9 @@ import com.fasterxml.jackson.annotation.JsonValue;
  */
 public enum DispositionReason {
 
+	/** Native envelope cannot reliably bind observations to the declared roster. */
+	PROTOCOL_UNBOUND("protocol_unbound"),
+
 	/**
 	 * The stage threw. There is no verdict, only a portable failure code.
 	 */

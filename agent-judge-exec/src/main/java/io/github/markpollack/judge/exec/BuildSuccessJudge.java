@@ -41,9 +41,11 @@ public class BuildSuccessJudge extends CommandJudge {
 	/**
 	 * Create a BuildSuccessJudge with a custom build command.
 	 * @param buildCommand the build command to execute
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public BuildSuccessJudge(String buildCommand) {
-		super(buildCommand, 0, BUILD_TIMEOUT);
+	public BuildSuccessJudge(java.util.function.Supplier<? extends Path> source, String buildCommand) {
+		super(source, buildCommand, 0, BUILD_TIMEOUT);
 	}
 
 	/**
@@ -53,8 +55,9 @@ public class BuildSuccessJudge extends CommandJudge {
 	 * @param goals Maven goals to execute (e.g., "clean", "compile", "test")
 	 * @return BuildSuccessJudge configured for Maven
 	 */
-	public static BuildSuccessJudge maven(String... goals) {
-		return new MavenBuildJudge(goals);
+	public static io.github.markpollack.judge.construction.EvidenceStep<Path> maven(String... goals) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new MavenBuildJudge(source, goals.clone()));
 	}
 
 	/**
@@ -64,8 +67,9 @@ public class BuildSuccessJudge extends CommandJudge {
 	 * @param tasks Gradle tasks to execute (e.g., "build", "test")
 	 * @return BuildSuccessJudge configured for Gradle
 	 */
-	public static BuildSuccessJudge gradle(String... tasks) {
-		return new GradleBuildJudge(tasks);
+	public static io.github.markpollack.judge.construction.EvidenceStep<Path> gradle(String... tasks) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new GradleBuildJudge(source, tasks.clone()));
 	}
 
 	/**
@@ -75,19 +79,20 @@ public class BuildSuccessJudge extends CommandJudge {
 
 		private final String[] goals;
 
-		MavenBuildJudge(String[] goals) {
-			super("mvn " + String.join(" ", goals)); // Temporary, will be resolved in
+		MavenBuildJudge(java.util.function.Supplier<? extends Path> source, String[] goals) {
+			super(source, "mvn " + String.join(" ", goals)); // Temporary, will be
+																// resolved in
 			// judge()
-			this.goals = goals;
+			this.goals = goals.clone();
 		}
 
 		@Override
-		public Judgment judge(Path workspace) {
+		protected Judgment evaluate(Path workspace) {
 			// Detect wrapper in workspace
 			String command = detectMavenCommand(workspace);
 			// Create new judge with detected command
-			BuildSuccessJudge actualJudge = new BuildSuccessJudge(command);
-			return actualJudge.judge(workspace);
+			BuildSuccessJudge actualJudge = new BuildSuccessJudge(() -> workspace, command);
+			return actualJudge.judge();
 		}
 
 		private String detectMavenCommand(Path workspace) {
@@ -107,19 +112,20 @@ public class BuildSuccessJudge extends CommandJudge {
 
 		private final String[] tasks;
 
-		GradleBuildJudge(String[] tasks) {
-			super("gradle " + String.join(" ", tasks)); // Temporary, will be resolved in
+		GradleBuildJudge(java.util.function.Supplier<? extends Path> source, String[] tasks) {
+			super(source, "gradle " + String.join(" ", tasks)); // Temporary, will be
+																// resolved in
 			// judge()
-			this.tasks = tasks;
+			this.tasks = tasks.clone();
 		}
 
 		@Override
-		public Judgment judge(Path workspace) {
+		protected Judgment evaluate(Path workspace) {
 			// Detect wrapper in workspace
 			String command = detectGradleCommand(workspace);
 			// Create new judge with detected command
-			BuildSuccessJudge actualJudge = new BuildSuccessJudge(command);
-			return actualJudge.judge(workspace);
+			BuildSuccessJudge actualJudge = new BuildSuccessJudge(() -> workspace, command);
+			return actualJudge.judge();
 		}
 
 		private String detectGradleCommand(Path workspace) {
@@ -130,6 +136,16 @@ public class BuildSuccessJudge extends CommandJudge {
 			return "gradle " + String.join(" ", tasks);
 		}
 
+	}
+
+	/**
+	 * Configures a custom build command.
+	 * @param command build command
+	 * @return typed workspace stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<Path> builder(String command) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new BuildSuccessJudge(source, command));
 	}
 
 }

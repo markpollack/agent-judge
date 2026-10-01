@@ -139,14 +139,14 @@ class WeightedAverageOverflowTest {
 
 	@Test
 	void aSimpleJuryWithMaxValueWeightsVotesNormally() {
-		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
-			.judge(context -> passJudgment(0.9), MAX)
-			.judge(context -> failJudgment(0.3), MAX)
+		SimpleJury jury = SimpleJury.builder()
+			.judge(() -> passJudgment(0.9), MAX)
+			.judge(() -> failJudgment(0.3), MAX)
 			.votingStrategy(new WeightedAverageStrategy())
 			.parallel(false)
 			.build();
 
-		Verdict verdict = jury.vote(simpleContext("overflowing weights"));
+		Verdict verdict = jury.vote();
 
 		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.judgment().score()).isCloseTo(0.6, within(1e-15));

@@ -26,7 +26,7 @@ import java.util.Objects;
  * </p>
  *
  * <h2>Portable form</h2> <pre>
- * {"descriptionVersion": 2, "kind": "CASCADED", "aggregateMayBeNotApplicable": false,
+ * {"descriptionVersion": 3, "kind": "CASCADED", "aggregateMayBeNotApplicable": false,
  *  "tiers": [{...}, ...]}
  * </pre>
  *
@@ -69,6 +69,7 @@ public record CascadedJuryDescription(List<TierDescription> tiers) implements Ju
 		Map<String, Object> tree = new LinkedHashMap<>();
 		tree.put("kind", "CASCADED");
 		tree.put("aggregateMayBeNotApplicable", aggregateMayBeNotApplicable());
+		tree.put("routingOpinionBound", routingOpinionBound().name());
 		tree.put("tiers", tierTrees);
 		return tree;
 	}

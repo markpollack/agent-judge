@@ -39,7 +39,7 @@ class FileExistsJudgeDegeneracyTest {
 	Path workspace;
 
 	private Judgment judge(String path) {
-		return new FileExistsJudge(path).judge(workspace);
+		return FileExistsJudge.builder(path).evidence(workspace).build().judge();
 	}
 
 	@Test

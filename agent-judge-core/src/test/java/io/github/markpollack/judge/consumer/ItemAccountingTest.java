@@ -99,7 +99,7 @@ class ItemAccountingTest {
 	@Test
 	@DisplayName("a direct rejection: the root decided it itself, and there is nothing to follow")
 	void aDirectRejection() {
-		Verdict root = SimpleJury.of(Judgment.fail("a requirement was not met")).vote(CONTEXT);
+		Verdict root = SimpleJury.of(Judgment.fail("a requirement was not met")).vote();
 
 		Verdict selected = selectedDetermination(root);
 
@@ -113,7 +113,7 @@ class ItemAccountingTest {
 	@Test
 	@DisplayName("a direct instrument failure: undecided, so it is excluded from the subject denominator")
 	void aDirectInstrumentFailure() {
-		Verdict root = brokenReduction(Judgment.pass("a"), Judgment.pass("b")).vote(CONTEXT);
+		Verdict root = brokenReduction(Judgment.pass("a"), Judgment.pass("b")).vote();
 
 		Verdict selected = selectedDetermination(root);
 
@@ -124,30 +124,25 @@ class ItemAccountingTest {
 	@Test
 	@DisplayName("a rejection on a boundary-refused tier: the decision carries it, the aggregate stays an error")
 	void aBoundaryRejection() {
-		Verdict root = boundaryRejectingCascade().vote(CONTEXT);
+		Verdict root = boundaryRejectingCascade().vote();
 
 		Verdict selected = selectedDetermination(root);
 
 		assertThat(selected).isSameAs(root);
 		assertThat(selected.provenance().basis()).as("the chain stops here: a rejection is a determination")
 			.isEqualTo(VerdictProvenanceBasis.INDIVIDUAL_REJECTION);
-		assertThat(selected.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+		assertThat(selected.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
 		assertThat(selected.judgment().status()).as("no FAIL was manufactured; the rejection is in the decision")
 			.isNotEqualTo(JudgmentStatus.FAIL);
-		assertThat(boundaryDispositions(root)).as("one machinery failure, counted where it was emitted").isEqualTo(1);
+		assertThat(boundaryDispositions(root)).as("one machinery failure, counted where it was emitted").isZero();
 	}
 
 	@Test
 	@DisplayName("a rejection copied through two cascade levels is still one rejection and one machinery failure")
 	void aRejectionCopiedThroughTwoLevels() {
-		Jury<CompletionEvidence> inner = boundaryRejectingCascade();
-		Jury<CompletionEvidence> middle = CascadedJury.<CompletionEvidence>builder()
-			.tier("inner", inner, RoutingRule.FINAL_TIER)
-			.build();
-		Verdict root = CascadedJury.<CompletionEvidence>builder()
-			.tier("middle", middle, RoutingRule.FINAL_TIER)
-			.build()
-			.vote(CONTEXT);
+		Jury inner = boundaryRejectingCascade();
+		Jury middle = CascadedJury.builder().tier("inner", inner, RoutingRule.FINAL_TIER).build();
+		Verdict root = CascadedJury.builder().tier("middle", middle, RoutingRule.FINAL_TIER).build().vote();
 
 		Verdict selected = selectedDetermination(root);
 
@@ -156,17 +151,17 @@ class ItemAccountingTest {
 		assertThat(selected.provenance().basis()).isEqualTo(VerdictProvenanceBasis.INDIVIDUAL_REJECTION);
 		assertThat(selected.judgment()).as("the copies are equal, so counting the root as well would double-count")
 			.isEqualTo(root.judgment());
-		assertThat(boundaryDispositions(root)).as("the refusal happened once, three levels down").isEqualTo(1);
+		assertThat(boundaryDispositions(root)).as("the refusal happened once, three levels down").isZero();
 	}
 
 	@Test
 	@DisplayName("a refused stage followed by a passing tier: the item passes, and the refusal is still counted")
 	void aRefusedStageFollowedByAPass() {
-		Verdict root = CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", excludingTier(), RoutingRule.REJECT_ON_ANY_FAIL)
+		Verdict root = CascadedJury.builder()
+			.tier("rubric", excludingTier(), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", SimpleJury.of(Judgment.pass("OK")), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		Verdict selected = selectedDetermination(root);
 
@@ -182,10 +177,10 @@ class ItemAccountingTest {
 	@Test
 	@DisplayName("an excluded aggregate leaves the denominator rather than passing or failing")
 	void anExcludedItem() {
-		Verdict root = CascadedJury.<CompletionEvidence>builder()
+		Verdict root = CascadedJury.builder()
 			.tier("rubric", capableExcludingTier(), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		Verdict selected = selectedDetermination(root);
 
@@ -196,12 +191,12 @@ class ItemAccountingTest {
 	@Test
 	@DisplayName("only named copy edges are followed: a later completed determination is not searched for")
 	void onlyNamedEdgesAreFollowed() {
-		Verdict root = CascadedJury.<CompletionEvidence>builder()
+		Verdict root = CascadedJury.builder()
 			.tier("first", brokenReduction(Judgment.fail("a requirement was not met"), Judgment.pass("other")),
-					RoutingRule.REJECT_ON_ANY_FAIL)
+					RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("second", SimpleJury.of(Judgment.pass("OK")), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		Verdict selected = selectedDetermination(root);
 
@@ -216,9 +211,9 @@ class ItemAccountingTest {
 	/** A leaf jury over one judgment. */
 	private interface SimpleJury {
 
-		static Jury<CompletionEvidence> of(Judgment judgment) {
-			return io.github.markpollack.judge.jury.SimpleJury.<CompletionEvidence>builder()
-				.judge(Judges.named(context -> judgment, "leaf"))
+		static Jury of(Judgment judgment) {
+			return io.github.markpollack.judge.jury.SimpleJury.builder()
+				.judge(Judges.named(() -> judgment, "leaf"))
 				.votingStrategy(new AllMustPassStrategy())
 				.build();
 		}
@@ -226,8 +221,8 @@ class ItemAccountingTest {
 	}
 
 	/** A leaf jury whose reduction breaks, over the judgments given. */
-	private static Jury<CompletionEvidence> brokenReduction(Judgment... judgments) {
-		io.github.markpollack.judge.jury.SimpleJury.Builder<CompletionEvidence> builder = io.github.markpollack.judge.jury.SimpleJury
+	private static Jury brokenReduction(Judgment... judgments) {
+		io.github.markpollack.judge.jury.SimpleJury.Builder builder = io.github.markpollack.judge.jury.SimpleJury
 			.<CompletionEvidence>builder()
 			.votingStrategy(new VotingStrategy() {
 				@Override
@@ -242,32 +237,29 @@ class ItemAccountingTest {
 			});
 		for (int index = 0; index < judgments.length; index++) {
 			Judgment judgment = judgments[index];
-			builder.judge(Judges.named(context -> judgment, "judge-" + (index + 1)));
+			builder.judge(Judges.named(() -> judgment, "judge-" + (index + 1)));
 		}
 		return builder.build();
 	}
 
 	/** An opaque tier that excludes the subject without ever declaring it may. */
-	private static Jury<CompletionEvidence> excludingTier() {
-		return opaque(Verdict.builder()
-			.judgment(Judgment.notApplicable("nothing here applies"))
-			.provenance(VerdictProvenance.own())
-			.build());
+	private static Jury excludingTier() {
+		return opaque(Verdict.single("excluded", Judgment.notApplicable("nothing here applies")));
 	}
 
 	/**
 	 * The same shape, but holding a genuine individual FAIL the cascade can reject on.
 	 */
-	private static Jury<CompletionEvidence> rejectableExcludingTier() {
+	private static Jury rejectableExcludingTier() {
 		Judgment failing = Judgment.fail("a requirement was not met");
 		return opaque(Verdict.of(Judgment.notApplicable("nothing here applies"), java.util.Map.of("strict", failing)));
 	}
 
 	/** A judge that declared, in advance, that it may exclude a subject. */
-	private record ConditionalJudge() implements io.github.markpollack.judge.JudgeWithMetadata<CompletionEvidence> {
+	private record ConditionalJudge() implements io.github.markpollack.judge.JudgeWithMetadata {
 
 		@Override
-		public Judgment judge(CompletionEvidence context) {
+		public Judgment judge() {
 			return Judgment.notApplicable("the change set contains no Java sources");
 		}
 
@@ -280,25 +272,26 @@ class ItemAccountingTest {
 	}
 
 	/** A tier whose judge declared it may exclude, so the exclusion is honoured. */
-	private static Jury<CompletionEvidence> capableExcludingTier() {
-		return io.github.markpollack.judge.jury.SimpleJury.<CompletionEvidence>builder()
-			.judge(new ConditionalJudge())
+	private static Jury capableExcludingTier() {
+		return io.github.markpollack.judge.jury.SimpleJury.builder()
+			.seat(declared(new ConditionalJudge()))
 			.votingStrategy(new ConsensusStrategy(io.github.markpollack.judge.jury.ErrorHandling.PROPAGATE,
 					io.github.markpollack.judge.jury.ExclusionHandling.EXCLUDE))
 			.build();
 	}
 
-	private static Jury<CompletionEvidence> boundaryRejectingCascade() {
-		return CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", rejectableExcludingTier(), RoutingRule.REJECT_ON_ANY_FAIL)
+	private static Jury boundaryRejectingCascade() {
+		return CascadedJury.builder()
+			.tier("rubric", brokenReduction(Judgment.fail("a requirement was not met"), Judgment.pass("other")),
+					RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", SimpleJury.of(Judgment.pass("OK")), RoutingRule.FINAL_TIER)
 			.build();
 	}
 
-	private static Jury<CompletionEvidence> opaque(Verdict verdict) {
-		return new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
+	private static Jury opaque(Verdict verdict) {
+		return new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
-			public List<Judge<CompletionEvidence>> getJudges() {
+			public List<Judge> getJudges() {
 				return List.of();
 			}
 
@@ -308,10 +301,16 @@ class ItemAccountingTest {
 			}
 
 			@Override
-			public Verdict vote(CompletionEvidence context) {
+			public Verdict vote() {
 				return verdict;
 			}
 		};
+	}
+
+	private static io.github.markpollack.judge.jury.JudgeSeat declared(io.github.markpollack.judge.Judge producer) {
+		return io.github.markpollack.judge.jury.JudgeSeat
+			.named(((io.github.markpollack.judge.JudgeWithMetadata) producer).metadata().name(), producer)
+			.notApplicableWhen(io.github.markpollack.judge.Judges.notApplicableCapability(producer).orElseThrow());
 	}
 
 }

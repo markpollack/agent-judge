@@ -1,0 +1,37 @@
+[
+  {
+    "file": "criteria.md",
+    "repository": "markpollack/agent-judge-tutorial",
+    "commit": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec",
+    "path": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/spec/smart-appointment-scheduling/manage-appointment-lifecycle/criteria.md",
+    "sha256": "69268831a36819792a8ffda4dfeb9a4734fb0f5dfb631142e0b6fd0ccdbfb2a1"
+  },
+  {
+    "file": "rules.md",
+    "repository": "markpollack/agent-judge-tutorial",
+    "commit": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec",
+    "path": "case-studies/spec-driven-petclinic/fixtures/petclinic/appointment-scheduling-spec-with-usecases/spec/smart-appointment-scheduling/rules.md",
+    "sha256": "280d14c05099c72eca120989f7899e6cb3fa8255f95c73bd1c3acec165df708a"
+  },
+  {
+    "file": "ears-six.txt",
+    "repository": "markpollack/agent-judge-tutorial",
+    "commit": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec",
+    "path": "case-studies/spec-driven-petclinic/tutorial-support/src/main/resources/recordings/ears-uc6-cancellation.txt",
+    "sha256": "fb9398ce701c52a6d31efd17381ba302daca74d51ab44f85f944efa38cb3fc1c"
+  },
+  {
+    "file": "ears-all.txt",
+    "repository": "markpollack/agent-judge-tutorial",
+    "commit": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec",
+    "path": "case-studies/spec-driven-petclinic/tutorial-support/src/main/resources/recordings/spec-conformance-uc6.txt",
+    "sha256": "af0066f0755fa9eb407d2efe3a683c1ad93a0f47d50526096acb37a621d4fc2b"
+  },
+  {
+    "file": "rfc-all.txt",
+    "repository": "markpollack/agent-judge-tutorial",
+    "commit": "27756e9f1d4248bb0229c182f23d403a8bc5d2ec",
+    "path": "case-studies/spec-driven-petclinic/tutorial-support/src/main/resources/recordings/architecture-rules.txt",
+    "sha256": "1ee51445d0132fbe7e0595b8831060946b3415d8fc2ff0be49e044e5be5260ac"
+  }
+]

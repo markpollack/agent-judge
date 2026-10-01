@@ -7,7 +7,7 @@ package io.github.markpollack.judge.assertions;
 import io.github.markpollack.judge.requirement.Requirement;
 
 import com.sun.net.httpserver.HttpServer;
-import io.github.markpollack.judge.RequirementJudge;
+import io.github.markpollack.judge.construction.JudgeRecipe;
 import io.github.markpollack.judge.evaluation.*;
 import io.github.markpollack.judge.jury.Verdict;
 import io.github.markpollack.judge.jev.JevEvidence;
@@ -29,7 +29,7 @@ class ConferenceAssertionTest {
 
 	HttpClient http;
 
-	RequirementJudge<String, JevEvidence> judge;
+	JudgeRecipe<String, JevEvidence> judge;
 
 	final AtomicReference<String> choice = new AtomicReference<>("violated");
 
@@ -75,7 +75,7 @@ class ConferenceAssertionTest {
 	}
 
 	EvaluationResult evaluate(JevEvidence evidence, Requirement<String> requirement) {
-		return Evaluations.evaluate(requirement, judge, evidence, fixture.binding);
+		return ConfiguredRules.evaluate(requirement, judge, evidence, fixture.binding);
 	}
 
 	private void satisfies(JevEvidence evidence, Requirement<String> requirement) {
@@ -164,7 +164,8 @@ class ConferenceAssertionTest {
 			assertEquals(evidence.requirementSha256(),
 					ConferenceFixture.sha(state.path("requirement").asText().getBytes(StandardCharsets.UTF_8)));
 			assertEquals(evidence.text(), state.path("evidence").asText());
-			assertEquals(2, state.size());
+			assertEquals(3, state.size());
+			assertTrue(state.path("requirementIdentity").isObject());
 			String body = new String(bytes, StandardCharsets.UTF_8);
 			for (String excluded : List.of("UNSELECTED-AGENT-OUTPUT", "reviewedSubjectTruth", "reviewBasis",
 					"FAKE-LOCAL-KEY", "expectedEvidenceDisposition"))

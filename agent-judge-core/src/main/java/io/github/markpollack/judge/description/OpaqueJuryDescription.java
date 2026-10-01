@@ -34,7 +34,7 @@ import io.github.markpollack.judge.jury.VotingStrategy;
  *
  * <h2>Portable form</h2> <pre>
  * {
- *   "descriptionVersion": 2,
+ *   "descriptionVersion": 3,
  *   "kind": "OPAQUE",
  *   "aggregateMayBeNotApplicable": false,
  *   "implementation": {...},
@@ -47,15 +47,13 @@ import io.github.markpollack.judge.jury.VotingStrategy;
  * </p>
  *
  * @param implementation the class that implements the jury
- * @param aggregateMayBeNotApplicable what the jury itself declared, since an opaque
- * jury's structure gives no way to derive it
  * @param strategy the jury's strategy, or null when it reports none
  * @param judges the jury's flattened judges, in the order it reports them
  * @author Mark Pollack
  * @since 0.17.0
  */
-public record OpaqueJuryDescription(ImplementationIdentity implementation, boolean aggregateMayBeNotApplicable,
-		@Nullable StrategyDescription strategy, List<JudgeDescription> judges) implements JuryDescription {
+public record OpaqueJuryDescription(ImplementationIdentity implementation, @Nullable StrategyDescription strategy,
+		List<JudgeDescription> judges) implements JuryDescription {
 
 	/** Validate the implementation and copy the judges. */
 	public OpaqueJuryDescription {
@@ -63,13 +61,17 @@ public record OpaqueJuryDescription(ImplementationIdentity implementation, boole
 		judges = List.copyOf(Objects.requireNonNull(judges, "judges must not be null"));
 	}
 
-	static OpaqueJuryDescription of(Jury<?> jury) {
+	@Override
+	public boolean aggregateMayBeNotApplicable() {
+		return false;
+	}
+
+	static OpaqueJuryDescription of(Jury jury) {
 		Objects.requireNonNull(jury, "jury must not be null");
-		VotingStrategy votingStrategy = jury instanceof VotingJury<?> voting ? voting.getVotingStrategy() : null;
+		VotingStrategy votingStrategy = jury instanceof VotingJury voting ? voting.getVotingStrategy() : null;
 		StrategyDescription strategy = votingStrategy == null ? null : votingStrategy.describe();
-		List<? extends Judge<?>> reported = Objects.requireNonNull(
-				jury instanceof VotingJury<?> voting ? voting.getJudges() : List.of(),
-				"getJudges() must not return null");
+		List<? extends Judge> reported = Objects.requireNonNull(
+				jury instanceof VotingJury voting ? voting.getJudges() : List.of(), "getJudges() must not return null");
 		List<JudgeDescription> judges = new ArrayList<>(reported.size());
 		for (int index = 0; index < reported.size(); index++) {
 			try {
@@ -79,8 +81,7 @@ public record OpaqueJuryDescription(ImplementationIdentity implementation, boole
 				throw new IllegalArgumentException("judges[" + index + "]: " + ex.getMessage(), ex);
 			}
 		}
-		return new OpaqueJuryDescription(ImplementationIdentity.of(jury.getClass()), jury.aggregateMayBeNotApplicable(),
-				strategy, judges);
+		return new OpaqueJuryDescription(ImplementationIdentity.of(jury.getClass()), strategy, judges);
 	}
 
 	@Override
@@ -95,7 +96,8 @@ public record OpaqueJuryDescription(ImplementationIdentity implementation, boole
 		}
 		Map<String, Object> tree = new LinkedHashMap<>();
 		tree.put("kind", "OPAQUE");
-		tree.put("aggregateMayBeNotApplicable", aggregateMayBeNotApplicable);
+		tree.put("aggregateMayBeNotApplicable", aggregateMayBeNotApplicable());
+		tree.put("routingOpinionBound", routingOpinionBound().name());
 		tree.put("implementation", implementation.portableTree());
 		StrategyDescription reported = strategy;
 		tree.put("strategy",

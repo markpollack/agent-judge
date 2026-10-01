@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai.requirements;
 
 import java.util.List;
@@ -65,7 +70,7 @@ class RosterErrorEvidenceTests {
 			assertThat(judgment.checks()).extracting(Check::id).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
 			assertThat(judgment.checks()).extracting(check -> check.judgment().status())
 				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.ERROR, JudgmentStatus.FAIL);
-			assertThat(judgment.metadata()).containsEntry("criteriaTotal", 3).containsEntry("established", 1L);
+			assertThat(judgment.metadata()).containsEntry("criteriaTotal", 3).containsEntry("established", 1);
 		}
 
 		@Test
@@ -129,7 +134,7 @@ class RosterErrorEvidenceTests {
 			assertThat(judgment.checks()).extracting(Check::id).containsExactly("RULE-1", "RULE-2", "RULE-3");
 			assertThat(judgment.checks()).extracting(check -> check.judgment().status())
 				.containsExactly(JudgmentStatus.PASS, JudgmentStatus.ERROR, JudgmentStatus.FAIL);
-			assertThat(judgment.metadata()).containsEntry("constraintsTotal", 3).containsEntry("established", 1L);
+			assertThat(judgment.metadata()).containsEntry("constraintsTotal", 3).containsEntry("established", 1);
 		}
 
 		@Test
@@ -165,11 +170,11 @@ class RosterErrorEvidenceTests {
 	// ==================== Helpers ====================
 
 	private static Judgment ears(String answers) {
-		return EarsJudge.rollupFor(CRITERIA, answer(answers));
+		return EarsParser.rollupFor(CRITERIA, answer(answers));
 	}
 
 	private static Judgment rfc(String answers) {
-		return Rfc2119Judge.rollupFor(CONSTRAINTS, answer(answers));
+		return Rfc2119Parser.rollupFor(CONSTRAINTS, answer(answers));
 	}
 
 	private static JudgeModelResponse answer(String text) {

@@ -14,7 +14,7 @@ import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.requirements.EarsCriterion;
 import io.github.markpollack.judge.ai.requirements.Rfc2119Constraint;
 import io.github.markpollack.judge.requirement.Requirement;
-import io.github.markpollack.judge.RequirementJudge;
+import io.github.markpollack.judge.ai.requirements.*;
 import io.github.markpollack.judge.evaluation.Evaluations;
 import io.github.markpollack.judge.requirement.RequirementSource;
 import io.github.markpollack.judge.provenance.ArtifactRef;
@@ -43,264 +43,222 @@ import org.junit.jupiter.api.Test;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Executable native-input adapters. Every provider answer is a local fixture. */
+/** Actual public native producers with local protocol fixtures only. */
 class NativeRequirementConsumerTest {
-
-	private static final Rfc2119Constraint RFC = new Rfc2119Constraint("RULE-4", "MUST", "Acquire Owner before Pet",
-			"Prevent lock-order inversion", "Persistence exists");
-
-	private static final EarsCriterion EARS = new EarsCriterion("UC6-AC8", "Reject cancellation at start",
-			"When cancellation is requested at the start, the system shall reject it.", "Appointments exist");
 
 	private static final String SELECTED_EVIDENCE = "Source.java:4 acquires Pet before Owner; no other context selected.";
 
-	@Test
-	void rfcNativeSpecificationReachesBothProvidersThroughActualInvocationInput() {
-		var actual = requirement(RFC, RFC.id());
-		var model = new CapturingModel();
-		var seen = new ArrayList<Requirement<Rfc2119Constraint>>();
-		try (var transport = new FixtureHttp()) {
-			var artifacts = new LinkedHashMap<String, byte[]>();
-			var provider = jev(transport, artifacts).rendering(Rfc2119Constraint::asPrompt);
-			RequirementJudge<Rfc2119Constraint, JevEvidence> observed = (requirement, evidence) -> {
-				seen.add(requirement);
-				return provider.judge(requirement, evidence);
-			};
-			var evidence = evidence(RFC.asPrompt());
-			var nativeCompletion = completion(NativeRequirementConsumerTest::completionRfc,
-					Rfc2119Constraint::applicability, model, Witness.APPLICABLE, seen);
-			var first = Evaluations.evaluate(actual, observed, evidence);
-			var second = Evaluations.evaluate(actual, nativeCompletion, evidence);
-			assertThat(first.verdict().conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
-			assertThat(second.verdict().conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
-			assertThat(first.verdict().requirement()).isSameAs(actual);
-			assertThat(seen).hasSize(2).allSatisfy(r -> assertThat(r).isSameAs(actual));
-			assertThat(requestRequirement(artifacts)).isEqualTo(RFC.asPrompt());
-			assertThat(model.text()).contains(actual.id(), actual.revision(), actual.source().artifact().sha256(),
-					RFC.keyword(), RFC.requirement(), RFC.reason(), RFC.applicability());
-			assertThat(Checks.parse(artifacts.get("request")).path("state").path("evidence").asText())
-				.isEqualTo(SELECTED_EVIDENCE);
-			assertThat(transport.calls).hasValue(1);
-			assertThat(model.requests).hasSize(1);
-		}
-	}
+	private static final Rfc2119Requirement RFC = Rfc2119Requirement.of("RULE-4", "revision-7", "MUST",
+			"Acquire Owner before Pet", "Prevent lock-order inversion", "Persistence exists");
 
-	@Test
-	void earsTitleSentenceAndApplicabilityReachBothProviders() {
-		var actual = requirement(EARS, EARS.id());
-		var model = new CapturingModel();
-		try (var transport = new FixtureHttp()) {
-			var artifacts = new LinkedHashMap<String, byte[]>();
-			Function<EarsCriterion, String> render = s -> "Title: " + s.title() + "\n" + s.asPrompt();
-			var provider = jev(transport, artifacts).rendering(render);
-			var evidence = evidence(render.apply(EARS));
-			assertThat(provider.judge(actual, evidence).status()).isEqualTo(JudgmentStatus.FAIL);
-			var completion = completion(NativeRequirementConsumerTest::completionEars, EarsCriterion::applicability,
-					model, Witness.APPLICABLE, new ArrayList<>());
-			assertThat(completion.judge(actual, evidence).status()).isEqualTo(JudgmentStatus.FAIL);
-			for (String field : List.of(EARS.title(), EARS.requirement(), EARS.applicability())) {
-				assertThat(requestRequirement(artifacts)).contains(field);
-				assertThat(model.text()).contains(field);
-			}
-		}
-	}
-
-	@Test
-	void oneRendererUsesEachActualSpecificationWithoutASecondConfiguredRequirement() {
-		var changed = new Rfc2119Constraint("RULE-5", "SHOULD", "Acquire Pet before Owner", "New rationale", "Always");
-		try (var transport = new FixtureHttp()) {
-			var artifacts = new LinkedHashMap<String, byte[]>();
-			var provider = jev(transport, artifacts).rendering(Rfc2119Constraint::asPrompt);
-			for (var spec : List.of(RFC, changed)) {
-				var actual = requirement(spec, spec.id());
-				assertThat(provider.judge(actual, evidence(spec.asPrompt())).status()).isEqualTo(JudgmentStatus.FAIL);
-				assertThat(requestRequirement(artifacts)).isEqualTo(spec.asPrompt());
-			}
-			assertThat(transport.calls).hasValue(2);
-		}
-	}
-
-	@Test
-	void eachInvocationRendersOnceAndNeverRebindsStaleEvidence() {
-		var actual = requirement(RFC, RFC.id());
-		var renderCalls = new AtomicInteger();
-		try (var transport = new FixtureHttp()) {
-			var provider = jev(transport, new LinkedHashMap<>()).<Rfc2119Constraint>rendering(spec -> {
-				renderCalls.incrementAndGet();
-				return spec.asPrompt();
-			});
-			var stale = evidence("Earlier rendered requirement");
-			String digest = stale.requirementSha256();
-			assertThat(provider.judge(actual, stale).status()).isEqualTo(JudgmentStatus.ERROR);
-			assertThat(provider.judge(actual, stale).status()).isEqualTo(JudgmentStatus.ERROR);
-			assertThat(stale.requirementSha256()).isEqualTo(digest);
-			assertThat(renderCalls).hasValue(2);
-			assertThat(transport.calls).hasValue(0);
-			assertThat(provider.judge(actual, evidence(RFC.asPrompt())).status()).isEqualTo(JudgmentStatus.FAIL);
-			assertThat(renderCalls).hasValue(3);
-			assertThat(transport.calls).hasValue(1);
-		}
-	}
-
-	@Test
-	void explicitApplicabilityPreflightRetainsExclusionAndUncertaintyWithoutProviderCalls() {
-		var actual = requirement(RFC, RFC.id());
-		try (var transport = new FixtureHttp()) {
-			var provider = jev(transport, new LinkedHashMap<>()).rendering(Rfc2119Constraint::asPrompt);
-			var excluded = preflight(provider, Rfc2119Constraint::applicability, Witness.EXCLUDED);
-			var result = Evaluations.evaluate(actual, excluded, evidence(RFC.asPrompt()));
-			assertThat(result.verdict().conclusion()).isEqualTo(Verdict.Conclusion.NOT_APPLICABLE);
-			assertThat(result.verdict().judgment().finding()).isNull();
-			assertThat(result.verdict().judgment().reasoning()).contains("No persistence");
-			var unresolved = preflight(provider, Rfc2119Constraint::applicability, Witness.TO_BE_JUDGED);
-			assertThat(unresolved.judge(actual, evidence(RFC.asPrompt())).status()).isEqualTo(JudgmentStatus.ABSTAIN);
-			assertThat(transport.calls).hasValue(0);
-		}
-	}
-
-	@Test
-	void unconditionalSpecificationCannotBeExcluded() {
-		var spec = new Rfc2119Constraint(RFC.id(), RFC.keyword(), RFC.requirement(), RFC.reason());
-		var actual = requirement(spec, spec.id());
-		try (var transport = new FixtureHttp()) {
-			var provider = jev(transport, new LinkedHashMap<>()).rendering(Rfc2119Constraint::asPrompt);
-			assertThat(preflight(provider, Rfc2119Constraint::applicability, Witness.EXCLUDED)
-				.judge(actual, evidence(spec.asPrompt()))
-				.status()).isEqualTo(JudgmentStatus.ERROR);
-			assertThat(transport.calls).hasValue(0);
-		}
-	}
-
-	@Test
-	void completionApplicabilityRequiresAnAuditableReasonAndDoesNotInventSatisfaction() {
-		var actual = requirement(EARS, EARS.id());
-		var model = new CapturingModel();
-		var provider = completion(NativeRequirementConsumerTest::completionEars, EarsCriterion::applicability, model,
-				Witness.TO_BE_JUDGED, new ArrayList<>());
-		model.answer = "NOT_APPLICABLE: Source.java:4 has no appointments";
-		assertThat(provider.judge(actual, evidence(EARS.asPrompt())).status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
-		assertThat(model.text()).contains(EARS.applicability(), "TO_BE_JUDGED");
-		model.answer = "INSUFFICIENT: evidence cannot establish appointment support";
-		assertThat(provider.judge(actual, evidence(EARS.asPrompt())).status()).isEqualTo(JudgmentStatus.ABSTAIN);
-		model.answer = "VIOLATED: Source.java:4 permits cancellation";
-		assertThat(provider.judge(actual, evidence(EARS.asPrompt())).status()).isEqualTo(JudgmentStatus.FAIL);
-	}
-
-	@Test
-	void completionExclusionCannotContradictApplicableWitness() {
-		var model = new CapturingModel();
-		model.answer = "NOT_APPLICABLE: claimed exclusion";
-		var provider = completion(NativeRequirementConsumerTest::completionRfc, Rfc2119Constraint::applicability, model,
-				Witness.APPLICABLE, new ArrayList<>());
-		assertThat(provider.judge(requirement(RFC, RFC.id()), evidence(RFC.asPrompt())).status())
-			.isEqualTo(JudgmentStatus.ERROR);
-	}
-
-	@Test
-	void completionProtocolErrorsRemainInstrumentFailures() {
-		var actual = requirement(RFC, RFC.id());
-		var model = new CapturingModel();
-		var provider = completion(NativeRequirementConsumerTest::completionRfc, Rfc2119Constraint::applicability, model,
-				Witness.TO_BE_JUDGED, new ArrayList<>());
-		for (String answer : List.of("NOT_APPLICABLE:", "NOT_APPLICABLE", "PROBABLY: maybe", "SATISFIED:")) {
-			model.answer = answer;
-			assertThat(provider.judge(actual, evidence(RFC.asPrompt())).status()).isEqualTo(JudgmentStatus.ERROR);
-		}
-		model.failure = true;
-		assertThat(provider.judge(actual, evidence(RFC.asPrompt())).status()).isEqualTo(JudgmentStatus.ERROR);
-	}
-
-	private enum Witness {
-
-		APPLICABLE, EXCLUDED, TO_BE_JUDGED
-
-	}
-
-	private static <S> RequirementJudge<S, JevEvidence> preflight(RequirementJudge<S, JevEvidence> delegate,
-			Function<S, String> applicability, Witness witness) {
-		return (requirement, evidence) -> {
-			String condition = applicability.apply(requirement.specification());
-			if (witness == Witness.EXCLUDED)
-				return condition == null ? Judgment.error("Cannot exclude unconditional requirement")
-						: Judgment.notApplicable("No persistence in selected source; " + condition + " does not hold");
-			if (condition != null && witness == Witness.TO_BE_JUDGED)
-				return Judgment.abstain("Unresolved applicability");
-			return delegate.judge(requirement, evidence);
-		};
-	}
-
-	private static <S> RequirementJudge<S, JevEvidence> completion(Function<S, String> render,
-			Function<S, String> applicability, CapturingModel model, Witness witness, List<Requirement<S>> seen) {
-		return (supplied, evidence) -> {
-			seen.add(supplied);
-			String condition = applicability.apply(supplied.specification());
-			if (witness == Witness.EXCLUDED)
-				return condition == null ? Judgment.error("Cannot exclude unconditional requirement")
-						: Judgment.notApplicable("Declared condition is absent");
-			String protocol = "Return SATISFIED, VIOLATED, INSUFFICIENT or NOT_APPLICABLE followed by colon and reason. "
-					+ "NOT_APPLICABLE requires the declared condition to be false and a reason.";
-			try {
-				var response = model.generate(new JudgeModelRequest(
-						List.of(new JudgeMessage(JudgeMessageRole.SYSTEM, protocol), new JudgeMessage(
-								JudgeMessageRole.USER,
-								"Application ID: " + supplied.id() + " Revision: " + supplied.revision() + " Source: "
-										+ supplied.source() + "\n" + render.apply(supplied.specification())),
-								new JudgeMessage(JudgeMessageRole.USER, evidence.text()),
-								new JudgeMessage(JudgeMessageRole.USER, "Applicability witness: " + witness)),
-						JudgeModelOptions.defaults(), Map.of()));
-				String[] parts = response.text().split(":", 2);
-				if (parts.length != 2 || parts[1].isBlank())
-					return Judgment.error("Missing protocol reason");
-				String reason = parts[1].strip();
-				return switch (parts[0]) {
-					case "SATISFIED" -> Judgment.pass(reason);
-					case "VIOLATED" -> Judgment.fail(reason);
-					case "INSUFFICIENT" -> Judgment.abstain(reason);
-					case "NOT_APPLICABLE" -> condition != null && witness == Witness.TO_BE_JUDGED
-							? Judgment.notApplicable(reason) : Judgment.error("Exclusion contradicts applicability");
-					default -> Judgment.error("Unknown protocol answer");
-				};
-			}
-			catch (RuntimeException ex) {
-				return Judgment.error("Completion instrument failed");
-			}
-		};
-	}
-
-	private static <S> Requirement<S> requirement(S specification, String nativeId) {
-		return new Requirement<>("scheduling/" + nativeId, "revision-7", "Display sentence", specification,
-				new RequirementSource(ref("specification:source", specification.toString()), nativeId));
-	}
+	private static final EarsRequirement EARS = EarsRequirement.of("UC6-AC8", "revision-7",
+			"Reject cancellation at start", "When cancellation is requested at the start, the system shall reject it.",
+			"Appointments exist");
 
 	private static ArtifactRef ref(String id, String content) {
 		return ArtifactRef.ofBytes(id, content.getBytes(UTF_8), null);
 	}
 
-	private static JevEvidence evidence(String renderedRequirement) {
+	private static JevEvidence evidence(String render) {
 		return new JevEvidence(SELECTED_EVIDENCE, ref("selected:bundle", SELECTED_EVIDENCE),
 				ref("selected:manifest", "Synthetic protocol fixture; no sufficiency claim"),
-				ref("rendered:requirement", renderedRequirement).sha256(), false);
+				ref("rendered:requirement", render).sha256(), false);
 	}
 
-	private static String jevIdentity(Requirement<?> requirement) {
-		return "Requirement " + requirement.id() + " revision " + requirement.revision() + "\nSource "
-				+ requirement.source().artifact().id() + " sha256 " + requirement.source().artifact().sha256() + "\n";
+	@Test
+	void rfcNativeSpecificationReachesBothProvidersThroughActualInvocationInput() {
+		try (var transport = new FixtureHttp()) {
+			var artifacts = new LinkedHashMap<String, byte[]>();
+			var nativeRuntime = jev(transport, artifacts).rendering(Rfc2119Specification::asPrompt);
+			var actual = Rfc2119Judge.builder()
+				.runtime(nativeRuntime)
+				.requirement(RFC)
+				.evidence(evidence(RFC.specification().asPrompt()))
+				.build()
+				.judge();
+			assertThat(actual.status()).isEqualTo(JudgmentStatus.FAIL);
+			assertThat(actual.requirement()).isSameAs(RFC);
+			assertThat(actual.invocations()).hasSize(1);
+			assertThat(actual.probabilityDistribution()).isNotNull();
+			assertThat(requestRequirement(artifacts)).isEqualTo(RFC.specification().asPrompt());
+			assertThat(transport.calls).hasValue(1);
+			JudgeModel model = request -> {
+				assertThat(request.messages().getFirst().content()).contains(RFC.id(), RFC.specification().asPrompt(),
+						SELECTED_EVIDENCE);
+				return new JudgeModelResponse("RULE-4: FAIL - Source.java:4 violates", "fixture-model", null, Map.of());
+			};
+			var generated = Rfc2119Judge.builder()
+				.runtime(model)
+				.requirement(RFC)
+				.evidence(SELECTED_EVIDENCE)
+				.build()
+				.judge();
+			assertThat(generated.status()).isEqualTo(JudgmentStatus.FAIL);
+			assertThat(generated.requirement()).isSameAs(RFC);
+			assertThat(generated.invocations()).hasSize(1);
+		}
 	}
 
-	private static String completionRfc(Rfc2119Constraint specification) {
-		return "RFC2119 document ID: " + specification.id() + "\nKeyword: " + specification.keyword() + "\nConstraint: "
-				+ specification.requirement() + "\nRationale: " + specification.reason() + "\nApplicability: "
-				+ specification.applicability();
+	@Test
+	void earsTitleSentenceAndApplicabilityReachBothProviders() {
+		try (var transport = new FixtureHttp()) {
+			var artifacts = new LinkedHashMap<String, byte[]>();
+			var runtime = jev(transport, artifacts).rendering(EarsSpecification::asPrompt);
+			var result = EarsJudge.builder()
+				.runtime(runtime)
+				.requirement(EARS)
+				.evidence(evidence(EARS.specification().asPrompt()))
+				.build()
+				.judge();
+			assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
+			assertThat(result.requirement()).isSameAs(EARS);
+			assertThat(requestRequirement(artifacts)).contains(EARS.specification().title(),
+					EARS.specification().requirement(), EARS.specification().applicability());
+			JudgeModel model = request -> new JudgeModelResponse("UC6-AC8: FAIL - Source.java:4 violates", null, null,
+					Map.of());
+			assertThat(EarsJudge.builder()
+				.runtime(model)
+				.requirement(EARS)
+				.evidence(SELECTED_EVIDENCE)
+				.build()
+				.judge()
+				.status()).isEqualTo(JudgmentStatus.FAIL);
+		}
 	}
 
-	private static String completionEars(EarsCriterion specification) {
-		return "EARS document ID: " + specification.id() + "\nHeading: " + specification.title()
-				+ "\nVerbatim sentence: " + specification.requirement() + "\nApplicability: "
-				+ specification.applicability();
+	@Test
+	void directJevAndRfcReuseNativeBoundaryWithoutAnotherDomainExecution() {
+		try (var transport = new FixtureHttp()) {
+			var runtime = jev(transport, new LinkedHashMap<>());
+			var direct = JevJudge.builder()
+				.runtime(runtime.rendering(Rfc2119Specification::asPrompt))
+				.requirement(RFC)
+				.evidence(evidence(RFC.specification().asPrompt()))
+				.build()
+				.judge();
+			assertThat(direct.status()).isEqualTo(JudgmentStatus.FAIL);
+			assertThat(direct.requirement()).isSameAs(RFC);
+			assertThat(transport.calls).hasValue(1);
+		}
 	}
 
-	private static JevJudge jev(FixtureHttp transport, Map<String, byte[]> artifacts) {
-		return new JevJudge("fixture-key", "jev-1.13.0", TransportTest.ENDPOINT, Duration.ofSeconds(1), 16000, 32000,
+	@Test
+	void eachInvocationRendersOnceAndNeverRebindsStaleEvidence() {
+		var calls = new AtomicInteger();
+		try (var transport = new FixtureHttp()) {
+			var runtime = jev(transport, new LinkedHashMap<>()).<Rfc2119Specification>rendering(spec -> {
+				calls.incrementAndGet();
+				return spec.asPrompt();
+			});
+			var stale = evidence("Earlier rendered requirement");
+			var ready = Rfc2119Judge.builder().runtime(runtime).requirement(RFC).evidence(stale).build();
+			assertThat(ready.judge().status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(ready.judge().status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(calls).hasValue(2);
+			assertThat(transport.calls).hasValue(0);
+		}
+	}
+
+	@Test
+	void freshAcquisitionOccursAtOperationBoundary() {
+		var acquired = new AtomicInteger();
+		try (var transport = new FixtureHttp()) {
+			var ready = Rfc2119Judge.builder()
+				.runtime(jev(transport, new LinkedHashMap<>()).rendering(Rfc2119Specification::asPrompt))
+				.requirement(RFC)
+				.evidenceSupplier(() -> {
+					acquired.incrementAndGet();
+					return evidence(RFC.specification().asPrompt());
+				})
+				.build();
+			assertThat(acquired).hasValue(0);
+			ready.judge();
+			ready.judge();
+			assertThat(acquired).hasValue(2);
+			assertThat(transport.calls).hasValue(2);
+		}
+	}
+
+	@Test
+	void completionApplicabilityRequiresReasonAndNeverInventsSatisfaction() {
+		for (var value : Map
+			.of("NOT_APPLICABLE - no appointments", JudgmentStatus.NOT_APPLICABLE,
+					"CANNOT_DETERMINE - evidence insufficient", JudgmentStatus.ABSTAIN,
+					"FAIL - Source.java:4 permits cancellation", JudgmentStatus.FAIL)
+			.entrySet()) {
+			JudgeModel model = req -> new JudgeModelResponse(EARS.id() + ": " + value.getKey(), null, null, Map.of());
+			assertThat(EarsJudge.builder().runtime(model).requirement(EARS).build().judge().status())
+				.isEqualTo(value.getValue());
+		}
+	}
+
+	@Test
+	void unconditionalExclusionRetainsOriginalAndLocalRejection() {
+		var unconditional = Rfc2119Requirement.of("RULE-4", "7", "MUST", "lock", "why", null);
+		JudgeModel model = req -> new JudgeModelResponse("RULE-4: NOT_APPLICABLE - inconvenient", null, null, Map.of());
+		var result = Rfc2119Jury.builder().runtime(model).requirements(List.of(unconditional)).build().vote();
+		assertThat(result.conclusion()).isEqualTo(Verdict.Conclusion.INCONCLUSIVE);
+		assertThat(result.compositeAttempts().getFirst().verdict().individual().getFirst().status())
+			.isEqualTo(JudgmentStatus.NOT_APPLICABLE);
+		assertThat(result.compositeAttempts().getFirst().verdict().seats().getFirst().rejection()).isNotNull();
+	}
+
+	@Test
+	void malformedCompletionRemainsInstrumentFailureWithNativeAnswer() {
+		for (String answer : List.of("RULE-4: NOT_APPLICABLE", "RULE-4: PROBABLY - maybe", "RULE-4: PASS")) {
+			JudgeModel model = req -> new JudgeModelResponse(answer, "fixture", null, Map.of());
+			var result = Rfc2119Judge.builder().runtime(model).requirement(RFC).build().judge();
+			assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(result.invocations().getFirst().nativeFacts()).containsEntry("text", answer);
+		}
+	}
+
+	@Test
+	void failedCompletionRetainsAttemptAndConfiguredRequirement() {
+		JudgeModel model = req -> {
+			throw new IllegalStateException("transport unavailable");
+		};
+		var result = Rfc2119Judge.builder().runtime(model).requirement(RFC).build().judge();
+		assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
+		assertThat(result.requirement()).isSameAs(RFC);
+		assertThat(result.invocations().getFirst().completed()).isFalse();
+	}
+
+	@Test
+	void jevRosterCountsEveryNativeExecutionAndRoundTripsOriginalSignals() {
+		try (var transport = new FixtureHttp()) {
+			var artifacts = new LinkedHashMap<String, byte[]>();
+			var second = Rfc2119Requirement.of("RULE-5", "revision-8", "SHOULD", "Retain source facts", "Auditability",
+					null);
+			var nativeRuntime = jev(transport, artifacts).rendering(Rfc2119Specification::asPrompt);
+			var ready = Rfc2119Jury.builder()
+				.runtime(nativeRuntime)
+				.requirements(List.of(RFC, second))
+				.evidenceByRequirement(Map.of(RFC.id(), evidence(RFC.specification().asPrompt()), second.id(),
+						evidence(second.specification().asPrompt())))
+				.build();
+			assertThat(transport.calls).hasValue(0);
+			var original = ready.vote();
+			assertThat(transport.calls).hasValue(2);
+			assertThat(original.conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
+			assertThat(io.github.markpollack.judge.jury.InvocationRecords.of(original)).hasSize(2);
+			for (var item : original.compositeAttempts()) {
+				var answer = item.verdict().individual().getFirst();
+				assertThat(answer.probabilityDistribution()).isNotNull();
+				assertThat(answer.confidence()).isNotNull();
+				assertThat(answer.provenance().response()).isNotNull();
+				assertThat(answer.requirement()).isNotNull();
+				assertThat(answer.invocationIds()).hasSize(1);
+			}
+			var codec = NativeRequirementCodecs.codec();
+			var restored = codec.read(codec.write(original));
+			assertThat(restored).isEqualTo(original);
+			assertThat(transport.calls).hasValue(2);
+		}
+	}
+
+	private static JevRuntime jev(FixtureHttp transport, Map<String, byte[]> artifacts) {
+		return new JevRuntime("fixture-key", "jev-1.13.0", TransportTest.ENDPOINT, Duration.ofSeconds(1), 16000, 32000,
 				JevJudgeTest.choice(), transport, (kind, bytes) -> {
 					artifacts.put(kind, bytes.clone());
 					return ArtifactRef.ofBytes("fixture:" + kind, bytes, null);
@@ -311,29 +269,6 @@ class NativeRequirementConsumerTest {
 		return Checks.parse(artifacts.get("request")).path("state").path("requirement").asText();
 	}
 
-	private static final class CapturingModel implements JudgeModel {
-
-		final List<JudgeModelRequest> requests = new ArrayList<>();
-
-		String answer = "VIOLATED: Source.java:4 violates the supplied requirement";
-
-		boolean failure;
-
-		@Override
-		public JudgeModelResponse generate(JudgeModelRequest request) {
-			requests.add(request);
-			if (failure)
-				throw new IllegalStateException("Fixture backend failure");
-			return new JudgeModelResponse(answer, "fixture-model", null, Map.of());
-		}
-
-		String text() {
-			return requests.getLast().messages().stream().map(JudgeMessage::content).reduce("", (a, b) -> a + "\n" + b);
-		}
-
-	}
-
-	/** Injects captured bytes without opening a socket; honors the SDK's body handler. */
 	private static final class FixtureHttp extends TransportTest.PendingHttp {
 
 		@Override

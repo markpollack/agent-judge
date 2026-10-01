@@ -90,16 +90,16 @@ class SubjectCauseTest {
 	@Test
 	@DisplayName("a cascade copying a tier keeps the leaf's cause, and the leaf is counted once")
 	void aCopiedLeafKeepsItsCause() {
-		Jury<CompletionEvidence> tier = SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> emptySubject(), "diff-size"))
+		Jury tier = SimpleJury.builder()
+			.judge(Judges.named(() -> emptySubject(), "diff-size"))
 			.votingStrategy(new AllMustPassStrategy())
 			.build();
 
-		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("gate", tier, RoutingRule.REJECT_ON_ANY_FAIL)
+		Verdict verdict = CascadedJury.builder()
+			.tier("gate", tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", passing(), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.tier("gate", VerdictProvenanceBasis.TIER_OUTCOME));
 		assertThat(verdict.individual()).singleElement()
@@ -113,12 +113,12 @@ class SubjectCauseTest {
 	@Test
 	@DisplayName("an empty subject alongside a quality failure: two leaves, one aggregate, no cause on the aggregate")
 	void anEmptySubjectBesideAQualityFailure() {
-		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> emptySubject(), "diff-size"))
-			.judge(Judges.named(context -> Judgment.fail("the answer contradicted its sources"), "faithfulness"))
+		Verdict verdict = SimpleJury.builder()
+			.judge(Judges.named(() -> emptySubject(), "diff-size"))
+			.judge(Judges.named(() -> Judgment.fail("the answer contradicted its sources"), "faithfulness"))
 			.votingStrategy(new AllMustPassStrategy())
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		assertThat(verdict.individual()).extracting(Judgment::reasonCode)
 			.containsExactly(JudgmentReasonCode.SUBJECT_EMPTY, null);
@@ -153,9 +153,9 @@ class SubjectCauseTest {
 		return (Map<String, Object>) judgment.metadata().get(Judgment.AGGREGATION_KEY);
 	}
 
-	private static Jury<CompletionEvidence> passing() {
-		return SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> Judgment.pass("OK"), "semantic"))
+	private static Jury passing() {
+		return SimpleJury.builder()
+			.judge(Judges.named(() -> Judgment.pass("OK"), "semantic"))
 			.votingStrategy(new ConsensusStrategy())
 			.build();
 	}

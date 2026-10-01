@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai.requirements;
 
 import java.util.List;
@@ -115,7 +120,8 @@ class Rfc2119JudgeTests {
 	void aBackendThatCouldNotAnswerBlamesTheJudgeNotTheSubject() {
 		JudgeModel model = request -> new JudgeModelResponse("No API credentials are configured for this backend",
 				"recorded", null, Map.of(), false);
-		Judgment judgment = Rfc2119Judge.create("rules", THREE, model).judge(context());
+		Judgment judgment = Rfc2119Parser.rollupFor(THREE,
+				model.generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).isEqualTo("No API credentials are configured for this backend");
@@ -124,7 +130,8 @@ class Rfc2119JudgeTests {
 	@Test
 	void aSilentlyUnsuccessfulBackendStillNamesItselfAsTheProblem() {
 		JudgeModel model = request -> new JudgeModelResponse("", "recorded", null, Map.of(), false);
-		Judgment judgment = Rfc2119Judge.create("rules", THREE, model).judge(context());
+		Judgment judgment = Rfc2119Parser.rollupFor(THREE,
+				model.generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).isEqualTo("The judging agent did not complete its run");
@@ -139,7 +146,7 @@ class Rfc2119JudgeTests {
 				""");
 
 		assertThat(judgment.score()).isNull();
-		assertThat(judgment.metadata()).containsEntry("constraintsTotal", 3).containsEntry("established", 2L);
+		assertThat(judgment.metadata()).containsEntry("constraintsTotal", 3).containsEntry("established", 2);
 	}
 
 	@Test
@@ -176,7 +183,7 @@ class Rfc2119JudgeTests {
 		// The document is telling the judge how strictly to read the rule, and why the
 		// design
 		// chose it. Both travel into the question.
-		String prompt = Rfc2119Judge.templateFor("rules", THREE)
+		String prompt = Rfc2119Parser.templateFor("rules", THREE)
 			.render(java.util.Map.of("workspace", context().toString()));
 
 		assertThat(prompt).contains("Answer every one of the 3 constraints");
@@ -189,7 +196,8 @@ class Rfc2119JudgeTests {
 
 	private static Judgment judge(String answers) {
 		JudgeModel model = request -> new JudgeModelResponse(answers, "stub", null, Map.of());
-		return Rfc2119Judge.create("rules", THREE, model).judge(context());
+		return Rfc2119Parser.rollupFor(THREE,
+				model.generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
 	}
 
 	private static Path context() {

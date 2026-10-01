@@ -75,7 +75,7 @@ class CrossJvmDescriptionStabilityTest {
 
 	@Test
 	void theRuntimeNamesTheDescriptionAvoidsAreReallyUnstable() {
-		Judge<CompletionEvidence> lambda = ctx -> Judgment.pass("probe");
+		Judge lambda = () -> Judgment.pass("probe");
 
 		assertThat(lambda.getClass().getName()).contains("$$Lambda").contains("/0x");
 	}

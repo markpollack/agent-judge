@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.springai;
 
 import java.util.List;
@@ -29,7 +34,8 @@ class SpringAiEvaluatorTest {
 
 	@Test
 	void shouldEvaluateWithSingleJudge() {
-		Judge<CompletionEvidence> judge = (CompletionEvidence ctx) -> Judgment.pass("Output is correct");
+		java.util.function.Function<CompletionEvidence, Judge> judge = (
+				CompletionEvidence ctx) -> () -> Judgment.pass("Output is correct");
 
 		Judgment result = SpringAiEvaluator.evaluate("Summarize", this::mockResponse, judge);
 
@@ -38,18 +44,22 @@ class SpringAiEvaluatorTest {
 
 	@Test
 	void shouldEvaluateWithJury() {
-		Judge<CompletionEvidence> passJudge = (CompletionEvidence ctx) -> Judgment.pass("Good");
-		Judge<CompletionEvidence> failJudge = (CompletionEvidence ctx) -> Judgment.fail("Bad");
-		Judge<CompletionEvidence> passJudge2 = (CompletionEvidence ctx) -> Judgment.pass("Fine");
+		java.util.function.Function<CompletionEvidence, Judge> passJudge = (
+				CompletionEvidence ctx) -> () -> Judgment.pass("Good");
+		java.util.function.Function<CompletionEvidence, Judge> failJudge = (
+				CompletionEvidence ctx) -> () -> Judgment.fail("Bad");
+		java.util.function.Function<CompletionEvidence, Judge> passJudge2 = (
+				CompletionEvidence ctx) -> () -> Judgment.pass("Fine");
 
-		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
-			.judge(passJudge)
-			.judge(failJudge)
-			.judge(passJudge2)
+		java.util.function.Function<CompletionEvidence, io.github.markpollack.judge.jury.Jury> jury = ctx -> SimpleJury
+			.builder()
+			.judge(passJudge.apply(ctx))
+			.judge(failJudge.apply(ctx))
+			.judge(passJudge2.apply(ctx))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		Verdict verdict = SpringAiEvaluator.evaluate("Summarize", this::mockResponse, jury);
+		Verdict verdict = SpringAiEvaluator.evaluateJury("Summarize", this::mockResponse, jury);
 
 		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individual()).hasSize(3);

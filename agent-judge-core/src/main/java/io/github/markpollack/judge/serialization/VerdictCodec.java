@@ -35,13 +35,36 @@ public final class VerdictCodec {
 	 * @param specifications additional unique names and concrete native types
 	 */
 	public VerdictCodec(Map<String, Class<?>> specifications) {
-		var types = new LinkedHashMap<String, Class<?>>();
-		types.put("text", String.class);
-		types.put("allOf", AllOf.class);
+		this(generalTypes(specifications), true);
+	}
+
+	private static Map<String, SpecificationCodec<?>> generalTypes(Map<String, Class<?>> specifications) {
+		Map<String, SpecificationCodec<?>> result = new LinkedHashMap<>();
+		specifications.forEach((name, type) -> result.put(name, SpecificationCodec.general(type)));
+		return result;
+	}
+
+	/**
+	 * Registers exact pure native Requirement factories.
+	 * @param specifications additional stable wire names and trusted reconstruction
+	 * @return current-format codec
+	 */
+	public static VerdictCodec withSpecifications(Map<String, SpecificationCodec<?>> specifications) {
+		return new VerdictCodec(specifications, true);
+	}
+
+	private VerdictCodec(Map<String, SpecificationCodec<?>> specifications, boolean registered) {
+		var types = new LinkedHashMap<String, SpecificationCodec<?>>();
+		types.put("text", SpecificationCodec.general(String.class));
+		types.put("allOf", SpecificationCodec.general(AllOf.class));
 		for (var entry : specifications.entrySet()) {
-			if (entry.getKey().isBlank() || types.containsKey(entry.getKey()) || types.containsValue(entry.getValue()))
+			Objects.requireNonNull(entry.getValue());
+			if (entry.getKey().isBlank() || types.containsKey(entry.getKey())
+					|| types.values()
+						.stream()
+						.anyMatch(value -> value.specificationType().equals(entry.getValue().specificationType())))
 				throw new IllegalArgumentException("Ambiguous specification codec: " + entry.getKey());
-			types.put(entry.getKey(), Objects.requireNonNull(entry.getValue()));
+			types.put(entry.getKey(), entry.getValue());
 		}
 		mapper = JsonMapper.builder()
 			.disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
@@ -52,6 +75,7 @@ public final class VerdictCodec {
 			.disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
 			.enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
 			.enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
+			.enable(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES)
 			.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
 			.enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
 			.build();
@@ -66,6 +90,7 @@ public final class VerdictCodec {
 	 */
 	public String write(Verdict verdict) {
 		verdict.conclusion();
+		io.github.markpollack.judge.jury.InvocationRecords.of(verdict);
 		return encode(verdict);
 	}
 
@@ -77,6 +102,7 @@ public final class VerdictCodec {
 	public Verdict read(String json) {
 		Verdict verdict = decode(json, Verdict.class);
 		verdict.conclusion();
+		io.github.markpollack.judge.jury.InvocationRecords.of(verdict);
 		return verdict;
 	}
 
@@ -95,6 +121,8 @@ public final class VerdictCodec {
 	 * @return current JSON
 	 */
 	public String write(EvaluationResult result) {
+		result.verdict().conclusion();
+		io.github.markpollack.judge.jury.InvocationRecords.of(result.verdict());
 		var policy = new LinkedHashMap<String, Object>();
 		switch (result.policyResult()) {
 			case PolicyResult.NotRequested ignored -> policy.put("kind", "notRequested");
@@ -124,7 +152,8 @@ public final class VerdictCodec {
 		fields(root, Set.of("schemaVersion", "verdict", "policyResult"));
 		if (!root.path("schemaVersion").isIntegralNumber() || !root.path("schemaVersion").canConvertToInt()
 				|| root.path("schemaVersion").intValue() != ResultJson.VERSION)
-			throw new IllegalArgumentException("Unsupported evaluation schemaVersion");
+			throw new IllegalArgumentException("Unsupported evaluation schemaVersion; expected " + ResultJson.VERSION
+					+ "; older typed schemas require pinned archival reading");
 		Verdict verdict = read(root.path("verdict").toString());
 		JsonNode policy = root.path("policyResult");
 		PolicyResult result = switch (policy.path("kind").asText()) {

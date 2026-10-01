@@ -70,18 +70,22 @@ public class CommandJudge extends DeterministicJudge<Path> {
 	/**
 	 * Create a CommandJudge with default settings (exit code 0, 2 minute timeout).
 	 * @param command the shell command to execute
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public CommandJudge(String command) {
-		this(command, 0, Duration.ofMinutes(2));
+	public CommandJudge(java.util.function.Supplier<? extends Path> source, String command) {
+		this(source, command, 0, Duration.ofMinutes(2));
 	}
 
 	/**
 	 * Create a CommandJudge with custom exit code and default timeout.
 	 * @param command the shell command to execute
 	 * @param expectedExitCode the expected exit code for success (typically 0)
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public CommandJudge(String command, int expectedExitCode) {
-		this(command, expectedExitCode, Duration.ofMinutes(2));
+	public CommandJudge(java.util.function.Supplier<? extends Path> source, String command, int expectedExitCode) {
+		this(source, command, expectedExitCode, Duration.ofMinutes(2));
 	}
 
 	/**
@@ -89,9 +93,12 @@ public class CommandJudge extends DeterministicJudge<Path> {
 	 * @param command the shell command to execute
 	 * @param expectedExitCode the expected exit code for success (typically 0)
 	 * @param timeout maximum duration for command execution
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public CommandJudge(String command, int expectedExitCode, Duration timeout) {
-		this(command, expectedExitCode, timeout, LocalSandbox::new);
+	public CommandJudge(java.util.function.Supplier<? extends Path> source, String command, int expectedExitCode,
+			Duration timeout) {
+		this(source, command, expectedExitCode, timeout, LocalSandbox::new);
 	}
 
 	/**
@@ -101,10 +108,13 @@ public class CommandJudge extends DeterministicJudge<Path> {
 	 * @param timeout maximum duration for command execution
 	 * @param sandboxFactory factory function that creates a Sandbox for the given
 	 * workspace path
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public CommandJudge(String command, int expectedExitCode, Duration timeout,
-			Function<Path, Sandbox> sandboxFactory) {
-		super("CommandJudge", String.format("Executes command: %s (expects exit code %d)", command, expectedExitCode));
+	public CommandJudge(java.util.function.Supplier<? extends Path> source, String command, int expectedExitCode,
+			Duration timeout, Function<Path, Sandbox> sandboxFactory) {
+		super(source, "CommandJudge",
+				String.format("Executes command: %s (expects exit code %d)", command, expectedExitCode));
 		this.command = command;
 		this.expectedExitCode = expectedExitCode;
 		this.timeout = timeout;
@@ -112,7 +122,7 @@ public class CommandJudge extends DeterministicJudge<Path> {
 	}
 
 	@Override
-	public Judgment judge(Path workspace) {
+	protected Judgment evaluate(Path workspace) {
 		try (Sandbox sandbox = sandboxFactory.apply(workspace)) {
 			ExecSpec spec = ExecSpec.builder().shellCommand(command).timeout(timeout).build();
 
@@ -174,6 +184,54 @@ public class CommandJudge extends DeterministicJudge<Path> {
 	 */
 	public Duration getTimeout() {
 		return timeout;
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @param command producer configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<Path> builder(String command) {
+		return io.github.markpollack.judge.construction.EvidenceSteps.of(source -> new CommandJudge(source, command));
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @param command producer configuration
+	 * @param expectedExitCode producer configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<Path> builder(String command,
+			int expectedExitCode) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new CommandJudge(source, command, expectedExitCode));
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @param command producer configuration
+	 * @param expectedExitCode producer configuration
+	 * @param timeout producer configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<Path> builder(String command,
+			int expectedExitCode, Duration timeout) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new CommandJudge(source, command, expectedExitCode, timeout));
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @param command producer configuration
+	 * @param expectedExitCode producer configuration
+	 * @param timeout producer configuration
+	 * @param sandboxFactory producer configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<Path> builder(String command,
+			int expectedExitCode, Duration timeout, Function<Path, Sandbox> sandboxFactory) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new CommandJudge(source, command, expectedExitCode, timeout, sandboxFactory));
 	}
 
 }

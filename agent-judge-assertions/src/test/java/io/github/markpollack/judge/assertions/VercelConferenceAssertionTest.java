@@ -90,7 +90,8 @@ class VercelConferenceAssertionTest extends ConferenceAssertionTest {
 		assertEquals(fixture.configuration.path("criteria"), request.at("/questions/q/criteria"));
 		assertEquals("choice", request.at("/questions/q/type").asText());
 		assertEquals(1, request.path("questions").size());
-		assertEquals(2, request.path("state").size());
+		assertEquals(3, request.path("state").size());
+		assertEquals(fixture.requirement(index).id(), request.at("/state/requirementIdentity/id").asText());
 		assertTrue(requests.getFirst().length <= fixture.configuration.path("maxBodyBytes").asInt());
 		assertArrayEquals(lastResponse, Files.readAllBytes(output.resolve(j.provenance().response().id())));
 		JsonNode trace = trace(j);

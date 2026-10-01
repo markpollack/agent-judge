@@ -138,7 +138,7 @@ class CorrectnessJudgeTest {
 
 		public TestCorrectnessJudge() {
 			// Use null builder - we won't call judge() in unit tests
-			super(null);
+			super(() -> CompletionEvidence.builder().request("parsing fixture").build(), null);
 		}
 
 		public String testBuildPrompt(CompletionEvidence context) {

@@ -21,19 +21,19 @@ import static org.assertj.core.api.Assertions.*;
 class RequirementAssertionsTest {
 
 	static final Requirement<String> READY = Requirement.text("ready", "1", "READY");
-	static final RequirementJudge<String, String> CHECK = (r, e) -> r.specification().equals(e)
-			? Judgment.pass("matches") : Judgment.fail("differs");
+	static final io.github.markpollack.judge.construction.JudgeRecipe<String, String> CHECK = io.github.markpollack.judge.assertions.ConfiguredRules
+		.rule((r, e) -> r.specification().equals(e) ? Judgment.pass("matches") : Judgment.fail("differs"));
 
 	@Test
 	void pureRequirementContainsNoExecutionConfiguration() {
-		assertThat(
-				Arrays.stream(Requirement.class.getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+		assertThat(Arrays.stream(io.github.markpollack.judge.requirement.GeneralRequirement.class.getRecordComponents())
+			.map(java.lang.reflect.RecordComponent::getName))
 			.containsExactly("id", "revision", "text", "specification", "source");
 	}
 
 	@Test
 	void noPolicyIsACompleteSuccessfulEvaluation() {
-		var result = Evaluations.evaluate(READY, CHECK, "READY");
+		var result = ConfiguredRules.evaluate(READY, CHECK, "READY");
 		assertThat(result.policyResult()).isInstanceOf(PolicyResult.NotRequested.class);
 		assertThatCode(() -> RequirementAssertions.requireSatisfied(result)).doesNotThrowAnyException();
 		assertThat(result.verdict().requirement()).isSameAs(READY);
@@ -42,7 +42,7 @@ class RequirementAssertionsTest {
 	@ParameterizedTest
 	@EnumSource(PolicyAction.class)
 	void positiveSatisfactionRequiresRequestedPolicyToPermitReliance(PolicyAction action) {
-		var result = Evaluations.evaluate(READY, CHECK, "READY", v -> new PolicyDecision(action, "reviewed"));
+		var result = ConfiguredRules.evaluate(READY, CHECK, "READY", v -> new PolicyDecision(action, "reviewed"));
 		assertThat(result.verdict().conclusion()).isEqualTo(Verdict.Conclusion.PASS);
 		if (action == PolicyAction.RELY)
 			assertThatCode(() -> RequirementAssertions.requireSatisfied(result)).doesNotThrowAnyException();
@@ -55,7 +55,7 @@ class RequirementAssertionsTest {
 	@ParameterizedTest
 	@EnumSource(PolicyAction.class)
 	void negativeNeverBecomesSatisfiedIncludingRely(PolicyAction action) {
-		var result = Evaluations.evaluate(READY, CHECK, "NO", v -> new PolicyDecision(action, "reviewed"));
+		var result = ConfiguredRules.evaluate(READY, CHECK, "NO", v -> new PolicyDecision(action, "reviewed"));
 		assertThat(result.verdict().conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
 		assertThatThrownBy(() -> RequirementAssertions.requireSatisfied(result))
 			.isInstanceOfSatisfying(RequirementAssertionError.class, error -> {
@@ -68,13 +68,14 @@ class RequirementAssertionsTest {
 	void repeatedAssertionsAndReportsDoNotExecuteAgain() {
 		var calls = new AtomicInteger();
 		var policies = new AtomicInteger();
-		RequirementJudge<String, String> judge = (r, e) -> {
-			calls.incrementAndGet();
-			assertThat(r).isSameAs(READY);
-			return CHECK.judge(r, e);
-		};
+		io.github.markpollack.judge.construction.JudgeRecipe<String, String> judge = io.github.markpollack.judge.assertions.ConfiguredRules
+			.rule((r, e) -> {
+				calls.incrementAndGet();
+				assertThat(r).isSameAs(READY);
+				return CHECK.requirement(r).evidence(e).build().judge();
+			});
 		var originalDecision = new PolicyDecision(PolicyAction.RELY, "retain original");
-		var result = Evaluations.evaluate(READY, judge, "READY", v -> {
+		var result = ConfiguredRules.evaluate(READY, judge, "READY", v -> {
 			policies.incrementAndGet();
 			return originalDecision;
 		});
@@ -93,7 +94,7 @@ class RequirementAssertionsTest {
 		for (Policy policy : List.<Policy>of(v -> {
 			throw original;
 		}, v -> null)) {
-			var result = Evaluations.evaluate(READY, CHECK, "READY", policy);
+			var result = ConfiguredRules.evaluate(READY, CHECK, "READY", policy);
 			assertThat(result.verdict().conclusion()).isEqualTo(Verdict.Conclusion.PASS);
 			assertThatThrownBy(() -> RequirementAssertions.requireSatisfied(result))
 				.isInstanceOfSatisfying(RequirementAssertionError.class, error -> assertThat(error.getCause())
@@ -103,7 +104,7 @@ class RequirementAssertionsTest {
 
 	@Test
 	void ordinaryEvidenceEvaluationHasNoFabricatedRequirement() {
-		var result = Evaluations.evaluate((Judge<String>) e -> Judgment.pass("checked"), "value");
+		var result = Evaluations.evaluate((Judge) () -> Judgment.pass("checked"));
 		assertThat(result.verdict().requirement()).isNull();
 		assertThatThrownBy(() -> RequirementAssertions.requireSatisfied(result))
 			.isInstanceOf(IllegalArgumentException.class);
@@ -112,12 +113,13 @@ class RequirementAssertionsTest {
 	@Test
 	void missingConfigurationMakesZeroCalls() {
 		var calls = new AtomicInteger();
-		RequirementJudge<String, String> judge = (r, e) -> {
-			calls.incrementAndGet();
-			return Judgment.pass("yes");
-		};
-		assertThatNullPointerException().isThrownBy(() -> Evaluations.evaluate(null, judge, "x"));
-		assertThatNullPointerException().isThrownBy(() -> Evaluations.evaluate(READY, judge, "x", null));
+		io.github.markpollack.judge.construction.JudgeRecipe<String, String> judge = io.github.markpollack.judge.assertions.ConfiguredRules
+			.rule((r, e) -> {
+				calls.incrementAndGet();
+				return Judgment.pass("yes");
+			});
+		assertThatNullPointerException().isThrownBy(() -> ConfiguredRules.evaluate(null, judge, "x"));
+		assertThatNullPointerException().isThrownBy(() -> ConfiguredRules.evaluate(READY, judge, "x", null));
 		assertThat(calls).hasValue(0);
 	}
 
@@ -127,8 +129,8 @@ class RequirementAssertionsTest {
 			var results = new ArrayList<java.util.concurrent.Future<EvaluationResult>>();
 			for (int i = 0; i < 30; i++) {
 				String value = "value-" + i;
-				results.add(
-						executor.submit(() -> Evaluations.evaluate(Requirement.text(value, "1", value), CHECK, value)));
+				results.add(executor
+					.submit(() -> ConfiguredRules.evaluate(Requirement.text(value, "1", value), CHECK, value)));
 			}
 			for (var future : results)
 				RequirementAssertions.requireSatisfied(future.get());
@@ -140,7 +142,7 @@ class RequirementAssertionsTest {
 		var calls = new AtomicInteger();
 		try {
 			Thread.currentThread().interrupt();
-			assertThatThrownBy(() -> Evaluations.evaluate(READY, CHECK, "READY", v -> {
+			assertThatThrownBy(() -> ConfiguredRules.evaluate(READY, CHECK, "READY", v -> {
 				calls.incrementAndGet();
 				return new PolicyDecision(PolicyAction.RELY, "yes");
 			})).isInstanceOf(java.util.concurrent.CancellationException.class);
@@ -149,9 +151,9 @@ class RequirementAssertionsTest {
 			Thread.interrupted();
 		}
 		assertThat(calls).hasValue(0);
-		assertThatThrownBy(() -> Evaluations.evaluate(READY, (RequirementJudge<String, String>) (r, e) -> {
+		assertThatThrownBy(() -> ConfiguredRules.evaluate(READY, ConfiguredRules.<String, String>rule((r, e) -> {
 			throw new AssertionError("fatal");
-		}, "x")).isInstanceOf(AssertionError.class).hasMessage("fatal");
+		}), "x")).isInstanceOf(AssertionError.class).hasMessage("fatal");
 	}
 
 }

@@ -688,23 +688,12 @@ final class Interpreter {
 	}
 
 	private static Set<String> relationTokens() {
-		Set<String> tokens = new java.util.LinkedHashSet<>();
-		for (CompositeRelation relation : CompositeRelation.values()) {
-			tokens.add(relation.wireName());
-		}
-		return tokens;
+		return Set.of("cascade_tier", "meta_member");
 	}
 
 	private static Set<String> policyTokens() {
-		Set<String> tokens = new java.util.LinkedHashSet<>();
-		for (RoutingRule policy : RoutingRule.values()) {
-			// The v1 reader cannot certify the new identity/policy routing protocol.
-			// Its full coherence checks belong to the versioned modern reader.
-			if (policy != RoutingRule.STOP_ON_CONCLUSIVE) {
-				tokens.add(policy.wireName());
-			}
-		}
-		return tokens;
+		// Historical vocabulary is frozen, independent of current execution enums.
+		return Set.of("REJECT_ON_ANY_FAIL", "ACCEPT_ON_ALL_PASS", "FINAL_TIER");
 	}
 
 	private static Set<String> dispositionTokens() {
@@ -871,12 +860,11 @@ final class Interpreter {
 			this.undeterminable = true;
 			return;
 		}
-		if (RoutingRule.REJECT_ON_ANY_FAIL.wireName().equals(policy) && !statuses.contains(FAIL)) {
+		if ("REJECT_ON_ANY_FAIL".equals(policy) && !statuses.contains(FAIL)) {
 			inconsistent(decisionPath, "basis", "The outcome of tier '" + tier + "' was adopted under "
 					+ "REJECT_ON_ANY_FAIL, which stops only on a failing judge, but no judge in the tier failed.");
 		}
-		else if (RoutingRule.ACCEPT_ON_ALL_PASS.wireName().equals(policy)
-				&& !statuses.stream().allMatch(PASS::equals)) {
+		else if ("ACCEPT_ON_ALL_PASS".equals(policy) && !statuses.stream().allMatch(PASS::equals)) {
 			inconsistent(decisionPath, "basis", "The outcome of tier '" + tier + "' was adopted under "
 					+ "ACCEPT_ON_ALL_PASS, which stops only when every judge passes, but one did not.");
 		}
@@ -1053,7 +1041,7 @@ final class Interpreter {
 		if (policy == null) {
 			this.undeterminable = true;
 		}
-		else if (!RoutingRule.REJECT_ON_ANY_FAIL.wireName().equals(policy)) {
+		else if (!"REJECT_ON_ANY_FAIL".equals(policy)) {
 			inconsistent(decisionPath, "basis", "Only REJECT_ON_ANY_FAIL stops on an individual rejection, but tier '"
 					+ tier + "' uses " + policy + ".");
 		}

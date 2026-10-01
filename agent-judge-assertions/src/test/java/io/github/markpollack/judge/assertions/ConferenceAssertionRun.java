@@ -52,7 +52,7 @@ public final class ConferenceAssertionRun {
 				Path caseOutput = output.resolve(i == 0 ? "rule-4" : "uc6-ac8");
 
 				var judge = fixture.bind(fixture.judge(apiKey, endpoint, http, caseOutput));
-				var result = Evaluations.evaluate(fixture.requirement(i), judge, evidence.get(i), fixture.binding);
+				var result = ConfiguredRules.evaluate(fixture.requirement(i), judge, evidence.get(i), fixture.binding);
 				ConferenceFixture.save(result, caseOutput, "LIVE explicitly invoked; inspect actual outcome");
 				String outcome = "PASSED";
 				try {

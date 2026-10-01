@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai;
 
 import java.io.InputStream;
@@ -148,6 +153,9 @@ class ModelBackedJudgeDescriptionTests {
 			.promptTemplate(template)
 			.judgmentClassifier(classifier)
 			.model(model)
+			.evidence(io.github.markpollack.judge.completion.CompletionEvidence.builder()
+				.request("description fixture")
+				.build())
 			.build();
 	}
 

@@ -19,6 +19,8 @@ final class CompositeExecutionScope {
 
 	static final int MAX_ATTEMPTS = 32;
 
+	static final int MAX_ROSTER_ITEMS = 256;
+
 	private static final ThreadLocal<CompositeExecutionScope> CURRENT = new ThreadLocal<>();
 
 	private int depth;
@@ -44,14 +46,15 @@ final class CompositeExecutionScope {
 	}
 
 	/**
-	 * Invoke a child jury within the parent's budget, and require it to have produced something.
+	 * Invoke a child jury within the parent's budget, and require it to have produced
+	 * something.
 	 * <p>
-	 * The non-null check belongs <em>here</em>, inside the invocation, because this is the
-	 * boundary the parent wraps in its failure handler. A child that returns nothing produced
-	 * nothing, exactly like one that threw; checked one line later, in the parent, the resulting
-	 * {@code NullPointerException} would be raised outside that handler and would take the whole
-	 * parent down — a meta-jury losing the members that succeeded, a cascade never reaching the
-	 * healthy final tier behind the broken one.
+	 * The non-null check belongs <em>here</em>, inside the invocation, because this is
+	 * the boundary the parent wraps in its failure handler. A child that returns nothing
+	 * produced nothing, exactly like one that threw; checked one line later, in the
+	 * parent, the resulting {@code NullPointerException} would be raised outside that
+	 * handler and would take the whole parent down — a meta-jury losing the members that
+	 * succeeded, a cascade never reaching the healthy final tier behind the broken one.
 	 * </p>
 	 * @param child the child's configured name, for the failure the parent records
 	 * @param invocation the child's vote
@@ -88,12 +91,19 @@ final class CompositeExecutionScope {
 		Deque<AttemptAtDepth> pending = new ArrayDeque<>();
 		pushSiblings(pending, rootAttempts, 1);
 		int count = 0;
+		int rosterCount = 0;
 		while (!pending.isEmpty()) {
 			AttemptAtDepth current = pending.pop();
 			if (current.depth() > MAX_DEPTH) {
 				throw new CompositeLimitExceededException("Composite depth limit of " + MAX_DEPTH + " exceeded");
 			}
-			count++;
+			if (current.attempt().relation() == CompositeRelation.ROSTER_ITEM) {
+				if (++rosterCount > MAX_ROSTER_ITEMS)
+					throw new CompositeLimitExceededException(
+							"Roster population limit of " + MAX_ROSTER_ITEMS + " exceeded");
+			}
+			else
+				count++;
 			if (count > MAX_ATTEMPTS) {
 				throw new CompositeLimitExceededException("Composite attempt limit of " + MAX_ATTEMPTS + " exceeded");
 			}

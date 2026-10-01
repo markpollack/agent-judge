@@ -44,6 +44,15 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 		@Nullable CompositeFailure failure) {
 
 	/**
+	 * Derives routing from the original child and its accepted treatment.
+	 * @return routing decision for a cascade attempt, otherwise null
+	 */
+	public @Nullable RoutingDecision routingDecision() {
+		return routingRule == null ? null
+				: VerdictSemantics.routingDecision(routingRule, verdict, disposition == AttemptDisposition.USED);
+	}
+
+	/**
 	 * Validate identity, relation/routingRule legality, the exactly-one outcome rule, and
 	 * the disposition.
 	 */
@@ -86,7 +95,7 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 					dispositionReason + " describes a verdict the stage returned, so the attempt must keep it");
 		}
 		if (verdict != null) {
-			requireReasonMatchesVerdict(name, disposition, dispositionReason, verdict);
+			requireReasonMatchesVerdict(name, relation, disposition, dispositionReason, verdict);
 		}
 	}
 
@@ -97,8 +106,8 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 	 * @param reason why not, or null
 	 * @param verdict the verdict the stage returned
 	 */
-	private static void requireReasonMatchesVerdict(String name, AttemptDisposition disposition,
-			@Nullable DispositionReason reason, Verdict verdict) {
+	private static void requireReasonMatchesVerdict(String name, CompositeRelation relation,
+			AttemptDisposition disposition, @Nullable DispositionReason reason, Verdict verdict) {
 		boolean undecided = verdict.provenance().kind() == VerdictProvenanceKind.UNDECIDED;
 		if (reason == DispositionReason.CHILD_UNDECIDED && !undecided) {
 			throw new IllegalArgumentException(
@@ -111,7 +120,7 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 					+ "' returned an exclusion the parent would not honour, but its aggregate was "
 					+ verdict.judgment().status());
 		}
-		if (disposition == AttemptDisposition.USED && undecided) {
+		if (disposition == AttemptDisposition.USED && undecided && relation == CompositeRelation.CONSTITUENT) {
 			throw new IllegalArgumentException("a USED attempt consumed stage '" + name
 					+ "' as a determination, but its verdict decided nothing; that is a stage failure, " + "not a use");
 		}
@@ -124,6 +133,7 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 	 * @param routingRule the cascade routingRule, or null for a meta-jury member
 	 * @param verdict the returned verdict
 	 * @return a used attempt
+	 *
 	 * @since 0.17.0
 	 */
 	public static CompositeAttempt used(String name, CompositeRelation relation, @Nullable RoutingRule routingRule,
@@ -139,6 +149,7 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 	 * @param reason why the verdict could not be used
 	 * @param verdict the verdict the stage actually returned, kept unchanged
 	 * @return a stage-failed attempt
+	 *
 	 * @since 0.17.0
 	 */
 	public static CompositeAttempt stageFailed(String name, CompositeRelation relation,
@@ -154,6 +165,7 @@ public record CompositeAttempt(String name, CompositeRelation relation, @Nullabl
 	 * @param routingRule the cascade routingRule, or null for a meta-jury member
 	 * @param failure the portable failure evidence
 	 * @return a stage-failed attempt carrying a failure code
+	 *
 	 * @since 0.17.0
 	 */
 	public static CompositeAttempt executionFailed(String name, CompositeRelation relation,

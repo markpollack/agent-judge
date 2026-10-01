@@ -10,15 +10,22 @@ import io.github.markpollack.judge.Judge;
 /**
  * A jury that reduces opinions with a declared voting strategy.
  *
- * @param <E> evidence type
  */
-public interface VotingJury<E> extends Jury<E> {
+public interface VotingJury extends Jury {
+
+	/**
+	 * Begins ordinary ready-member assembly.
+	 * @return composition builder
+	 */
+	static SimpleJury.Builder builder() {
+		return SimpleJury.builder();
+	}
 
 	/**
 	 * Configured direct judges; meta-juries describe their members separately.
 	 * @return direct judges
 	 */
-	List<Judge<E>> getJudges();
+	List<Judge> getJudges();
 
 	/**
 	 * Declared voting configuration.

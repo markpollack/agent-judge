@@ -67,9 +67,9 @@ class HistoricalBoundaryTest {
 
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 
-	private static final String VOCABULARY_GOLDEN = "/conformance/result-vocabulary-0.17.json";
+	private static final String VOCABULARY_GOLDEN = "/conformance/result-vocabulary-v5.json";
 
-	private static final String BOUNDARY_GOLDEN = "/conformance/boundary-rejection-0.17.json";
+	private static final String BOUNDARY_GOLDEN = "/conformance/boundary-refusal-v5.json";
 
 	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder()
 		.request("pin the result format")
@@ -106,11 +106,11 @@ class HistoricalBoundaryTest {
 		Verdict excluded = Verdict.of(Judgment.notApplicable("nothing in this rubric applies"),
 				Map.of("strict", failing));
 
-		return CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", opaque(excluded), RoutingRule.REJECT_ON_ANY_FAIL)
+		return CascadedJury.builder()
+			.tier("rubric", opaque(excluded), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", passing(), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 	}
 
 	@Nested
@@ -122,7 +122,7 @@ class HistoricalBoundaryTest {
 		void theVocabularyIsPinned() throws Exception {
 			assertThat(MAPPER.readTree(writeVocabulary()))
 				.as("the result vocabulary changed; review before repinning %s", VOCABULARY_GOLDEN)
-				.isEqualTo(ModernFixtureExpectations.statusOnly(goldenTree(VOCABULARY_GOLDEN)));
+				.isEqualTo(goldenTree(VOCABULARY_GOLDEN));
 		}
 
 		@Test
@@ -157,21 +157,21 @@ class HistoricalBoundaryTest {
 		void theBoundaryRejectionIsPinned() throws Exception {
 			assertThat(MAPPER.readTree(writeBoundaryRejection()))
 				.as("the boundary-rejection projection changed; review before repinning %s", BOUNDARY_GOLDEN)
-				.isEqualTo(ModernFixtureExpectations.statusOnly(goldenTree(BOUNDARY_GOLDEN)));
+				.isEqualTo(goldenTree(BOUNDARY_GOLDEN));
 		}
 
 		@Test
 		@DisplayName("the boundary rejection round-trips, keeping the child's claim and the parent's marker apart")
 		void theBoundaryRejectionRoundTrips() throws Exception {
 			Verdict parsed = MAPPER.readValue(writeBoundaryRejection(), Verdict.class);
-
-			assertThat(parsed.provenance().basis()).isEqualTo(VerdictProvenanceBasis.INDIVIDUAL_REJECTION);
-			assertThat(parsed.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+			assertThat(parsed.provenance())
+				.isEqualTo(VerdictProvenance.tier("semantic", VerdictProvenanceBasis.TIER_OUTCOME));
+			assertThat(parsed.conclusion()).isEqualTo(Verdict.Conclusion.PASS);
 			CompositeAttempt refused = parsed.compositeAttempts().get(0);
 			assertThat(refused.disposition()).isEqualTo(AttemptDisposition.STAGE_FAILED);
-			assertThat(refused.dispositionReason()).isEqualTo(DispositionReason.UNDECLARED_NOT_APPLICABLE);
+			assertThat(refused.dispositionReason()).isEqualTo(DispositionReason.INVALID_TIER_RESULT);
 			assertThat(refused.verdict().judgment().status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
-			assertThat(parsed.seats()).containsExactly(new Seat(0, "strict", KeySource.DECLARED));
+			assertThat(refused.verdict().individual().get(0).status()).isEqualTo(JudgmentStatus.FAIL);
 		}
 
 	}
@@ -337,17 +337,17 @@ class HistoricalBoundaryTest {
 		}
 	}
 
-	private static Jury<CompletionEvidence> passing() {
-		return SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> Judgment.pass("the semantic tier accepted it"), "semantic"))
+	private static Jury passing() {
+		return SimpleJury.builder()
+			.judge(Judges.named(() -> Judgment.pass("the semantic tier accepted it"), "semantic"))
 			.votingStrategy(new ConsensusStrategy())
 			.build();
 	}
 
-	private static Jury<CompletionEvidence> opaque(Verdict verdict) {
-		return new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
+	private static Jury opaque(Verdict verdict) {
+		return new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
-			public List<Judge<CompletionEvidence>> getJudges() {
+			public List<Judge> getJudges() {
 				return List.of();
 			}
 
@@ -357,7 +357,7 @@ class HistoricalBoundaryTest {
 			}
 
 			@Override
-			public Verdict vote(CompletionEvidence context) {
+			public Verdict vote() {
 				return verdict;
 			}
 		};

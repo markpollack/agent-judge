@@ -26,51 +26,26 @@ import io.github.markpollack.judge.jury.ExclusionHandling;
  * </p>
  *
  * <h2>Portable form</h2> <pre>
- * {"descriptionVersion": 2, "kind": "META", "aggregateMayBeNotApplicable": false,
+ * {"descriptionVersion": 3, "kind": "META", "aggregateMayBeNotApplicable": false,
  *  "strategy": {...}, "members": [{...}, ...]}
  * </pre>
  *
- * <h2>Why the capability is carried rather than derived</h2>
- * <p>
- * One declared usable member retains its complete aggregate, including N/A. For
- * reductions, exactly as in {@link SimpleJuryDescription}, the strategy's not-applicable
- * policy is only derivable from a description that declared it, and reading its absence
- * as {@code REFUSE} publishes a confident {@code false} for a meta-jury that can in fact
- * return an exclusion. The jury states what it is, and a declared policy is cross-checked
- * against it.
- * </p>
+ * Applicability and routing-opinion bounds derive from the structured configuration.
+ * Custom strategies must describe their exclusion policy explicitly.
  *
  * @param strategy the strategy over member aggregates
  * @param members the members, in execution order
- * @param aggregateMayBeNotApplicable whether this jury's aggregate may be
- * {@code NOT_APPLICABLE}, as the jury itself reports it
  * @author Mark Pollack
  * @since 0.17.0
  * @see MemberDescription
  */
-public record MetaJuryDescription(StrategyDescription strategy, List<MemberDescription> members,
-		boolean aggregateMayBeNotApplicable) implements JuryDescription {
+public record MetaJuryDescription(StrategyDescription strategy,
+		List<MemberDescription> members) implements JuryDescription {
 
-	/**
-	 * Validate and copy the members, and check the stated capability against what is
-	 * derivable.
-	 * @throws IllegalArgumentException if the strategy declared a not-applicable policy
-	 * that contradicts the stated capability
-	 */
+	/** Validates and freezes the configured structure before any execution. */
 	public MetaJuryDescription {
 		Objects.requireNonNull(strategy, "strategy must not be null");
 		members = List.copyOf(Objects.requireNonNull(members, "members must not be null"));
-		ExclusionHandling declared = strategy.exclusionHandling();
-		if (declared != null) {
-			boolean derived = (declared == ExclusionHandling.EXCLUDE
-					|| (members.size() == 1 && declared == ExclusionHandling.TREAT_AS_FAIL))
-					&& members.stream().anyMatch(member -> member.jury().aggregateMayBeNotApplicable());
-			if (derived != aggregateMayBeNotApplicable) {
-				throw new IllegalArgumentException("strategy '" + strategy.name() + "' declares notApplicablePolicy "
-						+ declared + " over " + members.size() + " member(s), from which aggregateMayBeNotApplicable "
-						+ "is " + derived + "; the description states " + aggregateMayBeNotApplicable);
-			}
-		}
 	}
 
 	@Override
@@ -86,9 +61,20 @@ public record MetaJuryDescription(StrategyDescription strategy, List<MemberDescr
 		Map<String, Object> tree = new LinkedHashMap<>();
 		tree.put("kind", "META");
 		tree.put("aggregateMayBeNotApplicable", aggregateMayBeNotApplicable());
+		tree.put("routingOpinionBound", routingOpinionBound().name());
 		tree.put("strategy", strategy.portableTree());
 		tree.put("members", memberTrees);
 		return tree;
 	}
 
+	@Override
+	public OpinionBound routingOpinionBound() {
+		return members.size() == 1 ? members.get(0).jury().routingOpinionBound() : OpinionBound.MAY;
+	}
+
+	@Override
+	public boolean aggregateMayBeNotApplicable() {
+		return (members.size() == 1 || strategy.exclusionHandling() == ExclusionHandling.EXCLUDE)
+				&& members.stream().anyMatch(member -> member.jury().aggregateMayBeNotApplicable());
+	}
 }

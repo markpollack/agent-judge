@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.file;
 
 import io.github.markpollack.judge.DeterministicJudge;
@@ -23,21 +28,17 @@ public class FileComparisonJudge extends DeterministicJudge<DirectoryComparison>
 
 	private static final Logger logger = LoggerFactory.getLogger(FileComparisonJudge.class);
 
-	private final MavenSemanticJudge mavenJudge = new MavenSemanticJudge();
-
-	private final XmlSemanticJudge xmlJudge = new XmlSemanticJudge();
-
-	private final JavaSemanticJudge javaJudge = new JavaSemanticJudge();
-
-	private final TextFileJudge textJudge = new TextFileJudge();
-
-	/** Create a composite semantic file-comparison judge. */
-	public FileComparisonJudge() {
-		super("FileComparisonJudge", "Compares all files in expected directory against actual directory");
+	/**
+	 * Create a composite semantic file-comparison judge.
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
+	 */
+	public FileComparisonJudge(java.util.function.Supplier<? extends DirectoryComparison> source) {
+		super(source, "FileComparisonJudge", "Compares all files in expected directory against actual directory");
 	}
 
 	@Override
-	public Judgment judge(DirectoryComparison evidence) {
+	protected Judgment evaluate(DirectoryComparison evidence) {
 		Path expectedDir = evidence.expectedDirectory();
 		Path actualDir = evidence.actualDirectory();
 
@@ -114,15 +115,23 @@ public class FileComparisonJudge extends DeterministicJudge<DirectoryComparison>
 
 	private Judgment dispatch(String filePath, FileComparison evidence) {
 		if (filePath.endsWith("pom.xml")) {
-			return mavenJudge.judge(evidence);
+			return new MavenSemanticJudge(() -> evidence).judge();
 		}
 		if (filePath.endsWith(".xml")) {
-			return xmlJudge.judge(evidence);
+			return new XmlSemanticJudge(() -> evidence).judge();
 		}
 		if (filePath.endsWith(".java")) {
-			return javaJudge.judge(evidence);
+			return new JavaSemanticJudge(() -> evidence).judge();
 		}
-		return textJudge.judge(evidence);
+		return new TextFileJudge(() -> evidence).judge();
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<DirectoryComparison> builder() {
+		return io.github.markpollack.judge.construction.EvidenceSteps.of(source -> new FileComparisonJudge(source));
 	}
 
 }

@@ -34,7 +34,7 @@ class FileContentJudgeContainmentTest {
 	Path workspace;
 
 	private Judgment judge(String path, String expected) {
-		return new FileContentJudge(path, expected).judge(workspace);
+		return FileContentJudge.builder(path, expected).evidence(workspace).build().judge();
 	}
 
 	@Test

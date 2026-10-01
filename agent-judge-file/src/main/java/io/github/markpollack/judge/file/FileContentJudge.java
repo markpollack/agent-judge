@@ -53,9 +53,12 @@ public class FileContentJudge extends DeterministicJudge<Path> {
 	 * @param filePath path relative to the judgment workspace
 	 * @param expectedContent expected text or regular expression
 	 * @param matchMode comparison mode
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public FileContentJudge(String filePath, String expectedContent, MatchMode matchMode) {
-		super("FileContentJudge",
+	public FileContentJudge(java.util.function.Supplier<? extends Path> source, String filePath, String expectedContent,
+			MatchMode matchMode) {
+		super(source, "FileContentJudge",
 				String.format("Verifies file content at %s (%s match)", filePath, matchMode.name().toLowerCase()));
 		this.filePath = filePath;
 		this.expectedContent = expectedContent;
@@ -66,13 +69,16 @@ public class FileContentJudge extends DeterministicJudge<Path> {
 	 * Create an exact-content judge.
 	 * @param filePath path relative to the judgment workspace
 	 * @param expectedContent expected file content
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public FileContentJudge(String filePath, String expectedContent) {
-		this(filePath, expectedContent, MatchMode.EXACT);
+	public FileContentJudge(java.util.function.Supplier<? extends Path> source, String filePath,
+			String expectedContent) {
+		this(source, filePath, expectedContent, MatchMode.EXACT);
 	}
 
 	@Override
-	public Judgment judge(Path evidence) {
+	protected Judgment evaluate(Path evidence) {
 		Path workspace = evidence.toAbsolutePath().normalize();
 		Path targetFile = workspace.resolve(filePath).toAbsolutePath().normalize();
 
@@ -149,6 +155,31 @@ public class FileContentJudge extends DeterministicJudge<Path> {
 		 */
 		REGEX
 
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @param filePath producer configuration
+	 * @param expectedContent producer configuration
+	 * @param matchMode producer configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<Path> builder(String filePath,
+			String expectedContent, MatchMode matchMode) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new FileContentJudge(source, filePath, expectedContent, matchMode));
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @param filePath producer configuration
+	 * @param expectedContent producer configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<Path> builder(String filePath,
+			String expectedContent) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new FileContentJudge(source, filePath, expectedContent));
 	}
 
 }

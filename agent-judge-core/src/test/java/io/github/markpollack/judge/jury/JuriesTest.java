@@ -24,41 +24,41 @@ class JuriesTest {
 
 	@Test
 	void fromJudgesShouldCreateJuryWithAutoNaming() {
-		Judge<CompletionEvidence> unnamedJudge1 = ctx -> booleanPass("Pass 1");
-		Judge<CompletionEvidence> unnamedJudge2 = ctx -> booleanFail("Fail 2");
+		Judge unnamedJudge1 = () -> booleanPass("Pass 1");
+		Judge unnamedJudge2 = () -> booleanFail("Fail 2");
 
-		Jury<CompletionEvidence> jury = Juries.fromJudges(new MajorityVotingStrategy(), unnamedJudge1, unnamedJudge2);
+		Jury jury = Juries.fromJudges(new MajorityVotingStrategy(), unnamedJudge1, unnamedJudge2);
 
 		CompletionEvidence context = simpleContext("Test goal");
-		Verdict verdict = jury.vote(context);
+		Verdict verdict = jury.vote();
 
 		assertThat(verdict.individualByName()).containsKeys("Judge#1", "Judge#2");
 	}
 
 	@Test
 	void fromJudgesShouldPreserveNamedJudges() {
-		Judge<CompletionEvidence> named1 = alwaysPass("FileExists");
-		Judge<CompletionEvidence> named2 = alwaysFail("Correctness");
-		Judge<CompletionEvidence> named3 = alwaysPass("BuildSuccess");
+		Judge named1 = alwaysPass("FileExists");
+		Judge named2 = alwaysFail("Correctness");
+		Judge named3 = alwaysPass("BuildSuccess");
 
-		Jury<CompletionEvidence> jury = Juries.fromJudges(new MajorityVotingStrategy(), named1, named2, named3);
+		Jury jury = Juries.fromJudges(new MajorityVotingStrategy(), named1, named2, named3);
 
 		CompletionEvidence context = simpleContext("Test goal");
-		Verdict verdict = jury.vote(context);
+		Verdict verdict = jury.vote();
 
 		assertThat(verdict.individualByName()).containsKeys("FileExists", "Correctness", "BuildSuccess");
 	}
 
 	@Test
 	void fromJudgesShouldHandleDuplicateNamesWithSuffixes() {
-		Judge<CompletionEvidence> judge1 = alwaysPass("FileCheck");
-		Judge<CompletionEvidence> judge2 = alwaysFail("FileCheck"); // duplicate name
-		Judge<CompletionEvidence> judge3 = alwaysPass("FileCheck"); // another duplicate
+		Judge judge1 = alwaysPass("FileCheck");
+		Judge judge2 = alwaysFail("FileCheck"); // duplicate name
+		Judge judge3 = alwaysPass("FileCheck"); // another duplicate
 
-		Jury<CompletionEvidence> jury = Juries.fromJudges(new MajorityVotingStrategy(), judge1, judge2, judge3);
+		Jury jury = Juries.fromJudges(new MajorityVotingStrategy(), judge1, judge2, judge3);
 
 		CompletionEvidence context = simpleContext("Test goal");
-		Verdict verdict = jury.vote(context);
+		Verdict verdict = jury.vote();
 
 		// First keeps original, duplicates get -2, -3 suffixes
 		assertThat(verdict.individualByName()).containsKeys("FileCheck", "FileCheck-2", "FileCheck-3");
@@ -66,13 +66,13 @@ class JuriesTest {
 
 	@Test
 	void fromJudgesShouldHandleMixedNamedAndUnnamed() {
-		Judge<CompletionEvidence> named = alwaysPass("NamedJudge");
-		Judge<CompletionEvidence> unnamed = ctx -> booleanFail("Unnamed");
+		Judge named = alwaysPass("NamedJudge");
+		Judge unnamed = () -> booleanFail("Unnamed");
 
-		Jury<CompletionEvidence> jury = Juries.fromJudges(new MajorityVotingStrategy(), named, unnamed);
+		Jury jury = Juries.fromJudges(new MajorityVotingStrategy(), named, unnamed);
 
 		CompletionEvidence context = simpleContext("Test goal");
-		Verdict verdict = jury.vote(context);
+		Verdict verdict = jury.vote();
 
 		assertThat(verdict.individualByName()).containsKeys("NamedJudge", "Judge#2");
 	}
@@ -86,7 +86,7 @@ class JuriesTest {
 
 	@Test
 	void fromJudgesShouldRejectNullJudges() {
-		assertThatThrownBy(() -> Juries.fromJudges(new MajorityVotingStrategy(), (Judge<CompletionEvidence>[]) null))
+		assertThatThrownBy(() -> Juries.fromJudges(new MajorityVotingStrategy(), (Judge[]) null))
 			.isInstanceOf(IllegalArgumentException.class);
 	}
 
@@ -116,16 +116,14 @@ class JuriesTest {
 
 	@Test
 	void combineShouldCreateMetaJury() {
-		Jury<CompletionEvidence> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"),
-				alwaysPass("J2"));
+		Jury jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"), alwaysPass("J2"));
 
-		Jury<CompletionEvidence> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"),
-				alwaysFail("J4"));
+		Jury jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"), alwaysFail("J4"));
 
-		Jury<CompletionEvidence> metaJury = Juries.combine(jury1, jury2, new MajorityVotingStrategy());
+		Jury metaJury = Juries.combine(jury1, jury2, new MajorityVotingStrategy());
 
 		CompletionEvidence context = simpleContext("Test goal");
-		Verdict verdict = metaJury.vote(context);
+		Verdict verdict = metaJury.vote();
 
 		// jury1 → PASS, jury2 → FAIL, majority → FAIL (tie resolved by TieBreakRule)
 		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name)
@@ -134,7 +132,7 @@ class JuriesTest {
 
 	@Test
 	void combineShouldRequireNonNullJuries() {
-		Jury<CompletionEvidence> jury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"));
+		Jury jury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"));
 
 		assertThatThrownBy(() -> Juries.combine(null, jury, new MajorityVotingStrategy()))
 			.isInstanceOf(IllegalArgumentException.class)
@@ -149,14 +147,14 @@ class JuriesTest {
 
 	@Test
 	void allOfShouldCreateMetaJuryFromMultiple() {
-		Jury<CompletionEvidence> jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"));
-		Jury<CompletionEvidence> jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J2"));
-		Jury<CompletionEvidence> jury3 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J3"));
+		Jury jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"));
+		Jury jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J2"));
+		Jury jury3 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J3"));
 
-		Jury<CompletionEvidence> metaJury = Juries.allOf(new ConsensusStrategy(), jury1, jury2, jury3);
+		Jury metaJury = Juries.allOf(new ConsensusStrategy(), jury1, jury2, jury3);
 
 		CompletionEvidence context = simpleContext("Test goal");
-		Verdict verdict = metaJury.vote(context);
+		Verdict verdict = metaJury.vote();
 
 		// All juries pass → consensus pass
 		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name)
@@ -172,7 +170,7 @@ class JuriesTest {
 
 	@Test
 	void allOfShouldRejectNullJuries() {
-		assertThatThrownBy(() -> Juries.allOf(new ConsensusStrategy(), (Jury<CompletionEvidence>[]) null))
+		assertThatThrownBy(() -> Juries.allOf(new ConsensusStrategy(), (Jury[]) null))
 			.isInstanceOf(IllegalArgumentException.class);
 	}
 
@@ -181,21 +179,20 @@ class JuriesTest {
 	@Test
 	void shouldSupportComplexJuryComposition() {
 		// Create specialized juries
-		Jury<CompletionEvidence> fileJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("FileExists"),
+		Jury fileJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("FileExists"),
 				alwaysPass("FileContent"));
 
-		Jury<CompletionEvidence> buildJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("MavenBuild"),
+		Jury buildJury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("MavenBuild"),
 				alwaysPass("GradleBuild"));
 
-		Jury<CompletionEvidence> correctnessJury = Juries.fromJudges(new ConsensusStrategy(),
-				alwaysPass("Correctness1"), alwaysPass("Correctness2"));
+		Jury correctnessJury = Juries.fromJudges(new ConsensusStrategy(), alwaysPass("Correctness1"),
+				alwaysPass("Correctness2"));
 
 		// Combine into meta-jury
-		Jury<CompletionEvidence> metaJury = Juries.allOf(new MajorityVotingStrategy(), fileJury, buildJury,
-				correctnessJury);
+		Jury metaJury = Juries.allOf(new MajorityVotingStrategy(), fileJury, buildJury, correctnessJury);
 
 		CompletionEvidence context = simpleContext("Complex evaluation");
-		Verdict verdict = metaJury.vote(context);
+		Verdict verdict = metaJury.vote();
 
 		// All sub-juries pass → majority passes
 		assertThat(verdict.compositeAttempts()).hasSize(3);
@@ -204,13 +201,13 @@ class JuriesTest {
 
 	@Test
 	void shouldPreserveJudgeIdentityThroughComposition() {
-		Judge<CompletionEvidence> judge1 = alwaysPass("UniqueJudge1");
-		Judge<CompletionEvidence> judge2 = alwaysFail("UniqueJudge2");
+		Judge judge1 = alwaysPass("UniqueJudge1");
+		Judge judge2 = alwaysFail("UniqueJudge2");
 
-		Jury<CompletionEvidence> jury = Juries.fromJudges(new MajorityVotingStrategy(), judge1, judge2);
+		Jury jury = Juries.fromJudges(new MajorityVotingStrategy(), judge1, judge2);
 
 		CompletionEvidence context = simpleContext("Test");
-		Verdict verdict = jury.vote(context);
+		Verdict verdict = jury.vote();
 
 		assertThat(verdict.individualByName().get("UniqueJudge1").status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individualByName().get("UniqueJudge2").status()).isEqualTo(JudgmentStatus.FAIL);

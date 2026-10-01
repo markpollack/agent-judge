@@ -58,10 +58,10 @@ class CascadeRuleTest {
 	private static final String EXCLUSION = "the change set contains no Java sources";
 
 	/** A judge that declares it may exclude, so a jury built on it is capable. */
-	private record Conditional(String name, Judgment result) implements JudgeWithMetadata<CompletionEvidence> {
+	private record Conditional(String name, Judgment result) implements JudgeWithMetadata {
 
 		@Override
-		public Judgment judge(CompletionEvidence context) {
+		public Judgment judge() {
 			return this.result;
 		}
 
@@ -73,43 +73,41 @@ class CascadeRuleTest {
 	}
 
 	/** A leaf jury whose reduction throws, so the tier returns an undecided verdict. */
-	private static Jury<CompletionEvidence> undecidedTier(Judgment... judgments) {
-		SimpleJury.Builder<CompletionEvidence> builder = SimpleJury.<CompletionEvidence>builder()
-			.votingStrategy(new VotingStrategy() {
-				@Override
-				public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
-					throw new IllegalStateException("the reduction broke");
-				}
+	private static Jury undecidedTier(Judgment... judgments) {
+		SimpleJury.Builder builder = SimpleJury.builder().votingStrategy(new VotingStrategy() {
+			@Override
+			public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
+				throw new IllegalStateException("the reduction broke");
+			}
 
-				@Override
-				public String getName() {
-					return "broken";
-				}
-			});
+			@Override
+			public String getName() {
+				return "broken";
+			}
+		});
 		for (int index = 0; index < judgments.length; index++) {
 			Judgment judgment = judgments[index];
-			builder.judge(Judges.named(context -> judgment, "judge-" + (index + 1)));
+			builder.judge(Judges.named(() -> judgment, "judge-" + (index + 1)));
 		}
 		return builder.build();
 	}
 
 	/** A leaf jury whose reduction returns null. */
-	private static Jury<CompletionEvidence> nullReducingTier(Judgment... judgments) {
-		SimpleJury.Builder<CompletionEvidence> builder = SimpleJury.<CompletionEvidence>builder()
-			.votingStrategy(new VotingStrategy() {
-				@Override
-				public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
-					return null;
-				}
+	private static Jury nullReducingTier(Judgment... judgments) {
+		SimpleJury.Builder builder = SimpleJury.builder().votingStrategy(new VotingStrategy() {
+			@Override
+			public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
+				return null;
+			}
 
-				@Override
-				public String getName() {
-					return "silent";
-				}
-			});
+			@Override
+			public String getName() {
+				return "silent";
+			}
+		});
 		for (int index = 0; index < judgments.length; index++) {
 			Judgment judgment = judgments[index];
-			builder.judge(Judges.named(context -> judgment, "judge-" + (index + 1)));
+			builder.judge(Judges.named(() -> judgment, "judge-" + (index + 1)));
 		}
 		return builder.build();
 	}
@@ -118,7 +116,7 @@ class CascadeRuleTest {
 	 * An opaque tier that returns an excluded aggregate over real individuals while
 	 * declaring no capability, so a parent must refuse it.
 	 */
-	private static Jury<CompletionEvidence> opaqueExcludingTier(Judgment... individuals) {
+	private static Jury opaqueExcludingTier(Judgment... individuals) {
 		return returning(Verdict.of(Judgment.notApplicable(EXCLUSION), namedOf(individuals)));
 	}
 
@@ -138,9 +136,9 @@ class CascadeRuleTest {
 		return seats;
 	}
 
-	private static Jury<CompletionEvidence> passingTier(String reasoning) {
-		return SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> Judgment.pass(reasoning), "ok"))
+	private static Jury passingTier(String reasoning) {
+		return SimpleJury.builder()
+			.judge(Judges.named(() -> Judgment.pass(reasoning), "ok"))
 			.votingStrategy(new ConsensusStrategy())
 			.build();
 	}
@@ -152,9 +150,9 @@ class CascadeRuleTest {
 	 * final tier.
 	 * @return the inner cascade
 	 */
-	private static Jury<CompletionEvidence> boundaryRejectingCascade(Jury<CompletionEvidence> finalTier) {
-		return CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.REJECT_ON_ANY_FAIL)
+	private static Jury acceptedRejectingCascade(Jury finalTier) {
+		return CascadedJury.builder()
+			.tier("rubric", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", finalTier, RoutingRule.FINAL_TIER)
 			.build();
 	}
@@ -170,23 +168,23 @@ class CascadeRuleTest {
 	 * </p>
 	 * @param inner the child cascade's verdict, as the parent recorded it
 	 */
-	private static void assertIsABoundaryRejectedD1(Verdict inner) {
+	private static void assertIsAcceptedUndecidedRejection(Verdict inner) {
 		assertThat(inner.provenance()).as("the inner cascade stopped on the rejection the refused tier had established")
 			.isEqualTo(new VerdictProvenance(VerdictProvenanceKind.TIER, "rubric",
 					VerdictProvenanceBasis.INDIVIDUAL_REJECTION));
 		assertThat(inner.judgment().status()).as("no FAIL is manufactured").isEqualTo(JudgmentStatus.ERROR);
 		assertThat(inner.judgment().reasonCode()).as("the root is the parent-built machinery error")
-			.isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+			.isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
 		assertThat(inner.judgment().score()).as("and no score of zero either").isNull();
 
 		assertThat(inner.compositeAttempts()).extracting(CompositeAttempt::name)
 			.as("the cascade stopped at the rubric tier, so its final tier never ran")
 			.containsExactly("rubric");
 		CompositeAttempt refused = inner.compositeAttempts().get(0);
-		assertThat(refused.disposition()).isEqualTo(AttemptDisposition.STAGE_FAILED);
-		assertThat(refused.dispositionReason()).isEqualTo(DispositionReason.UNDECLARED_NOT_APPLICABLE);
+		assertThat(refused.disposition()).isEqualTo(AttemptDisposition.USED);
+		assertThat(refused.dispositionReason()).isNull();
 		assertThat(refused.verdict().judgment().status()).as("the child's own claim is kept unchanged")
-			.isEqualTo(JudgmentStatus.NOT_APPLICABLE);
+			.isEqualTo(JudgmentStatus.ERROR);
 		assertThat(inner.individual()).extracting(Judgment::status)
 			.as("the rejecting tier's individuals are copied, FAIL included")
 			.containsExactly(JudgmentStatus.PASS, JudgmentStatus.FAIL);
@@ -209,11 +207,11 @@ class CascadeRuleTest {
 	@Test
 	@DisplayName("1. a genuine FAIL plus a broken reduction stops the cascade with a rejection")
 	void genuineFailPlusBrokenReductionStops() {
-		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("gate", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.REJECT_ON_ANY_FAIL)
+		Verdict verdict = CascadedJury.builder()
+			.tier("gate", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		assertThat(verdict.provenance()).isEqualTo(
 				new VerdictProvenance(VerdictProvenanceKind.TIER, "gate", VerdictProvenanceBasis.INDIVIDUAL_REJECTION));
@@ -223,17 +221,18 @@ class CascadeRuleTest {
 		assertThat(verdict.individual()).extracting(Judgment::status)
 			.containsExactly(JudgmentStatus.PASS, JudgmentStatus.FAIL);
 		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name).containsExactly("gate");
-		assertThat(verdict.compositeAttempts().get(0).dispositionReason()).isEqualTo(DispositionReason.CHILD_UNDECIDED);
+		assertThat(verdict.compositeAttempts().get(0).dispositionReason()).isNull();
 	}
 
 	@Test
-	@DisplayName("2. the same tier under ACCEPT_ON_ALL_PASS escalates: a broken stage accepts nothing")
+	@DisplayName("2. the same tier under STOP_ON_ALL_OPINIONS_PASS escalates: a broken stage accepts nothing")
 	void acceptOnAllPassNeverStopsOnAFailedStage() {
-		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("structural", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.ACCEPT_ON_ALL_PASS)
+		Verdict verdict = CascadedJury.builder()
+			.tier("structural", undecidedTier(Judgment.pass("a"), Judgment.fail("b")),
+					RoutingRule.STOP_ON_ALL_OPINIONS_PASS)
 			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		assertThat(verdict.provenance())
 			.isEqualTo(VerdictProvenance.tier("semantic", VerdictProvenanceBasis.TIER_OUTCOME));
@@ -241,41 +240,40 @@ class CascadeRuleTest {
 		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name)
 			.containsExactly("structural", "semantic");
 		assertThat(verdict.compositeAttempts().get(0).disposition()).as("the failure is still counted")
-			.isEqualTo(AttemptDisposition.STAGE_FAILED);
+			.isEqualTo(AttemptDisposition.USED);
 	}
 
 	@Test
 	@DisplayName("3. an undecided final tier decides nothing at all")
 	void anUndecidedFinalTierDecidesNothing() {
-		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
+		Verdict verdict = CascadedJury.builder()
 			.tier("only", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
-		assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.NO_TIER_DECIDED);
-		assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.undecided());
-		assertThat(verdict.individual()).as("an empty root: nothing was adopted").isEmpty();
-		assertThat(verdict.seats()).isEmpty();
+		assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
+		assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.tier("only", VerdictProvenanceBasis.TIER_OUTCOME));
+		assertThat(verdict.individual()).hasSize(2);
+		assertThat(verdict.seats()).hasSize(2);
 		assertThat(verdict.compositeAttempts()).hasSize(1);
 	}
 
 	@Test
 	@DisplayName("4. a meta tier with one good failing member and one broken member stops on the rejection")
 	void nestedMetaWithAGenuineFailStops() {
-		Jury<CompletionEvidence> failingMember = SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> Judgment.fail("a requirement was not met"), "strict"))
+		Jury failingMember = SimpleJury.builder()
+			.judge(Judges.named(() -> Judgment.fail("a requirement was not met"), "strict"))
 			.votingStrategy(new ConsensusStrategy())
 			.build();
-		Jury<CompletionEvidence> tier = Juries.meta(
-				new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
-				new NamedJury<CompletionEvidence>("strict", failingMember),
-				new NamedJury<CompletionEvidence>("broken", throwing(new IllegalStateException("boom"))));
+		Jury tier = Juries.meta(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
+				new NamedJury("strict", failingMember),
+				new NamedJury("broken", throwing(new IllegalStateException("boom"))));
 
-		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("review", tier, RoutingRule.REJECT_ON_ANY_FAIL)
+		Verdict verdict = CascadedJury.builder()
+			.tier("review", tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		assertThat(verdict.provenance()).isEqualTo(new VerdictProvenance(VerdictProvenanceKind.TIER, "review",
 				VerdictProvenanceBasis.INDIVIDUAL_REJECTION));
@@ -290,25 +288,25 @@ class CascadeRuleTest {
 		@Test
 		@DisplayName("as the sole final tier, nothing is decided, and the refusal is countable")
 		void soleFinalTier() {
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
+			Verdict verdict = CascadedJury.builder()
 				.tier("only", opaqueExcludingTier(Judgment.pass("a")), RoutingRule.FINAL_TIER)
 				.build()
-				.vote(CONTEXT);
+				.vote();
 
 			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.NO_TIER_DECIDED);
 			assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.undecided());
 			assertThat(verdict.compositeAttempts().get(0).dispositionReason())
-				.isEqualTo(DispositionReason.UNDECLARED_NOT_APPLICABLE);
+				.isEqualTo(DispositionReason.INVALID_TIER_RESULT);
 		}
 
 		@Test
 		@DisplayName("as a non-final tier it escalates, and the refusal stays countable when a later tier passes")
 		void nonFinalTierFollowedByAPass() {
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("rubric", opaqueExcludingTier(Judgment.pass("a")), RoutingRule.REJECT_ON_ANY_FAIL)
+			Verdict verdict = CascadedJury.builder()
+				.tier("rubric", opaqueExcludingTier(Judgment.pass("a")), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 				.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 				.build()
-				.vote(CONTEXT);
+				.vote();
 
 			assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 			assertThat(verdict.judgment().reasoning())
@@ -317,7 +315,7 @@ class CascadeRuleTest {
 				.doesNotContain("NOT_APPLICABLE");
 			CompositeAttempt refused = verdict.compositeAttempts().get(0);
 			assertThat(refused.disposition()).isEqualTo(AttemptDisposition.STAGE_FAILED);
-			assertThat(refused.dispositionReason()).isEqualTo(DispositionReason.UNDECLARED_NOT_APPLICABLE);
+			assertThat(refused.dispositionReason()).isEqualTo(DispositionReason.INVALID_TIER_RESULT);
 			assertThat(refused.verdict().judgment().status()).as("the child's own claim is unchanged")
 				.isEqualTo(JudgmentStatus.NOT_APPLICABLE);
 		}
@@ -325,15 +323,12 @@ class CascadeRuleTest {
 		@Test
 		@DisplayName("a tier that did declare the capability is honoured, not refused")
 		void aDeclaredExclusionIsUsed() {
-			Jury<CompletionEvidence> capable = SimpleJury.<CompletionEvidence>builder()
-				.judge(new Conditional("conditional", Judgment.notApplicable(EXCLUSION)))
+			Jury capable = SimpleJury.builder()
+				.seat(declared(new Conditional("conditional", Judgment.notApplicable(EXCLUSION))))
 				.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 				.build();
 
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("rubric", capable, RoutingRule.FINAL_TIER)
-				.build()
-				.vote(CONTEXT);
+			Verdict verdict = CascadedJury.builder().tier("rubric", capable, RoutingRule.FINAL_TIER).build().vote();
 
 			assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
 			assertThat(verdict.provenance())
@@ -350,15 +345,13 @@ class CascadeRuleTest {
 		@Test
 		@DisplayName("an inner rejection is a determination, adopted as a tier outcome without re-rejecting")
 		void anInnerRejectionIsAdopted() {
-			Jury<CompletionEvidence> inner = CascadedJury.<CompletionEvidence>builder()
-				.tier("gate", undecidedTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.REJECT_ON_ANY_FAIL)
+			Jury inner = CascadedJury.builder()
+				.tier("gate", undecidedTier(Judgment.pass("a"), Judgment.fail("b")),
+						RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 				.tier("unused", passingTier("never reached"), RoutingRule.FINAL_TIER)
 				.build();
 
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("inner", inner, RoutingRule.FINAL_TIER)
-				.build()
-				.vote(CONTEXT);
+			Verdict verdict = CascadedJury.builder().tier("inner", inner, RoutingRule.FINAL_TIER).build().vote();
 
 			assertThat(verdict.provenance())
 				.isEqualTo(VerdictProvenance.tier("inner", VerdictProvenanceBasis.TIER_OUTCOME));
@@ -372,19 +365,14 @@ class CascadeRuleTest {
 		@Test
 		@DisplayName("an inner propagated outcome is likewise a determination")
 		void anInnerPropagatedOutcomeIsAdopted() {
-			Jury<CompletionEvidence> erroring = SimpleJury.<CompletionEvidence>builder()
-				.judge(Judges.named(context -> Judgment.error("the index was unreachable"), "flaky"))
-				.judge(Judges.named(context -> Judgment.pass("another seat"), "other"))
+			Jury erroring = SimpleJury.builder()
+				.judge(Judges.named(() -> Judgment.error("the index was unreachable"), "flaky"))
+				.judge(Judges.named(() -> Judgment.pass("another seat"), "other"))
 				.votingStrategy(new ConsensusStrategy())
 				.build();
-			Jury<CompletionEvidence> inner = CascadedJury.<CompletionEvidence>builder()
-				.tier("leaf", erroring, RoutingRule.FINAL_TIER)
-				.build();
+			Jury inner = CascadedJury.builder().tier("leaf", erroring, RoutingRule.FINAL_TIER).build();
 
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("inner", inner, RoutingRule.FINAL_TIER)
-				.build()
-				.vote(CONTEXT);
+			Verdict verdict = CascadedJury.builder().tier("inner", inner, RoutingRule.FINAL_TIER).build().vote();
 
 			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.ERRORS_PROPAGATED);
 			assertThat(verdict.provenance())
@@ -394,13 +382,8 @@ class CascadeRuleTest {
 		@Test
 		@DisplayName("names are local: each level names only its own direct tier")
 		void namesAreLocal() {
-			Jury<CompletionEvidence> inner = CascadedJury.<CompletionEvidence>builder()
-				.tier("leaf", passingTier("OK"), RoutingRule.FINAL_TIER)
-				.build();
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("outer-tier", inner, RoutingRule.FINAL_TIER)
-				.build()
-				.vote(CONTEXT);
+			Jury inner = CascadedJury.builder().tier("leaf", passingTier("OK"), RoutingRule.FINAL_TIER).build();
+			Verdict verdict = CascadedJury.builder().tier("outer-tier", inner, RoutingRule.FINAL_TIER).build().vote();
 
 			assertThat(verdict.provenance().tier()).isEqualTo("outer-tier");
 			assertThat(verdict.compositeAttempts().get(0).verdict().provenance().tier()).isEqualTo("leaf");
@@ -411,25 +394,20 @@ class CascadeRuleTest {
 	@Test
 	@DisplayName("7. a refused exclusion holding a real FAIL stops, and the root is parent-authored")
 	void refusedExclusionWithARealFailStops() {
-		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")), RoutingRule.REJECT_ON_ANY_FAIL)
+		Verdict verdict = CascadedJury.builder()
+			.tier("rubric", opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")),
+					RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
-
-		assertThat(verdict.provenance()).isEqualTo(new VerdictProvenance(VerdictProvenanceKind.TIER, "rubric",
-				VerdictProvenanceBasis.INDIVIDUAL_REJECTION));
-		assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
-		assertThat(verdict.judgment().reasoning()).contains("rubric")
-			.contains("NOT_APPLICABLE")
-			.contains("genuine individual FAIL");
-		assertThat(verdict.judgment().status()).as("no FAIL and no score is manufactured")
-			.isNotEqualTo(JudgmentStatus.FAIL);
-		assertThat(verdict.judgment().score()).isNull();
-		CompositeAttempt attempt = verdict.compositeAttempts().get(0);
-		assertThat(attempt.verdict().judgment().status()).as("the child's verdict is unchanged")
-			.isEqualTo(JudgmentStatus.NOT_APPLICABLE);
-		assertThat(attempt.dispositionReason()).isEqualTo(DispositionReason.UNDECLARED_NOT_APPLICABLE);
+			.vote();
+		assertThat(verdict.provenance())
+			.isEqualTo(VerdictProvenance.tier("semantic", VerdictProvenanceBasis.TIER_OUTCOME));
+		assertThat(verdict.conclusion()).isEqualTo(Verdict.Conclusion.PASS);
+		CompositeAttempt refused = verdict.compositeAttempts().get(0);
+		assertThat(refused.dispositionReason()).isEqualTo(DispositionReason.INVALID_TIER_RESULT);
+		assertThat(refused.verdict().judgment().status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
+		assertThat(refused.verdict().individual()).extracting(Judgment::status)
+			.containsExactly(JudgmentStatus.PASS, JudgmentStatus.FAIL);
 	}
 
 	@Test
@@ -440,14 +418,14 @@ class CascadeRuleTest {
 		// the tier is undecided for control flow. The FAIL beneath it is still real, and
 		// one
 		// established violation is enough to reject.
-		Jury<CompletionEvidence> refusing = returning(refusedVerdict());
+		Jury refusing = returning(refusedVerdict());
 		assertThat(refusing.aggregateMayBeNotApplicable()).isFalse();
 
-		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("rubric", refusing, RoutingRule.REJECT_ON_ANY_FAIL)
+		Verdict verdict = CascadedJury.builder()
+			.tier("rubric", refusing, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		assertThat(verdict.provenance()).isEqualTo(new VerdictProvenance(VerdictProvenanceKind.TIER, "rubric",
 				VerdictProvenanceBasis.INDIVIDUAL_REJECTION));
@@ -460,7 +438,7 @@ class CascadeRuleTest {
 			.as("the rejecting tier's individuals are copied, including the FAIL that established it")
 			.containsExactly(JudgmentStatus.NOT_APPLICABLE, JudgmentStatus.FAIL);
 		CompositeAttempt attempt = verdict.compositeAttempts().get(0);
-		assertThat(attempt.dispositionReason()).isEqualTo(DispositionReason.CHILD_UNDECIDED);
+		assertThat(attempt.dispositionReason()).isNull();
 		assertThat(attempt.verdict().judgment()).as("the child's verdict is unchanged").isEqualTo(verdict.judgment());
 		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name)
 			.as("the cascade stopped, so the later tier never ran")
@@ -484,30 +462,19 @@ class CascadeRuleTest {
 	@ValueSource(booleans = { true, false })
 	@DisplayName("9. a null-returning reduction behaves exactly like a throwing one")
 	void nullReductionsBehaveLikeThrows(boolean nested) {
-		Jury<CompletionEvidence> tier = nullReducingTier(Judgment.pass("a"), Judgment.fail("b"));
-		Jury<CompletionEvidence> cascadeTier = nested
-				? Juries.meta(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
-						new NamedJury<CompletionEvidence>("inner", tier))
-				: tier;
+		Jury tier = nullReducingTier(Judgment.pass("a"), Judgment.fail("b"));
+		Jury cascadeTier = nested ? Juries.meta(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
+				new NamedJury("inner", tier)) : tier;
 
-		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("gate", cascadeTier, RoutingRule.REJECT_ON_ANY_FAIL)
+		Verdict verdict = CascadedJury.builder()
+			.tier("gate", cascadeTier, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
-		if (nested) {
-			// The meta-jury's own individuals are member aggregates; the FAIL is one
-			// level down,
-			// so the meta tier has no genuine FAIL of its own and the cascade escalates.
-			assertThat(verdict.provenance())
-				.isEqualTo(VerdictProvenance.tier("semantic", VerdictProvenanceBasis.TIER_OUTCOME));
-			assertThat(verdict.compositeAttempts().get(0).disposition()).isEqualTo(AttemptDisposition.STAGE_FAILED);
-		}
-		else {
-			assertThat(verdict.provenance().basis()).isEqualTo(VerdictProvenanceBasis.INDIVIDUAL_REJECTION);
-			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
-		}
+		assertThat(verdict.provenance().basis()).isEqualTo(VerdictProvenanceBasis.INDIVIDUAL_REJECTION);
+		assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
+		assertThat(verdict.compositeAttempts().get(0).disposition()).isEqualTo(AttemptDisposition.USED);
 	}
 
 	@Nested
@@ -533,17 +500,17 @@ class CascadeRuleTest {
 		 * excluded
 		 * @return the inner cascade
 		 */
-		private Jury<CompletionEvidence> rejectingCascade(boolean innerCapable) {
-			return boundaryRejectingCascade(innerCapable ? capableTier() : passingTier("OK"));
+		private Jury rejectingCascade(boolean innerCapable) {
+			return acceptedRejectingCascade(innerCapable ? capableTier() : passingTier("OK"));
 		}
 
 		/**
 		 * A tier that declares its aggregate may be excluded, so the cascade holding it
 		 * is capable.
 		 */
-		private Jury<CompletionEvidence> capableTier() {
-			return SimpleJury.<CompletionEvidence>builder()
-				.judge(new Conditional("conditional", Judgment.pass("OK")))
+		private Jury capableTier() {
+			return SimpleJury.builder()
+				.seat(declared(new Conditional("conditional", Judgment.pass("OK"))))
 				.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 				.build();
 		}
@@ -575,13 +542,10 @@ class CascadeRuleTest {
 		@ValueSource(booleans = { true, false })
 		@DisplayName("the outer cascade adopts it as a tier outcome and never re-rejects")
 		void asASoleFinalTier(boolean innerCapable) {
-			Jury<CompletionEvidence> inner = rejectingCascade(innerCapable);
+			Jury inner = rejectingCascade(innerCapable);
 			assertThat(inner.aggregateMayBeNotApplicable()).isEqualTo(innerCapable);
 
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("inner", inner, RoutingRule.FINAL_TIER)
-				.build()
-				.vote(CONTEXT);
+			Verdict verdict = CascadedJury.builder().tier("inner", inner, RoutingRule.FINAL_TIER).build().vote();
 
 			assertThat(verdict.provenance())
 				.isEqualTo(VerdictProvenance.tier("inner", VerdictProvenanceBasis.TIER_OUTCOME));
@@ -589,7 +553,7 @@ class CascadeRuleTest {
 
 			// What the outer copy marker alone never established: that there was a D1 to
 			// adopt.
-			assertIsABoundaryRejectedD1(verdict.compositeAttempts().get(0).verdict());
+			assertIsAcceptedUndecidedRejection(verdict.compositeAttempts().get(0).verdict());
 
 			Verdict selected = selectedDetermination(verdict);
 			assertThat(selected.provenance().basis()).as("the chain ends at the inner rejection")
@@ -598,26 +562,26 @@ class CascadeRuleTest {
 			assertThat(selected.judgment().status()).as("non-pass: in the denominator, not the numerator")
 				.isNotEqualTo(JudgmentStatus.PASS);
 			assertThat(selected.judgment().reasonCode()).as("and one machinery failure, counted once")
-				.isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+				.isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
 		}
 
 		@ParameterizedTest
 		@ValueSource(booleans = { true, false })
 		@DisplayName("as a rejecting non-final tier, its determination is adopted rather than refused")
 		void asARejectingNonFinalTier(boolean innerCapable) {
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("inner", rejectingCascade(innerCapable), RoutingRule.REJECT_ON_ANY_FAIL)
+			Verdict verdict = CascadedJury.builder()
+				.tier("inner", rejectingCascade(innerCapable), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 				.tier("outer-final", passingTier("OK"), RoutingRule.FINAL_TIER)
 				.build()
-				.vote(CONTEXT);
+				.vote();
 
 			assertThat(verdict.provenance())
 				.isEqualTo(VerdictProvenance.tier("inner", VerdictProvenanceBasis.TIER_OUTCOME));
 			assertThat(verdict.judgment().reasonCode()).as("still one machinery failure, counted once")
-				.isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+				.isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
 			assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name).containsExactly("inner");
 
-			assertIsABoundaryRejectedD1(verdict.compositeAttempts().get(0).verdict());
+			assertIsAcceptedUndecidedRejection(verdict.compositeAttempts().get(0).verdict());
 
 			Verdict selected = selectedDetermination(verdict);
 			assertThat(selected.provenance().basis()).isEqualTo(VerdictProvenanceBasis.INDIVIDUAL_REJECTION);
@@ -651,19 +615,18 @@ class CascadeRuleTest {
 	@EnumSource(ErrorHandling.class)
 	@DisplayName("11. a rejecting cascade as a meta member is a determination, and is never scored")
 	void aRejectingCascadeAsAMetaMember(ErrorHandling errorPolicy) {
-		Jury<CompletionEvidence> inner = boundaryRejectingCascade(passingTier("OK"));
+		Jury inner = acceptedRejectingCascade(passingTier("OK"));
 
 		Verdict verdict = Juries
-			.meta(new AllMustPassStrategy(errorPolicy, ExclusionHandling.EXCLUDE),
-					new NamedJury<CompletionEvidence>("inner", inner),
-					new NamedJury<CompletionEvidence>("healthy", returning(Verdict.single("b", Judgment.pass("ok")))))
-			.vote(CONTEXT);
+			.meta(new AllMustPassStrategy(errorPolicy, ExclusionHandling.EXCLUDE), new NamedJury("inner", inner),
+					new NamedJury("healthy", returning(Verdict.single("b", Judgment.pass("ok")))))
+			.vote();
 
 		CompositeAttempt member = verdict.compositeAttempts().get(0);
 		assertThat(member.name()).isEqualTo("inner");
 		assertThat(member.disposition()).as("a determined verdict, not a stage failure")
 			.isEqualTo(AttemptDisposition.USED);
-		assertIsABoundaryRejectedD1(member.verdict());
+		assertIsAcceptedUndecidedRejection(member.verdict());
 
 		assertThat(verdict.individual()).extracting(Judgment::status)
 			.as("the machinery error reached the reduction, so how it was treated is a decision, not an absence")
@@ -674,8 +637,8 @@ class CascadeRuleTest {
 		if (errorPolicy == ErrorHandling.PROPAGATE || errorPolicy == ErrorHandling.TREAT_AS_FAIL) {
 			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.ERRORS_PROPAGATED);
 			assertThat(originOf(verdict.judgment())).as("the machinery cause is carried up by name, counted once")
-				.containsOnlyKeys(JudgmentReasonCode.STAGE_FAILED.wireName())
-				.containsEntry(JudgmentReasonCode.STAGE_FAILED.wireName(), 1);
+				.containsOnlyKeys(JudgmentReasonCode.AGGREGATION_FAILED.wireName())
+				.containsEntry(JudgmentReasonCode.AGGREGATION_FAILED.wireName(), 1);
 			assertThat(evidenceOf(verdict.judgment()))
 				.as("a policy exit reduces nothing, so no treatment was performed")
 				.containsEntry(AggregationEvidence.ELIGIBLE_COUNT, 0)
@@ -694,27 +657,27 @@ class CascadeRuleTest {
 				.containsEntry(AggregationEvidence.PASS_COUNT, 1)
 				.containsEntry(AggregationEvidence.FAIL_COUNT, 0);
 			assertThat(originOf(verdict.judgment())).as("and the excluded cause is named, not merely missing")
-				.containsOnlyKeys(JudgmentReasonCode.STAGE_FAILED.wireName())
-				.containsEntry(JudgmentReasonCode.STAGE_FAILED.wireName(), 1);
+				.containsOnlyKeys(JudgmentReasonCode.AGGREGATION_FAILED.wireName())
+				.containsEntry(JudgmentReasonCode.AGGREGATION_FAILED.wireName(), 1);
 		}
 	}
 
 	@Test
 	@DisplayName("a throwing final tier decides nothing; a throwing non-final tier escalates")
 	void throwingTiers() {
-		Verdict undecided = CascadedJury.<CompletionEvidence>builder()
+		Verdict undecided = CascadedJury.builder()
 			.tier("only", throwing(new IllegalStateException("boom")), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 		assertThat(undecided.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.NO_TIER_DECIDED);
 		assertThat(undecided.compositeAttempts().get(0).dispositionReason())
 			.isEqualTo(DispositionReason.EXECUTION_FAILED);
 
-		Verdict escalated = CascadedJury.<CompletionEvidence>builder()
-			.tier("broken", throwing(new IllegalStateException("boom")), RoutingRule.REJECT_ON_ANY_FAIL)
+		Verdict escalated = CascadedJury.builder()
+			.tier("broken", throwing(new IllegalStateException("boom")), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 		assertThat(escalated.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(escalated.compositeAttempts().get(0).verdict()).as("a throw leaves a code, not a verdict").isNull();
 	}
@@ -725,30 +688,29 @@ class CascadeRuleTest {
 		// A member whose own strategy turned a judge error into a failing contribution:
 		// the
 		// member completed a reduction, so its FAIL is real.
-		Jury<CompletionEvidence> errorDerived = SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> Judgment.error("the index was unreachable"), "flaky"))
-			.judge(Judges.named(context -> Judgment.pass("another seat"), "other"))
+		Jury errorDerived = SimpleJury.builder()
+			.judge(Judges.named(() -> Judgment.error("the index was unreachable"), "flaky"))
+			.judge(Judges.named(() -> Judgment.pass("another seat"), "other"))
 			.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE))
 			.build();
 		// A member whose exclusion policy turned an exclusion into a failing
 		// contribution.
-		Jury<CompletionEvidence> exclusionDerived = SimpleJury.<CompletionEvidence>builder()
-			.judge(new Conditional("conditional", Judgment.notApplicable(EXCLUSION)))
-			.judge(Judges.named(context -> Judgment.pass("another seat"), "other"))
+		Jury exclusionDerived = SimpleJury.builder()
+			.seat(declared(new Conditional("conditional", Judgment.notApplicable(EXCLUSION))))
+			.judge(Judges.named(() -> Judgment.pass("another seat"), "other"))
 			.votingStrategy(new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.TREAT_AS_FAIL))
 			.build();
 
-		for (Jury<CompletionEvidence> member : List.of(errorDerived, exclusionDerived)) {
-			Jury<CompletionEvidence> tier = Juries.meta(
-					new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
-					new NamedJury<CompletionEvidence>("member", member),
-					new NamedJury<CompletionEvidence>("broken", throwing(new IllegalStateException("boom"))));
+		for (Jury member : List.of(errorDerived, exclusionDerived)) {
+			Jury tier = Juries.meta(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
+					new NamedJury("member", member),
+					new NamedJury("broken", throwing(new IllegalStateException("boom"))));
 
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("review", tier, RoutingRule.REJECT_ON_ANY_FAIL)
+			Verdict verdict = CascadedJury.builder()
+				.tier("review", tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 				.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 				.build()
-				.vote(CONTEXT);
+				.vote();
 
 			assertThat(verdict.provenance().basis()).as("a completed member reduction is a genuine FAIL")
 				.isEqualTo(VerdictProvenanceBasis.INDIVIDUAL_REJECTION);
@@ -765,23 +727,23 @@ class CascadeRuleTest {
 		// So its one usable member is a determined D1, whose aggregate is a machinery
 		// ERROR, and a
 		// second member breaks the tier so the cascade reaches the rule at all.
-		Jury<CompletionEvidence> tier = Juries.meta(
-				new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
-				new NamedJury<CompletionEvidence>("rejected", boundaryRejectingCascade(passingTier("OK"))),
-				new NamedJury<CompletionEvidence>("broken", throwing(new IllegalStateException("boom"))));
+		Jury tier = Juries.meta(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
+				new NamedJury("rejected", acceptedRejectingCascade(passingTier("OK"))),
+				new NamedJury("broken", throwing(new IllegalStateException("boom"))));
 
-		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("review", tier, RoutingRule.REJECT_ON_ANY_FAIL)
+		Verdict verdict = CascadedJury.builder()
+			.tier("review", tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		CompositeAttempt reviewed = verdict.compositeAttempts().get(0);
-		assertThat(reviewed.dispositionReason()).isEqualTo(DispositionReason.CHILD_UNDECIDED);
+		assertThat(reviewed.dispositionReason()).isNull();
 		assertThat(reviewed.verdict().individual()).extracting(Judgment::status)
 			.as("a machinery error is standing exactly where a genuine FAIL would stop the cascade")
 			.containsExactly(JudgmentStatus.ERROR);
-		assertThat(reviewed.verdict().individual().get(0).reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
+		assertThat(reviewed.verdict().individual().get(0).reasonCode())
+			.isEqualTo(JudgmentReasonCode.AGGREGATION_FAILED);
 
 		assertThat(verdict.provenance()).as("and the cascade escalated past it rather than rejecting on it")
 			.isEqualTo(VerdictProvenance.tier("semantic", VerdictProvenanceBasis.TIER_OUTCOME));
@@ -791,17 +753,17 @@ class CascadeRuleTest {
 	@Test
 	@DisplayName("nor does an errored individual in a tier that did complete: only a FAIL stops one")
 	void anErroredIndividualIsNotAFail() {
-		Jury<CompletionEvidence> tier = SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> Judgment.error("the index was unreachable"), "flaky"))
-			.judge(Judges.named(context -> Judgment.pass("fine"), "ok"))
+		Jury tier = SimpleJury.builder()
+			.judge(Judges.named(() -> Judgment.error("the index was unreachable"), "flaky"))
+			.judge(Judges.named(() -> Judgment.pass("fine"), "ok"))
 			.votingStrategy(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE))
 			.build();
 
-		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("review", tier, RoutingRule.REJECT_ON_ANY_FAIL)
+		Verdict verdict = CascadedJury.builder()
+			.tier("review", tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		CompositeAttempt reviewed = verdict.compositeAttempts().get(0);
 		assertThat(reviewed.disposition()).as("this tier finished; it simply has an errored individual")
@@ -815,20 +777,26 @@ class CascadeRuleTest {
 	@Test
 	@DisplayName("an undecided tier holding nothing at all escalates: there is no rejection to adopt")
 	void anEmptyUndecidedTierEscalates() {
-		Jury<CompletionEvidence> tier = Juries.meta(
-				new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
-				new NamedJury<CompletionEvidence>("broken", returning(undecidedVerdict())));
+		Jury tier = Juries.meta(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
+				new NamedJury("broken", returning(undecidedVerdict())));
 
-		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-			.tier("review", tier, RoutingRule.REJECT_ON_ANY_FAIL)
+		Verdict verdict = CascadedJury.builder()
+			.tier("review", tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", passingTier("OK"), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
-		assertThat(verdict.compositeAttempts().get(0).verdict().individual()).isEmpty();
+		assertThat(verdict.compositeAttempts().get(0).routingDecision().reason())
+			.isEqualTo(RoutingDecision.Reason.NO_ROOT_OPINIONS);
 		assertThat(verdict.provenance())
 			.isEqualTo(VerdictProvenance.tier("semantic", VerdictProvenanceBasis.TIER_OUTCOME));
 		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
+	}
+
+	private static io.github.markpollack.judge.jury.JudgeSeat declared(io.github.markpollack.judge.Judge producer) {
+		return io.github.markpollack.judge.jury.JudgeSeat
+			.named(((io.github.markpollack.judge.JudgeWithMetadata) producer).metadata().name(), producer)
+			.notApplicableWhen(io.github.markpollack.judge.Judges.notApplicableCapability(producer).orElseThrow());
 	}
 
 }

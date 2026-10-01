@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai.requirements;
 
 import java.io.IOException;
@@ -15,30 +20,34 @@ import org.slf4j.LoggerFactory;
 /**
  * One acceptance criterion, read from the specification the code was built from.
  *
- * <p>The judge does not invent these and does not get to choose them. Somebody wrote them down,
- * numbered, before any code existed, and this reads them verbatim.
+ * <p>
+ * The judge does not invent these and does not get to choose them. Somebody wrote them
+ * down, numbered, before any code existed, and this reads them verbatim.
  *
- * <p>The identifier is what makes an answer traceable back to the thing that was asked, and what
- * lets the roster notice a missing answer. A specification with 52 criteria has 52; a judge that
- * answers five of them has sampled it, not evaluated it.
+ * <p>
+ * The identifier is what makes an answer traceable back to the thing that was asked, and
+ * what lets the roster notice a missing answer. A specification with 52 criteria has 52;
+ * a judge that answers five of them has sampled it, not evaluated it.
  *
  * <h2>Conditional criteria</h2>
  *
- * <p>Some criteria only apply to some subjects — a rule about Java sources against a change set
- * that contains none. {@code applicability} states that condition, and stating it is what makes
- * {@code NOT_APPLICABLE} an available answer for this criterion. A criterion with no
- * applicability clause is unconditional: it applies to every subject, and an audit that tries to
- * exclude it is making a protocol error rather than a finding.
+ * <p>
+ * Some criteria only apply to some subjects — a rule about Java sources against a change
+ * set that contains none. {@code applicability} states that condition, and stating it is
+ * what makes {@code NOT_APPLICABLE} an available answer for this criterion. A criterion
+ * with no applicability clause is unconditional: it applies to every subject, and an
+ * audit that tries to exclude it is making a protocol error rather than a finding.
  *
- * <p>The asymmetry is deliberate. Excluding a criterion removes it from the denominator, so the
- * condition under which that is legitimate belongs in the document, written before the subject
- * was seen, rather than in an answer written after.
+ * <p>
+ * The asymmetry is deliberate. Excluding a criterion removes it from the denominator, so
+ * the condition under which that is legitimate belongs in the document, written before
+ * the subject was seen, rather than in an answer written after.
  *
  * @param id the specification's own identifier, such as {@code UC6-AC41}
  * @param title the criterion's heading text
  * @param requirement the criterion sentence, verbatim from the specification
- * @param applicability the condition under which this criterion applies, or null when it always
- * does; must be non-blank when present
+ * @param applicability the condition under which this criterion applies, or null when it
+ * always does; must be non-blank when present
  * @author Mark Pollack
  * @since 0.16.0
  */
@@ -73,7 +82,9 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 		return this.applicability != null;
 	}
 
-	/** Flow logging at INFO: what was parsed, what was answered, what bound the verdict. */
+	/**
+	 * Flow logging at INFO: what was parsed, what was answered, what bound the verdict.
+	 */
 	private static final Logger logger = LoggerFactory.getLogger(EarsCriterion.class);
 
 	/** {@code ### UC6-AC5: Permit adjacent future appointments} */
@@ -86,11 +97,15 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 	 * @throws java.io.UncheckedIOException if the document cannot be read
 	 */
 	public static List<EarsCriterion> from(Path criteriaFile) {
+		return parseSnapshot(read(criteriaFile), criteriaFile.getFileName().toString());
+	}
+
+	static List<EarsCriterion> parseSnapshot(String snapshot, String sourceName) {
 		List<EarsCriterion> criteria = new ArrayList<>();
 		String id = null;
 		String title = null;
 
-		for (String line : read(criteriaFile).lines().toList()) {
+		for (String line : snapshot.lines().toList()) {
 			Matcher heading = HEADING.matcher(line.strip());
 			if (heading.matches()) {
 				id = heading.group(1);
@@ -110,7 +125,7 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 		}
 		// The denominator comes from the parser, not from the model. Logged before any
 		// answer exists, because that is what makes the roster guard meaningful.
-		logger.info("{} criteria parsed from {}", criteria.size(), criteriaFile.getFileName());
+		logger.info("{} criteria parsed from {}", criteria.size(), sourceName);
 
 		return List.copyOf(criteria);
 	}
@@ -120,15 +135,15 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 	 * @param all the criteria read from the document
 	 * @param ids the identifiers to select, such as {@code UC6-AC41}
 	 * @return the named criteria, in the document's order rather than the caller's
-	 * @throws IllegalArgumentException if any named identifier is not in the document, because
-	 * silently returning fewer would evaluate a roster nobody wrote
+	 * @throws IllegalArgumentException if any named identifier is not in the document,
+	 * because silently returning fewer would evaluate a roster nobody wrote
 	 */
 	public static List<EarsCriterion> select(List<EarsCriterion> all, String... ids) {
 		List<String> wanted = List.of(ids);
 		List<EarsCriterion> selected = all.stream().filter(c -> wanted.contains(c.id())).toList();
 		if (selected.size() != wanted.size()) {
-			throw new IllegalArgumentException("asked for " + wanted.size()
-				+ " criteria and found " + selected.size() + " in the document");
+			throw new IllegalArgumentException(
+					"asked for " + wanted.size() + " criteria and found " + selected.size() + " in the document");
 		}
 		return selected;
 	}

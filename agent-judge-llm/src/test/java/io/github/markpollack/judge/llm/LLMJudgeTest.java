@@ -89,7 +89,8 @@ class LLMJudgeTest {
 	static class TestLLMJudge extends LLMJudge<CompletionEvidence> {
 
 		TestLLMJudge(String name, String description, ChatClient.Builder chatClientBuilder) {
-			super(name, description, chatClientBuilder);
+			super(() -> CompletionEvidence.builder().request("parsing fixture").build(), name, description,
+					chatClientBuilder);
 		}
 
 		@Override

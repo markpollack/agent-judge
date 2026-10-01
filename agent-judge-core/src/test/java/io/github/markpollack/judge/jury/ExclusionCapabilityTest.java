@@ -49,10 +49,10 @@ class ExclusionCapabilityTest {
 	private static final String CONDITION = "the change set contains no Java sources";
 
 	/** A judge that declares, in advance, that it may exclude a subject. */
-	private record Conditional(String name, Judgment result) implements JudgeWithMetadata<CompletionEvidence> {
+	private record Conditional(String name, Judgment result) implements JudgeWithMetadata {
 
 		@Override
-		public Judgment judge(CompletionEvidence context) {
+		public Judgment judge() {
 			return this.result;
 		}
 
@@ -64,10 +64,10 @@ class ExclusionCapabilityTest {
 	}
 
 	/** A judge that carries metadata and declares no capability at all. */
-	private record Unconditional(String name, Judgment result) implements JudgeWithMetadata<CompletionEvidence> {
+	private record Unconditional(String name, Judgment result) implements JudgeWithMetadata {
 
 		@Override
-		public Judgment judge(CompletionEvidence context) {
+		public Judgment judge() {
 			return this.result;
 		}
 
@@ -94,13 +94,13 @@ class ExclusionCapabilityTest {
 		@DisplayName("a judge that carries only metadata declares no capability")
 		void metadataWithoutADeclaration() {
 			assertThat(Judges.notApplicableCapability(new Unconditional("plain", Judgment.pass("ok")))).isEmpty();
-			assertThat(Judges.notApplicableCapability(context -> Judgment.pass("lambda"))).isEmpty();
+			assertThat(Judges.notApplicableCapability(() -> Judgment.pass("lambda"))).isEmpty();
 		}
 
 		@Test
 		@DisplayName("a declaration is found through a wrapper that declares nothing")
 		void aTransparentWrapperPreservesTheCapability() {
-			Judge<CompletionEvidence> wrapped = Judges.named(new Conditional("inner", excluded()), "renamed");
+			Judge wrapped = Judges.named(new Conditional("inner", excluded()), "renamed");
 
 			assertThat(Judges.notApplicableCapability(wrapped)).contains(CONDITION);
 		}
@@ -108,7 +108,7 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("the outermost declaration wins, because it is the one the jury seated")
 		void theOutermostDeclarationWins() {
-			Judge<CompletionEvidence> wrapped = new NamedJudge<CompletionEvidence>(new Conditional("inner", excluded()),
+			Judge wrapped = new NamedJudge(new Conditional("inner", excluded()),
 					new JudgeMetadata("outer", "", JudgeType.DETERMINISTIC, "the subject is a binary artifact"));
 
 			assertThat(Judges.notApplicableCapability(wrapped)).contains("the subject is a binary artifact");
@@ -117,15 +117,18 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("a wrapper naming an incapable judge does not manufacture a capability")
 		void namingDoesNotManufactureACapability() {
-			assertThat(Judges.notApplicableCapability(Judges.named(context -> Judgment.pass("ok"), "named"))).isEmpty();
+			assertThat(Judges.notApplicableCapability(Judges.named(() -> Judgment.pass("ok"), "named"))).isEmpty();
 		}
 
 		@Test
 		@DisplayName("the deduplicating rename Juries.fromJudges applies keeps the capability underneath")
 		void deduplicationPreservesTheCapability() {
-			Jury<CompletionEvidence> jury = Juries.fromJudges(
-					new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE),
-					new Conditional("same", excluded()), new Conditional("same", excluded()));
+			Jury jury = SimpleJury.builder()
+				.seat(declared(new Conditional("same", excluded())))
+				.seat(io.github.markpollack.judge.jury.JudgeSeat.named("same-2", new Conditional("same", excluded()))
+					.notApplicableWhen(CONDITION))
+				.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
+				.build();
 
 			SimpleJuryDescription description = (SimpleJuryDescription) jury.describe();
 			assertThat(description.seats()).extracting(seat -> seat.judge().notApplicableWhen())
@@ -137,9 +140,9 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("a judge whose metadata cannot be read is refused rather than read as incapable")
 		void unreadableMetadataIsNotAbsence() {
-			Judge<CompletionEvidence> throwing = new JudgeWithMetadata<CompletionEvidence>() {
+			Judge throwing = new JudgeWithMetadata() {
 				@Override
-				public Judgment judge(CompletionEvidence judgmentContext) {
+				public Judgment judge() {
 					return Judgment.pass("ok");
 				}
 
@@ -172,9 +175,9 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("a judge whose metadata cannot be read has declared nothing, and never runs to use it")
 		void unreadableMetadataDeclaresNothing() {
-			Judge<CompletionEvidence> throwing = new JudgeWithMetadata<CompletionEvidence>() {
+			Judge throwing = new JudgeWithMetadata() {
 				@Override
-				public Judgment judge(CompletionEvidence judgmentContext) {
+				public Judgment judge() {
 					return excluded();
 				}
 
@@ -184,14 +187,14 @@ class ExclusionCapabilityTest {
 				}
 			};
 
-			Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
+			Jury jury = SimpleJury.builder()
 				.judge(throwing)
 				.votingStrategy(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE))
 				.build();
 
 			assertThat(jury.aggregateMayBeNotApplicable()).as("nothing was declared, so nothing may be excluded")
 				.isFalse();
-			Judgment seat = jury.vote(context()).individual().get(0);
+			Judgment seat = jury.vote().individual().get(0);
 			assertThat(seat.reasonCode()).as("the jury cannot name the judge, so it does not run it")
 				.isEqualTo(JudgmentReasonCode.JUDGE_METADATA_UNREADABLE);
 			assertThatThrownBy(jury::describe, "describing it still fails loudly")
@@ -201,12 +204,12 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("a declaration that differs between build and description is refused")
 		void anUnstableDeclarationIsRefused() {
-			Judge<CompletionEvidence> unstable = new JudgeWithMetadata<CompletionEvidence>() {
+			Judge unstable = new JudgeWithMetadata() {
 
 				private int calls;
 
 				@Override
-				public Judgment judge(CompletionEvidence judgmentContext) {
+				public Judgment judge() {
 					return Judgment.pass("ok");
 				}
 
@@ -217,13 +220,11 @@ class ExclusionCapabilityTest {
 				}
 			};
 
-			Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
-				.judge(unstable)
-				.votingStrategy(new ConsensusStrategy())
-				.build();
+			Jury jury = SimpleJury.builder().judge(unstable).votingStrategy(new ConsensusStrategy()).build();
 
-			assertThatThrownBy(jury::describe).isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("exclusion capability changed after the jury was built");
+			assertThat(jury.describe().aggregateMayBeNotApplicable()).isFalse();
+			assertThat(((SimpleJuryDescription) jury.describe()).seats().getFirst().judge().notApplicableWhen())
+				.isNull();
 		}
 
 	}
@@ -235,8 +236,8 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("a capable seat under a refusing strategy is a construction error")
 		void aCapableSeatUnderRefuseIsRejected() {
-			assertThatThrownBy(() -> SimpleJury.<CompletionEvidence>builder()
-				.judge(new Conditional("conditional", excluded()))
+			assertThatThrownBy(() -> SimpleJury.builder()
+				.seat(declared(new Conditional("conditional", excluded())))
 				.votingStrategy(new ConsensusStrategy())
 				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("refuses exclusions");
 		}
@@ -245,8 +246,8 @@ class ExclusionCapabilityTest {
 		@EnumSource(value = ExclusionHandling.class, names = { "EXCLUDE", "TREAT_AS_FAIL" })
 		@DisplayName("the same seat builds once the strategy says what to do with an exclusion")
 		void aCapableSeatBuildsUnderAPolicyThatDecides(ExclusionHandling policy) {
-			assertThatCode(() -> SimpleJury.<CompletionEvidence>builder()
-				.judge(new Conditional("conditional", excluded()))
+			assertThatCode(() -> SimpleJury.builder()
+				.seat(declared(new Conditional("conditional", excluded())))
 				.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, policy))
 				.build()).doesNotThrowAnyException();
 		}
@@ -254,7 +255,7 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("an incapable jury builds under the default, which is the common case")
 		void anIncapableJuryBuildsUnderTheDefault() {
-			assertThatCode(() -> SimpleJury.<CompletionEvidence>builder()
+			assertThatCode(() -> SimpleJury.builder()
 				.judge(new Unconditional("plain", Judgment.pass("ok")))
 				.votingStrategy(new ConsensusStrategy())
 				.build()).doesNotThrowAnyException();
@@ -263,10 +264,9 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("a possibly-excluding member under a refusing meta-strategy is a construction error")
 		void aCapableMemberUnderRefuseIsRejected() {
-			Jury<CompletionEvidence> capable = capableJury();
+			Jury capable = capableJury();
 
-			assertThatThrownBy(
-					() -> Juries.meta(new ConsensusStrategy(), new NamedJury<CompletionEvidence>("rubric", capable)))
+			assertThatThrownBy(() -> Juries.meta(new ConsensusStrategy(), new NamedJury("rubric", capable)))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("refuses exclusions");
 		}
@@ -274,9 +274,9 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("an opaque jury makes no pre-spend guarantee, so it composes anywhere and is checked at runtime")
 		void anOpaqueJuryIsNotCapableByDefault() {
-			Jury<CompletionEvidence> opaque = new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
+			Jury opaque = new io.github.markpollack.judge.jury.VotingJury() {
 				@Override
-				public List<Judge<CompletionEvidence>> getJudges() {
+				public List<Judge> getJudges() {
 					return List.of();
 				}
 
@@ -286,14 +286,13 @@ class ExclusionCapabilityTest {
 				}
 
 				@Override
-				public Verdict vote(CompletionEvidence judgmentContext) {
+				public Verdict vote() {
 					return Verdict.single("sole", excluded());
 				}
 			};
 
 			assertThat(opaque.aggregateMayBeNotApplicable()).isFalse();
-			assertThatCode(
-					() -> Juries.meta(new ConsensusStrategy(), new NamedJury<CompletionEvidence>("opaque", opaque)))
+			assertThatCode(() -> Juries.meta(new ConsensusStrategy(), new NamedJury("opaque", opaque)))
 				.doesNotThrowAnyException();
 		}
 
@@ -307,12 +306,12 @@ class ExclusionCapabilityTest {
 		@DisplayName("a simple jury is capable only when a seat declares it and the policy honours it")
 		void simpleJuryBound() {
 			assertThat(capableJury().aggregateMayBeNotApplicable()).isTrue();
-			assertThat(SimpleJury.<CompletionEvidence>builder()
-				.judge(new Conditional("conditional", excluded()))
+			assertThat(SimpleJury.builder()
+				.seat(declared(new Conditional("conditional", excluded())))
 				.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.TREAT_AS_FAIL))
 				.build()
 				.aggregateMayBeNotApplicable()).as("one declared seat retains its exclusion by identity").isTrue();
-			assertThat(SimpleJury.<CompletionEvidence>builder()
+			assertThat(SimpleJury.builder()
 				.judge(new Unconditional("plain", Judgment.pass("ok")))
 				.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 				.build()
@@ -322,20 +321,17 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("a meta-jury and a cascade propagate the bound from what they compose")
 		void compositeBounds() {
-			Jury<CompletionEvidence> capable = capableJury();
-			Jury<CompletionEvidence> meta = Juries.meta(
-					new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE),
-					new NamedJury<CompletionEvidence>("rubric", capable));
-			Jury<CompletionEvidence> cascade = CascadedJury.<CompletionEvidence>builder()
-				.tier("only", meta, RoutingRule.FINAL_TIER)
-				.build();
+			Jury capable = capableJury();
+			Jury meta = Juries.meta(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE),
+					new NamedJury("rubric", capable));
+			Jury cascade = CascadedJury.builder().tier("only", meta, RoutingRule.FINAL_TIER).build();
 
 			assertThat(meta.aggregateMayBeNotApplicable()).isTrue();
 			assertThat(cascade.aggregateMayBeNotApplicable()).isTrue();
 
-			Jury<CompletionEvidence> refusingMeta = Juries.meta(new ConsensusStrategy(),
-					new NamedJury<CompletionEvidence>("plain",
-							SimpleJury.<CompletionEvidence>builder()
+			Jury refusingMeta = Juries.meta(new ConsensusStrategy(),
+					new NamedJury("plain",
+							SimpleJury.builder()
 								.judge(new Unconditional("plain", Judgment.pass("ok")))
 								.votingStrategy(new ConsensusStrategy())
 								.build()));
@@ -351,17 +347,12 @@ class ExclusionCapabilityTest {
 			// agree; a strategy that states its policy through the interface alone is
 			// where a
 			// derived description used to publish a confident, wrong false.
-			for (Jury<CompletionEvidence> jury : List.of(capableJury(), customCapableJury(),
+			for (Jury jury : List.of(capableJury(), customCapableJury(),
 					Juries.meta(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE),
-							new NamedJury<CompletionEvidence>("rubric", capableJury())),
-					Juries.meta(new DelegatingExcluder(),
-							new NamedJury<CompletionEvidence>("rubric", customCapableJury())),
-					CascadedJury.<CompletionEvidence>builder()
-						.tier("only", capableJury(), RoutingRule.FINAL_TIER)
-						.build(),
-					CascadedJury.<CompletionEvidence>builder()
-						.tier("only", customCapableJury(), RoutingRule.FINAL_TIER)
-						.build())) {
+							new NamedJury("rubric", capableJury())),
+					Juries.meta(new DelegatingExcluder(), new NamedJury("rubric", customCapableJury())),
+					CascadedJury.builder().tier("only", capableJury(), RoutingRule.FINAL_TIER).build(),
+					CascadedJury.builder().tier("only", customCapableJury(), RoutingRule.FINAL_TIER).build())) {
 				assertThat(jury.aggregateMayBeNotApplicable()).as("every jury here really can exclude").isTrue();
 				assertThat(jury.describe().aggregateMayBeNotApplicable()).isEqualTo(jury.aggregateMayBeNotApplicable());
 				assertThat(jury.describe().toPortable()).containsEntry("aggregateMayBeNotApplicable",
@@ -378,18 +369,20 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("an exclusion from an undeclared seat becomes a coded error, not an honoured exclusion")
 		void undeclaredExclusionIsContained() {
-			Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
-				.judge(Judges.named(context -> excluded(), "sneaky"))
-				.judge(Judges.named(context -> Judgment.pass("ok"), "honest"))
+			Jury jury = SimpleJury.builder()
+				.judge(Judges.named(() -> excluded(), "sneaky"))
+				.judge(Judges.named(() -> Judgment.pass("ok"), "honest"))
 				.votingStrategy(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE))
 				.build();
 
-			Verdict verdict = jury.vote(context());
+			Verdict verdict = jury.vote();
 			Judgment sneaky = verdict.individualByName().get("sneaky");
 
-			assertThat(sneaky.status()).isEqualTo(JudgmentStatus.ERROR);
-			assertThat(sneaky.reasonCode()).isEqualTo(JudgmentReasonCode.UNDECLARED_NOT_APPLICABLE);
-			assertThat(sneaky.reasoning()).contains("without declaring").contains(CONDITION);
+			assertThat(sneaky.status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
+			assertThat(verdict.seats().get(0).rejection().reasonCode())
+				.isEqualTo(JudgmentReasonCode.UNDECLARED_NOT_APPLICABLE);
+			assertThat(verdict.seats().get(0).rejection().reasoning()).contains("without declaring")
+				.contains(CONDITION);
 		}
 
 		@Test
@@ -401,12 +394,12 @@ class ExclusionCapabilityTest {
 			// A gate, so the failing contribution shows in the aggregate rather than
 			// being
 			// absorbed into a "the judges disagree" abstention.
-			Judgment treatedAsFail = SimpleJury.<CompletionEvidence>builder()
-				.judge(Judges.named(context -> excluded(), "sneaky"))
-				.judge(Judges.named(context -> Judgment.pass("ok"), "honest"))
+			Judgment treatedAsFail = SimpleJury.builder()
+				.judge(Judges.named(() -> excluded(), "sneaky"))
+				.judge(Judges.named(() -> Judgment.pass("ok"), "honest"))
 				.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE))
 				.build()
-				.vote(context())
+				.vote()
 				.judgment();
 			assertThat(treatedAsFail.status()).as("a judge's own error may be scored; machinery's may not")
 				.isEqualTo(JudgmentStatus.FAIL);
@@ -415,25 +408,25 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("a declared seat's exclusion is honoured untouched")
 		void aDeclaredExclusionIsHonoured() {
-			Jury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
-				.judge(new Conditional("conditional", excluded()))
-				.judge(Judges.named(context -> Judgment.pass("ok"), "honest"))
+			Jury jury = SimpleJury.builder()
+				.seat(declared(new Conditional("conditional", excluded())))
+				.judge(Judges.named(() -> Judgment.pass("ok"), "honest"))
 				.votingStrategy(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE))
 				.build();
 
-			Verdict verdict = jury.vote(context());
+			Verdict verdict = jury.vote();
 
 			assertThat(verdict.individualByName().get("conditional").status()).isEqualTo(JudgmentStatus.NOT_APPLICABLE);
 			assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		}
 
 		private Verdict jurySeatingAnUndeclaredExclusion(ErrorHandling errorPolicy) {
-			return SimpleJury.<CompletionEvidence>builder()
-				.judge(Judges.named(context -> excluded(), "sneaky"))
-				.judge(Judges.named(context -> Judgment.pass("ok"), "honest"))
+			return SimpleJury.builder()
+				.judge(Judges.named(() -> excluded(), "sneaky"))
+				.judge(Judges.named(() -> Judgment.pass("ok"), "honest"))
 				.votingStrategy(new ConsensusStrategy(errorPolicy, ExclusionHandling.EXCLUDE))
 				.build()
-				.vote(context());
+				.vote();
 		}
 
 	}
@@ -445,9 +438,9 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("a positional seat identifies a position rather than a judge, and is rejected")
 		void positionalSeatsAreRejected() {
-			assertThatThrownBy(() -> SimpleJury.<CompletionEvidence>builder()
-				.judge(Judges.named(context -> Judgment.pass("ok"), "named"))
-				.judge(context -> Judgment.pass("lambda"))
+			assertThatThrownBy(() -> SimpleJury.builder()
+				.judge(Judges.named(() -> Judgment.pass("ok"), "named"))
+				.judge(() -> Judgment.pass("lambda"))
 				.votingStrategy(new ConsensusStrategy())
 				.requireDeclaredNames()
 				.build()).isInstanceOf(IllegalArgumentException.class)
@@ -458,9 +451,9 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("two seats declaring the same name would overwrite one another")
 		void duplicateDeclaredNamesAreRejected() {
-			assertThatThrownBy(() -> SimpleJury.<CompletionEvidence>builder()
-				.judge(Judges.named(context -> Judgment.pass("a"), "same"))
-				.judge(Judges.named(context -> Judgment.fail("b"), "same"))
+			assertThatThrownBy(() -> SimpleJury.builder()
+				.judge(Judges.named(() -> Judgment.pass("a"), "same"))
+				.judge(Judges.named(() -> Judgment.fail("b"), "same"))
 				.votingStrategy(new ConsensusStrategy())
 				.requireDeclaredNames()
 				.build()).isInstanceOf(IllegalArgumentException.class)
@@ -475,9 +468,9 @@ class ExclusionCapabilityTest {
 			// guard, the unnamed seat's judgment lands under the same key and one of the
 			// two
 			// disappears.
-			assertThatThrownBy(() -> SimpleJury.<CompletionEvidence>builder()
-				.judge(Judges.named(context -> Judgment.pass("a"), "Judge#2"))
-				.judge(context -> Judgment.fail("b"))
+			assertThatThrownBy(() -> SimpleJury.builder()
+				.judge(Judges.named(() -> Judgment.pass("a"), "Judge#2"))
+				.judge(() -> Judgment.fail("b"))
 				.votingStrategy(new ConsensusStrategy())
 				.requireDeclaredNames()
 				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("seats[1]");
@@ -486,14 +479,14 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("a fully declared jury builds, and it is opt-in so an unnamed jury still builds without it")
 		void declaredNamesBuild() {
-			assertThatCode(() -> SimpleJury.<CompletionEvidence>builder()
-				.judge(Judges.named(context -> Judgment.pass("a"), "first"))
-				.judge(Judges.named(context -> Judgment.fail("b"), "second"))
+			assertThatCode(() -> SimpleJury.builder()
+				.judge(Judges.named(() -> Judgment.pass("a"), "first"))
+				.judge(Judges.named(() -> Judgment.fail("b"), "second"))
 				.votingStrategy(new ConsensusStrategy())
 				.requireDeclaredNames()
 				.build()).doesNotThrowAnyException();
-			assertThatCode(() -> SimpleJury.<CompletionEvidence>builder()
-				.judge(context -> Judgment.pass("lambda"))
+			assertThatCode(() -> SimpleJury.builder()
+				.judge(() -> Judgment.pass("lambda"))
 				.votingStrategy(new ConsensusStrategy())
 				.build()).doesNotThrowAnyException();
 		}
@@ -501,12 +494,12 @@ class ExclusionCapabilityTest {
 		@Test
 		@DisplayName("the collision it exists for is real: without it, one judgment overwrites the other")
 		void theCollisionItGuardsAgainstIsReal() {
-			Verdict verdict = SimpleJury.<CompletionEvidence>builder()
-				.judge(Judges.named(context -> Judgment.pass("a"), "Judge#2"))
-				.judge(context -> Judgment.fail("b"))
+			Verdict verdict = SimpleJury.builder()
+				.judge(Judges.named(() -> Judgment.pass("a"), "Judge#2"))
+				.judge(() -> Judgment.fail("b"))
 				.votingStrategy(new ConsensusStrategy())
 				.build()
-				.vote(context());
+				.vote();
 
 			assertThat(verdict.individual()).hasSize(2);
 			assertThat(verdict.individualByName()).as("two judgments, one key").hasSize(1);
@@ -526,9 +519,9 @@ class ExclusionCapabilityTest {
 			.containsEntry("notApplicableWhen", Map.of("declared", false));
 	}
 
-	private static Jury<CompletionEvidence> capableJury() {
-		return SimpleJury.<CompletionEvidence>builder()
-			.judge(new Conditional("conditional", excluded()))
+	private static Jury capableJury() {
+		return SimpleJury.builder()
+			.seat(declared(new Conditional("conditional", excluded())))
 			.votingStrategy(new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 			.build();
 	}
@@ -537,9 +530,9 @@ class ExclusionCapabilityTest {
 	 * The same capable jury, under a custom strategy that declares its policy only
 	 * through the interface.
 	 */
-	private static Jury<CompletionEvidence> customCapableJury() {
-		return SimpleJury.<CompletionEvidence>builder()
-			.judge(new Conditional("conditional", excluded()))
+	private static Jury customCapableJury() {
+		return SimpleJury.builder()
+			.seat(declared(new Conditional("conditional", excluded())))
 			.votingStrategy(new DelegatingExcluder())
 			.build();
 	}
@@ -569,6 +562,12 @@ class ExclusionCapabilityTest {
 			return ExclusionHandling.EXCLUDE;
 		}
 
+	}
+
+	private static io.github.markpollack.judge.jury.JudgeSeat declared(io.github.markpollack.judge.Judge producer) {
+		return io.github.markpollack.judge.jury.JudgeSeat
+			.named(((io.github.markpollack.judge.JudgeWithMetadata) producer).metadata().name(), producer)
+			.notApplicableWhen(io.github.markpollack.judge.Judges.notApplicableCapability(producer).orElseThrow());
 	}
 
 }

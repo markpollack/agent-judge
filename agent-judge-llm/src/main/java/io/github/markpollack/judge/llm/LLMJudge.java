@@ -21,10 +21,10 @@ import org.springframework.ai.chat.client.ChatClient;
  * </p>
  *
  * <p>
- * <strong>Template Method Pattern:</strong> The {@link #judge(Object)} method
- * orchestrates the evaluation flow: build prompt → call LLM → parse response. Subclasses
- * implement {@link #buildPrompt(Object)} and {@link #parseResponse(String, Object)} to
- * customize behavior.
+ * <strong>Template Method Pattern:</strong> The {@link #judge()} method orchestrates the
+ * evaluation flow: build prompt → call LLM → parse response. Subclasses implement
+ * {@link #buildPrompt(Object)} and {@link #parseResponse(String, Object)} to customize
+ * behavior.
  * </p>
  *
  * <p>
@@ -44,9 +44,11 @@ import org.springframework.ai.chat.client.ChatClient;
  * @author Mark Pollack
  * @since 0.1.0
  */
-public abstract class LLMJudge<E> implements JudgeWithMetadata<E> {
+public abstract class LLMJudge<E> implements JudgeWithMetadata {
 
 	private final JudgeMetadata metadata;
+
+	private final java.util.function.Supplier<? extends E> evidence;
 
 	/** Chat client used by subclasses to evaluate prompts. */
 	protected final ChatClient chatClient;
@@ -57,8 +59,12 @@ public abstract class LLMJudge<E> implements JudgeWithMetadata<E> {
 	 * @param description the judge description
 	 * @param chatClientBuilder the chat client builder for LLM calls (null allowed for
 	 * testing)
+	 * @param evidence fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	protected LLMJudge(String name, String description, ChatClient.Builder chatClientBuilder) {
+	protected LLMJudge(java.util.function.Supplier<? extends E> evidence, String name, String description,
+			ChatClient.Builder chatClientBuilder) {
+		this.evidence = java.util.Objects.requireNonNull(evidence);
 		// No exclusion capability: this judge always answers its question, or errors
 		// trying.
 		this.metadata = new JudgeMetadata(name, description, JudgeType.LLM_POWERED);
@@ -96,14 +102,37 @@ public abstract class LLMJudge<E> implements JudgeWithMetadata<E> {
 	 * Template method that orchestrates: build prompt → call LLM → parse response.
 	 * Subclasses customize via {@link #buildPrompt} and {@link #parseResponse}.
 	 * </p>
-	 * @param context the judgment context
 	 * @return the judgment from the LLM
 	 */
 	@Override
-	public Judgment judge(E context) {
+	public final Judgment judge() {
+		return evaluate(java.util.Objects.requireNonNull(evidence.get(), "acquired evidence"));
+	}
+
+	/**
+	 * Evaluates one acquired snapshot.
+	 * @param context actual evidence
+	 * @return native judgment
+	 */
+	protected Judgment evaluate(E context) {
 		String prompt = buildPrompt(context);
-		String response = this.chatClient.prompt().user(prompt).call().content();
-		return parseResponse(response, context);
+		var result = new SpringAiJudgeModel(this.chatClient)
+			.execute(io.github.markpollack.judge.ai.model.JudgeModelRequest.user(prompt));
+		Judgment judgment;
+		try {
+			judgment = result.answer().completed() ? parseResponse(result.answer().text(), context)
+					: Judgment.error(result.answer().text());
+		}
+		catch (java.util.concurrent.CancellationException cancelled) {
+			throw cancelled;
+		}
+		catch (RuntimeException failure) {
+			if (Thread.currentThread().isInterrupted())
+				throw new java.util.concurrent.CancellationException("Native decoding interrupted");
+			judgment = Judgment.error("Native decoding failed: " + failure.getClass().getName() + ": "
+					+ java.util.Objects.toString(failure.getMessage(), ""));
+		}
+		return judgment.withInvocation(result.invocation());
 	}
 
 	@Override

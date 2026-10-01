@@ -31,23 +31,28 @@ public class CoveragePreservationJudge extends DeterministicJudge<CoverageCompar
 
 	/**
 	 * Create with default threshold of 5 percentage points.
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public CoveragePreservationJudge() {
-		this(DEFAULT_THRESHOLD);
+	public CoveragePreservationJudge(java.util.function.Supplier<? extends CoverageComparison> source) {
+		this(source, DEFAULT_THRESHOLD);
 	}
 
 	/**
 	 * Create with custom threshold.
 	 * @param threshold maximum allowed coverage drop in percentage points
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public CoveragePreservationJudge(double threshold) {
-		super("CoveragePreservationJudge",
+	public CoveragePreservationJudge(java.util.function.Supplier<? extends CoverageComparison> source,
+			double threshold) {
+		super(source, "CoveragePreservationJudge",
 				"Verifies test coverage drop within " + threshold + " percentage points of baseline");
 		this.threshold = threshold;
 	}
 
 	@Override
-	public Judgment judge(CoverageComparison evidence) {
+	protected Judgment evaluate(CoverageComparison evidence) {
 		double baselineLineCoverage = evidence.baselineLineCoverage();
 
 		CoverageMetrics current = JaCoCoReportParser.parse(evidence.workspace());
@@ -88,6 +93,25 @@ public class CoveragePreservationJudge extends DeterministicJudge<CoverageCompar
 	 */
 	public double getThreshold() {
 		return threshold;
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<CoverageComparison> builder() {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new CoveragePreservationJudge(source));
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @param threshold producer configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<CoverageComparison> builder(double threshold) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new CoveragePreservationJudge(source, threshold));
 	}
 
 }

@@ -6,7 +6,8 @@ package io.github.markpollack.judge.jury;
 
 import java.util.*;
 import java.util.function.Function;
-import io.github.markpollack.judge.RequirementJudge;
+import io.github.markpollack.judge.construction.*;
+import java.util.function.Supplier;
 import io.github.markpollack.judge.requirement.*;
 import io.github.markpollack.judge.judgment.*;
 
@@ -42,7 +43,7 @@ public final class Assignments<E> {
 	 * @param judge evaluator
 	 * @return this configuration
 	 */
-	public <S> Assignments<E> judge(Requirement<S> child, RequirementJudge<S, E> judge) {
+	public <S> Assignments<E> judge(Requirement<S> child, JudgeRecipe<S, E> judge) {
 		return judge(child, Function.identity(), judge);
 	}
 
@@ -53,7 +54,7 @@ public final class Assignments<E> {
 	 * @param jury evaluator
 	 * @return this configuration
 	 */
-	public <S> Assignments<E> jury(Requirement<S> child, RequirementJury<S, E> jury) {
+	public <S> Assignments<E> jury(Requirement<S> child, JuryRecipe<S, E> jury) {
 		return jury(child, Function.identity(), jury);
 	}
 
@@ -66,18 +67,17 @@ public final class Assignments<E> {
 	 * @param judge requirement-aware evaluator
 	 * @return this configuration
 	 */
-	public <S, C> Assignments<E> judge(Requirement<S> child, Function<E, C> selectEvidence,
-			RequirementJudge<S, C> judge) {
+	public <S, C> Assignments<E> judge(Requirement<S> child, Function<E, C> selectEvidence, JudgeRecipe<S, C> judge) {
 		Objects.requireNonNull(selectEvidence, "selector");
 		Objects.requireNonNull(judge, "judge");
 		Requirement<S> actual = constituent(child);
-		return add(actual,
-				evidence -> Verdict
-					.single(actual.id(),
-							Objects.requireNonNull(judge.judge(actual,
-									Objects.requireNonNull(selectEvidence.apply(evidence), "selected evidence")),
-									"judge returned null"))
-					.forRequirement(actual));
+		EvidenceStep<C> step = judge.requirement(actual);
+		return add(actual, evidence -> {
+			C selected = Objects.requireNonNull(selectEvidence.apply(evidence), "selected evidence");
+			return io.github.markpollack.judge.evaluation.Evaluations.evaluate(step.evidence(selected).build())
+				.verdict()
+				.forRequirement(actual);
+		});
 	}
 
 	/**
@@ -90,21 +90,22 @@ public final class Assignments<E> {
 	 * @param jury requirement-aware jury
 	 * @return this configuration
 	 */
-	public <S, C> Assignments<E> jury(Requirement<S> child, Function<E, C> selectEvidence, RequirementJury<S, C> jury) {
+	public <S, C> Assignments<E> jury(Requirement<S> child, Function<E, C> selectEvidence, JuryRecipe<S, C> jury) {
 		Objects.requireNonNull(selectEvidence, "selector");
 		Objects.requireNonNull(jury, "jury");
 		Requirement<S> actual = constituent(child);
+		JuryEvidenceStep<C> step = jury.requirement(actual);
 		return add(actual,
-				evidence -> Objects.requireNonNull(
-						jury.vote(actual, Objects.requireNonNull(selectEvidence.apply(evidence), "selected evidence")),
-						"jury returned null"));
+				evidence -> step.evidence(Objects.requireNonNull(selectEvidence.apply(evidence), "selected evidence"))
+					.build()
+					.vote());
 	}
 
 	private <S> Requirement<S> constituent(Requirement<S> reference) {
 		Objects.requireNonNull(reference, "child");
 		for (Requirement<?> candidate : parent.specification().constituents()) {
 			if (candidate.id().equals(reference.id())) {
-				if (!candidate.equals(reference))
+				if (!Requirement.equivalent(candidate, reference))
 					throw new IllegalArgumentException(
 							"Constituent reference differs from parent entry: " + reference.id());
 				// Complete structural equality includes the native specification. Execute
@@ -146,7 +147,7 @@ public final class Assignments<E> {
 	 *
 	 * @param <E> evidence type
 	 */
-	public static final class Prepared<E> {
+	public static final class Prepared<E> implements JuryEvidenceStep<E> {
 
 		private final Requirement<AllOf> parent;
 
@@ -162,9 +163,30 @@ public final class Assignments<E> {
 		 * @param evidence parent evidence
 		 * @return complete parent verdict
 		 */
-		public Verdict vote(E evidence) {
+		private Verdict vote(E evidence) {
 			Objects.requireNonNull(evidence, "evidence");
 			return CompositeExecutionScope.withinCompositeVote(() -> execute(evidence));
+		}
+
+		@Override
+		public ReadyJury evidence(E evidence) {
+			Objects.requireNonNull(evidence, "evidence");
+			return evidenceSupplier(() -> evidence);
+		}
+
+		@Override
+		public ReadyJury evidenceSupplier(Supplier<? extends E> provider) {
+			Objects.requireNonNull(provider, "provider");
+			return () -> new Jury() {
+				public Verdict vote() {
+					return Prepared.this.vote(Objects.requireNonNull(provider.get(), "acquired evidence"));
+				}
+
+				public io.github.markpollack.judge.description.JuryDescription describe() {
+					return new io.github.markpollack.judge.description.AuditJuryDescription("allOf",
+							parent.specification().constituents(), !parent.specification().applicable());
+				}
+			};
 		}
 
 		private Verdict execute(E evidence) {

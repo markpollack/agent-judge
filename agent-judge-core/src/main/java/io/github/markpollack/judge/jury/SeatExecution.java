@@ -14,6 +14,8 @@ public enum SeatExecution {
 
 	/** A valid value was returned, including a returned ERROR. */
 	RETURNED,
+	/** A value was observed but refused by the seat contract. */
+	RETURNED_REJECTED,
 	/**
 	 * Orchestration replaced a failed/null invocation, unreadable metadata or undeclared
 	 * exclusion.

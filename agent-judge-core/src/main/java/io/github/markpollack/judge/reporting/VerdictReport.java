@@ -5,6 +5,8 @@
 package io.github.markpollack.judge.reporting;
 
 import java.util.*;
+import io.github.markpollack.judge.requirement.Requirement;
+import org.jspecify.annotations.Nullable;
 import io.github.markpollack.judge.jury.*;
 import io.github.markpollack.judge.judgment.Judgment;
 
@@ -82,6 +84,20 @@ public final class VerdictReport {
 	}
 
 	/**
+	 * Counts native invocations once by their stable identities, including shared roster
+	 * owners and semantic copies through identity or selected tiers.
+	 * @return complete unique native invocation records in traversal order
+	 */
+	public List<io.github.markpollack.judge.provenance.Invocation> invocations() {
+		return io.github.markpollack.judge.jury.InvocationRecords.of(verdict);
+	}
+
+	private static String requirement(@Nullable Requirement<?> value) {
+		return value == null ? "" : "; requirement=" + value.id() + "@" + value.revision() + "; source="
+				+ value.source().artifact().id() + "#" + value.source().artifact().sha256();
+	}
+
+	/**
 	 * Summarize conclusion, deciding path, opinions and retained failures.
 	 * @return deterministic readable text
 	 */
@@ -89,6 +105,10 @@ public final class VerdictReport {
 		var lines = new ArrayList<String>();
 		lines.add((verdict.requirement() == null ? "Check" : "Requirement " + verdict.requirement().id()) + ": "
 				+ conclusion());
+		if (!verdict.roster().isEmpty())
+			lines.add("Declared roster: " + verdict.roster().stream().map(q -> q.id() + "@" + q.revision()).toList());
+		if (!invocations().isEmpty())
+			lines.add("Native invocations: " + invocations().size());
 		lines.add("Collective judgment: " + verdict.judgment().status() + "; "
 				+ bounded(verdict.judgment().reasoning(), 640));
 		if (verdict.judgment().finding() != null)
@@ -103,10 +123,16 @@ public final class VerdictReport {
 			lines.add("Deciding path: " + String.join(" / ", decidingPath()));
 		for (int i = 0; i < verdict.individual().size(); i++)
 			lines.add("Seat " + verdict.seats().get(i).verdictKey() + ": " + verdict.individual().get(i).status() + "; "
-					+ verdict.seats().get(i).participation());
+					+ verdict.seats().get(i).participation() + requirement(verdict.individual().get(i).requirement())
+					+ (verdict.seats().get(i).rejection() == null ? ""
+							: "; rejected=" + Objects.requireNonNull(verdict.seats().get(i).rejection()).reasonCode()));
 		for (var entry : attempts())
-			lines.add(entry.path() + ": " + entry.attempt().disposition() + "; " + (entry.attempt().verdict() == null
-					? entry.attempt().failure() : entry.attempt().verdict().judgment().status()));
+			lines.add(entry.path() + ": " + entry.attempt().disposition() + "; "
+					+ (entry.attempt().verdict() == null ? entry.attempt().failure()
+							: entry.attempt().verdict().judgment().status())
+					+ (entry.attempt().routingDecision() == null ? ""
+							: "; routing=" + entry.attempt().routingDecision().reason())
+					+ (entry.attempt().verdict() == null ? "" : requirement(entry.attempt().verdict().requirement())));
 		return String.join("\n", lines);
 	}
 

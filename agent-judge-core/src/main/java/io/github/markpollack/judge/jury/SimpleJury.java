@@ -75,15 +75,14 @@ import org.slf4j.LoggerFactory;
  * invocations remain contained inputs to the configured error reduction; they are not
  * identity results.
  *
- * @param <E> evidence type
  * @author Mark Pollack
  * @since 0.1.0
  */
-public class SimpleJury<E> implements VotingJury<E> {
+public class SimpleJury implements VotingJury {
 
 	private static final Logger logger = LoggerFactory.getLogger(SimpleJury.class);
 
-	private final List<Judge<E>> judges;
+	private final List<Judge> judges;
 
 	private final VotingStrategy votingStrategy;
 
@@ -110,8 +109,11 @@ public class SimpleJury<E> implements VotingJury<E> {
 	 */
 	private final List<String> declaredCapabilities;
 
-	private SimpleJury(List<Judge<E>> judges, VotingStrategy votingStrategy, Map<String, Double> weights,
-			boolean parallel, Executor executor, Set<Integer> deduplicatedPositions, boolean requireDeclaredNames) {
+	private final Map<Integer, JudgeSeat> declarations;
+
+	private SimpleJury(List<Judge> judges, VotingStrategy votingStrategy, Map<String, Double> weights, boolean parallel,
+			Executor executor, Set<Integer> deduplicatedPositions, boolean requireDeclaredNames,
+			Map<Integer, JudgeSeat> declarations) {
 		if (judges == null || judges.isEmpty()) {
 			throw new IllegalArgumentException("Jury must have at least one judge");
 		}
@@ -124,11 +126,28 @@ public class SimpleJury<E> implements VotingJury<E> {
 		this.parallel = parallel;
 		this.executor = executor != null ? executor : ForkJoinPool.commonPool();
 		this.deduplicatedPositions = Set.copyOf(deduplicatedPositions);
-		this.declaredCapabilities = readCapabilities(this.judges);
+		this.declarations = Map.copyOf(declarations);
+		List<String> capabilities = new ArrayList<>();
+		for (int i = 0; i < judges.size(); i++)
+			capabilities.add(declarations.containsKey(i) ? declarations.get(i).notApplicableWhen() : null);
+		this.declaredCapabilities = Collections.unmodifiableList(capabilities);
 		requireCoherentExclusionPolicy(this.judges, this.declaredCapabilities, votingStrategy);
 		if (requireDeclaredNames) {
 			requireDeclaredNames(this.judges, this.deduplicatedPositions);
 		}
+	}
+
+	private SeatKey seatKey(Judge judge, int position) {
+		JudgeSeat declaration = declarations.get(position);
+		return declaration == null ? SeatKey.of(judge, position)
+				: new SeatKey(position, declaration.name(), true, null, null);
+	}
+
+	private io.github.markpollack.judge.description.JudgeDescription seatDescription(int position, Judge judge) {
+		var original = Judges.describe(judge);
+		return new io.github.markpollack.judge.description.JudgeDescription(original.name(), original.type(),
+				original.delegateName(), original.delegateType(), declaredCapabilities.get(position),
+				original.implementation(), original.configuration());
 	}
 
 	/**
@@ -143,9 +162,9 @@ public class SimpleJury<E> implements VotingJury<E> {
 	 * @param judges the configured judges
 	 * @return the declaration per position, with null for a seat that declares none
 	 */
-	private static <E> List<String> readCapabilities(List<Judge<E>> judges) {
+	private static List<String> readCapabilities(List<Judge> judges) {
 		List<String> capabilities = new ArrayList<>(judges.size());
-		for (Judge<E> judge : judges) {
+		for (Judge judge : judges) {
 			String declared;
 			try {
 				declared = Judges.notApplicableCapability(judge).orElse(null);
@@ -170,7 +189,7 @@ public class SimpleJury<E> implements VotingJury<E> {
 	 * @param capabilities each seat's declaration
 	 * @param strategy the configured strategy
 	 */
-	private static <E> void requireCoherentExclusionPolicy(List<Judge<E>> judges, List<String> capabilities,
+	private static void requireCoherentExclusionPolicy(List<Judge> judges, List<String> capabilities,
 			VotingStrategy strategy) {
 		if (strategy.exclusionHandling() != ExclusionHandling.REFUSE) {
 			return;
@@ -192,10 +211,10 @@ public class SimpleJury<E> implements VotingJury<E> {
 	 * @param judges the configured judges
 	 * @param deduplicated positions whose key was manufactured to break a collision
 	 */
-	private static <E> void requireDeclaredNames(List<Judge<E>> judges, Set<Integer> deduplicated) {
+	private void requireDeclaredNames(List<Judge> judges, Set<Integer> deduplicated) {
 		Map<String, Integer> byKey = new LinkedHashMap<>();
 		for (int position = 0; position < judges.size(); position++) {
-			SeatKey key = SeatKey.of(judges.get(position), position);
+			SeatKey key = seatKey(judges.get(position), position);
 			if (!key.declared() && !deduplicated.contains(position)) {
 				throw new IllegalArgumentException("seats[" + position + "] has no declared name, so its verdict key '"
 						+ key.verdictKey() + "' identifies a position rather than a judge; "
@@ -218,16 +237,18 @@ public class SimpleJury<E> implements VotingJury<E> {
 	 * unchanged.
 	 * </p>
 	 * @return true when this jury's aggregate may be NOT_APPLICABLE
+	 *
 	 * @since 0.17.0
 	 */
 	@Override
 	public boolean aggregateMayBeNotApplicable() {
-		return (judges.size() == 1 || votingStrategy.exclusionHandling() == ExclusionHandling.EXCLUDE)
-				&& declaredCapabilities.stream().anyMatch(declared -> declared != null);
+		if (declaredCapabilities.stream().allMatch(java.util.Objects::isNull))
+			return false;
+		return describe().aggregateMayBeNotApplicable();
 	}
 
 	@Override
-	public List<Judge<E>> getJudges() {
+	public List<Judge> getJudges() {
 		return judges;
 	}
 
@@ -251,14 +272,15 @@ public class SimpleJury<E> implements VotingJury<E> {
 	 * @throws IllegalArgumentException if a seat cannot be described, for example because
 	 * its judge declares a non-portable configuration or its metadata cannot be read; the
 	 * message names the seat
+	 *
 	 * @since 0.17.0
 	 */
 	@Override
 	public JuryDescription describe() {
 		List<SeatDescription> seats = new ArrayList<>(judges.size());
 		for (int position = 0; position < judges.size(); position++) {
-			Judge<E> judge = judges.get(position);
-			SeatKey key = SeatKey.of(judge, position);
+			Judge judge = judges.get(position);
+			SeatKey key = seatKey(judge, position);
 			KeySource keySource;
 			if (deduplicatedPositions.contains(position)) {
 				keySource = KeySource.DEDUPLICATED;
@@ -275,8 +297,8 @@ public class SimpleJury<E> implements VotingJury<E> {
 				// the
 				// judge as undeclared.
 				SeatDescription seat = new SeatDescription(position, key.verdictKey(), keySource, weight,
-						Judges.describe(judge));
-				requireStableCapability(position, seat.judge().notApplicableWhen());
+						seatDescription(position, judge));
+
 				seats.add(seat);
 			}
 			catch (IllegalArgumentException ex) {
@@ -289,7 +311,7 @@ public class SimpleJury<E> implements VotingJury<E> {
 		// exclusionHandling(), which a default describe() does not carry, and a
 		// derivation
 		// would then publish a confident false about a jury that can exclude.
-		return new SimpleJuryDescription(votingStrategy.describe(), seats, aggregateMayBeNotApplicable());
+		return new SimpleJuryDescription(votingStrategy.describe(), seats);
 	}
 
 	/**
@@ -317,21 +339,21 @@ public class SimpleJury<E> implements VotingJury<E> {
 	}
 
 	@Override
-	public Verdict vote(E context) {
-		return voteForComposition(context).verdict();
+	public Verdict vote() {
+		return voteForComposition().verdict();
 	}
 
 	/** Per-call validity is orchestration state, never fabricated result metadata. */
 	record CompositionVote(Verdict verdict, boolean identity) {
 	}
 
-	CompositionVote voteForComposition(E context) {
+	CompositionVote voteForComposition() {
 		// Read every seat's key once, on the caller's thread and before any judge runs,
 		// so a
 		// judge whose metadata cannot be read becomes an ERROR seat instead of an
 		// exception.
 		List<SeatKey> keys = IntStream.range(0, judges.size())
-			.mapToObj(index -> SeatKey.of(judges.get(index), index))
+			.mapToObj(index -> seatKey(judges.get(index), index))
 			.toList();
 
 		List<Invocation> invocations;
@@ -339,8 +361,7 @@ public class SimpleJury<E> implements VotingJury<E> {
 		if (parallel) {
 			// Parallel execution using CompletableFuture
 			List<CompletableFuture<Invocation>> futures = IntStream.range(0, judges.size())
-				.mapToObj(index -> CompletableFuture.supplyAsync(() -> invokeJudge(index, keys.get(index), context),
-						executor))
+				.mapToObj(index -> CompletableFuture.supplyAsync(() -> invokeJudge(index, keys.get(index)), executor))
 				.toList();
 
 			// Wait for all to complete
@@ -352,11 +373,11 @@ public class SimpleJury<E> implements VotingJury<E> {
 		else {
 			// Sequential execution
 			invocations = IntStream.range(0, judges.size())
-				.mapToObj(index -> invokeJudge(index, keys.get(index), context))
+				.mapToObj(index -> invokeJudge(index, keys.get(index)))
 				.toList();
 		}
 
-		List<Judgment> individualJudgments = invocations.stream().map(Invocation::judgment).toList();
+		List<Judgment> individualJudgments = invocations.stream().map(Invocation::original).toList();
 		boolean identity = judges.size() == 1 && invocations.get(0).returned();
 
 		// Build identity map (preserves order via LinkedHashMap) and the seats that join
@@ -367,16 +388,18 @@ public class SimpleJury<E> implements VotingJury<E> {
 		for (int i = 0; i < judges.size(); i++) {
 			judgmentByName.put(keys.get(i).verdictKey(), individualJudgments.get(i));
 			seats.add(new Seat(i, keys.get(i).verdictKey(), keySourceAt(i, keys.get(i)),
-					invocations.get(i).returned() ? SeatExecution.RETURNED : SeatExecution.CONTAINED_FAILURE,
-					Participation.NOT_RECORDED, invocations.get(i).cause()));
+					invocations.get(i).rejection() != null ? SeatExecution.RETURNED_REJECTED
+							: invocations.get(i).returned() ? SeatExecution.RETURNED : SeatExecution.CONTAINED_FAILURE,
+					Participation.NOT_RECORDED, invocations.get(i).cause(), declaredCapabilities.get(i),
+					invocations.get(i).rejection()));
 		}
 
+		List<Judgment> reductionInputs = invocations.stream().map(Invocation::judgment).toList();
 		var reduction = identity ? new AggregationBoundary.Reduction(individualJudgments.get(0), null)
-				: aggregateWithinBoundary(individualJudgments);
+				: aggregateWithinBoundary(reductionInputs);
 		Judgment judgment = reduction.judgment();
 		for (int i = 0; i < seats.size(); i++)
-			seats.set(i,
-					seats.get(i).treated(Participation.forJudgment(individualJudgments.get(i), judgment, identity)));
+			seats.set(i, seats.get(i).treated(Participation.forJudgment(reductionInputs.get(i), judgment, identity)));
 
 		Verdict verdict = Verdict.builder()
 			.reductionFailure(reduction.failure())
@@ -392,10 +415,25 @@ public class SimpleJury<E> implements VotingJury<E> {
 		return new CompositionVote(verdict, identity);
 	}
 
-	private record Invocation(Judgment judgment, boolean returned, @org.jspecify.annotations.Nullable Throwable cause) {
+	private record Invocation(Judgment judgment, boolean returned, @org.jspecify.annotations.Nullable Throwable cause,
+			@org.jspecify.annotations.Nullable Judgment observed) {
 		Invocation(Judgment judgment, boolean returned) {
-			this(judgment, returned, null);
+			this(judgment, returned, null, null);
 		}
+
+		Invocation(Judgment judgment, boolean returned, @org.jspecify.annotations.Nullable Throwable cause) {
+			this(judgment, returned, cause, null);
+		}
+
+		Judgment original() {
+			return observed == null ? judgment : observed;
+		}
+
+		@org.jspecify.annotations.Nullable
+		Judgment rejection() {
+			return observed == null ? null : judgment;
+		}
+
 	}
 
 	private KeySource keySourceAt(int position, SeatKey key) {
@@ -431,17 +469,17 @@ public class SimpleJury<E> implements VotingJury<E> {
 	 * @param context the judgment context
 	 * @return the result and whether it was returned validly rather than contained
 	 */
-	private Invocation invokeJudge(int index, SeatKey key, E context) {
+	private Invocation invokeJudge(int index, SeatKey key) {
 		if (key.metadataFailure() != null) {
 			String reasoning = key.unreadableMetadata();
 			logger.warn("{}; recording an ERROR for the error policy to resolve", reasoning, key.cause());
 			return new Invocation(Judgment.error(JudgmentReasonCode.JUDGE_METADATA_UNREADABLE, reasoning), false,
 					key.cause());
 		}
-		Judge<E> judge = judges.get(index);
+		Judge judge = judges.get(index);
 		String name = key.verdictKey();
 		try {
-			Judgment raw = judge.judge(context);
+			Judgment raw = judge.judge();
 			Judgment judgment = guardExclusion(index, name, raw);
 			if (judgment == null) {
 				logger.warn("Judge '{}' returned no judgment; recording an ERROR for the error policy to resolve",
@@ -450,7 +488,7 @@ public class SimpleJury<E> implements VotingJury<E> {
 						Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "Judge '" + name + "' returned no judgment"),
 						false);
 			}
-			return new Invocation(judgment, judgment == raw);
+			return new Invocation(judgment, judgment == raw, null, judgment == raw ? null : raw);
 		}
 		catch (Exception ex) {
 			preserveCancellation(ex);
@@ -515,9 +553,9 @@ public class SimpleJury<E> implements VotingJury<E> {
 	 */
 	record SeatKey(int position, String verdictKey, boolean declared, String metadataFailure, Exception cause) {
 
-		static <E> SeatKey of(Judge<E> judge, int position) {
+		static SeatKey of(Judge judge, int position) {
 			String positional = "Judge#" + (position + 1);
-			if (!(judge instanceof JudgeWithMetadata<?> withMetadata)) {
+			if (!(judge instanceof JudgeWithMetadata withMetadata)) {
 				return new SeatKey(position, positional, false, null, null);
 			}
 			JudgeMetadata metadata;
@@ -550,25 +588,23 @@ public class SimpleJury<E> implements VotingJury<E> {
 
 	/**
 	 * Create a new builder for SimpleJury.
-	 * @param <E> evidence type
 	 * @return builder instance
 	 */
-	public static <E> Builder<E> builder() {
-		return new Builder<E>();
+	public static Builder builder() {
+		return new Builder();
 	}
 
 	/**
-	 * {@code Builder<E>} for SimpleJury.
+	 * {@code Builder} for SimpleJury.
 	 *
-	 * @param <E> evidence type
 	 */
-	public static class Builder<E> {
+	public static class Builder {
 
 		/** Create an empty jury builder. */
 		public Builder() {
 		}
 
-		private final List<Judge<E>> judges = new ArrayList<>();
+		private final List<Judge> judges = new ArrayList<>();
 
 		private final Map<String, Double> weights = new LinkedHashMap<>();
 
@@ -582,12 +618,34 @@ public class SimpleJury<E> implements VotingJury<E> {
 
 		private boolean requireDeclaredNames;
 
+		private final Map<Integer, JudgeSeat> declarations = new LinkedHashMap<>();
+
+		/**
+		 * Adds a locally declared seat.
+		 * @param seat immutable seat
+		 * @return this builder
+		 */
+		public Builder seat(JudgeSeat seat) {
+			declarations.put(judges.size(), java.util.Objects.requireNonNull(seat));
+			return judge(seat.judge());
+		}
+
+		/**
+		 * Adds a named ready Judge with no exclusion permission.
+		 * @param name composition name
+		 * @param judge ready judge
+		 * @return this builder
+		 */
+		public Builder judge(String name, Judge judge) {
+			return seat(JudgeSeat.named(name, judge));
+		}
+
 		/**
 		 * Add a judge with equal weight (1.0).
 		 * @param judge the judge to add
 		 * @return this builder
 		 */
-		public Builder<E> judge(Judge<E> judge) {
+		public Builder judge(Judge judge) {
 			return judge(judge, 1.0);
 		}
 
@@ -599,7 +657,7 @@ public class SimpleJury<E> implements VotingJury<E> {
 		 * @throws IllegalArgumentException if the judge is null, or the weight is not
 		 * finite or is negative
 		 */
-		public Builder<E> judge(Judge<E> judge, double weight) {
+		public Builder judge(Judge judge, double weight) {
 			if (judge == null) {
 				throw new IllegalArgumentException("Judge cannot be null");
 			}
@@ -622,7 +680,7 @@ public class SimpleJury<E> implements VotingJury<E> {
 		 * @param judge the renamed judge
 		 * @return this builder
 		 */
-		Builder<E> deduplicatedJudge(Judge<E> judge) {
+		Builder deduplicatedJudge(Judge judge) {
 			judge(judge);
 			deduplicated.add(judges.size() - 1);
 			return this;
@@ -633,7 +691,7 @@ public class SimpleJury<E> implements VotingJury<E> {
 		 * @param votingStrategy the voting strategy
 		 * @return this builder
 		 */
-		public Builder<E> votingStrategy(VotingStrategy votingStrategy) {
+		public Builder votingStrategy(VotingStrategy votingStrategy) {
 			this.votingStrategy = votingStrategy;
 			return this;
 		}
@@ -643,7 +701,7 @@ public class SimpleJury<E> implements VotingJury<E> {
 		 * @param parallel true for parallel execution (default), false for sequential
 		 * @return this builder
 		 */
-		public Builder<E> parallel(boolean parallel) {
+		public Builder parallel(boolean parallel) {
 			this.parallel = parallel;
 			return this;
 		}
@@ -653,7 +711,7 @@ public class SimpleJury<E> implements VotingJury<E> {
 		 * @param executor the executor to use
 		 * @return this builder
 		 */
-		public Builder<E> executor(Executor executor) {
+		public Builder executor(Executor executor) {
 			this.executor = executor;
 			return this;
 		}
@@ -675,9 +733,10 @@ public class SimpleJury<E> implements VotingJury<E> {
 		 * a declared name that collides with a positional key.
 		 * </p>
 		 * @return this builder
+		 *
 		 * @since 0.17.0
 		 */
-		public Builder<E> requireDeclaredNames() {
+		public Builder requireDeclaredNames() {
 			this.requireDeclaredNames = true;
 			return this;
 		}
@@ -686,12 +745,12 @@ public class SimpleJury<E> implements VotingJury<E> {
 		 * Build the SimpleJury instance.
 		 * @return configured SimpleJury
 		 */
-		public SimpleJury<E> build() {
+		public SimpleJury build() {
 			if (votingStrategy == null) {
 				throw new IllegalStateException("Voting strategy is required");
 			}
-			return new SimpleJury<E>(judges, votingStrategy, weights, parallel, executor, deduplicated,
-					requireDeclaredNames);
+			return new SimpleJury(judges, votingStrategy, weights, parallel, executor, deduplicated,
+					requireDeclaredNames, declarations);
 		}
 
 	}

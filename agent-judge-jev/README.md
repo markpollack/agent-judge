@@ -1,6 +1,6 @@
 # Jev adapter
 
-`JevJudge` implements `RequirementJudge<String, JevEvidence>` with TypeSafe's System One API,
+`JevJudge` is a configured `Judge` using a reusable `JevRuntime` for TypeSafe's System One API,
 using `io.github.gudcks0305:jev-typesafe:0.2.0`. It has no Spring or generative-model runtime.
 The caller supplies a model, credential, HTTP client, explicit question/projection,
 deadline, byte bounds and a protected `ArtifactCapture`. The HTTP client must disable
@@ -11,7 +11,7 @@ requires `typesafe-ai/jev`; an alias response leaves the underlying version unkn
 HTTP loopback endpoints with the corresponding paths are allowed for tests.
 No environment credentials are read.
 
-The adapter receives `judge(Requirement<String>, JevEvidence)` and sends the actual String specification as `state.requirement` and selected evidence text as `state.evidence`. For native specifications, `jev.rendering(renderer)` returns `RequirementJudge<S, JevEvidence>`. It renders the specification supplied on each invocation exactly once; it captures no independently configured requirement. Requirement identity and native structure remain associated with the evaluation's Verdict. Stale evidence digests are refused before HTTP and are never rebound to new text.
+Configure `JevJudge.builder().runtime(runtime).requirement(actual).evidence(bundle).build()` and call `judge()` with no arguments. The lower `runtime.rendering(renderer)` is a typed `NativeRuntime<RequirementRequest<S,JevEvidence>,Judgment>` shared by JevJudge and the actual RFC2119/EARS Judges. It renders the actual native specification once per execution, sends it as `state.requirement`, and sends selected evidence as `state.evidence`. `state.requirementIdentity` carries the outer id, revision and source snapshot separately from the evidence's native specification digest. The Judgment owns its actual pure Requirement association and native invocation facts. Stale evidence digests are refused before HTTP and are never rebound to new text.
 
 Workspace, agent output, execution-context metadata and the evidence manifest are not sent. Evidence
 must carry its exact UTF-8 bundle digest, retained manifest reference, exact requirement
@@ -37,10 +37,10 @@ Confidence, ProbabilityDistribution and source-backed `CalibrationClaim` pass th
 and retained Verdict reporting. The TypeSafe claim is a provider declaration, not local
 empirical calibration. Requested/reported versions remain distinct in provenance revision
 (`jev-adapter:2;jev-java:0.2.0;requested=...;reported=...;route=...;underlyingModelVersion=...`) and the protected trace.
-The exact native response and serialized configuration are retained through artifact refs.
+The exact native response and serialized configuration are retained through artifact refs. Invocation records retain available completion, HTTP attempts, native usage, response refs and original thrown causes even when decoding fails. Causes are memory-only; portable facts use typed codes/text or exact bounded native data.
 
 There is exactly one SDK HTTP attempt (`maxRetries(0)`). The SDK owns its request deadline;
-interruption restores the flag and cancels the actual HTTP future. The observer captures the SDK's bounded intended request bytes before sending and publishes
+interruption restores the flag, cancels the actual HTTP future and propagates cancellation. The observer captures the SDK's bounded intended request bytes before sending and publishes
 bounded response bytes before SDK convenience decoding and forwards cancellation, avoiding derived
 future cancellation loss. Bounds cover selected UTF-8 requirement/evidence, encoded request,
 response and captured artifacts. Oversized responses are canceled, with no truncated body
@@ -50,8 +50,8 @@ client invocations, not private socket behavior inside an injected client.
 
 `ArtifactCapture` must retain exact copies under caller-controlled access and retention
 limits, return matching SHA-256 references, and complete promptly. It receives no credential
-or request headers. Provider bodies, including error echoes, are protected artifacts only;
-result diagnostics use fixed safe messages. Intended request bytes do not certify
+or request headers. Ordinarily, provider bodies and error echoes are protected artifacts; if artifact capture fails after receiving a bounded body, the retained invocation keeps that body as `nativeResponseJson` rather than discarding the only original.
+Result reasoning uses fixed diagnostic messages. Intended request bytes do not certify
 transmission; connection failure or cancellation may prevent it. Response headers and request
 IDs may be absent when the response did not complete. Capture failure is instrument ERROR. The trace
 records request/response refs, requested/reported model, optional request ID, attempt count,

@@ -49,7 +49,7 @@ class SummariesTest {
 		var current = StoredVerdicts
 			.interpret(Verdict.single("known", io.github.markpollack.judge.judgment.Judgment.pass("known")));
 		assertThat(current.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
-		assertThat(current.summary()).contains("Source: explicit version-4").doesNotContain("unsupported version");
+		assertThat(current.summary()).contains("Source: explicit version-5").doesNotContain("unsupported version");
 		for (int version : List.of(2, 4, 99)) {
 			var unsupported = StoredVerdicts.interpret(Map.of("schemaVersion", version));
 			assertThat(unsupported.readingSupport()).isEqualTo(ReadingSupport.UNDETERMINED);

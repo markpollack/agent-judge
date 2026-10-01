@@ -28,7 +28,6 @@ import io.github.markpollack.judge.judgment.Judgment;
  * Executable examples are maintained in the Agent Judge Tutorial:
  * https://github.com/markpollack/agent-judge-tutorial.
  *
- * @param <E> evidence type
  * @author Mark Pollack
  * @since 0.1.0
  * @see Judge
@@ -36,9 +35,9 @@ import io.github.markpollack.judge.judgment.Judgment;
  * @see JudgeMetadata
  * @see Judges
  */
-public final class NamedJudge<E> implements JudgeWithMetadata<E> {
+public final class NamedJudge implements JudgeWithMetadata {
 
-	private final Judge<E> delegate;
+	private final Judge delegate;
 
 	private final JudgeMetadata metadata;
 
@@ -47,14 +46,14 @@ public final class NamedJudge<E> implements JudgeWithMetadata<E> {
 	 * @param delegate the judge to wrap
 	 * @param metadata the metadata for this judge
 	 */
-	public NamedJudge(Judge<E> delegate, JudgeMetadata metadata) {
+	public NamedJudge(Judge delegate, JudgeMetadata metadata) {
 		this.delegate = delegate;
 		this.metadata = metadata;
 	}
 
 	@Override
-	public Judgment judge(E context) {
-		return this.delegate.judge(context);
+	public Judgment judge() {
+		return this.delegate.judge();
 	}
 
 	/**
@@ -73,9 +72,10 @@ public final class NamedJudge<E> implements JudgeWithMetadata<E> {
 	 * describe the wrapped judge as well.
 	 * </p>
 	 * @return the wrapped judge
+	 *
 	 * @since 0.17.0
 	 */
-	public Judge<E> delegate() {
+	public Judge delegate() {
 		return this.delegate;
 	}
 

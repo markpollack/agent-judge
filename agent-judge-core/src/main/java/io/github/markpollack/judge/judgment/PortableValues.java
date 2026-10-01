@@ -42,7 +42,7 @@ import org.jspecify.annotations.Nullable;
  * @author Mark Pollack
  * @since 0.14.0
  */
-final class PortableValues {
+public final class PortableValues {
 
 	/**
 	 * The largest magnitude an IEEE-754 double represents exactly. A JSON consumer
@@ -58,6 +58,17 @@ final class PortableValues {
 			+ "array, or string-keyed object; keep live Java objects in CompletionEvidence or another non-result surface.";
 
 	private PortableValues() {
+	}
+
+	/**
+	 * Validates and freezes a portable facts object with a caller-selected diagnostic
+	 * path.
+	 * @param facts string-keyed facts
+	 * @param path root diagnostic path
+	 * @return recursively immutable facts
+	 */
+	public static Map<String, Object> copy(Map<String, Object> facts, String path) {
+		return normalizeObject(java.util.Objects.requireNonNull(facts), java.util.Objects.requireNonNull(path));
 	}
 
 	/**
@@ -91,7 +102,9 @@ final class PortableValues {
 						+ " is outside the interoperable integer range of +/-" + MAX_INTEROPERABLE_INTEGER
 						+ ", so it cannot cross a JSON boundary as the value it is.");
 			}
-			return value;
+			if (integral >= Integer.MIN_VALUE && integral <= Integer.MAX_VALUE)
+				return Integer.valueOf((int) integral);
+			return Long.valueOf(integral);
 		}
 		if (value instanceof Double number) {
 			if (!Double.isFinite(number)) {
@@ -105,7 +118,7 @@ final class PortableValues {
 				throw new IllegalArgumentException(
 						path + ": " + number + " has no JSON representation. Numbers must be finite.");
 			}
-			return number;
+			return Double.valueOf(number.toString());
 		}
 		if (value instanceof Map<?, ?> object) {
 			return normalizeObject(object, path);

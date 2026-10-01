@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai.requirements;
 
 import java.util.List;
@@ -116,7 +121,8 @@ class FixedRosterAggregationTests {
 
 	private static Judgment judge(String answers) {
 		JudgeModel model = request -> new JudgeModelResponse(answers, "stub", null, Map.of());
-		return EarsJudge.create("audit", THREE, model).judge(Path.of("/tmp/implementation"));
+		return EarsParser.rollupFor(THREE,
+				model.generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
 	}
 
 }

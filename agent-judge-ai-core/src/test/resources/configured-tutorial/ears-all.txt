@@ -1,0 +1,56 @@
+Captured 2026-09-06 from a live AgentClient run. Verbatim agent output follows the blank line.
+
+I'll start by exploring the codebase structure to understand what I'm auditing.The spec is present in-repo. Let me read the UC6 criteria and the core implementation.Now let me read the supporting services that several criteria depend on.Let me check a few edge paths that could be genuine failures.I audited the implementation against the in-repo spec (`spec/smart-appointment-scheduling/manage-appointment-lifecycle/criteria.md`). Existing surefire reports show 270 tests, 0 failures.
+
+UC6-AC1: PASS - `AppointmentService.java:259-271` builds and saves an `Appointment` with no `visitRepository` call, as do the other two creation sites (`ReservationService.java:273`, `StaffFallbackService.java:369`).
+UC6-AC2: PASS - `AppointmentService.java:96-98` queries `findByOwnerIdAndStatusAndStartTimeGreaterThanEqualOrderByStartTimeAsc(ownerId, BOOKED, now)`, scoping to one owner, `BOOKED`, and future starts.
+UC6-AC3: PASS - `StaffCalendarService.getCalendarItems` maps `appointmentRepository.findAll()` over the requested date window with no status or owner filter (`StaffCalendarService.java:47-52`).
+UC6-AC4: PASS - `AppointmentService.java:253-271` creates the appointment once `LiveFeasibilityService.checkFeasibility` finds no owner/pet overlap.
+UC6-AC5: PASS - overlap is queried as `StartTimeLessThan(end) AND EndTimeGreaterThan(start)` (`AppointmentRepository.java:33-40`), so an appointment beginning exactly at another's end does not match.
+UC6-AC6: PASS - `LiveFeasibilityService.java:110-140` returns false on any owner or pet overlap and `AppointmentService.java:256` throws before `save`.
+UC6-AC7: PASS - `AppointmentService.java:158` sets `CANCELLED` for an owned `BOOKED` appointment whose start is still future.
+UC6-AC8: PASS - `AppointmentService.java:154-156` rejects when `!now.isBefore(startTime)`, which is true at the exact start instant, before any mutation.
+UC6-AC9: PASS - the same guard covers post-start cancellation, exercised by `AppointmentServiceTests.testCancelAppointmentByOwnerFailsIfPastStartTime`.
+UC6-AC10: PASS - cancellation runs in one `@Transactional` unit under ordered pessimistic locks on owner/pet/vet/appointment (`AppointmentService.java:138`), and every overlap query filters `status = BOOKED`, so the interval is freed on commit.
+UC6-AC11: PASS - both cancel paths touch only the request's `retentionDeadline`, never its status (`AppointmentService.java:162-168`, `428-434`).
+UC6-AC12: PASS - `AppointmentController` exposes no rebook route, and `SchedulingRequestService.java:125-126` treats `CONFIRMED` as terminal so only a new request unblocks booking.
+UC6-AC13: PASS - `AppointmentService.java:259-271` never calls `setRequest` and sets `BookingSource.STAFF_DIRECT` with the trimmed offline reason.
+UC6-AC14: PASS - `AppointmentService.java:187-189` throws on a null/blank offline reason before any entity is touched.
+UC6-AC15: PASS - `AppointmentService.java:229-233` rejects only when `!startTime.isBefore(staffHorizonEnd)`, accepting starts strictly inside the horizon.
+UC6-AC16: PASS - `AppointmentService.java:224-227` compares against `SchedulingTimeService.nextGridBoundary`, rejecting only starts strictly before it.
+UC6-AC17: PASS - `AppointmentService.java:225-227` throws "Start time must be in the future" when `startTime.isBefore(nextGrid)`.
+UC6-AC18: PASS - `AppointmentService.java:231-233` throws when the start is at or after the exclusive `calculateStaffHorizonEnd`.
+UC6-AC19: PASS - `LiveFeasibilityService.checkFeasibility` gates DST, 15-minute grid, horizon, vet active, specialty, contiguous effective availability (closure and leave via `EffectiveAvailabilityService.java:58-71`), and vet/owner/pet overlap, with `AppointmentService.java:256` throwing before `save`.
+UC6-AC20: PASS - `AppointmentService.java:245-249` throws when `findByPetIdAndStatusNotIn` finds a request outside `CONFIRMED/CANCELLED/EXPIRED`, and the rollback preserves it.
+UC6-AC21: PASS - `AppointmentService.java:355-363` moves a `BOOKED` appointment to the new vet/start/end after the feasibility check.
+UC6-AC22: PASS - `AppointmentService.java:288-290` throws on a blank reason before the appointment is loaded, leaving the interval untouched.
+UC6-AC23: PASS - reschedule mutates the same entity (id preserved) and appends an `APPOINTMENT_RESCHEDULED` record carrying `priorStartTime`/`priorVetId` without deleting prior audit rows (`AppointmentService.java:367-371`).
+UC6-AC24: PASS - `AppointmentService.java:295-297` and `311-313` reject any status other than `BOOKED`, covering `COMPLETED`, `CANCELLED`, and `NO_SHOW`.
+UC6-AC25: PASS - `AppointmentService.java:425` sets `CANCELLED` after the nonblank-reason and before-end checks pass.
+UC6-AC26: PASS - `AppointmentService.java:381-383` throws on a blank cancellation reason before loading the appointment.
+UC6-AC27: PASS - `AppointmentService.java:397-399` throws when `!now.isBefore(endTime)`, which holds at and after the scheduled end.
+UC6-AC28: PASS - `AppointmentService.java:458-460` throws when `now.isBefore(endTime)`, before any status or Visit change.
+UC6-AC29: PASS - the same guard uses `isBefore`, so `now == endTime` falls through to the completion path (`AppointmentService.java:458`).
+UC6-AC30: PASS - `AppointmentServiceTests.testCompleteAppointmentCreatesExactlyOneVisit` completes an appointment 30 minutes past its end and asserts `COMPLETED`.
+UC6-AC31: PASS - `AppointmentService.java:450-452` throws on a blank clinical description before the `visitRepository.save` at line 496.
+UC6-AC32: PASS - `AppointmentService.java:490-499` creates and links one Visit only when `appointment.getVisit()` is null, asserted by `testCompleteAppointmentCreatesExactlyOneVisit`.
+UC6-AC33: PASS - `AppointmentService.java:466-468` and `485-487` return the existing DTO when already `COMPLETED` with a Visit; `testCompletingAppointmentTwiceReusesTheExistingVisit` verifies `visitRepository.save` runs once.
+UC6-AC34: PASS - `AppointmentService.java:492` sets the date to `startTime.atZone(timeService.getClinicZoneId()).toLocalDate()`.
+UC6-AC35: PASS - `AppointmentService.java:493` sets the Visit description solely from the trimmed `clinicalDescription` parameter, with no owner or AI field read anywhere in the method.
+UC6-AC36: PASS - `AppointmentService.java:525-527` throws when `now.isBefore(endTime)` before any status change.
+UC6-AC37: PASS - the same guard passes at or after the end, and `AppointmentService.java:556` sets `NO_SHOW`, exercised by `testMarkNoShowSuccess`.
+UC6-AC38: PASS - `markNoShow` never references `visitRepository`, and `testMarkNoShowSuccess` asserts `pet.getVisits()` is empty.
+UC6-AC39: PASS - `completeAppointment` rejects only `CANCELLED`, so a `NO_SHOW` appointment falls through to `COMPLETED`; `testCompletingNoShowAppointmentCreatesVisit` covers it.
+UC6-AC40: PASS - terminal statuses are rejected or returned unchanged at `AppointmentService.java:149-151`, `295-297`, `392-394`, `462-464`, and `533-535`.
+UC6-AC41: CANNOT_DETERMINE - no main-source path ever sets a vet inactive (`Vet.setActive` at `Vet.java:58` is called only by test fixtures, always with `true`), so nothing here exercises deactivation or its effect on existing appointments.
+UC6-AC42: PASS - `AppointmentService.java:241-242` and `345-346` reject an inactive vet on direct booking and reschedule, reinforced by `LiveFeasibilityService.java:86`.
+UC6-AC43: PASS - `V2__smart_appointment_scheduling.sql` only adds an FK from `appointments.visit_id` to `visits` and never alters, deletes, or date-filters the legacy rows seeded in `V1__legacy_baseline.sql:107-110`.
+UC6-AC44: PASS - `LiveFeasibilityService` queries only `AppointmentRepository` and `ReservationRepository`, and `VisitRepository` is injected nowhere except `AppointmentService` for completion.
+UC6-AC45: PASS - no `VisitController` exists in `src/main`, and `VisitControllerTests` asserts 404 for both GET and POST on `/owners/1/pets/1/visits/new`.
+UC6-AC46: PASS - each lifecycle method returns the current state when its transition is already applied (`AppointmentService.java:145`, `413`, `486`, `549`), though the truly-concurrent loser falls to optimistic-lock failure rather than this branch.
+UC6-AC48: PASS - `AppointmentService.java:196-210` rejects `GENERAL` with a specialty, `SPECIALTY` without one, and an inactive specialty, all before the appointment is constructed.
+UC6-AC49: PASS - all three creation sites set both fields (`AppointmentService.java:263-264`, `ReservationService.java:278-279`, `StaffFallbackService.java:374-375`) onto the non-null `care_type` and nullable `required_specialty_id` columns.
+UC6-AC50: PASS - `AppointmentService.java:315-316` reads `appointment.getCareType()` and `getRequiredSpecialty()` and passes them to `checkFeasibility` at line 349.
+UC6-AC51: PASS - `AppointmentService.java:365` calls `resolveConflictsForAppointment(..., RESCHEDULED, ...)`, which flips only `UNRESOLVED` rows and stamps `resolvedAt` while keeping type, interval, and `detectedAt` (`CalendarConflictService.java:133-152`).
+UC6-AC52: PASS - both cancel paths call `resolveConflictsForAppointment(..., CANCELLED, ...)` (`AppointmentService.java:170`, `436`) through the same in-place update that retains the conflict record.
+UC6-AC47: PASS - `Appointment` carries `@Version` (`Appointment.java:82-84`) and every lifecycle method takes an ordered `PESSIMISTIC_WRITE` lock on the appointment row via `LockCoordinator.lockResources`, so two actions cannot both commit from one version.

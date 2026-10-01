@@ -686,7 +686,7 @@ seat is keyed by position and records an `ERROR` naming the failure, for the `Er
 
 ```java
 tier.judge(Judges.named(new DddReviewQualityJudge(), "dddQuality"));   // do this
-tier.judge(ctx -> { ... });                                            // becomes "Judge#3"
+tier.judge(() -> { ... });                                            // becomes "Judge#3"
 ```
 
 **Know what identity does *not* reach.** `VotingStrategy.aggregate(List<Judgment>, Map<String,Double>)`

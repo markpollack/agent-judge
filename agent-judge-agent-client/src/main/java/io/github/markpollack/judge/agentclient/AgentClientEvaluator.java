@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.agentclient;
 
 import java.nio.file.Path;
@@ -42,7 +47,7 @@ public final class AgentClientEvaluator {
 	 * @return the judge result
 	 */
 	public static Judgment evaluate(String goal, Path workspace, Supplier<AgentClientResponse> call,
-			Judge<AgentExecutionEvidence> judge) {
+			java.util.function.Function<AgentExecutionEvidence, Judge> judge) {
 		return evaluate(goal, workspace, call, judge, Map.of());
 	}
 
@@ -56,9 +61,9 @@ public final class AgentClientEvaluator {
 	 * @return the judge result
 	 */
 	public static Judgment evaluate(String goal, Path workspace, Supplier<AgentClientResponse> call,
-			Judge<AgentExecutionEvidence> judge, Map<String, Object> extraMetadata) {
+			java.util.function.Function<AgentExecutionEvidence, Judge> judge, Map<String, Object> extraMetadata) {
 		AgentExecutionEvidence context = AgentClientEvidence.execute(goal, workspace, call, extraMetadata);
-		return judge.judge(context);
+		return java.util.Objects.requireNonNull(judge.apply(context)).judge();
 	}
 
 	/**
@@ -69,9 +74,9 @@ public final class AgentClientEvaluator {
 	 * @param jury jury applied to the captured execution
 	 * @return the jury verdict
 	 */
-	public static Verdict evaluate(String goal, Path workspace, Supplier<AgentClientResponse> call,
-			Jury<AgentExecutionEvidence> jury) {
-		return evaluate(goal, workspace, call, jury, Map.of());
+	public static Verdict evaluateJury(String goal, Path workspace, Supplier<AgentClientResponse> call,
+			java.util.function.Function<AgentExecutionEvidence, Jury> jury) {
+		return evaluateJury(goal, workspace, call, jury, Map.of());
 	}
 
 	/**
@@ -83,10 +88,10 @@ public final class AgentClientEvaluator {
 	 * @param extraMetadata caller-supplied context metadata
 	 * @return the jury verdict
 	 */
-	public static Verdict evaluate(String goal, Path workspace, Supplier<AgentClientResponse> call,
-			Jury<AgentExecutionEvidence> jury, Map<String, Object> extraMetadata) {
+	public static Verdict evaluateJury(String goal, Path workspace, Supplier<AgentClientResponse> call,
+			java.util.function.Function<AgentExecutionEvidence, Jury> jury, Map<String, Object> extraMetadata) {
 		AgentExecutionEvidence context = AgentClientEvidence.execute(goal, workspace, call, extraMetadata);
-		return jury.vote(context);
+		return java.util.Objects.requireNonNull(jury.apply(context)).vote();
 	}
 
 }

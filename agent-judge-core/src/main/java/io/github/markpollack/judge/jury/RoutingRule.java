@@ -21,21 +21,27 @@ public enum RoutingRule {
 	 * to the next tier for further evaluation. Use for deterministic fail-fast gates
 	 * (Tier 1).
 	 */
-	REJECT_ON_ANY_FAIL("REJECT_ON_ANY_FAIL"),
+	STOP_ON_ANY_OPINION_FAIL("STOP_ON_ANY_OPINION_FAIL"),
 
 	/**
 	 * If ALL judges in the tier pass, stop the cascade and ACCEPT. If any judge fails or
 	 * is uncertain (low confidence), escalate. Use for structural analysis tiers (Tier
 	 * 2).
 	 */
-	ACCEPT_ON_ALL_PASS("ACCEPT_ON_ALL_PASS"),
+	STOP_ON_ALL_OPINIONS_PASS("STOP_ON_ALL_OPINIONS_PASS"),
 
 	/**
 	 * Continue while the verdict is inconclusive or not applicable; stop on PASS or FAIL.
 	 */
 	STOP_ON_CONCLUSIVE("STOP_ON_CONCLUSIVE"),
 	/** Last tier: retain its result or failed attempt without resuming composition. */
-	FINAL_TIER("FINAL_TIER");
+	FINAL_TIER("FINAL_TIER"),
+
+	/** stop only on a passing complete conclusion. */
+	STOP_ON_CONCLUSION_PASS("STOP_ON_CONCLUSION_PASS"),
+
+	/** stop only on a failing complete conclusion. */
+	STOP_ON_CONCLUSION_FAIL("STOP_ON_CONCLUSION_FAIL");
 
 	private final String wireName;
 

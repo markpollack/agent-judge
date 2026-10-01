@@ -1,6 +1,8 @@
 # Portable results: schema version 4
 
-The current stored Judgment, Verdict and EvaluationResult format uses the existing integer `schemaVersion` discriminator with value **4**. Java domain records do not store a format version or a writable second conclusion. `VerdictCodec` validates before returning a usable domain Verdict, using the same typed rules as `Verdict.conclusion()`.
+> Historical V4 contract at `7387aab1bf9d3bd56e4d9a932f2f40e2978d676d`. Current APIs use [V5](portable-results-v5.md) and strictly refuse V4; this document is archival context.
+
+The V4 stored Judgment, Verdict and EvaluationResult format uses the existing integer `schemaVersion` discriminator with value **4**. Java domain records do not store a format version or a writable second conclusion. `VerdictCodec` validates before returning a usable domain Verdict, using the same typed rules as `Verdict.conclusion()`.
 
 ## Actual changes from version 3
 

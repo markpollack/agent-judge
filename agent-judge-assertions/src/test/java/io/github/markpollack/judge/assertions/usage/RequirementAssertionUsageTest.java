@@ -21,11 +21,11 @@ class RequirementAssertionUsageTest {
 
 	@Test
 	void explicitNativeRequirementAndEvidence() {
-		var latency = new Requirement<Integer>("latency", "1", "Response within budget", 100,
-				Requirement.text("source", "1", "Response budget: 100 ms").source());
-		RequirementJudge<Integer, Long> withinBudget = (r, e) -> e <= r.specification() ? Judgment.pass("within budget")
-				: Judgment.fail("too slow");
-		var result = Evaluations.evaluate(latency, withinBudget, 42L);
+		var latency = new io.github.markpollack.judge.requirement.GeneralRequirement<Integer>("latency", "1",
+				"Response within budget", 100, Requirement.text("source", "1", "Response budget: 100 ms").source());
+		io.github.markpollack.judge.construction.JudgeRecipe<Integer, Long> withinBudget = io.github.markpollack.judge.assertions.ConfiguredRules
+			.rule((r, e) -> e <= r.specification() ? Judgment.pass("within budget") : Judgment.fail("too slow"));
+		var result = io.github.markpollack.judge.assertions.ConfiguredRules.evaluate(latency, withinBudget, 42L);
 		RequirementAssertions.requireSatisfied(result);
 		assertThat(VerdictReport.of(result.verdict()).conclusion()).isEqualTo(Verdict.Conclusion.PASS);
 	}

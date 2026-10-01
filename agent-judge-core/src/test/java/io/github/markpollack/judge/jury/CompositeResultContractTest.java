@@ -41,12 +41,12 @@ class CompositeResultContractTest {
 	void verdictDeclarationAndJsonExposeOnlyTheCorrectedSevenComponentTruth() throws Exception {
 		assertThat(Arrays.stream(Verdict.class.getRecordComponents()).map(RecordComponent::getName)).containsExactly(
 				"judgment", "individual", "individualByName", "weights", "seats", "provenance", "compositeAttempts",
-				"declaredCardinality", "requirement", "reductionFailure");
+				"declaredCardinality", "requirement", "reductionFailure", "roster", "invocations");
 
 		JsonNode json = MAPPER.readTree(MAPPER.writeValueAsString(Verdict.single("leaf", booleanPass("passed"))));
 		assertThat(json.fieldNames()).toIterable()
 			.containsExactly("schemaVersion", "judgment", "individual", "individualByName", "weights", "seats",
-					"provenance", "compositeAttempts", "declaredCardinality");
+					"provenance", "compositeAttempts", "declaredCardinality", "roster", "invocations");
 		assertThat(json.at("/seats/0").toString()).isEqualTo(
 				"{\"position\":0,\"verdictKey\":\"leaf\",\"keySource\":\"DECLARED\",\"execution\":\"RETURNED\",\"participation\":\"IDENTITY\"}");
 		assertThat(json.at("/provenance").toString()).isEqualTo("{\"kind\":\"own\"}");
@@ -79,7 +79,8 @@ class CompositeResultContractTest {
 	void relationPolicyAndFailureTokensAreExactAndCaseSensitive() throws Exception {
 		assertThat(MAPPER.writeValueAsString(CompositeRelation.CASCADE_TIER)).isEqualTo("\"cascade_tier\"");
 		assertThat(MAPPER.writeValueAsString(CompositeRelation.META_MEMBER)).isEqualTo("\"meta_member\"");
-		assertThat(MAPPER.writeValueAsString(RoutingRule.REJECT_ON_ANY_FAIL)).isEqualTo("\"REJECT_ON_ANY_FAIL\"");
+		assertThat(MAPPER.writeValueAsString(RoutingRule.STOP_ON_ANY_OPINION_FAIL))
+			.isEqualTo("\"STOP_ON_ANY_OPINION_FAIL\"");
 		assertThat(MAPPER.writeValueAsString(executionFailure())).isEqualTo("{\"code\":\"jury_execution_failed\"}");
 		assertThatThrownBy(() -> CompositeRelation.fromWire("CASCADE_TIER"))
 			.isInstanceOf(IllegalArgumentException.class);
@@ -101,7 +102,7 @@ class CompositeResultContractTest {
 		for (String message : hostileMessages) {
 			Verdict verdict = Juries
 				.combine(throwing(new IllegalStateException(message)), returning(leaf("ok")), new ConsensusStrategy())
-				.vote(CONTEXT);
+				.vote();
 			String json = MAPPER.writeValueAsString(verdict.compositeAttempts().get(0).failure());
 			assertThat(json).isEqualTo("{\"code\":\"jury_execution_failed\"}");
 			assertThat(json).doesNotContain(message).doesNotContain("message").doesNotContain("stackTrace");
@@ -110,25 +111,24 @@ class CompositeResultContractTest {
 
 	@Test
 	void configuredNamesUseOneStrictUnicodeValidatorAndRejectDuplicatesBeforeInvocation() {
-		assertThat(new NamedJury<CompletionEvidence>("a/b~c-\uD83D\uDE80", returning(leaf("ok"))).name())
-			.isEqualTo("a/b~c-\uD83D\uDE80");
-		assertThat(new NamedJury<CompletionEvidence>("a".repeat(64), returning(leaf("ok"))).name()).hasSize(64);
+		assertThat(new NamedJury("a/b~c-\uD83D\uDE80", returning(leaf("ok"))).name()).isEqualTo("a/b~c-\uD83D\uDE80");
+		assertThat(new NamedJury("a".repeat(64), returning(leaf("ok"))).name()).hasSize(64);
 
 		for (String invalid : List.of("", " ", " leading", "trailing\u2003", "\u00A0leading", "trailing\u00A0",
 				"e\u0301", "bad\u0001name", "bad\u200Ename", "bad\u2028name", "bad\uD800name", "a".repeat(65))) {
-			assertThatThrownBy(() -> new NamedJury<CompletionEvidence>(invalid, returning(leaf("ok"))),
-					"invalid configured name %s", printable(invalid))
+			assertThatThrownBy(() -> new NamedJury(invalid, returning(leaf("ok"))), "invalid configured name %s",
+					printable(invalid))
 				.isInstanceOfAny(IllegalArgumentException.class, NullPointerException.class);
 		}
 
 		AtomicInteger invocations = new AtomicInteger();
-		Jury<CompletionEvidence> counted = countingLeaf(invocations);
-		assertThatThrownBy(() -> CascadedJury.<CompletionEvidence>builder()
-			.tier("duplicate", counted, RoutingRule.REJECT_ON_ANY_FAIL)
+		Jury counted = countingLeaf(invocations);
+		assertThatThrownBy(() -> CascadedJury.builder()
+			.tier("duplicate", counted, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("duplicate", counted, RoutingRule.FINAL_TIER)
 			.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Duplicate");
-		assertThatThrownBy(() -> Juries.meta(new ConsensusStrategy(),
-				new NamedJury<CompletionEvidence>("same", counted), new NamedJury<CompletionEvidence>("same", counted)))
+		assertThatThrownBy(() -> Juries.meta(new ConsensusStrategy(), new NamedJury("same", counted),
+				new NamedJury("same", counted)))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Duplicate");
 		assertThat(invocations).hasValue(0);
@@ -148,8 +148,8 @@ class CompositeResultContractTest {
 		// line
 		// separator the case above supplies is not a witness for the paragraph separator.
 		for (String separator : List.of("bad name", "bad name")) {
-			assertThatThrownBy(() -> new NamedJury<CompletionEvidence>(separator, returning(leaf("ok"))),
-					"separator %s", printable(separator))
+			assertThatThrownBy(() -> new NamedJury(separator, returning(leaf("ok"))), "separator %s",
+					printable(separator))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("forbidden Unicode code point");
 		}
@@ -158,11 +158,11 @@ class CompositeResultContractTest {
 		// validator owes the caller that diagnostic rather than a read past the end of
 		// the
 		// string, so the expected type is what distinguishes the bound from its absence.
-		assertThatThrownBy(() -> new NamedJury<CompletionEvidence>("a\uD800", returning(leaf("ok"))),
+		assertThatThrownBy(() -> new NamedJury("a\uD800", returning(leaf("ok"))),
 				"a name whose last unit is a high surrogate")
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Unicode scalar values");
-		assertThatThrownBy(() -> new NamedJury<CompletionEvidence>("bad\uD800name", returning(leaf("ok"))),
+		assertThatThrownBy(() -> new NamedJury("bad\uD800name", returning(leaf("ok"))),
 				"a high surrogate followed by an ordinary character")
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Unicode scalar values");
@@ -170,19 +170,19 @@ class CompositeResultContractTest {
 		// Near misses that are still valid names: a paired astral character is one
 		// scalar, and
 		// an interior SPACE_SEPARATOR is neither a line nor a paragraph separator.
-		assertThat(new NamedJury<CompletionEvidence>("a🚀b", returning(leaf("ok"))).name()).isEqualTo("a🚀b");
-		assertThat(new NamedJury<CompletionEvidence>("two words", returning(leaf("ok"))).name()).isEqualTo("two words");
+		assertThat(new NamedJury("a🚀b", returning(leaf("ok"))).name()).isEqualTo("a🚀b");
+		assertThat(new NamedJury("two words", returning(leaf("ok"))).name()).isEqualTo("two words");
 	}
 
 	@Test
 	void equalValuedTiersRetainDistinctConfiguredIdentityAndOrder() {
 		Verdict equal = leaf("same value");
-		CascadedJury<CompletionEvidence> cascade = CascadedJury.<CompletionEvidence>builder()
-			.tier("alpha", returning(equal), RoutingRule.REJECT_ON_ANY_FAIL)
+		CascadedJury cascade = CascadedJury.builder()
+			.tier("alpha", returning(equal), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("beta", returning(equal), RoutingRule.FINAL_TIER)
 			.build();
 
-		Verdict verdict = cascade.vote(CONTEXT);
+		Verdict verdict = cascade.vote();
 
 		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name).containsExactly("alpha", "beta");
 		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::verdict).containsExactly(equal, equal);
@@ -194,7 +194,7 @@ class CompositeResultContractTest {
 		Map<String, Judgment> byName = new LinkedHashMap<>();
 		byName.put("second", contained);
 		Map<String, Double> weights = new LinkedHashMap<>();
-		weights.put("second", 0.75);
+		weights.put("0", 0.75);
 		Verdict stopping = Verdict.builder()
 			.judgment(contained)
 			.individual(List.of(contained))
@@ -203,12 +203,13 @@ class CompositeResultContractTest {
 			.seats(List.of(new Seat(0, "second", KeySource.DECLARED)))
 			.provenance(VerdictProvenance.own())
 			.build();
-		CascadedJury<CompletionEvidence> cascade = CascadedJury.<CompletionEvidence>builder()
-			.tier("broken", throwing(new IllegalStateException("must not disappear")), RoutingRule.REJECT_ON_ANY_FAIL)
+		CascadedJury cascade = CascadedJury.builder()
+			.tier("broken", throwing(new IllegalStateException("must not disappear")),
+					RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("fallback", returning(stopping), RoutingRule.FINAL_TIER)
 			.build();
 
-		Verdict verdict = cascade.vote(CONTEXT);
+		Verdict verdict = cascade.vote();
 
 		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::name)
 			.containsExactly("broken", "fallback");
@@ -218,18 +219,18 @@ class CompositeResultContractTest {
 		assertThat(verdict.individualByName()).containsExactlyEntriesOf(byName);
 		assertThat(verdict.weights()).containsExactlyEntriesOf(weights);
 
-		CascadedJury<CompletionEvidence> errorCascade = CascadedJury.<CompletionEvidence>builder()
+		CascadedJury errorCascade = CascadedJury.builder()
 			.tier("fatal", throwingError(new AssertionError("fatal")), RoutingRule.FINAL_TIER)
 			.build();
-		assertThatThrownBy(() -> errorCascade.vote(CONTEXT)).isInstanceOf(AssertionError.class).hasMessage("fatal");
+		assertThatThrownBy(() -> errorCascade.vote()).isInstanceOf(AssertionError.class).hasMessage("fatal");
 	}
 
 	@Test
 	void aThrowingFinalTierReturnsTheFixedErrorAndItsFailedAttempt() {
-		Verdict verdict = CascadedJury.<CompletionEvidence>builder()
+		Verdict verdict = CascadedJury.builder()
 			.tier("final", throwing(new IllegalStateException("caller text")), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 
 		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(verdict.judgment().reasoning()).isEqualTo("The final cascade tier failed to execute.");
@@ -257,12 +258,11 @@ class CompositeResultContractTest {
 		};
 		Judgment first = booleanPass("first succeeded");
 		Judgment last = booleanPass("last succeeded");
-		Jury<CompletionEvidence> meta = Juries.meta(forbiddenStrategy,
-				new NamedJury<CompletionEvidence>("first", returning(Verdict.single("first", first))),
-				new NamedJury<CompletionEvidence>("broken", throwing(new IllegalArgumentException("boom"))),
-				new NamedJury<CompletionEvidence>("last", returning(Verdict.single("last", last))));
+		Jury meta = Juries.meta(forbiddenStrategy, new NamedJury("first", returning(Verdict.single("first", first))),
+				new NamedJury("broken", throwing(new IllegalArgumentException("boom"))),
+				new NamedJury("last", returning(Verdict.single("last", last))));
 
-		Verdict verdict = meta.vote(CONTEXT);
+		Verdict verdict = meta.vote();
 
 		assertThat(strategyCalls).hasValue(0);
 		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
@@ -280,11 +280,10 @@ class CompositeResultContractTest {
 		for (int failureIndex = 0; failureIndex < 3; failureIndex++) {
 			AtomicInteger calls = new AtomicInteger();
 			AtomicInteger strategyCalls = new AtomicInteger();
-			Jury<CompletionEvidence> meta = Juries.meta(countingStrategy(strategyCalls),
-					metaMember("first", 0, failureIndex, calls), metaMember("middle", 1, failureIndex, calls),
-					metaMember("final", 2, failureIndex, calls));
+			Jury meta = Juries.meta(countingStrategy(strategyCalls), metaMember("first", 0, failureIndex, calls),
+					metaMember("middle", 1, failureIndex, calls), metaMember("final", 2, failureIndex, calls));
 
-			Verdict verdict = meta.vote(CONTEXT);
+			Verdict verdict = meta.vote();
 
 			assertThat(calls).hasValue(3);
 			assertThat(strategyCalls).hasValue(0);
@@ -295,11 +294,9 @@ class CompositeResultContractTest {
 
 		AtomicInteger calls = new AtomicInteger();
 		AtomicInteger strategyCalls = new AtomicInteger();
-		Jury<CompletionEvidence> multiple = Juries.meta(countingStrategy(strategyCalls),
-				new NamedJury<CompletionEvidence>("first", countedThrowing(calls)),
-				new NamedJury<CompletionEvidence>("middle", countedReturning(calls)),
-				new NamedJury<CompletionEvidence>("final", countedThrowing(calls)));
-		Verdict verdict = multiple.vote(CONTEXT);
+		Jury multiple = Juries.meta(countingStrategy(strategyCalls), new NamedJury("first", countedThrowing(calls)),
+				new NamedJury("middle", countedReturning(calls)), new NamedJury("final", countedThrowing(calls)));
+		Verdict verdict = multiple.vote();
 		assertThat(calls).hasValue(3);
 		assertThat(strategyCalls).hasValue(0);
 		assertThat(verdict.compositeAttempts()).extracting(CompositeAttempt::failure)
@@ -309,15 +306,11 @@ class CompositeResultContractTest {
 
 	@Test
 	void pathsAreStrictReversibleAndPreorderAcrossMetaCascadeMeta() {
-		Jury<CompletionEvidence> inner = Juries.meta(new ConsensusStrategy(),
-				new NamedJury<CompletionEvidence>("c~d", returning(leaf("inner"))));
-		Jury<CompletionEvidence> cascade = CascadedJury.<CompletionEvidence>builder()
-			.tier("a/b", inner, RoutingRule.FINAL_TIER)
-			.build();
-		Jury<CompletionEvidence> outer = Juries.meta(new ConsensusStrategy(),
-				new NamedJury<CompletionEvidence>("outer", cascade));
+		Jury inner = Juries.meta(new ConsensusStrategy(), new NamedJury("c~d", returning(leaf("inner"))));
+		Jury cascade = CascadedJury.builder().tier("a/b", inner, RoutingRule.FINAL_TIER).build();
+		Jury outer = Juries.meta(new ConsensusStrategy(), new NamedJury("outer", cascade));
 
-		List<CompositePathEntry> flattened = CompositePaths.flatten(outer.vote(CONTEXT));
+		List<CompositePathEntry> flattened = CompositePaths.flatten(outer.vote());
 
 		assertThat(flattened).extracting(CompositePathEntry::path)
 			.containsExactly("/outer", "/outer/a~1b", "/outer/a~1b/c~0d");
@@ -339,31 +332,31 @@ class CompositeResultContractTest {
 	@Test
 	void executionAcceptsDepthEightAndRefusesDepthNineBeforeDestinationInvocation() {
 		AtomicInteger acceptedLeafCalls = new AtomicInteger();
-		Verdict accepted = nestedCascade(8, acceptedLeafCalls).vote(CONTEXT);
+		Verdict accepted = nestedCascade(8, acceptedLeafCalls).vote();
 		assertThat(acceptedLeafCalls).hasValue(1);
 		assertThat(CompositePaths.flatten(accepted)).hasSize(8);
 
 		AtomicInteger rejectedLeafCalls = new AtomicInteger();
-		assertThatThrownBy(() -> nestedCascade(9, rejectedLeafCalls).vote(CONTEXT))
+		assertThatThrownBy(() -> nestedCascade(9, rejectedLeafCalls).vote())
 			.isInstanceOf(CompositeLimitExceededException.class)
 			.hasMessageContaining("depth");
 		assertThat(rejectedLeafCalls).hasValue(0);
-		assertThat(nestedCascade(1, new AtomicInteger()).vote(CONTEXT).compositeAttempts()).hasSize(1);
+		assertThat(nestedCascade(1, new AtomicInteger()).vote().compositeAttempts()).hasSize(1);
 	}
 
 	@Test
 	void executionAcceptsAttemptThirtyTwoAndRefusesThirtyThreeBeforeDestinationInvocation() {
 		AtomicInteger acceptedLastCalls = new AtomicInteger();
-		Verdict accepted = flatCascade(32, acceptedLastCalls).vote(CONTEXT);
+		Verdict accepted = flatCascade(32, acceptedLastCalls).vote();
 		assertThat(accepted.compositeAttempts()).hasSize(32);
 		assertThat(acceptedLastCalls).hasValue(1);
 
 		AtomicInteger rejectedLastCalls = new AtomicInteger();
-		assertThatThrownBy(() -> flatCascade(33, rejectedLastCalls).vote(CONTEXT))
+		assertThatThrownBy(() -> flatCascade(33, rejectedLastCalls).vote())
 			.isInstanceOf(CompositeLimitExceededException.class)
 			.hasMessageContaining("attempt");
 		assertThat(rejectedLastCalls).hasValue(0);
-		assertThat(flatCascade(1, new AtomicInteger()).vote(CONTEXT).compositeAttempts()).hasSize(1);
+		assertThat(flatCascade(1, new AtomicInteger()).vote().compositeAttempts()).hasSize(1);
 	}
 
 	@Test
@@ -432,21 +425,19 @@ class CompositeResultContractTest {
 			.build();
 	}
 
-	private static Jury<CompletionEvidence> nestedCascade(int depth, AtomicInteger leafCalls) {
-		Jury<CompletionEvidence> jury = countingLeaf(leafCalls);
+	private static Jury nestedCascade(int depth, AtomicInteger leafCalls) {
+		Jury jury = countingLeaf(leafCalls);
 		for (int current = depth; current > 0; current--) {
-			jury = CascadedJury.<CompletionEvidence>builder()
-				.tier("level-" + current, jury, RoutingRule.FINAL_TIER)
-				.build();
+			jury = CascadedJury.builder().tier("level-" + current, jury, RoutingRule.FINAL_TIER).build();
 		}
 		return jury;
 	}
 
-	private static CascadedJury<CompletionEvidence> flatCascade(int attempts, AtomicInteger lastCalls) {
-		CascadedJury.Builder<CompletionEvidence> builder = CascadedJury.<CompletionEvidence>builder();
+	private static CascadedJury flatCascade(int attempts, AtomicInteger lastCalls) {
+		CascadedJury.Builder builder = CascadedJury.builder();
 		for (int index = 1; index <= attempts; index++) {
-			Jury<CompletionEvidence> jury = index == attempts ? countingLeaf(lastCalls) : returning(leaf("pass"));
-			RoutingRule policy = index == attempts ? RoutingRule.FINAL_TIER : RoutingRule.REJECT_ON_ANY_FAIL;
+			Jury jury = index == attempts ? countingLeaf(lastCalls) : returning(leaf("pass"));
+			RoutingRule policy = index == attempts ? RoutingRule.FINAL_TIER : RoutingRule.STOP_ON_ANY_OPINION_FAIL;
 			builder.tier("tier-" + index, jury, policy);
 		}
 		return builder.build();
@@ -465,27 +456,25 @@ class CompositeResultContractTest {
 		return Verdict.single("leaf", booleanPass(reasoning));
 	}
 
-	private static Jury<CompletionEvidence> countingLeaf(AtomicInteger calls) {
+	private static Jury countingLeaf(AtomicInteger calls) {
 		return jury(() -> {
 			calls.incrementAndGet();
 			return leaf("counted");
 		});
 	}
 
-	private static NamedJury<CompletionEvidence> metaMember(String name, int index, int failureIndex,
-			AtomicInteger calls) {
-		return new NamedJury<CompletionEvidence>(name,
-				index == failureIndex ? countedThrowing(calls) : countedReturning(calls));
+	private static NamedJury metaMember(String name, int index, int failureIndex, AtomicInteger calls) {
+		return new NamedJury(name, index == failureIndex ? countedThrowing(calls) : countedReturning(calls));
 	}
 
-	private static Jury<CompletionEvidence> countedReturning(AtomicInteger calls) {
+	private static Jury countedReturning(AtomicInteger calls) {
 		return jury(() -> {
 			calls.incrementAndGet();
 			return leaf("returned");
 		});
 	}
 
-	private static Jury<CompletionEvidence> countedThrowing(AtomicInteger calls) {
+	private static Jury countedThrowing(AtomicInteger calls) {
 		return jury(() -> {
 			calls.incrementAndGet();
 			throw new IllegalStateException("failed");
@@ -507,26 +496,26 @@ class CompositeResultContractTest {
 		};
 	}
 
-	private static Jury<CompletionEvidence> returning(Verdict verdict) {
+	private static Jury returning(Verdict verdict) {
 		return jury(() -> verdict);
 	}
 
-	private static Jury<CompletionEvidence> throwing(RuntimeException failure) {
+	private static Jury throwing(RuntimeException failure) {
 		return jury(() -> {
 			throw failure;
 		});
 	}
 
-	private static Jury<CompletionEvidence> throwingError(Error failure) {
+	private static Jury throwingError(Error failure) {
 		return jury(() -> {
 			throw failure;
 		});
 	}
 
-	private static Jury<CompletionEvidence> jury(java.util.function.Supplier<Verdict> vote) {
-		return new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
+	private static Jury jury(java.util.function.Supplier<Verdict> vote) {
+		return new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
-			public List<Judge<CompletionEvidence>> getJudges() {
+			public List<Judge> getJudges() {
 				return List.of();
 			}
 
@@ -536,7 +525,7 @@ class CompositeResultContractTest {
 			}
 
 			@Override
-			public Verdict vote(CompletionEvidence context) {
+			public Verdict vote() {
 				return vote.get();
 			}
 		};

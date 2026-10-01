@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.langchain4j;
 
 import io.github.markpollack.judge.completion.CompletionEvidence;
@@ -39,7 +44,7 @@ public final class LangChain4jEvaluator {
 	 * @return the judgment
 	 */
 	public static <T> Judgment evaluate(String goal, Function<String, Result<T>> serviceCall,
-			Judge<CompletionEvidence> judge) {
+			java.util.function.Function<CompletionEvidence, Judge> judge) {
 		return evaluate(goal, serviceCall, judge, Map.of());
 	}
 
@@ -54,8 +59,10 @@ public final class LangChain4jEvaluator {
 	 * @return the judgment
 	 */
 	public static <T> Judgment evaluate(String goal, Function<String, Result<T>> serviceCall,
-			Judge<CompletionEvidence> judge, Map<String, Object> extraMetadata) {
-		return judge.judge(LangChain4jCompletionEvidenceBuilder.execute(goal, serviceCall, extraMetadata));
+			java.util.function.Function<CompletionEvidence, Judge> judge, Map<String, Object> extraMetadata) {
+		return java.util.Objects
+			.requireNonNull(judge.apply(LangChain4jCompletionEvidenceBuilder.execute(goal, serviceCall, extraMetadata)))
+			.judge();
 	}
 
 	/**
@@ -66,9 +73,9 @@ public final class LangChain4jEvaluator {
 	 * @param jury the jury to evaluate the result
 	 * @return the verdict
 	 */
-	public static <T> Verdict evaluate(String goal, Function<String, Result<T>> serviceCall,
-			Jury<CompletionEvidence> jury) {
-		return evaluate(goal, serviceCall, jury, Map.of());
+	public static <T> Verdict evaluateJury(String goal, Function<String, Result<T>> serviceCall,
+			java.util.function.Function<CompletionEvidence, Jury> jury) {
+		return evaluateJury(goal, serviceCall, jury, Map.of());
 	}
 
 	/**
@@ -81,9 +88,11 @@ public final class LangChain4jEvaluator {
 	 * @param extraMetadata additional metadata to attach
 	 * @return the verdict
 	 */
-	public static <T> Verdict evaluate(String goal, Function<String, Result<T>> serviceCall,
-			Jury<CompletionEvidence> jury, Map<String, Object> extraMetadata) {
-		return jury.vote(LangChain4jCompletionEvidenceBuilder.execute(goal, serviceCall, extraMetadata));
+	public static <T> Verdict evaluateJury(String goal, Function<String, Result<T>> serviceCall,
+			java.util.function.Function<CompletionEvidence, Jury> jury, Map<String, Object> extraMetadata) {
+		return java.util.Objects
+			.requireNonNull(jury.apply(LangChain4jCompletionEvidenceBuilder.execute(goal, serviceCall, extraMetadata)))
+			.vote();
 	}
 
 }

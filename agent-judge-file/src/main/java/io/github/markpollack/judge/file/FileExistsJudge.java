@@ -37,14 +37,16 @@ public class FileExistsJudge extends DeterministicJudge<Path> {
 	/**
 	 * Create a file-existence judge.
 	 * @param filePath path relative to the judgment workspace
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public FileExistsJudge(String filePath) {
-		super("FileExistsJudge", "Verifies that file exists at path: " + filePath);
+	public FileExistsJudge(java.util.function.Supplier<? extends Path> source, String filePath) {
+		super(source, "FileExistsJudge", "Verifies that file exists at path: " + filePath);
 		this.filePath = filePath;
 	}
 
 	@Override
-	public Judgment judge(Path evidence) {
+	protected Judgment evaluate(Path evidence) {
 		Path workspace = evidence.toAbsolutePath().normalize();
 		Path targetFile = workspace.resolve(filePath).toAbsolutePath().normalize();
 
@@ -82,6 +84,16 @@ public class FileExistsJudge extends DeterministicJudge<Path> {
 		return (isFile ? Judgment.builder().pass() : Judgment.builder().fail()).reasoning(reason)
 			.check(isFile ? Check.pass("file_exists", "File found at " + filePath) : Check.fail("file_exists", reason))
 			.build();
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @param filePath producer configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<Path> builder(String filePath) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new FileExistsJudge(source, filePath));
 	}
 
 }

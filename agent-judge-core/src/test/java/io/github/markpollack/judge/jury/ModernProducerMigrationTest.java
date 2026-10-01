@@ -82,18 +82,18 @@ class ModernProducerMigrationTest {
 		assertThat(original.metadata()).containsOnlyKeys("elapsedMillis");
 		assertThat(enriched.metadata()).containsEntry("trace", List.of("a", "b"));
 		assertThat(attached.metadata()).containsKey(Judgment.AGGREGATION_KEY);
-		assertThat(Judges.named(context -> original, "named").judge(CONTEXT)).isSameAs(original);
+		assertThat(Judges.named(() -> original, "named").judge()).isSameAs(original);
 	}
 
 	@Test
 	void multiSeatAggregationRetainsCompleteInputsWithoutInheritingNativeSupport() {
 		Judgment original = rich();
-		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> original, "negative"))
-			.judge(Judges.named(context -> Judgment.pass("other"), "positive"))
+		Verdict verdict = SimpleJury.builder()
+			.judge(Judges.named(() -> original, "negative"))
+			.judge(Judges.named(() -> Judgment.pass("other"), "positive"))
 			.votingStrategy(new ConsensusStrategy())
 			.build()
-			.vote(CONTEXT);
+			.vote();
 		assertThat(verdict.individual().get(0)).isSameAs(original);
 		assertThat(verdict.individualByName().get("negative")).isSameAs(original);
 		assertThat(verdict.judgment().confidence()).isNull();

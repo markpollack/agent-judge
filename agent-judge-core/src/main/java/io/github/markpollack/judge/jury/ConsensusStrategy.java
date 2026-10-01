@@ -89,7 +89,7 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * <p>
  * Note this is independent of {@link CascadedJury} escalation, which inspects a tier's
  * <em>individual</em> judgments rather than its aggregate. A tier using
- * {@link RoutingRule#ACCEPT_ON_ALL_PASS} still escalates when any judge abstains.
+ * {@link RoutingRule#STOP_ON_ALL_OPINIONS_PASS} still escalates when any judge abstains.
  * </p>
  *
  * <p>
@@ -128,6 +128,7 @@ public class ConsensusStrategy implements VotingStrategy {
 	 * @param errorPolicy policy for handling errors
 	 * @param notApplicablePolicy policy for handling excluded judgments
 	 * @throws IllegalArgumentException if either policy is null
+	 *
 	 * @since 0.17.0
 	 */
 	public ConsensusStrategy(ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
@@ -198,6 +199,7 @@ public class ConsensusStrategy implements VotingStrategy {
 	/**
 	 * Declares both policies. This strategy has no threshold.
 	 * @return the declared description
+	 *
 	 * @since 0.17.0
 	 */
 	@Override

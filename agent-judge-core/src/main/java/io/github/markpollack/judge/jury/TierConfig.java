@@ -10,14 +10,13 @@ import java.util.Objects;
 /**
  * Configuration for a single tier within a {@link CascadedJury}.
  *
- * @param <E> evidence type
  * @param name human-readable tier name for diagnostics (e.g., "deterministic")
  * @param jury the jury implementation for this tier
  * @param routingRule cascade control flow routingRule
  * @author Mark Pollack
  * @since 0.9.0
  */
-public record TierConfig<E>(String name, Jury<E> jury, RoutingRule routingRule) {
+public record TierConfig(String name, Jury jury, RoutingRule routingRule) {
 
 	/** Validate all tier components. */
 	public TierConfig {

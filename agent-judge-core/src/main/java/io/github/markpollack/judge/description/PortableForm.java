@@ -129,6 +129,11 @@ final class PortableForm {
 			case CascadedJuryDescription cascaded -> cascaded.portableTree();
 			case MetaJuryDescription meta -> meta.portableTree();
 			case OpaqueJuryDescription opaque -> opaque.portableTree();
+			default -> {
+				var tree = new LinkedHashMap<>(description.toPortable());
+				tree.remove(DESCRIPTION_VERSION);
+				yield tree;
+			}
 		};
 	}
 

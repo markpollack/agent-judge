@@ -17,6 +17,7 @@ public record EvaluationResult(Verdict verdict, PolicyResult policyResult) {
 	/** Reject absent or unusable records. */
 	public EvaluationResult {
 		Objects.requireNonNull(verdict, "verdict").conclusion();
+		io.github.markpollack.judge.jury.InvocationRecords.of(verdict);
 		Objects.requireNonNull(policyResult, "policyResult");
 	}
 }

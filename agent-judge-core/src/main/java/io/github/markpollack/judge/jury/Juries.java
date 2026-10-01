@@ -47,7 +47,6 @@ public final class Juries {
 	 * names are detected, suffixes "-2", "-3", etc. are added deterministically to ensure
 	 * uniqueness.
 	 * </p>
-	 * @param <E> evidence type
 	 * @param strategy the voting strategy
 	 * @param judges the judges to include
 	 * @return a simple jury with named judges
@@ -55,17 +54,17 @@ public final class Juries {
 	 * cannot be read because its {@code metadata()} returns null or throws; the message
 	 * names the position
 	 */
-	public static <E> VotingJury<E> fromJudges(VotingStrategy strategy, Judge<E>... judges) {
+	public static VotingJury fromJudges(VotingStrategy strategy, Judge... judges) {
 		if (judges == null || judges.length == 0) {
 			throw new IllegalArgumentException("At least one judge is required");
 		}
 
-		SimpleJury.Builder<E> builder = SimpleJury.<E>builder().votingStrategy(strategy);
+		SimpleJury.Builder builder = SimpleJury.builder().votingStrategy(strategy);
 
 		Map<String, Integer> nameCount = new HashMap<>();
 
 		for (int i = 0; i < judges.length; i++) {
-			Judge<E> judge = judges[i];
+			Judge judge = judges[i];
 			// Names are needed now to break collisions, so unreadable metadata is a
 			// construction
 			// error here rather than an ERROR seat at vote time.
@@ -101,7 +100,6 @@ public final class Juries {
 
 	/**
 	 * Combine two juries into a meta-jury.
-	 * @param <E> evidence type
 	 * @param first the first jury
 	 * @param second the second jury
 	 * @param metaStrategy the voting strategy for aggregating jury verdicts
@@ -109,45 +107,43 @@ public final class Juries {
 	 * @deprecated use {@link #meta(VotingStrategy, NamedJury...)} with explicit names
 	 */
 	@Deprecated(since = "0.14.0")
-	public static <E> VotingJury<E> combine(Jury<E> first, Jury<E> second, VotingStrategy metaStrategy) {
+	public static VotingJury combine(Jury first, Jury second, VotingStrategy metaStrategy) {
 		if (first == null || second == null) {
 			throw new IllegalArgumentException("Both juries must be non-null");
 		}
-		return meta(metaStrategy, new NamedJury<E>("member-1", first), new NamedJury<E>("member-2", second));
+		return meta(metaStrategy, new NamedJury("member-1", first), new NamedJury("member-2", second));
 	}
 
 	/**
 	 * Create a meta-jury from multiple juries.
-	 * @param <E> evidence type
 	 * @param strategy the voting strategy for aggregating jury verdicts
 	 * @param juries the juries to combine
 	 * @return a meta-jury combining all juries
 	 * @deprecated use {@link #meta(VotingStrategy, NamedJury...)} with explicit names
 	 */
 	@Deprecated(since = "0.14.0")
-	public static <E> VotingJury<E> allOf(VotingStrategy strategy, Jury<E>... juries) {
+	public static VotingJury allOf(VotingStrategy strategy, Jury... juries) {
 		if (juries == null || juries.length == 0) {
 			throw new IllegalArgumentException("At least one jury is required");
 		}
-		List<NamedJury<E>> members = new java.util.ArrayList<>();
+		List<NamedJury> members = new java.util.ArrayList<>();
 		for (int index = 0; index < juries.length; index++) {
-			members.add(new NamedJury<E>("member-" + (index + 1), juries[index]));
+			members.add(new NamedJury("member-" + (index + 1), juries[index]));
 		}
-		return new MetaJury<E>(members, strategy);
+		return new MetaJury(members, strategy);
 	}
 
 	/**
 	 * Create a meta-jury from explicitly named members.
-	 * @param <E> evidence type
 	 * @param strategy strategy that aggregates successful member aggregates
 	 * @param members named members in execution order
 	 * @return configured named meta-jury
 	 */
-	public static <E> VotingJury<E> meta(VotingStrategy strategy, NamedJury<E>... members) {
+	public static VotingJury meta(VotingStrategy strategy, NamedJury... members) {
 		if (members == null || members.length == 0) {
 			throw new IllegalArgumentException("At least one named jury is required");
 		}
-		return new MetaJury<E>(List.of(members), strategy);
+		return new MetaJury(List.of(members), strategy);
 	}
 
 }

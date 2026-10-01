@@ -14,8 +14,8 @@ package io.github.markpollack.judge;
  * </p>
  *
  * <p>
- * Subclasses implement the {@link Judge#judge(Object)} method for their evidence type
- * with their specific evaluation logic.
+ * Subclasses implement the {@link Judge#judge()} method for their evidence type with
+ * their specific evaluation logic.
  * </p>
  *
  * <p>
@@ -37,19 +37,40 @@ package io.github.markpollack.judge;
  * @author Mark Pollack
  * @since 0.1.0
  */
-public abstract class DeterministicJudge<E> implements io.github.markpollack.judge.JudgeWithMetadata<E> {
+public abstract class DeterministicJudge<E> implements io.github.markpollack.judge.JudgeWithMetadata {
 
 	private final JudgeMetadata metadata;
+
+	private final java.util.function.Supplier<? extends E> evidence;
 
 	/**
 	 * Create a deterministic judge with discoverable metadata.
 	 * @param name judge name
 	 * @param description human-readable purpose
+	 * @param evidence fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	protected DeterministicJudge(String name, String description) {
+	protected DeterministicJudge(java.util.function.Supplier<? extends E> evidence, String name, String description) {
+		this.evidence = java.util.Objects.requireNonNull(evidence);
 		// No exclusion capability: a deterministic judge that cannot evaluate abstains.
 		this.metadata = new JudgeMetadata(name, description, JudgeType.DETERMINISTIC);
 	}
+
+	/**
+	 * Executes with one freshly acquired real evidence snapshot.
+	 * @return original judgment
+	 */
+	@Override
+	public final io.github.markpollack.judge.judgment.Judgment judge() {
+		return evaluate(java.util.Objects.requireNonNull(evidence.get(), "acquired evidence"));
+	}
+
+	/**
+	 * Evaluates the configured snapshot.
+	 * @param evidence actual evidence
+	 * @return judgment
+	 */
+	protected abstract io.github.markpollack.judge.judgment.Judgment evaluate(E evidence);
 
 	/**
 	 * Get metadata for this judge.

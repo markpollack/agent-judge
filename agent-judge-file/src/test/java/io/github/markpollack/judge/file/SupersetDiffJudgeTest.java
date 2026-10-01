@@ -26,7 +26,8 @@ class SupersetDiffJudgeTest {
 	@TempDir
 	Path referenceDir;
 
-	private final SupersetDiffJudge judge = new SupersetDiffJudge();
+	private final io.github.markpollack.judge.construction.EvidenceStep<DirectoryComparison> judge = SupersetDiffJudge
+		.builder();
 
 	@Test
 	void passesWhenWorkspaceMatchesReference() throws IOException {
@@ -35,7 +36,7 @@ class SupersetDiffJudgeTest {
 		writeFile(workspace, "src/Main.java", "public class Main {}");
 		writeFile(workspace, "pom.xml", "<project/>");
 
-		Judgment judgment = judge.judge(contextWithReference(referenceDir));
+		Judgment judgment = judge.evidence(contextWithReference(referenceDir)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.checks()).hasSize(2);
@@ -51,7 +52,7 @@ class SupersetDiffJudgeTest {
 		writeFile(workspace, "src/Extra.java", "public class Extra {}");
 		writeFile(workspace, "README.md", "# Hello");
 
-		Judgment judgment = judge.judge(contextWithReference(referenceDir));
+		Judgment judgment = judge.evidence(contextWithReference(referenceDir)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.checks()).hasSize(1);
@@ -64,7 +65,7 @@ class SupersetDiffJudgeTest {
 		writeFile(referenceDir, "pom.xml", "<project/>");
 		writeFile(workspace, "pom.xml", "<project/>");
 
-		Judgment judgment = judge.judge(contextWithReference(referenceDir));
+		Judgment judgment = judge.evidence(contextWithReference(referenceDir)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.reasoning()).contains("1 of 2");
@@ -82,7 +83,7 @@ class SupersetDiffJudgeTest {
 		writeFile(referenceDir, "src/Main.java", "public class Main {}");
 		writeFile(workspace, "src/Main.java", "public class Main { int x; }");
 
-		Judgment judgment = judge.judge(contextWithReference(referenceDir));
+		Judgment judgment = judge.evidence(contextWithReference(referenceDir)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertScore(judgment, 0.0);
@@ -101,7 +102,7 @@ class SupersetDiffJudgeTest {
 		writeFile(workspace, "b.txt", "WRONG");
 		// c.txt missing
 
-		Judgment judgment = judge.judge(contextWithReference(referenceDir));
+		Judgment judgment = judge.evidence(contextWithReference(referenceDir)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.reasoning()).contains("1 of 3");
@@ -116,9 +117,10 @@ class SupersetDiffJudgeTest {
 		writeFile(workspace, "src/Main.java", "public class Main {}");
 		// .mvn/ and mvnw not in workspace — should be excluded
 
-		SupersetDiffJudge judgeWithExcludes = new SupersetDiffJudge(Set.of(".mvn/", "mvnw"));
+		io.github.markpollack.judge.construction.EvidenceStep<DirectoryComparison> judgeWithExcludes = SupersetDiffJudge
+			.builder(Set.of(".mvn/", "mvnw"));
 
-		Judgment judgment = judgeWithExcludes.judge(contextWithReference(referenceDir));
+		Judgment judgment = judgeWithExcludes.evidence(contextWithReference(referenceDir)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.checks()).hasSize(1);
@@ -128,7 +130,7 @@ class SupersetDiffJudgeTest {
 	void abstainWhenReferenceDirDoesNotExist() {
 		Path nonexistent = workspace.resolve("nonexistent-ref");
 
-		Judgment judgment = judge.judge(contextWithReference(nonexistent));
+		Judgment judgment = judge.evidence(contextWithReference(nonexistent)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(judgment.reasoning()).contains("does not exist");
@@ -137,7 +139,7 @@ class SupersetDiffJudgeTest {
 	@Test
 	void abstainWhenReferenceDirIsEmpty() throws IOException {
 		// referenceDir exists but has no files
-		Judgment judgment = judge.judge(contextWithReference(referenceDir));
+		Judgment judgment = judge.evidence(contextWithReference(referenceDir)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(judgment.reasoning()).contains("No files");
@@ -150,7 +152,7 @@ class SupersetDiffJudgeTest {
 		writeFile(workspace, "src/main/java/com/example/App.java", "class App {}");
 		writeFile(workspace, "src/main/resources/application.properties", "server.port=8080");
 
-		Judgment judgment = judge.judge(contextWithReference(referenceDir));
+		Judgment judgment = judge.evidence(contextWithReference(referenceDir)).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.checks()).hasSize(2);
@@ -163,7 +165,7 @@ class SupersetDiffJudgeTest {
 
 		DirectoryComparison context = new DirectoryComparison(referenceDir, workspace);
 
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 	}
@@ -175,7 +177,7 @@ class SupersetDiffJudgeTest {
 		writeFile(workspace, "a.txt", "aaa");
 		writeFile(workspace, "b.txt", "bbb");
 
-		Judgment judgment = judge.judge(contextWithReference(referenceDir));
+		Judgment judgment = judge.evidence(contextWithReference(referenceDir)).build().judge();
 
 		assertThat(judgment.metadata()).containsKey("expectedDir");
 		assertThat(judgment.metadata().get("matchedFiles")).isEqualTo(2);
@@ -184,9 +186,15 @@ class SupersetDiffJudgeTest {
 
 	@Test
 	void hasCorrectMetadata() {
-		assertThat(judge.metadata().name()).isEqualTo("SupersetDiffJudge");
-		assertThat(judge.metadata().description()).contains("superset");
-		assertThat(judge.metadata().type()).isEqualTo(JudgeType.DETERMINISTIC);
+		assertThat(((io.github.markpollack.judge.JudgeWithMetadata) judge
+			.evidence(new DirectoryComparison(workspace, workspace))
+			.build()).metadata().name()).isEqualTo("SupersetDiffJudge");
+		assertThat(((io.github.markpollack.judge.JudgeWithMetadata) judge
+			.evidence(new DirectoryComparison(workspace, workspace))
+			.build()).metadata().description()).contains("superset");
+		assertThat(((io.github.markpollack.judge.JudgeWithMetadata) judge
+			.evidence(new DirectoryComparison(workspace, workspace))
+			.build()).metadata().type()).isEqualTo(JudgeType.DETERMINISTIC);
 	}
 
 	// ==================== Helpers ====================

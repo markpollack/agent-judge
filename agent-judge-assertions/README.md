@@ -1,19 +1,24 @@
 # Retained requirement assertions
 
-Core's `Evaluations` invokes a Judge or Jury and optionally applies a `Policy` to its complete Verdict. `RequirementAssertions` only inspects the retained `EvaluationResult`:
+Core executes configured producers and optionally applies an independent Policy. This module only inspects retained evaluations:
 
 ```java
-Requirement<String> requirement = Requirement.text("ready", "1", "READY");
-RequirementJudge<String, String> judge = (actual, evidence) -> actual.specification().equals(evidence)
-    ? Judgment.pass("matches") : Judgment.fail("differs");
-EvaluationResult result = Evaluations.evaluate(requirement, judge, "READY");
-RequirementAssertions.requireSatisfied(result);
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.requirement.Requirement;
+import io.github.markpollack.judge.evaluation.Evaluations;
+import io.github.markpollack.judge.assertions.RequirementAssertions;
+
+var actual = Requirement.text("ready", "1", "READY");
+// Retained values from an explicitly requirement-bound evaluation.
+var original = Judgment.pass("READY observed").forRequirement(actual);
+var retained = Verdict.single("ready", original).forRequirement(actual);
+var evaluated = Evaluations.of(retained);
+RequirementAssertions.requireSatisfied(evaluated);
 ```
 
-The overload with a final `Policy` requests policy execution. Omitting it means `NotRequested`, without an implicit decision. The other policy results are `Decided(originalDecision)` and `Failed(originalThrowable)`; there is no skipped state. Every usable conclusion reaches a requested policy. Invalid configuration and unusable stored records throw without creating an evaluation.
+`requireSatisfied(result)` additionally requires an actual Requirement association, PASS, and either no requested policy or RELY. An ordinary rule-only Judge supplies no invented Requirement. `RequirementAssertionError.result()` retains the complete unchanged evaluation, with an original failed-policy exception as its cause.
 
-Satisfaction requires an associated Requirement, a PASS conclusion, and either no requested policy or a RELY decision. A requested policy failure prevents success. RELY on a negative result remains rejection. `RequirementAssertionError.result()` retains the complete unchanged result, and a policy failure retains its original exception as the cause. ERROR, abstention, non-applicability, and failed attempts remain inspectable in domain records.
+Policy results are NotRequested, Decided(originalDecision) and Failed(originalThrowable). Every usable conclusion reaches a requested policy; invalid records fail before policy execution. RELY preserves a negative conclusion. Requirements contain no evaluators or policies.
 
-Use `Evaluations.evaluate(Judge<E>, E)` for ordinary checks and the sibling `RequirementJudge<S,E>`/`RequirementJury<S,E>` overloads when supplying a requirement. Requirements never carry policies or execution configuration. A Jury always retains its complete Verdict.
-
-Repeated assertions and `VerdictReport` inspection invoke nothing. The [AssertJ integration](../agent-judge-assertj/README.md) adds staged execution and caches a completed fluent stage. [Storage](../portable-results-v4.md) is independent of assertions. Tests use local fixtures; the conference runner remains separately invoked and requires explicit credentials. Frozen fixture vocabulary is translated only by the test loader.
+Repeated retained assertions and reports execute nothing. The [AssertJ integration](../agent-judge-assertj/README.md) provides typed construction and cached live terminals. Tests use local recorded fixtures; the separately invoked conference runner requires explicit credentials and is not part of verification.

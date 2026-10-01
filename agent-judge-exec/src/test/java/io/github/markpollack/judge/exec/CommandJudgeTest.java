@@ -28,8 +28,8 @@ class CommandJudgeTest {
 		Files.writeString(testFile, "test content");
 
 		// Command that should succeed (list files)
-		CommandJudge judge = new CommandJudge("ls test.txt");
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = CommandJudge.builder("ls test.txt");
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 		assertThat(judgment.reasoning()).contains("succeeded").contains("exit code 0");
@@ -44,8 +44,9 @@ class CommandJudgeTest {
 	@Test
 	void failingCommandFailsJudgment() {
 		// Command that should fail (non-existent command)
-		CommandJudge judge = new CommandJudge("nonexistentcommand123");
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = CommandJudge
+			.builder("nonexistentcommand123");
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.checks()).hasSize(1);
@@ -54,11 +55,12 @@ class CommandJudgeTest {
 
 	@Test
 	void executionFailureProducesErrorRatherThanFail() {
-		CommandJudge judge = new CommandJudge("echo never-runs", 0, Duration.ofSeconds(5), path -> {
-			throw new IllegalStateException("sandbox unavailable");
-		});
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = CommandJudge.builder("echo never-runs", 0,
+				Duration.ofSeconds(5), path -> {
+					throw new IllegalStateException("sandbox unavailable");
+				});
 
-		Judgment judgment = judge.judge(createContext());
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).contains("sandbox unavailable");
@@ -72,8 +74,9 @@ class CommandJudgeTest {
 	@Test
 	void customExitCodeJudgment() {
 		// Command that exits with code 1 (grep with no match)
-		CommandJudge judge = new CommandJudge("grep 'nonexistent' /dev/null", 1, Duration.ofSeconds(5));
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = CommandJudge
+			.builder("grep 'nonexistent' /dev/null", 1, Duration.ofSeconds(5));
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isTrue(); // Expects exit code 1
 		assertThat(judgment.metadata()).containsEntry("expectedExitCode", 1).containsEntry("exitCode", 1);
@@ -85,8 +88,8 @@ class CommandJudgeTest {
 		Path testFile = tempDir.resolve("output.txt");
 		Files.writeString(testFile, "Hello Judge");
 
-		CommandJudge judge = new CommandJudge("cat output.txt");
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = CommandJudge.builder("cat output.txt");
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 		assertThat(judgment.metadata()).containsKey("output");
@@ -95,8 +98,9 @@ class CommandJudgeTest {
 
 	@Test
 	void metadataIncludesCommandDetails() {
-		CommandJudge judge = new CommandJudge("echo 'test'", 0, Duration.ofSeconds(10));
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = CommandJudge.builder("echo 'test'", 0,
+				Duration.ofSeconds(10));
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.metadata()).containsEntry("command", "echo 'test'")
 			.containsEntry("expectedExitCode", 0)
@@ -105,7 +109,7 @@ class CommandJudgeTest {
 			.containsKey("elapsedMillis");
 		assertThat(judgment.metadata().get("elapsedMillis"))
 			.as("timing is a portable integer, not an ISO-8601 rendering of a Duration")
-			.isInstanceOf(Long.class);
+			.isInstanceOf(Integer.class);
 		assertThat(judgment.elapsed()).isNotNull().isGreaterThanOrEqualTo(Duration.ZERO);
 	}
 

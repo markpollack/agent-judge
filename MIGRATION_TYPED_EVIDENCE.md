@@ -1,28 +1,22 @@
-# Migrating to the 0.18 domain API
+# Configured execution migration
 
-This candidate deliberately revises the earlier 0.18 API. There are no deprecated Java aliases. Current typed storage uses [schemaVersion 4](portable-results-v4.md); V2/V3 are explicitly refused. Historical unversioned diagnostics remain separate.
+API compatibility is not required for the 0.18 source line. Configure real inputs before obtaining a ready producer.
 
-| Earlier surface | Current API |
+| Previous API | Current construction/execution |
 |---|---|
-| `Judge<RequirementEvidence<S,E>>` | `RequirementJudge<S,E>.judge(Requirement<S>,E)` |
-| Requirement-aware Jury encoded as a Judge | `RequirementJury<S,E>.vote(Requirement<S>,E)` returning a full Verdict |
-| Requirement-bound rendering | `JevJudge.rendering(Function<S,String>)`; actual requirement supplied per call |
-| `AcceptancePolicy.decide(Judgment)` | `Policy.decide(Verdict)` |
-| AcceptanceDecision / AcceptanceAction | PolicyDecision / PolicyAction |
-| AppliedPolicy / PolicyApplication on Judgment | Verdict-level `PolicyResult`: NotRequested, Decided, Failed |
-| AssertionResult / AcceptanceExecution | Core `EvaluationResult(Verdict, PolicyResult)` |
-| Public Interpretation / reading outcome | Derived `Verdict.conclusion()`; read-only `VerdictReport` |
-| ErrorPolicy / NotApplicablePolicy / TiePolicy / TierPolicy | ErrorHandling / ExclusionHandling / TieBreakRule / RoutingRule |
-| STOP_ON_RELIED_JUDGMENT | STOP_ON_CONCLUSIVE; application policy runs after composition |
-| `judgedByRequirement` / `withAcceptancePolicy` | `judgedBy(RequirementJudge or RequirementJury)` / `withPolicy` |
-| Default RELY, nullable override | No policy requested unless explicitly supplied; no trailing null |
-| Repeated fluent terminals reexecute | A completed fluent stage caches its EvaluationResult |
-| Jury exposes nullable voting strategy | VotingJury exposes strategy; CascadedJury exposes tiers; common Jury exposes neither |
+| `Judge<E>.judge(e)` | `Judge.judge()` after typed `.evidence(e).build()` |
+| `Jury<E>.vote(e)` | `Jury.vote()` after configuration |
+| `RequirementJudge<S,E>` | `JudgeRecipe<S,E>.requirement(actual)` → typed evidence → ready Judge |
+| `RequirementJury<S,E>` | `JuryRecipe<S,E>.requirement(actual)` → typed evidence → ready Jury |
+| Unconfigured deterministic constructors | Evidence value/supplier supplied at construction |
+| Native Jev requirement adapter | Actual public Jev/RFC2119/EARS Judge with a typed JevRuntime protocol |
+| Intrinsic Judge exclusion metadata used as permission | Immutable `JudgeSeat.named(...).notApplicableWhen(...)` |
+| `assertThatEvidence(e).judgedBy(j)` | `assertThat(configuredJudgeOrJury)` |
+| Retained `.withPolicy(...)` / `.isSatisfied()` | Explicit `Evaluations.apply(verdict, policy)` / read-only conclusion assertions |
+| AllOf `prepared.vote(e)` | `prepared.evidence(e).build().vote()` |
 
-Requirement remains pure; identity, revision, native specification and source are preserved per Verdict node. All-of specifications own child rosters. `Assignments` owns evaluators and typed evidence selectors; `.validate()` checks complete coverage and freezes the plan before calls. A child Jury retains its entire record.
+A ready ordinary Jury accepts mixed independent requirements/evidence without inventing a shared parent. Explicit AllOf assignments retain complete child Verdicts and validated coverage. Actual Requirements remain pure values; their identity/revision/source/native specification travel on original Judgments.
 
-Packages now separate `judgment`, `requirement`, `jury`, `policy`, `evaluation`, `reporting`, and `serialization`. Historical diagnostic types live under `serialization.diagnostics`; they are not domain conclusion objects. The earlier `result` package and `JudgeSpec` remain removed; concrete filesystem judges live in `agent-judge-file`.
+Generated native rosters retain one investigative call for the whole roster. Typed structured rosters require real common or per-requirement evidence and report one execution per item. Names identify seats; requirement ids identify inputs. Neither is reconstructed from naming conventions.
 
-Typed evidence remains specific to each family: `Path`, `FileComparison`, `DirectoryComparison`, `CoverageComparison`, `RagEvidence`, `CompletionEvidence`, `AgentExecutionEvidence`, and `JevEvidence`. `ModelBackedJudge<E>` uses explicit variable rendering. No universal context or required magic metadata replaces these types.
-
-[Executable examples](agent-judge-assertj/src/test/java/io/github/markpollack/judge/assertj/AssertJApiExperienceTest.java) and [package diagrams](domain-model.md) show the current construction and execution grammar. Frozen V2/V3 resources and release notes remain historical evidence, not current examples.
+Retained results use [V5](portable-results-v5.md), with description V3. Current codecs refuse V2/V3/V4. Use `NativeRequirementCodecs.codec()` for exact RFC2119/EARS reconstruction, or register a pure `SpecificationCodec` factory. Frozen artifacts remain unchanged; archival reading uses the baseline code and original semantics.

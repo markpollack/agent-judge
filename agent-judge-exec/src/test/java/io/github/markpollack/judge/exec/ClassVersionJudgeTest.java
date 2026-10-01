@@ -30,13 +30,13 @@ class ClassVersionJudgeTest {
 	@TempDir
 	Path workspace;
 
-	private final ClassVersionJudge judge = new ClassVersionJudge(61);
+	private final io.github.markpollack.judge.construction.EvidenceStep<Path> judge = ClassVersionJudge.builder(61);
 
 	@Test
 	void correctVersionReturnsPass() throws IOException {
 		writeClassFile(workspace.resolve("target/classes/com/example/Foo.class"), 61);
 
-		Judgment judgment = judge.judge(workspace);
+		Judgment judgment = judge.evidence(workspace).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.checks()).hasSize(1);
@@ -47,7 +47,7 @@ class ClassVersionJudgeTest {
 	void wrongVersionReturnsFail() throws IOException {
 		writeClassFile(workspace.resolve("target/classes/com/example/Foo.class"), 55);
 
-		Judgment judgment = judge.judge(workspace);
+		Judgment judgment = judge.evidence(workspace).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.reasoning()).contains("55").contains("61");
@@ -60,7 +60,7 @@ class ClassVersionJudgeTest {
 		writeClassFile(workspace.resolve("target/classes/com/example/Foo.class"), 61);
 		writeClassFile(workspace.resolve("target/classes/com/example/Bar.class"), 61);
 
-		Judgment judgment = judge.judge(workspace);
+		Judgment judgment = judge.evidence(workspace).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.checks()).hasSize(2);
@@ -72,7 +72,7 @@ class ClassVersionJudgeTest {
 		writeClassFile(workspace.resolve("target/classes/com/example/Good.class"), 61);
 		writeClassFile(workspace.resolve("target/classes/com/example/Bad.class"), 52);
 
-		Judgment judgment = judge.judge(workspace);
+		Judgment judgment = judge.evidence(workspace).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.reasoning()).contains("1 of 2");
@@ -82,14 +82,14 @@ class ClassVersionJudgeTest {
 	void noClassFilesReturnsAbstain() throws IOException {
 		Files.createDirectories(workspace.resolve("target/classes"));
 
-		Judgment judgment = judge.judge(workspace);
+		Judgment judgment = judge.evidence(workspace).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 	}
 
 	@Test
 	void noTargetClassesDirReturnsAbstain() {
-		Judgment judgment = judge.judge(workspace);
+		Judgment judgment = judge.evidence(workspace).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(judgment.reasoning()).contains("No target/classes");
@@ -103,7 +103,7 @@ class ClassVersionJudgeTest {
 		Files.write(classes.resolve("Truncated.class"), new byte[] { (byte) 0xca, (byte) 0xfe });
 		Files.write(classes.resolve("Invalid.class"), new byte[] { 0, 0, 0, 0, 0, 0, 0, 61 });
 
-		Judgment judgment = judge.judge(workspace);
+		Judgment judgment = judge.evidence(workspace).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.finding()).isNull();

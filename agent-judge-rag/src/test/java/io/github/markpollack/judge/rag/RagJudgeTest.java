@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.rag;
 
 import io.github.markpollack.judge.JudgeMetadata;
@@ -22,7 +27,8 @@ class RagJudgeTest {
 
 	@Test
 	void faithfulnessJudgeShouldHaveCorrectMetadata() {
-		FaithfulnessJudge judge = new FaithfulnessJudge(null);
+		FaithfulnessJudge judge = new FaithfulnessJudge(() -> new RagEvidence("parsing fixture", "context", "answer"),
+				null);
 		JudgeMetadata metadata = judge.metadata();
 		assertThat(metadata.name()).isEqualTo("Faithfulness");
 		assertThat(metadata.type()).isEqualTo(JudgeType.LLM_POWERED);
@@ -30,7 +36,8 @@ class RagJudgeTest {
 
 	@Test
 	void faithfulnessJudgeShouldBuildPromptWithRagTriple() {
-		FaithfulnessJudge judge = new FaithfulnessJudge(null);
+		FaithfulnessJudge judge = new FaithfulnessJudge(() -> new RagEvidence("parsing fixture", "context", "answer"),
+				null);
 		RagEvidence ctx = ragContext("What is Java?", "Java is a programming language.", "Java is a language.");
 
 		String prompt = judge.buildPrompt(ctx);
@@ -44,7 +51,8 @@ class RagJudgeTest {
 
 	@Test
 	void faithfulnessJudgeShouldParseYesResponse() {
-		FaithfulnessJudge judge = new FaithfulnessJudge(null);
+		FaithfulnessJudge judge = new FaithfulnessJudge(() -> new RagEvidence("parsing fixture", "context", "answer"),
+				null);
 		RagEvidence ctx = ragContext("q", "c", "a");
 
 		Judgment result = judge.parseResponse("Answer: YES\nReasoning: All claims are supported by context.", ctx);
@@ -55,7 +63,8 @@ class RagJudgeTest {
 
 	@Test
 	void faithfulnessJudgeShouldParseNoResponse() {
-		FaithfulnessJudge judge = new FaithfulnessJudge(null);
+		FaithfulnessJudge judge = new FaithfulnessJudge(() -> new RagEvidence("parsing fixture", "context", "answer"),
+				null);
 		RagEvidence ctx = ragContext("q", "c", "a");
 
 		Judgment result = judge.parseResponse(
@@ -67,7 +76,8 @@ class RagJudgeTest {
 
 	@Test
 	void faithfulnessJudgeShouldAbstainOnUnparseableResponse() {
-		FaithfulnessJudge judge = new FaithfulnessJudge(null);
+		FaithfulnessJudge judge = new FaithfulnessJudge(() -> new RagEvidence("parsing fixture", "context", "answer"),
+				null);
 		RagEvidence ctx = ragContext("q", "c", "a");
 
 		Judgment result = judge.parseResponse("I'm not sure what to say here.", ctx);
@@ -78,7 +88,8 @@ class RagJudgeTest {
 
 	@Test
 	void faithfulnessJudgeShouldNotFalsePassOnNoWithYesInReasoning() {
-		FaithfulnessJudge judge = new FaithfulnessJudge(null);
+		FaithfulnessJudge judge = new FaithfulnessJudge(() -> new RagEvidence("parsing fixture", "context", "answer"),
+				null);
 		RagEvidence ctx = ragContext("q", "c", "a");
 
 		Judgment result = judge.parseResponse(
@@ -89,10 +100,11 @@ class RagJudgeTest {
 
 	@Test
 	void faithfulnessJudgeShouldAbstainOnEmptyContext() {
-		FaithfulnessJudge judge = new FaithfulnessJudge(null);
+		FaithfulnessJudge judge = new FaithfulnessJudge(() -> new RagEvidence("parsing fixture", "context", "answer"),
+				null);
 		RagEvidence ctx = new RagEvidence("What is Java?", "", "Java is a language");
 
-		Judgment result = judge.judge(ctx);
+		Judgment result = judge.evaluate(ctx);
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.reasoning()).contains("No context");
@@ -100,10 +112,11 @@ class RagJudgeTest {
 
 	@Test
 	void faithfulnessJudgeShouldAbstainOnEmptyAnswer() {
-		FaithfulnessJudge judge = new FaithfulnessJudge(null);
+		FaithfulnessJudge judge = new FaithfulnessJudge(() -> new RagEvidence("parsing fixture", "context", "answer"),
+				null);
 		RagEvidence ctx = new RagEvidence("What is Java?", "Java is a programming language", "");
 
-		Judgment result = judge.judge(ctx);
+		Judgment result = judge.evaluate(ctx);
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.reasoning()).contains("No answer");
@@ -113,7 +126,8 @@ class RagJudgeTest {
 
 	@Test
 	void contextualRelevanceJudgeShouldHaveCorrectMetadata() {
-		ContextualRelevanceJudge judge = new ContextualRelevanceJudge(null);
+		ContextualRelevanceJudge judge = new ContextualRelevanceJudge(
+				() -> new RagEvidence("parsing fixture", "context", "answer"), null);
 		JudgeMetadata metadata = judge.metadata();
 		assertThat(metadata.name()).isEqualTo("ContextualRelevance");
 		assertThat(metadata.type()).isEqualTo(JudgeType.LLM_POWERED);
@@ -121,7 +135,8 @@ class RagJudgeTest {
 
 	@Test
 	void contextualRelevanceJudgeShouldParseYesResponse() {
-		ContextualRelevanceJudge judge = new ContextualRelevanceJudge(null);
+		ContextualRelevanceJudge judge = new ContextualRelevanceJudge(
+				() -> new RagEvidence("parsing fixture", "context", "answer"), null);
 		RagEvidence ctx = ragContext("q", "c", "a");
 
 		Judgment result = judge.parseResponse("Answer: YES\nReasoning: The context directly addresses the question.",
@@ -132,10 +147,11 @@ class RagJudgeTest {
 
 	@Test
 	void contextualRelevanceJudgeShouldAbstainOnEmptyContext() {
-		ContextualRelevanceJudge judge = new ContextualRelevanceJudge(null);
+		ContextualRelevanceJudge judge = new ContextualRelevanceJudge(
+				() -> new RagEvidence("parsing fixture", "context", "answer"), null);
 		RagEvidence ctx = new RagEvidence("What is Spring Boot?", "", "");
 
-		Judgment result = judge.judge(ctx);
+		Judgment result = judge.evaluate(ctx);
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 	}
@@ -144,7 +160,8 @@ class RagJudgeTest {
 
 	@Test
 	void hallucinationJudgeShouldHaveCorrectMetadata() {
-		HallucinationJudge judge = new HallucinationJudge(null);
+		HallucinationJudge judge = new HallucinationJudge(() -> new RagEvidence("parsing fixture", "context", "answer"),
+				null);
 		JudgeMetadata metadata = judge.metadata();
 		assertThat(metadata.name()).isEqualTo("Hallucination");
 		assertThat(metadata.type()).isEqualTo(JudgeType.LLM_POWERED);
@@ -152,7 +169,8 @@ class RagJudgeTest {
 
 	@Test
 	void hallucinationJudgeShouldParseYesAsPass() {
-		HallucinationJudge judge = new HallucinationJudge(null);
+		HallucinationJudge judge = new HallucinationJudge(() -> new RagEvidence("parsing fixture", "context", "answer"),
+				null);
 		RagEvidence ctx = ragContext("q", "c", "a");
 
 		Judgment result = judge.parseResponse("Answer: YES\nReasoning: No hallucinations detected.", ctx);
@@ -162,7 +180,8 @@ class RagJudgeTest {
 
 	@Test
 	void hallucinationJudgeShouldParseNoAsFail() {
-		HallucinationJudge judge = new HallucinationJudge(null);
+		HallucinationJudge judge = new HallucinationJudge(() -> new RagEvidence("parsing fixture", "context", "answer"),
+				null);
 		RagEvidence ctx = ragContext("q", "c", "a");
 
 		Judgment result = judge.parseResponse(
@@ -173,7 +192,8 @@ class RagJudgeTest {
 
 	@Test
 	void hallucinationJudgeShouldAbstainOnUnparseableResponse() {
-		HallucinationJudge judge = new HallucinationJudge(null);
+		HallucinationJudge judge = new HallucinationJudge(() -> new RagEvidence("parsing fixture", "context", "answer"),
+				null);
 		RagEvidence ctx = ragContext("q", "c", "a");
 
 		Judgment result = judge.parseResponse("This is a confusing response without a clear verdict.", ctx);

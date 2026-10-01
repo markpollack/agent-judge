@@ -41,11 +41,11 @@ class IdentityCompositionTest {
 				new NumericFinding(4, NumericKind.ORDINAL_EXPECTATION, "impact:v1", 0, 4,
 						List.of("none", "low", "medium", "high", "critical"), QualityDirection.INCREASING),
 				null), null, null, null, "verified violation", List.of(), null, Map.of());
-		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
-			.judge(context -> negative)
+		Verdict verdict = SimpleJury.builder()
+			.judge(() -> negative)
 			.votingStrategy(new AverageVotingStrategy())
 			.build()
-			.vote(CONTEXT);
+			.vote();
 		assertThat(verdict.judgment()).isEqualTo(negative);
 	}
 
@@ -53,11 +53,11 @@ class IdentityCompositionTest {
 	void oneSeatDoesNotLoseEscalationIntent() {
 		Judgment escalated = new Judgment(JudgmentStatus.FAIL, null, null, null, null, "verified violation", List.of(),
 				null, Map.of());
-		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
-			.judge(context -> escalated)
+		Verdict verdict = SimpleJury.builder()
+			.judge(() -> escalated)
 			.votingStrategy(new AverageVotingStrategy())
 			.build()
-			.vote(CONTEXT);
+			.vote();
 		assertThat(verdict.judgment()).isEqualTo(escalated);
 	}
 
@@ -91,16 +91,16 @@ class IdentityCompositionTest {
 				return ExclusionHandling.TREAT_AS_FAIL;
 			}
 		};
-		Judge<CompletionEvidence> judge = new NamedJudge<CompletionEvidence>(context -> original,
+		Judge judge = new NamedJudge(() -> original,
 				new JudgeMetadata("one", "one", JudgeType.DETERMINISTIC, "subject has no Java"));
 		for (boolean parallel : List.of(false, true)) {
-			SimpleJury<CompletionEvidence> simple = SimpleJury.<CompletionEvidence>builder()
-				.judge(judge)
+			SimpleJury simple = SimpleJury.builder()
+				.seat(declared(judge))
 				.parallel(parallel)
 				.votingStrategy(neverReduce)
 				.build();
-			Verdict first = simple.vote(CONTEXT);
-			Verdict meta = Juries.meta(neverReduce, new NamedJury<CompletionEvidence>("member", simple)).vote(CONTEXT);
+			Verdict first = simple.vote();
+			Verdict meta = Juries.meta(neverReduce, new NamedJury("member", simple)).vote();
 			for (Verdict verdict : List.of(first, meta)) {
 				assertThat(verdict.judgment()).isSameAs(original);
 				assertThat(verdict.individual()).containsExactly(original);
@@ -109,38 +109,37 @@ class IdentityCompositionTest {
 			}
 			assertThat(simple.aggregateMayBeNotApplicable()).isTrue();
 			assertThat(simple.describe().aggregateMayBeNotApplicable()).isTrue();
-			assertThat(Juries.meta(neverReduce, new NamedJury<CompletionEvidence>("member", simple))
-				.describe()
-				.aggregateMayBeNotApplicable()).isTrue();
+			assertThat(
+					Juries.meta(neverReduce, new NamedJury("member", simple)).describe().aggregateMayBeNotApplicable())
+				.isTrue();
 		}
 		assertThat(reductions.get()).isZero();
-		assertThatThrownBy(() -> SimpleJury.<CompletionEvidence>builder()
-			.judge(judge)
-			.votingStrategy(new AverageVotingStrategy())
-			.build()).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(
+				() -> SimpleJury.builder().seat(declared(judge)).votingStrategy(new AverageVotingStrategy()).build())
+			.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
 	void twoDeclaredSeatsAndDirectStrategyRemainExplicitReductions() {
 		Judgment lowPositive = Judgment.builder().pass().score(0.1).reasoning("accepted positive").build();
 		AverageVotingStrategy strategy = new AverageVotingStrategy(ErrorHandling.IGNORE);
-		Verdict verdict = SimpleJury.<CompletionEvidence>builder()
-			.judge(context -> lowPositive)
-			.judge(context -> Judgment.error("backend unavailable"))
+		Verdict verdict = SimpleJury.builder()
+			.judge(() -> lowPositive)
+			.judge(() -> Judgment.error("backend unavailable"))
 			.votingStrategy(strategy)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(verdict.judgment()).isNotEqualTo(lowPositive);
 		assertThat(strategy.aggregate(List.of(lowPositive), Map.of()).status()).isEqualTo(JudgmentStatus.FAIL);
-		Jury<CompletionEvidence> broken = new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
+		Jury broken = new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
-			public Verdict vote(CompletionEvidence context) {
+			public Verdict vote() {
 				throw new IllegalStateException("member failed");
 			}
 
 			@Override
-			public List<Judge<CompletionEvidence>> getJudges() {
+			public List<Judge> getJudges() {
 				return List.of();
 			}
 
@@ -151,16 +150,19 @@ class IdentityCompositionTest {
 		};
 		Verdict meta = Juries
 			.meta(strategy,
-					new NamedJury<CompletionEvidence>("valid",
-							SimpleJury.<CompletionEvidence>builder()
-								.judge(context -> lowPositive)
-								.votingStrategy(strategy)
-								.build()),
-					new NamedJury<CompletionEvidence>("broken", broken))
-			.vote(CONTEXT);
+					new NamedJury("valid",
+							SimpleJury.builder().judge(() -> lowPositive).votingStrategy(strategy).build()),
+					new NamedJury("broken", broken))
+			.vote();
 		assertThat(meta.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(meta.individual()).containsExactly(lowPositive);
 		assertThat(meta.compositeAttempts()).hasSize(2);
+	}
+
+	private static io.github.markpollack.judge.jury.JudgeSeat declared(io.github.markpollack.judge.Judge producer) {
+		return io.github.markpollack.judge.jury.JudgeSeat
+			.named(((io.github.markpollack.judge.JudgeWithMetadata) producer).metadata().name(), producer)
+			.notApplicableWhen(io.github.markpollack.judge.Judges.notApplicableCapability(producer).orElseThrow());
 	}
 
 }

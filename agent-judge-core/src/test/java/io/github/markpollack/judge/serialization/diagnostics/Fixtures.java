@@ -89,17 +89,6 @@ final class Fixtures {
 		}
 	}
 
-	static Verdict golden(String resource) {
-		try {
-			return MAPPER.treeToValue(
-					io.github.markpollack.judge.conformance.ModernFixtureExpectations.statusOnly(readTree(resource)),
-					Verdict.class);
-		}
-		catch (Exception ex) {
-			throw new AssertionError("could not read " + resource + " as a Verdict", ex);
-		}
-	}
-
 	/**
 	 * The stored projection of a live verdict: the same map a reader parses from the
 	 * wire.
@@ -157,18 +146,18 @@ final class Fixtures {
 
 	// ==================== Live juries ====================
 
-	static Jury<CompletionEvidence> passingTier(String name, String reasoning) {
-		return SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> Judgment.pass(reasoning), name))
+	static Jury passingTier(String name, String reasoning) {
+		return SimpleJury.builder()
+			.judge(Judges.named(() -> Judgment.pass(reasoning), name))
 			.votingStrategy(new ConsensusStrategy())
 			.build();
 	}
 
 	/** An opaque jury that returns a fixed verdict and declares no capability. */
-	static Jury<CompletionEvidence> returning(Verdict verdict) {
-		return new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
+	static Jury returning(Verdict verdict) {
+		return new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
-			public List<Judge<CompletionEvidence>> getJudges() {
+			public List<Judge> getJudges() {
 				return List.of();
 			}
 
@@ -178,16 +167,16 @@ final class Fixtures {
 			}
 
 			@Override
-			public Verdict vote(CompletionEvidence context) {
+			public Verdict vote() {
 				return verdict;
 			}
 		};
 	}
 
-	static Jury<CompletionEvidence> throwing(RuntimeException failure) {
-		return new io.github.markpollack.judge.jury.VotingJury<CompletionEvidence>() {
+	static Jury throwing(RuntimeException failure) {
+		return new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
-			public List<Judge<CompletionEvidence>> getJudges() {
+			public List<Judge> getJudges() {
 				return List.of();
 			}
 
@@ -197,29 +186,28 @@ final class Fixtures {
 			}
 
 			@Override
-			public Verdict vote(CompletionEvidence context) {
+			public Verdict vote() {
 				throw failure;
 			}
 		};
 	}
 
 	/** A leaf jury whose reduction throws, so the tier returns an undecided verdict. */
-	static Jury<CompletionEvidence> undecidedTier(Judgment... judgments) {
-		SimpleJury.Builder<CompletionEvidence> builder = SimpleJury.<CompletionEvidence>builder()
-			.votingStrategy(new VotingStrategy() {
-				@Override
-				public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
-					throw new IllegalStateException("the reduction broke");
-				}
+	static Jury undecidedTier(Judgment... judgments) {
+		SimpleJury.Builder builder = SimpleJury.builder().votingStrategy(new VotingStrategy() {
+			@Override
+			public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
+				throw new IllegalStateException("the reduction broke");
+			}
 
-				@Override
-				public String getName() {
-					return "broken";
-				}
-			});
+			@Override
+			public String getName() {
+				return "broken";
+			}
+		});
 		for (int index = 0; index < judgments.length; index++) {
 			Judgment judgment = judgments[index];
-			builder.judge(Judges.named(context -> judgment, "judge-" + (index + 1)));
+			builder.judge(Judges.named(() -> judgment, "judge-" + (index + 1)));
 		}
 		return builder.build();
 	}
@@ -227,7 +215,7 @@ final class Fixtures {
 	/**
 	 * An opaque tier that excludes over real individuals while declaring no capability.
 	 */
-	static Jury<CompletionEvidence> opaqueExcludingTier(Judgment... individuals) {
+	static Jury opaqueExcludingTier(Judgment... individuals) {
 		Map<String, Judgment> byName = new LinkedHashMap<>();
 		for (int index = 0; index < individuals.length; index++) {
 			byName.put("judge-" + (index + 1), individuals[index]);
@@ -236,10 +224,10 @@ final class Fixtures {
 	}
 
 	/** A judge that declares it may exclude, so a jury built on it is capable. */
-	record Conditional(String name, Judgment result) implements JudgeWithMetadata<CompletionEvidence> {
+	record Conditional(String name, Judgment result) implements JudgeWithMetadata {
 
 		@Override
-		public Judgment judge(CompletionEvidence context) {
+		public Judgment judge() {
 			return this.result;
 		}
 

@@ -60,9 +60,12 @@ public class CorrectnessJudge extends LLMJudge<CompletionEvidence> {
 	/**
 	 * Create a correctness judge with the given chat client builder.
 	 * @param chatClientBuilder the chat client builder for LLM calls
+	 * @param evidence fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public CorrectnessJudge(ChatClient.Builder chatClientBuilder) {
-		super("Correctness", "Evaluates if agent accomplished the goal", chatClientBuilder);
+	public CorrectnessJudge(java.util.function.Supplier<? extends CompletionEvidence> evidence,
+			ChatClient.Builder chatClientBuilder) {
+		super(evidence, "Correctness", "Evaluates if agent accomplished the goal", chatClientBuilder);
 	}
 
 	@Override
@@ -124,6 +127,17 @@ public class CorrectnessJudge extends LLMJudge<CompletionEvidence> {
 
 		// Final fallback: return full response
 		return response;
+	}
+
+	/**
+	 * Configures native judging without acquiring evidence.
+	 * @param client Spring AI client configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<CompletionEvidence> builder(
+			ChatClient.Builder client) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(evidence -> new CorrectnessJudge(evidence, client));
 	}
 
 }

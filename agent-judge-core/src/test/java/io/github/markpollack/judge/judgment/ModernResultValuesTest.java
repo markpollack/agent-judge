@@ -366,15 +366,12 @@ class ModernResultValuesTest {
 		org.assertj.core.api.SoftAssertions softly = new org.assertj.core.api.SoftAssertions();
 		for (Finding finding : assessments) {
 			Judgment judgment = raw(JudgmentStatus.PASS, finding, null, null, null);
-			var jury = io.github.markpollack.judge.jury.SimpleJury.<CompletionEvidence>builder()
-				.judge(context -> judgment)
-				.judge(context -> Judgment.pass("other"))
+			var jury = io.github.markpollack.judge.jury.SimpleJury.builder()
+				.judge(() -> judgment)
+				.judge(() -> Judgment.pass("other"))
 				.votingStrategy(new ConsensusStrategy())
 				.build();
-			var reading = StoredVerdicts
-				.interpret(jury.vote(io.github.markpollack.judge.completion.CompletionEvidence.builder()
-					.request("bridge test")
-					.build()));
+			var reading = StoredVerdicts.interpret(jury.vote());
 			softly.assertThat(reading.readingSupport())
 				.as("retained modern assessment %s", finding)
 				.isEqualTo(ReadingSupport.SUPPORTED);

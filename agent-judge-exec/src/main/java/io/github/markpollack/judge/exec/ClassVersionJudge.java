@@ -49,16 +49,18 @@ public class ClassVersionJudge extends DeterministicJudge<Path> {
 	/**
 	 * Require the given JVM class-file major version.
 	 * @param expectedVersion required JVM major version
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public ClassVersionJudge(int expectedVersion) {
-		super("ClassVersionJudge", "Verifies .class file major versions match target Java version");
+	public ClassVersionJudge(java.util.function.Supplier<? extends Path> source, int expectedVersion) {
+		super(source, "ClassVersionJudge", "Verifies .class file major versions match target Java version");
 		if (expectedVersion < 45 || expectedVersion > 65535)
 			throw new IllegalArgumentException("Invalid class major version");
 		this.expectedVersion = expectedVersion;
 	}
 
 	@Override
-	public Judgment judge(Path workspace) {
+	protected Judgment evaluate(Path workspace) {
 		Path classesDir = workspace.resolve("target/classes");
 		if (!Files.isDirectory(classesDir)) {
 			return Judgment.abstain("No target/classes directory found");
@@ -137,6 +139,16 @@ public class ClassVersionJudge extends DeterministicJudge<Path> {
 			dis.readUnsignedShort(); // minor version
 			return dis.readUnsignedShort(); // major version
 		}
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @param expectedVersion producer configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<Path> builder(int expectedVersion) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(source -> new ClassVersionJudge(source, expectedVersion));
 	}
 
 }

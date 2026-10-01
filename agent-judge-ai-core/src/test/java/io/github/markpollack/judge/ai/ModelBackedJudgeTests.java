@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai;
 
 import io.github.markpollack.judge.ai.model.JudgeModel;
@@ -23,8 +28,7 @@ class ModelBackedJudgeTests {
 			.name("relevance")
 			.promptTemplate(JudgePromptTemplate.fromString("relevance", "Is {{output}} relevant to {{goal}}?"))
 			.judgmentClassifier(JudgmentClassifiers.passFail("relevant", "irrelevant"))
-			.model(model)
-			.build();
+			.model(model);
 
 		CompletionEvidence context = CompletionEvidence.builder()
 			.request("summarize the document")
@@ -32,7 +36,7 @@ class ModelBackedJudgeTests {
 			.status(CompletionStatus.SUCCESS)
 			.build();
 
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(judgment.reasoning()).isEqualTo("relevant");
@@ -47,8 +51,7 @@ class ModelBackedJudgeTests {
 			.name("relevance")
 			.promptTemplate(JudgePromptTemplate.fromString("relevance", "Is {{output}} relevant to {{goal}}?"))
 			.judgmentClassifier(JudgmentClassifiers.passFail("relevant", "irrelevant"))
-			.model(model)
-			.build();
+			.model(model);
 
 		CompletionEvidence context = CompletionEvidence.builder()
 			.request("summarize the document")
@@ -56,7 +59,7 @@ class ModelBackedJudgeTests {
 			.status(CompletionStatus.SUCCESS)
 			.build();
 
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 	}
@@ -70,8 +73,7 @@ class ModelBackedJudgeTests {
 			.name("relevance")
 			.promptTemplate(JudgePromptTemplate.fromString("relevance", "Is {{output}} relevant to {{goal}}?"))
 			.judgmentClassifier(JudgmentClassifiers.passFail("relevant", "irrelevant"))
-			.model(model)
-			.build();
+			.model(model);
 
 		CompletionEvidence context = CompletionEvidence.builder()
 			.request("test")
@@ -79,7 +81,7 @@ class ModelBackedJudgeTests {
 			.status(CompletionStatus.SUCCESS)
 			.build();
 
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(judgment.reasoning()).contains("maybe");
@@ -94,8 +96,7 @@ class ModelBackedJudgeTests {
 			.name("relevance")
 			.promptTemplate(JudgePromptTemplate.fromClasspath("judges/test-relevance.md"))
 			.judgmentClassifier(JudgmentClassifiers.passFail("relevant", "irrelevant"))
-			.model(model)
-			.build();
+			.model(model);
 
 		CompletionEvidence context = CompletionEvidence.builder()
 			.request("test goal")
@@ -103,7 +104,7 @@ class ModelBackedJudgeTests {
 			.status(CompletionStatus.SUCCESS)
 			.build();
 
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.PASS);
 	}
@@ -117,6 +118,9 @@ class ModelBackedJudgeTests {
 			.promptTemplate(JudgePromptTemplate.fromString("test", "{{goal}}"))
 			.judgmentClassifier(JudgmentClassifiers.passFail("yes", "no"))
 			.model(stubModel("yes"))
+			.evidence(io.github.markpollack.judge.completion.CompletionEvidence.builder()
+				.request("metadata fixture")
+				.build())
 			.build();
 
 		assertThat(judge.metadata().name()).isEqualTo("test-judge");
@@ -127,6 +131,9 @@ class ModelBackedJudgeTests {
 	void builderValidation() {
 		assertThatThrownBy(() -> ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
 			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
+			.evidence(io.github.markpollack.judge.completion.CompletionEvidence.builder()
+				.request("validation fixture")
+				.build())
 			.build()).isInstanceOf(IllegalStateException.class).hasMessageContaining("name");
 	}
 

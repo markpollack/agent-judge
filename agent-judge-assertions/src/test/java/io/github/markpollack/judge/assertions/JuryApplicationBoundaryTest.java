@@ -25,19 +25,19 @@ class JuryApplicationBoundaryTest {
 	void finalPolicyReceivesEveryChildAndNeverRestartsRouting(PolicyAction action) {
 		var calls = new AtomicInteger();
 		var policyCalls = new AtomicInteger();
-		Jury<String> failed = e -> {
+		Jury failed = () -> {
 			calls.incrementAndGet();
 			throw new IllegalStateException("unavailable");
 		};
-		Jury<String> fallback = e -> {
+		Jury fallback = () -> {
 			calls.incrementAndGet();
 			return Verdict.single("fallback", Judgment.fail("rejected"));
 		};
-		var cascade = CascadedJury.<String>builder()
+		var cascade = CascadedJury.builder()
 			.tier("first", failed, RoutingRule.STOP_ON_CONCLUSIVE)
 			.tier("last", fallback, RoutingRule.FINAL_TIER)
 			.build();
-		var result = Evaluations.evaluate(cascade, "evidence", v -> {
+		var result = Evaluations.evaluate(cascade, v -> {
 			policyCalls.incrementAndGet();
 			assertThat(v.compositeAttempts()).hasSize(2);
 			return new PolicyDecision(action, "retained");
@@ -50,16 +50,29 @@ class JuryApplicationBoundaryTest {
 
 	@Test
 	void individualRejectionAndCollectiveErrorBothReachPolicy() {
-		var rejected = Verdict.of(Judgment.notApplicable("invalid exclusion"),
-				Map.of("known", Judgment.fail("violation")));
-		Jury<String> first = e -> rejected;
-		var cascade = CascadedJury.<String>builder()
-			.tier("first", first, RoutingRule.REJECT_ON_ANY_FAIL)
-			.tier("last", (Jury<String>) e -> {
+		var rejected = SimpleJury.builder()
+			.judge("known", () -> Judgment.fail("violation"))
+			.judge("second", () -> Judgment.pass("present"))
+			.votingStrategy(new VotingStrategy() {
+				public Judgment aggregate(List<Judgment> values, Map<String, Double> weights) {
+					throw new IllegalStateException("reduction broken");
+				}
+
+				public String getName() {
+					return "broken";
+				}
+			})
+			.build()
+			.vote();
+
+		Jury first = () -> rejected;
+		var cascade = CascadedJury.builder()
+			.tier("first", first, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
+			.tier("last", (Jury) () -> {
 				throw new AssertionError("must not run");
 			}, RoutingRule.FINAL_TIER)
 			.build();
-		var result = Evaluations.evaluate(cascade, "evidence", v -> {
+		var result = Evaluations.evaluate(cascade, v -> {
 			assertThat(v.judgment().status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(v.compositeAttempts().getFirst().verdict()).isSameAs(rejected);
 			assertThat(v.conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
@@ -73,10 +86,10 @@ class JuryApplicationBoundaryTest {
 	@Test
 	void allFailedAttemptsStillReceiveRequestedPolicy() {
 		var calls = new AtomicInteger();
-		var cascade = CascadedJury.<String>builder().tier("last", (Jury<String>) e -> {
+		var cascade = CascadedJury.builder().tier("last", (Jury) () -> {
 			throw new IllegalStateException("down");
 		}, RoutingRule.FINAL_TIER).build();
-		var result = Evaluations.evaluate(cascade, "e", v -> {
+		var result = Evaluations.evaluate(cascade, v -> {
 			calls.incrementAndGet();
 			return new PolicyDecision(PolicyAction.ESCALATE, "all failed");
 		});
@@ -87,11 +100,24 @@ class JuryApplicationBoundaryTest {
 	@Test
 	void requirementJuryPreservesFullRecordAndReceivesActualRequirement() {
 		var actual = Requirement.text("security", "1", "safe");
-		var child = RequirementJuries.<String, String>voting(new MajorityVotingStrategy(), List.of((r, e) -> {
+		var ready = SimpleJury.builder().judge("one", ConfiguredRules.<String, String>rule((r, e) -> {
 			assertThat(r).isSameAs(actual);
 			return Judgment.pass("one");
-		}, (r, e) -> Judgment.pass("two"), (r, e) -> Judgment.fail("dissent")));
-		var result = Evaluations.evaluate(actual, child, "evidence");
+		}).requirement(actual).evidence("evidence").build())
+			.judge("two",
+					ConfiguredRules.<String, String>rule((r, e) -> Judgment.pass("two"))
+						.requirement(actual)
+						.evidence("evidence")
+						.build())
+			.judge("dissent",
+					ConfiguredRules.<String, String>rule((r, e) -> Judgment.fail("dissent"))
+						.requirement(actual)
+						.evidence("evidence")
+						.build())
+			.votingStrategy(new MajorityVotingStrategy())
+			.build();
+		var result = Evaluations.of(ready.vote().forRequirement(actual));
+
 		assertThat(result.verdict().individual()).hasSize(3);
 		assertThat(result.verdict().requirement()).isSameAs(actual);
 		RequirementAssertions.requireSatisfied(result);

@@ -2,47 +2,73 @@
  * Copyright (c) 2024-2026 Mark Pollack
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
+
 package io.github.markpollack.judge.assertj;
 
 import java.util.Objects;
 import java.util.function.Supplier;
 import org.assertj.core.api.AbstractAssert;
 import org.jspecify.annotations.Nullable;
-import io.github.markpollack.judge.*;
+import io.github.markpollack.judge.Judge;
+import io.github.markpollack.judge.construction.*;
 import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.jury.*;
 import io.github.markpollack.judge.evaluation.*;
 import io.github.markpollack.judge.policy.*;
 import io.github.markpollack.judge.assertions.*;
 
-/** Thin assertions over retained facts and staged, once-only evaluation. */
+/**
+ * Requirement-first construction and once-only live assertions. Retained assertions
+ * execute nothing and expose no policy configuration. Stages synchronize completion;
+ * independent pre-execution branches represent independent evaluations.
+ */
 public final class Assertions {
 
 	private Assertions() {
 	}
 
 	/**
-	 * Begin a requirement-aware assertion.
-	 * @param <S> specification type
-	 * @param requirement actual specification
-	 * @return evaluator selection
+	 * Begins typed construction for the actual requirement.
+	 * @param <S> native specification type
+	 * @param requirement immutable actual requirement
+	 * @return construction selection
 	 */
 	public static <S> RequirementStage<S> assertThat(Requirement<S> requirement) {
 		return new RequirementStage<>(requirement);
 	}
 
 	/**
-	 * Inspect a retained verdict without execution.
-	 * @param verdict complete verdict
-	 * @return verdict assertion
+	 * Begins a live ready-Judge assertion.
+	 * @param judge ready evaluator
+	 * @return once-only live stage
+	 */
+	public static LiveStage assertThat(Judge judge) {
+		Objects.requireNonNull(judge);
+		return new LiveStage(() -> Evaluations.evaluate(judge), null);
+	}
+
+	/**
+	 * Begins a live ready-Jury assertion retaining its whole Verdict.
+	 * @param jury ready composition
+	 * @return once-only live stage
+	 */
+	public static LiveStage assertThat(Jury jury) {
+		Objects.requireNonNull(jury);
+		return new LiveStage(() -> Evaluations.evaluate(jury), null);
+	}
+
+	/**
+	 * Inspects a retained Verdict without execution.
+	 * @param verdict complete retained result
+	 * @return retained assertion
 	 */
 	public static VerdictAssert assertThat(Verdict verdict) {
 		return new VerdictAssert(verdict);
 	}
 
 	/**
-	 * Inspect a retained execution without execution.
-	 * @param result complete result
+	 * Inspects retained evaluation and its original policy result.
+	 * @param result retained evaluation
 	 * @return retained assertion
 	 */
 	public static EvaluationAssert assertThat(EvaluationResult result) {
@@ -50,172 +76,180 @@ public final class Assertions {
 	}
 
 	/**
-	 * Begin an evidence-only check without inventing a Requirement.
-	 * @param <E> evidence type
-	 * @param evidence actual evidence
-	 * @return evidence-only evaluator selection
-	 */
-	public static <E> EvidenceOnlyStage<E> assertThatEvidence(E evidence) {
-		return new EvidenceOnlyStage<>(evidence);
-	}
-
-	/**
-	 * Requirement selects a sibling requirement-aware evaluator.
+	 * Selection that can only configure the asserted requirement.
 	 *
-	 * @param <S> native specification
+	 * @param <S> specification type
 	 */
-	public static final class RequirementStage<S> extends AbstractAssert<RequirementStage<S>, Requirement<S>> {
+	public static final class RequirementStage<S> {
 
-		private RequirementStage(Requirement<S> requirement) {
-			super(Objects.requireNonNull(requirement), RequirementStage.class);
+		private final Requirement<S> actual;
+
+		private RequirementStage(Requirement<S> actual) {
+			Requirement.validate(actual);
+			this.actual = actual;
 		}
 
 		/**
-		 * Choose a requirement-aware Judge. Ordinary evidence-only judges are not
-		 * accepted here.
+		 * Selects an unconfigured typed Judge recipe.
 		 * @param <E> evidence type
-		 * @param judge evaluator
-		 * @return evidence stage
+		 * @param recipe construction collaborator
+		 * @return evidence configuration
 		 */
-		public <E> EvidenceStage<E> judgedBy(RequirementJudge<S, E> judge) {
-			Objects.requireNonNull(judge);
-			return evidence -> new SatisfactionStage(() -> Evaluations.evaluate(actual, judge, evidence),
-					descriptionText(), null);
+		public <E> EvidenceStage<E> judgedBy(JudgeRecipe<S, E> recipe) {
+			EvidenceStep<E> step = Objects.requireNonNull(recipe).requirement(actual);
+			return evidence -> new SatisfactionStage(
+					() -> associated(Evaluations.evaluate(step.evidence(evidence).build()), actual), null);
 		}
 
 		/**
-		 * Choose a requirement-aware Jury; retain its complete verdict.
+		 * Selects typed complete-Jury construction.
 		 * @param <E> evidence type
-		 * @param jury jury
-		 * @return evidence stage
+		 * @param recipe construction collaborator
+		 * @return evidence configuration
 		 */
-		public <E> EvidenceStage<E> judgedBy(RequirementJury<S, E> jury) {
-			Objects.requireNonNull(jury);
-			return evidence -> new SatisfactionStage(() -> Evaluations.evaluate(actual, jury, evidence),
-					descriptionText(), null);
+		public <E> EvidenceStage<E> judgedBy(JuryRecipe<S, E> recipe) {
+			JuryEvidenceStep<E> step = Objects.requireNonNull(recipe).requirement(actual);
+			return evidence -> new SatisfactionStage(
+					() -> associated(Evaluations.evaluate(step.evidence(evidence).build()), actual), null);
 		}
 
 	}
 
+	private static EvaluationResult associated(EvaluationResult result, Requirement<?> actual) {
+		return new EvaluationResult(result.verdict().forRequirement(actual), result.policyResult());
+	}
+
 	/**
-	 * Require typed evidence before a terminal or policy can be chosen.
+	 * Evidence is selected exactly once through construction.
 	 *
 	 * @param <E> evidence type
 	 */
+	@FunctionalInterface
 	public interface EvidenceStage<E> {
 
 		/**
-		 * Supply actual evidence, without executing yet.
-		 * @param evidence evidence
-		 * @return terminal stage
+		 * Selects real prepared evidence without invoking a producer.
+		 * @param evidence immutable evidence snapshot
+		 * @return satisfaction terminal stage
 		 */
 		SatisfactionStage withEvidence(E evidence);
 
 	}
 
-	/**
-	 * An immutable configured evaluation; repeated terminals inspect its cached result.
-	 */
-	public static final class SatisfactionStage {
+	/** Live general-conclusion stage, with one cached producer and policy execution. */
+	public static class LiveStage {
 
-		private final Supplier<EvaluationResult> evaluation;
-
-		private final String description;
+		private final Supplier<EvaluationResult> execution;
 
 		private final @Nullable Policy policy;
 
 		private @Nullable EvaluationResult result;
 
-		private SatisfactionStage(Supplier<EvaluationResult> evaluation, String description, @Nullable Policy policy) {
-			this.evaluation = evaluation;
-			this.description = description;
+		private boolean attempted;
+
+		private @Nullable RuntimeException failure;
+
+		private @Nullable Error fatal;
+
+		private LiveStage(Supplier<EvaluationResult> execution, @Nullable Policy policy) {
+			this.execution = execution;
 			this.policy = policy;
 		}
 
 		/**
-		 * Configure a policy before execution.
-		 * @param policy requested policy
-		 * @return configured stage
-		 * @throws IllegalStateException after this stage has already executed
+		 * Selects an independent complete-Verdict policy before execution.
+		 * @param policy application policy
+		 * @return configured branch
+		 * @throws IllegalStateException after execution
 		 */
-		public synchronized SatisfactionStage withPolicy(Policy policy) {
-			if (result != null)
+		public synchronized LiveStage withPolicy(Policy policy) {
+			requireUnexecuted();
+			return new LiveStage(execution, Objects.requireNonNull(policy));
+		}
+
+		final void requireUnexecuted() {
+			if (attempted)
 				throw new IllegalStateException(
-						"Evaluation already completed; apply another policy explicitly to its retained Verdict");
-			return new SatisfactionStage(evaluation, description, Objects.requireNonNull(policy));
+						"Evaluation already completed; apply policy explicitly to its retained Verdict");
 		}
 
 		/**
-		 * Execute once and retain the result, without asserting satisfaction.
-		 * @return retained complete evaluation
+		 * Executes once, then returns the original cached evaluation.
+		 * @return retained original evaluation
 		 */
 		public synchronized EvaluationResult evaluate() {
-			if (result == null) {
-				EvaluationResult completed = evaluation.get();
-				result = policy == null ? completed : Evaluations.apply(completed.verdict(), policy);
+			if (!attempted) {
+				attempted = true;
+				try {
+					EvaluationResult completed = Objects.requireNonNull(execution.get());
+					result = policy == null ? completed : Evaluations.apply(completed.verdict(), policy);
+				}
+				catch (RuntimeException problem) {
+					failure = problem;
+					throw problem;
+				}
+				catch (Error problem) {
+					fatal = problem;
+					throw problem;
+				}
 			}
-			return result;
+			if (failure != null)
+				throw failure;
+			if (fatal != null)
+				throw fatal;
+			return Objects.requireNonNull(result);
 		}
 
-		/**
-		 * Establish satisfaction from retained facts. Repetition makes no further calls.
-		 */
-		public void isSatisfied() {
-			try {
-				RequirementAssertions.requireSatisfied(evaluate());
-			}
-			catch (RequirementAssertionError ex) {
-				if (description.isEmpty())
-					throw ex;
-				AssertionError described = new AssertionError("[" + description + "] " + ex.getMessage(), ex);
-				throw described;
-			}
+		/** Requires PASS and successful RELY when a policy was selected. */
+		public void isPassed() {
+			requirePassed(evaluate());
 		}
 
 	}
 
 	/**
-	 * Evidence-only selection.
-	 *
-	 * @param <E> evidence type
+	 * Requirement-context terminal; only actual typed requirement construction creates
+	 * it.
 	 */
-	public static final class EvidenceOnlyStage<E> {
+	public static final class SatisfactionStage extends LiveStage {
 
-		private final E evidence;
+		private final Supplier<EvaluationResult> execution;
 
-		private EvidenceOnlyStage(E evidence) {
-			this.evidence = Objects.requireNonNull(evidence);
+		private SatisfactionStage(Supplier<EvaluationResult> execution, @Nullable Policy policy) {
+			super(execution, policy);
+			this.execution = execution;
 		}
 
-		/**
-		 * Evaluate an ordinary Judge once.
-		 * @param judge evaluator
-		 * @return retained result assertion
-		 */
-		public EvaluationAssert judgedBy(Judge<E> judge) {
-			return assertThat(Evaluations.evaluate(judge, evidence));
+		@Override
+		public synchronized SatisfactionStage withPolicy(Policy policy) {
+			requireUnexecuted();
+			return new SatisfactionStage(execution, Objects.requireNonNull(policy));
 		}
 
-		/**
-		 * Execute a complete evidence-only Jury once.
-		 * @param jury jury
-		 * @return retained result assertion
-		 */
-		public EvaluationAssert judgedBy(Jury<E> jury) {
-			return assertThat(Evaluations.evaluate(jury, evidence));
+		/** Establishes satisfaction; repetition reads the same result. */
+		public void isSatisfied() {
+			RequirementAssertions.requireSatisfied(evaluate());
 		}
 
 	}
 
-	/** Neutral domain conclusion assertion. */
+	private static void requirePassed(EvaluationResult result) {
+		if (result.verdict().conclusion() != Verdict.Conclusion.PASS
+				|| result.policyResult() instanceof PolicyResult.Failed
+				|| result.policyResult() instanceof PolicyResult.Decided decision
+						&& decision.decision().action() != PolicyAction.RELY)
+			throw new RequirementAssertionError(result);
+	}
+
+	/** General assertions on a retained complete Verdict. */
 	public static final class VerdictAssert extends AbstractAssert<VerdictAssert, Verdict> {
 
-		private VerdictAssert(Verdict actual) {
-			super(actual, VerdictAssert.class);
+		private VerdictAssert(Verdict verdict) {
+			super(verdict, VerdictAssert.class);
 		}
 
 		/**
-		 * Require the derived conclusion.
+		 * Requires the derived conclusion.
 		 * @param expected expected conclusion
 		 * @return this assertion
 		 */
@@ -226,17 +260,25 @@ public final class Assertions {
 			return this;
 		}
 
+		/**
+		 * Requires retained PASS.
+		 * @return this assertion
+		 */
+		public VerdictAssert isPassed() {
+			return hasConclusion(Verdict.Conclusion.PASS);
+		}
+
 	}
 
-	/** Assertions over a completed invocation, never execution. */
+	/** General assertions on retained evaluation facts, including the selected policy. */
 	public static final class EvaluationAssert extends AbstractAssert<EvaluationAssert, EvaluationResult> {
 
-		private EvaluationAssert(EvaluationResult actual) {
-			super(actual, EvaluationAssert.class);
+		private EvaluationAssert(EvaluationResult result) {
+			super(result, EvaluationAssert.class);
 		}
 
 		/**
-		 * Require the neutral verdict conclusion.
+		 * Requires the original domain conclusion.
 		 * @param expected expected conclusion
 		 * @return this assertion
 		 */
@@ -247,22 +289,12 @@ public final class Assertions {
 		}
 
 		/**
-		 * Require that the check passed, independently of whether a Requirement was
-		 * supplied.
+		 * Requires PASS and the retained selected policy's successful RELY.
 		 * @return this assertion
 		 */
 		public EvaluationAssert isPassed() {
-			return hasConclusion(Verdict.Conclusion.PASS);
-		}
-
-		/**
-		 * Require associated requirement satisfaction and any requested reliance
-		 * decision.
-		 * @return this assertion
-		 */
-		public EvaluationAssert isSatisfied() {
 			isNotNull();
-			RequirementAssertions.requireSatisfied(actual);
+			requirePassed(actual);
 			return this;
 		}
 

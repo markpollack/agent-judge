@@ -59,10 +59,10 @@ final class ModernReader {
 						? RequirementOutcome.NOT_ASSESSED : RequirementOutcome.UNRESOLVED;
 			case NOT_APPLICABLE -> RequirementOutcome.NOT_APPLICABLE;
 		};
-		var draft = new StoredReading(3, 4, outcome, ReadingSupport.SUPPORTED, reader.decidedBy(verdict), root,
-				reader.stages, List.of(), "");
-		return new StoredReading(3, 4, outcome, ReadingSupport.SUPPORTED, draft.decidedBy(), root, reader.stages,
-				List.of(), Summaries.of(draft));
+		var draft = new StoredReading(3, io.github.markpollack.judge.serialization.ResultJson.VERSION, outcome,
+				ReadingSupport.SUPPORTED, reader.decidedBy(verdict), root, reader.stages, List.of(), "");
+		return new StoredReading(3, io.github.markpollack.judge.serialization.ResultJson.VERSION, outcome,
+				ReadingSupport.SUPPORTED, draft.decidedBy(), root, reader.stages, List.of(), Summaries.of(draft));
 	}
 
 	static boolean containsModern(Map<String, Object> value) {

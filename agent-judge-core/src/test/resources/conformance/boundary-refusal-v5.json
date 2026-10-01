@@ -1,0 +1,158 @@
+{
+  "schemaVersion" : 5,
+  "judgment" : {
+    "schemaVersion" : 5,
+    "producerStatus" : "pass",
+    "reasoning" : "the semantic tier accepted it",
+    "checks" : [ ],
+    "metadata" : { },
+    "invocations" : [ ],
+    "invocationIds" : [ ]
+  },
+  "individual" : [ {
+    "schemaVersion" : 5,
+    "producerStatus" : "pass",
+    "reasoning" : "the semantic tier accepted it",
+    "checks" : [ ],
+    "metadata" : { },
+    "invocations" : [ ],
+    "invocationIds" : [ ]
+  } ],
+  "individualByName" : {
+    "semantic" : {
+      "schemaVersion" : 5,
+      "producerStatus" : "pass",
+      "reasoning" : "the semantic tier accepted it",
+      "checks" : [ ],
+      "metadata" : { },
+      "invocations" : [ ],
+      "invocationIds" : [ ]
+    }
+  },
+  "weights" : {
+    "0" : 1.0
+  },
+  "seats" : [ {
+    "position" : 0,
+    "verdictKey" : "semantic",
+    "keySource" : "DECLARED",
+    "execution" : "RETURNED",
+    "participation" : "IDENTITY"
+  } ],
+  "provenance" : {
+    "kind" : "tier",
+    "tier" : "semantic",
+    "basis" : "tier_outcome"
+  },
+  "compositeAttempts" : [ {
+    "name" : "rubric",
+    "relation" : "cascade_tier",
+    "routingRule" : "STOP_ON_ANY_OPINION_FAIL",
+    "disposition" : "stage_failed",
+    "dispositionReason" : "invalid_tier_result",
+    "verdict" : {
+      "schemaVersion" : 5,
+      "judgment" : {
+        "schemaVersion" : 5,
+        "producerStatus" : "not_applicable",
+        "reasoning" : "nothing in this rubric applies",
+        "checks" : [ ],
+        "metadata" : { },
+        "invocations" : [ ],
+        "invocationIds" : [ ]
+      },
+      "individual" : [ {
+        "schemaVersion" : 5,
+        "producerStatus" : "fail",
+        "reasoning" : "a requirement was not met",
+        "checks" : [ ],
+        "metadata" : { },
+        "invocations" : [ ],
+        "invocationIds" : [ ]
+      } ],
+      "individualByName" : {
+        "strict" : {
+          "schemaVersion" : 5,
+          "producerStatus" : "fail",
+          "reasoning" : "a requirement was not met",
+          "checks" : [ ],
+          "metadata" : { },
+          "invocations" : [ ],
+          "invocationIds" : [ ]
+        }
+      },
+      "weights" : { },
+      "seats" : [ {
+        "position" : 0,
+        "verdictKey" : "strict",
+        "keySource" : "DECLARED",
+        "execution" : "RETURNED",
+        "participation" : "NOT_RECORDED"
+      } ],
+      "provenance" : {
+        "kind" : "own"
+      },
+      "compositeAttempts" : [ ],
+      "declaredCardinality" : 1,
+      "roster" : [ ],
+      "invocations" : [ ]
+    }
+  }, {
+    "name" : "semantic",
+    "relation" : "cascade_tier",
+    "routingRule" : "FINAL_TIER",
+    "disposition" : "used",
+    "verdict" : {
+      "schemaVersion" : 5,
+      "judgment" : {
+        "schemaVersion" : 5,
+        "producerStatus" : "pass",
+        "reasoning" : "the semantic tier accepted it",
+        "checks" : [ ],
+        "metadata" : { },
+        "invocations" : [ ],
+        "invocationIds" : [ ]
+      },
+      "individual" : [ {
+        "schemaVersion" : 5,
+        "producerStatus" : "pass",
+        "reasoning" : "the semantic tier accepted it",
+        "checks" : [ ],
+        "metadata" : { },
+        "invocations" : [ ],
+        "invocationIds" : [ ]
+      } ],
+      "individualByName" : {
+        "semantic" : {
+          "schemaVersion" : 5,
+          "producerStatus" : "pass",
+          "reasoning" : "the semantic tier accepted it",
+          "checks" : [ ],
+          "metadata" : { },
+          "invocations" : [ ],
+          "invocationIds" : [ ]
+        }
+      },
+      "weights" : {
+        "0" : 1.0
+      },
+      "seats" : [ {
+        "position" : 0,
+        "verdictKey" : "semantic",
+        "keySource" : "DECLARED",
+        "execution" : "RETURNED",
+        "participation" : "IDENTITY"
+      } ],
+      "provenance" : {
+        "kind" : "own"
+      },
+      "compositeAttempts" : [ ],
+      "declaredCardinality" : 1,
+      "roster" : [ ],
+      "invocations" : [ ]
+    }
+  } ],
+  "declaredCardinality" : 1,
+  "roster" : [ ],
+  "invocations" : [ ]
+}

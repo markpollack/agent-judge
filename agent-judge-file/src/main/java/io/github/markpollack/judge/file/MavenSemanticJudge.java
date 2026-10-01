@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.file;
 
 import io.github.markpollack.judge.file.comparator.MavenSemanticComparator;
@@ -22,13 +27,17 @@ public class MavenSemanticJudge extends DeterministicJudge<FileComparison> {
 
 	private final MavenSemanticComparator comparator = new MavenSemanticComparator();
 
-	/** Create a Maven semantic judge. */
-	public MavenSemanticJudge() {
-		super("MavenSemanticJudge", "Compares pom.xml files using Maven model-based semantic comparison");
+	/**
+	 * Create a Maven semantic judge.
+	 * @param source fresh evidence acquisition provider, invoked once per direct
+	 * execution
+	 */
+	public MavenSemanticJudge(java.util.function.Supplier<? extends FileComparison> source) {
+		super(source, "MavenSemanticJudge", "Compares pom.xml files using Maven model-based semantic comparison");
 	}
 
 	@Override
-	public Judgment judge(FileComparison evidence) {
+	protected Judgment evaluate(FileComparison evidence) {
 		String filePath = evidence.relativePath();
 		Path expectedFile = evidence.expectedFile();
 		Path actualFile = evidence.actualFile();
@@ -63,6 +72,14 @@ public class MavenSemanticJudge extends DeterministicJudge<FileComparison> {
 			logger.error("File comparison failed", e);
 			return Judgment.error("Failed to read files: " + e.getMessage());
 		}
+	}
+
+	/**
+	 * Configures a producer without executing or acquiring evidence.
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<FileComparison> builder() {
+		return io.github.markpollack.judge.construction.EvidenceSteps.of(source -> new MavenSemanticJudge(source));
 	}
 
 }

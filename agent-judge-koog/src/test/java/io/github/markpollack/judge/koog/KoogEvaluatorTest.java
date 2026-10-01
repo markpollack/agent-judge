@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.koog;
 
 import ai.koog.agents.core.agent.AIAgent;
@@ -30,7 +35,8 @@ class KoogEvaluatorTest {
 	@Test
 	void shouldEvaluateWithSingleJudge() {
 		AIAgent<String, String> agent = mockAgent();
-		Judge<CompletionEvidence> judge = (CompletionEvidence ctx) -> Judgment.pass("Output looks good");
+		java.util.function.Function<CompletionEvidence, Judge> judge = (
+				CompletionEvidence ctx) -> () -> Judgment.pass("Output looks good");
 
 		Judgment result = KoogEvaluator.evaluate(agent, "Build a REST API", judge);
 
@@ -41,18 +47,22 @@ class KoogEvaluatorTest {
 	@Test
 	void shouldEvaluateWithJury() {
 		AIAgent<String, String> agent = mockAgent();
-		Judge<CompletionEvidence> passJudge = (CompletionEvidence ctx) -> Judgment.pass("Looks good");
-		Judge<CompletionEvidence> failJudge = (CompletionEvidence ctx) -> Judgment.fail("Missing tests");
-		Judge<CompletionEvidence> passJudge2 = (CompletionEvidence ctx) -> Judgment.pass("Compiles fine");
+		java.util.function.Function<CompletionEvidence, Judge> passJudge = (
+				CompletionEvidence ctx) -> () -> Judgment.pass("Looks good");
+		java.util.function.Function<CompletionEvidence, Judge> failJudge = (
+				CompletionEvidence ctx) -> () -> Judgment.fail("Missing tests");
+		java.util.function.Function<CompletionEvidence, Judge> passJudge2 = (
+				CompletionEvidence ctx) -> () -> Judgment.pass("Compiles fine");
 
-		SimpleJury<CompletionEvidence> jury = SimpleJury.<CompletionEvidence>builder()
-			.judge(passJudge)
-			.judge(failJudge)
-			.judge(passJudge2)
+		java.util.function.Function<CompletionEvidence, io.github.markpollack.judge.jury.Jury> jury = ctx -> SimpleJury
+			.builder()
+			.judge(passJudge.apply(ctx))
+			.judge(failJudge.apply(ctx))
+			.judge(passJudge2.apply(ctx))
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
 
-		Verdict verdict = KoogEvaluator.evaluate(agent, "Build a REST API", jury);
+		Verdict verdict = KoogEvaluator.evaluateJury(agent, "Build a REST API", jury);
 
 		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(verdict.individual()).hasSize(3);

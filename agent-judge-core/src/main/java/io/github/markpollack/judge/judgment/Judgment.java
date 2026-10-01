@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.jspecify.annotations.Nullable;
+import io.github.markpollack.judge.requirement.Requirement;
 
 /**
  * A Judge's conclusion after evaluating supplied evidence. Structured findings,
@@ -40,6 +41,9 @@ import org.jspecify.annotations.Nullable;
  * @param checks bounded child judgments with unique IDs
  * @param provenance optional evaluation identity and retained artifact references
  * @param metadata recursively immutable portable metadata
+ * @param requirement actual configured requirement, absent only for rule-only judgments
+ * @param invocations owned immutable native observations
+ * @param invocationIds references to shared native observations
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({ "schemaVersion", "producerStatus", "finding", "confidence", "probabilityDistribution",
@@ -49,7 +53,9 @@ import org.jspecify.annotations.Nullable;
 @JsonDeserialize(using = io.github.markpollack.judge.serialization.ResultJson.JudgmentReader.class)
 public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding, @Nullable Confidence confidence,
 		@Nullable ProbabilityDistribution probabilityDistribution, @Nullable JudgmentReasonCode reasonCode,
-		String reasoning, List<Check> checks, @Nullable Provenance provenance, Map<String, Object> metadata) {
+		String reasoning, List<Check> checks, @Nullable Provenance provenance, Map<String, Object> metadata,
+		@Nullable Requirement<?> requirement, List<io.github.markpollack.judge.provenance.Invocation> invocations,
+		List<String> invocationIds) {
 
 	/**
 	 * Metadata key reserved for aggregation evidence written by voting strategies.
@@ -94,12 +100,95 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 	 * correct one.
 	 * </p>
 	 *
+	 *
 	 * @since 0.17.0
 	 */
 	public static final String ERROR_CODE_COUNTS_KEY = "errorCodeCounts";
 
-	/** Validate, copy, and recursively freeze every judgment component. */
+	/**
+	 * Validate, copy, and recursively freeze every judgment component.
+	 * @param producerStatus original producer disposition
+	 * @param finding optional product finding
+	 * @param confidence optional native confidence
+	 * @param probabilityDistribution optional native probability distribution
+	 * @param reasonCode typed producer cause, required for ERROR
+	 * @param reasoning original explanation
+	 * @param checks ordered original child judgments
+	 * @param provenance retained source and artifact references, or null
+	 * @param metadata portable original producer facts
+	 */
+	public Judgment(JudgmentStatus producerStatus, @Nullable Finding finding, @Nullable Confidence confidence,
+			@Nullable ProbabilityDistribution probabilityDistribution, @Nullable JudgmentReasonCode reasonCode,
+			String reasoning, List<Check> checks, @Nullable Provenance provenance, Map<String, Object> metadata) {
+		this(producerStatus, finding, confidence, probabilityDistribution, reasonCode, reasoning, checks, provenance,
+				metadata, null, List.of(), List.of());
+	}
+
+	/**
+	 * Retains the actual configured requirement without changing producer facts.
+	 * @param actual configured requirement
+	 * @return judgment associated with that requirement
+	 */
+	public Judgment forRequirement(io.github.markpollack.judge.requirement.Requirement<?> actual) {
+		io.github.markpollack.judge.requirement.Requirement.validate(actual);
+		if (requirement != null && !io.github.markpollack.judge.requirement.Requirement.equivalent(requirement, actual))
+			throw new IllegalArgumentException("Judgment already belongs to a different requirement");
+		if (requirement != null)
+			return this;
+		return new Judgment(producerStatus, finding, confidence, probabilityDistribution, reasonCode, reasoning, checks,
+				provenance, metadata, actual, invocations, invocationIds);
+	}
+
+	/**
+	 * Appends native invocation facts without discarding observations already owned.
+	 * @param fact original invocation
+	 * @return judgment retaining those facts
+	 */
+	public Judgment withInvocation(io.github.markpollack.judge.provenance.Invocation fact) {
+		Objects.requireNonNull(fact, "invocation");
+		for (var retained : invocations)
+			if (retained.id().equals(fact.id())) {
+				if (!retained.equals(fact))
+					throw new IllegalArgumentException("Conflicting invocation identity: " + fact.id());
+				return this;
+			}
+		var combined = new java.util.ArrayList<>(invocations);
+		combined.add(fact);
+		return withInvocations(combined);
+	}
+
+	/**
+	 * Replaces the owned native observations explicitly.
+	 * @param facts observed invocations
+	 * @return judgment retaining those facts
+	 */
+	public Judgment withInvocations(List<io.github.markpollack.judge.provenance.Invocation> facts) {
+		return new Judgment(producerStatus, finding, confidence, probabilityDistribution, reasonCode, reasoning, checks,
+				provenance, metadata, requirement, facts, invocationIds);
+	}
+
+	/**
+	 * References an invocation owned by the enclosing audit record.
+	 * @param ids original invocation identities
+	 * @return judgment retaining references without duplicated usage
+	 */
+	public Judgment withInvocationIds(List<String> ids) {
+		return new Judgment(producerStatus, finding, confidence, probabilityDistribution, reasonCode, reasoning, checks,
+				provenance, metadata, requirement, List.of(), ids);
+	}
+
+	/** Validates original producer facts and freezes retained collections. */
 	public Judgment {
+		invocations = List.copyOf(Objects.requireNonNull(invocations, "invocations"));
+		invocationIds = List.copyOf(Objects.requireNonNull(invocationIds, "invocation IDs"));
+		invocationIds.forEach(io.github.markpollack.judge.requirement.Requirement::requireText);
+		if (invocations.stream()
+			.map(io.github.markpollack.judge.provenance.Invocation::id)
+			.distinct()
+			.count() != invocations.size() || invocationIds.stream().distinct().count() != invocationIds.size())
+			throw new IllegalArgumentException("Duplicate invocation identity");
+		if (requirement != null)
+			io.github.markpollack.judge.requirement.Requirement.validate(requirement);
 		Objects.requireNonNull(producerStatus, "producer status must not be null");
 		Objects.requireNonNull(reasoning, "reasoning must not be null");
 		checks = List.copyOf(Objects.requireNonNull(checks, "checks must not be null"));
@@ -338,6 +427,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 	 * scoring it.
 	 * </p>
 	 * @return true if status is NOT_APPLICABLE
+	 *
 	 * @since 0.17.0
 	 */
 	public boolean notApplicable() {
@@ -427,6 +517,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 	 * @param reasoning what the subject lacks that the criterion is about; must be
 	 * non-blank
 	 * @return a not-applicable judgment
+	 *
 	 * @since 0.17.0
 	 */
 	public static Judgment notApplicable(String reasoning) {
@@ -458,6 +549,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 	 * by {@link #propagatedError}
 	 * @param reasoning why no finding was reached; must be non-blank
 	 * @return error judgment
+	 *
 	 * @since 0.17.0
 	 */
 	public static Judgment error(JudgmentReasonCode reasonCode, String reasoning) {
@@ -491,6 +583,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 	 * @return the propagating error judgment, carrying its origin
 	 * @throws IllegalArgumentException if the origin is empty, holds a non-terminal key,
 	 * or holds a count that is not a positive portable integer
+	 *
 	 * @since 0.17.0
 	 */
 	public static Judgment propagatedError(Map<JudgmentReasonCode, Long> origin, String reasoning) {
@@ -520,6 +613,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 	 * </p>
 	 * @param origin terminal codes to positive counts within the portable integer range
 	 * @return wire name to count, in encounter order
+	 *
 	 * @since 0.17.0
 	 */
 	public static Map<String, Object> portableOriginCounts(Map<JudgmentReasonCode, Long> origin) {
@@ -627,6 +721,9 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		builder.confidence = this.confidence;
 		builder.probabilityDistribution = this.probabilityDistribution;
 		builder.provenance = this.provenance;
+		builder.requirement = this.requirement;
+		builder.invocations = this.invocations;
+		builder.invocationIds = this.invocationIds;
 		builder.reasonCode = this.reasonCode;
 		builder.reasoning = this.reasoning;
 		builder.checks = new ArrayList<>(this.checks);
@@ -660,6 +757,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		/**
 		 * Select a not-applicable outcome.
 		 * @return a stage requiring NOT_APPLICABLE reasoning
+		 *
 		 * @since 0.17.0
 		 */
 		RequiredNotApplicableReason notApplicable();
@@ -678,6 +776,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		 * Select an error outcome with an explicit countable cause.
 		 * @param reasonCode the instrument code naming the cause
 		 * @return a stage requiring ERROR reasoning
+		 *
 		 * @since 0.17.0
 		 */
 		RequiredErrorReason error(JudgmentReasonCode reasonCode);
@@ -783,6 +882,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		 * </p>
 		 * @param reasonCode a {@link JudgmentReasonCode.Family#SUBJECT} code
 		 * @return this builder
+		 *
 		 * @since 0.17.0
 		 */
 		FindingBuilder reasonCode(JudgmentReasonCode reasonCode);
@@ -930,6 +1030,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		 * Replace the countable instrument cause.
 		 * @param reasonCode an {@link JudgmentReasonCode.Family#INSTRUMENT} code
 		 * @return this builder
+		 *
 		 * @since 0.17.0
 		 */
 		ErrorBuilder reasonCode(JudgmentReasonCode reasonCode);
@@ -965,6 +1066,12 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		private @Nullable ProbabilityDistribution probabilityDistribution;
 
 		private @Nullable Provenance provenance;
+
+		private @Nullable Requirement<?> requirement;
+
+		private List<io.github.markpollack.judge.provenance.Invocation> invocations = List.of();
+
+		private List<String> invocationIds = List.of();
 
 		private @Nullable JudgmentReasonCode reasonCode;
 
@@ -1137,7 +1244,8 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 			// message
 			// matches the one the compact constructor would otherwise raise.
 			return new Judgment(Objects.requireNonNull(status, "status must not be null"), finding, confidence,
-					probabilityDistribution, reasonCode, reasoning, checks, provenance, metadata);
+					probabilityDistribution, reasonCode, reasoning, checks, provenance, metadata, requirement,
+					invocations, invocationIds);
 		}
 
 	}

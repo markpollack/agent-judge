@@ -55,9 +55,8 @@ class RejectedExclusionExplanationTest {
 	/**
 	 * An opaque child that excludes the subject while declaring no capability to do so.
 	 */
-	private static Jury<CompletionEvidence> excluding(Judgment... individuals) {
-		return returning(
-				Verdict.of(Judgment.notApplicable("the change set contains no Java sources"), byName(individuals)));
+	private static Jury excluding(Judgment... individuals) {
+		return returning(Verdict.single("excluded", Judgment.notApplicable("the change set contains no Java sources")));
 	}
 
 	private static Map<String, Judgment> byName(Judgment... individuals) {
@@ -68,9 +67,9 @@ class RejectedExclusionExplanationTest {
 		return map;
 	}
 
-	private static Jury<CompletionEvidence> passing() {
-		return SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> PASSING, "backstop"))
+	private static Jury passing() {
+		return SimpleJury.builder()
+			.judge(Judges.named(() -> PASSING, "backstop"))
 			.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN))
 			.build();
 	}
@@ -82,10 +81,10 @@ class RejectedExclusionExplanationTest {
 		@Test
 		@DisplayName("a sole final tier's refused exclusion is named in the root reasoning")
 		void aSoleFinalTierIsExplained() {
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
+			Verdict verdict = CascadedJury.builder()
 				.tier("rubric", excluding(PASSING), RoutingRule.FINAL_TIER)
 				.build()
-				.vote(CONTEXT);
+				.vote();
 
 			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.NO_TIER_DECIDED);
 			assertThat(verdict.judgment().reasoning()).contains("rubric")
@@ -98,12 +97,12 @@ class RejectedExclusionExplanationTest {
 		@Test
 		@DisplayName("a refused exclusion at an earlier tier is named when nothing later decided")
 		void anEarlierTierIsExplainedWhenNothingDecided() {
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("rubric", excluding(PASSING), RoutingRule.REJECT_ON_ANY_FAIL)
+			Verdict verdict = CascadedJury.builder()
+				.tier("rubric", excluding(PASSING), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 				.tier("semantic", ContainmentTest.throwing(new IllegalStateException("the backend was unreachable")),
 						RoutingRule.FINAL_TIER)
 				.build()
-				.vote(CONTEXT);
+				.vote();
 
 			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.NO_TIER_DECIDED);
 			assertThat(verdict.judgment().reasoning()).contains("rubric").contains("NOT_APPLICABLE");
@@ -113,10 +112,9 @@ class RejectedExclusionExplanationTest {
 		@DisplayName("a meta member's refused exclusion is named in the root reasoning")
 		void aMetaMemberIsExplained() {
 			Verdict verdict = Juries
-				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
-						new NamedJury<CompletionEvidence>("healthy", passing()),
-						new NamedJury<CompletionEvidence>("rubric", excluding(PASSING)))
-				.vote(CONTEXT);
+				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN), new NamedJury("healthy", passing()),
+						new NamedJury("rubric", excluding(PASSING)))
+				.vote();
 
 			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
 			assertThat(verdict.judgment().reasoning()).contains("rubric")
@@ -135,11 +133,11 @@ class RejectedExclusionExplanationTest {
 		@Test
 		@DisplayName("R-E: a later selected tier keeps its own reasoning as the root")
 		void aLaterSelectedTierKeepsItsReasoning() {
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("rubric", excluding(PASSING), RoutingRule.REJECT_ON_ANY_FAIL)
+			Verdict verdict = CascadedJury.builder()
+				.tier("rubric", excluding(PASSING), RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 				.tier("semantic", passing(), RoutingRule.FINAL_TIER)
 				.build()
-				.vote(CONTEXT);
+				.vote();
 
 			assertThat(verdict.provenance().tier()).isEqualTo("semantic");
 			assertThat(verdict.judgment().reasoning()).isEqualTo("every requirement was met");
@@ -150,28 +148,30 @@ class RejectedExclusionExplanationTest {
 		@Test
 		@DisplayName("D1: the parent-built stage_failed root keeps its own text")
 		void theD1RootIsUnchanged() {
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("rubric", excluding(FAILING), RoutingRule.REJECT_ON_ANY_FAIL)
+			Verdict verdict = CascadedJury.builder()
+				.tier("rubric",
+						ContainmentTest
+							.returning(Verdict.of(Judgment.notApplicable("excluded"), Map.of("strict", FAILING))),
+						RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 				.tier("semantic", passing(), RoutingRule.FINAL_TIER)
 				.build()
-				.vote(CONTEXT);
-
-			assertThat(verdict.provenance().basis()).isEqualTo(VerdictProvenanceBasis.INDIVIDUAL_REJECTION);
-			assertThat(verdict.judgment().reasonCode()).isEqualTo(JudgmentReasonCode.STAGE_FAILED);
-			assertThat(verdict.judgment().reasoning())
-				.isEqualTo("Tier 'rubric' returned NOT_APPLICABLE without declaring that its aggregate may be "
-						+ "excluded, so its reduction is a stage failure; the cascade stopped because a genuine "
-						+ "individual FAIL in that tier established the rejection.");
+				.vote();
+			assertThat(verdict.provenance())
+				.isEqualTo(VerdictProvenance.tier("semantic", VerdictProvenanceBasis.TIER_OUTCOME));
+			assertThat(verdict.judgment()).isEqualTo(PASSING);
+			assertThat(verdict.compositeAttempts().get(0).dispositionReason())
+				.isEqualTo(DispositionReason.INVALID_TIER_RESULT);
+			assertThat(verdict.compositeAttempts().get(0).verdict().individual()).containsExactly(FAILING);
 		}
 
 		@Test
 		@DisplayName("a tier that threw still reports exactly what it reported before")
 		void aThrownTierIsUnchanged() {
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
+			Verdict verdict = CascadedJury.builder()
 				.tier("rubric", ContainmentTest.throwing(new IllegalStateException("the backend was unreachable")),
 						RoutingRule.FINAL_TIER)
 				.build()
-				.vote(CONTEXT);
+				.vote();
 
 			assertThat(verdict.judgment().reasoning()).isEqualTo("The final cascade tier failed to execute.");
 		}
@@ -180,11 +180,10 @@ class RejectedExclusionExplanationTest {
 		@DisplayName("a member that threw still reports exactly what it reported before")
 		void aThrownMemberIsUnchanged() {
 			Verdict verdict = Juries
-				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
-						new NamedJury<CompletionEvidence>("healthy", passing()),
-						new NamedJury<CompletionEvidence>("broken",
+				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN), new NamedJury("healthy", passing()),
+						new NamedJury("broken",
 								ContainmentTest.throwing(new IllegalStateException("the backend was unreachable"))))
-				.vote(CONTEXT);
+				.vote();
 
 			assertThat(verdict.judgment().reasoning()).isEqualTo(
 					"One or more jury members did not produce a usable determination, so this jury reduced nothing.");

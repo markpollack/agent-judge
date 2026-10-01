@@ -9,50 +9,92 @@ import java.util.Objects;
 import io.github.markpollack.judge.provenance.ArtifactRef;
 
 /**
- * A versioned requirement retaining its native specification and exact source identity.
- * The caller must supply a stable specification snapshot for the entire evaluation and
- * retention lifetime. This envelope does not deep-copy arbitrary S or authenticate a
- * source/specification relationship. A display sentence is not its semantic identity. A
- * Requirement states what must be true. Application reliance rules are configured
- * separately and never change the requirement.
+ * A pure versioned requirement with a stable native specification. Implementations must
+ * supply immutable snapshots; construction and result boundaries validate all
+ * implementations. Value equivalence uses all five components.
  *
  * @param <S> native specification type
- * @param id stable application requirement identity
- * @param revision semantic revision
- * @param text display description; provider rendering belongs to the evaluator
- * @param specification complete stable native specification snapshot
- * @param source source artifact and native/document-local identity
  */
 @com.fasterxml.jackson.databind.annotation.JsonSerialize(
 		using = io.github.markpollack.judge.serialization.ResultJson.RequirementWriter.class)
 @com.fasterxml.jackson.databind.annotation.JsonDeserialize(
 		using = io.github.markpollack.judge.serialization.ResultJson.RequirementReader.class)
-public record Requirement<S>(String id, String revision, String text, S specification, RequirementSource source) {
-	/** Validate required values without normalizing them. */
-	public Requirement {
-		requireText(id);
-		requireText(revision);
-		requireText(text);
-		Objects.requireNonNull(specification, "specification");
-		Objects.requireNonNull(source, "source");
-	}
+public interface Requirement<S> {
 
 	/**
-	 * Create a plain-text specification with content-addressed source provenance.
+	 * Returns the stable identity.
+	 * @return nonblank identity
+	 */
+	String id();
+
+	/**
+	 * Returns the semantic revision.
+	 * @return nonblank revision
+	 */
+	String revision();
+
+	/**
+	 * Returns the display description.
+	 * @return nonblank description
+	 */
+	String text();
+
+	/**
+	 * Returns the native specification.
+	 * @return immutable specification snapshot
+	 */
+	S specification();
+
+	/**
+	 * Returns the exact source identity.
+	 * @return source reference
+	 */
+	RequirementSource source();
+
+	/**
+	 * Creates a content-addressed text requirement.
 	 * @param id stable identity
 	 * @param revision semantic revision
 	 * @param text exact specification
-	 * @return text requirement
+	 * @return immutable text requirement
 	 */
-	public static Requirement<String> text(String id, String revision, String text) {
+	static Requirement<String> text(String id, String revision, String text) {
 		requireText(text);
-		return new Requirement<>(id, revision, text, text, new RequirementSource(
+		return new GeneralRequirement<>(id, revision, text, text, new RequirementSource(
 				ArtifactRef.ofBytes("requirement", text.getBytes(StandardCharsets.UTF_8), null), null));
 	}
 
 	/**
-	 * Validate a nonblank Unicode scalar string without normalization.
-	 * @param text value to validate
+	 * Validates the common values of any implementation.
+	 * @param requirement requirement to validate
+	 */
+	static void validate(Requirement<?> requirement) {
+		Objects.requireNonNull(requirement, "requirement");
+		requireText(requirement.id());
+		requireText(requirement.revision());
+		requireText(requirement.text());
+		Objects.requireNonNull(requirement.specification(), "specification");
+		Objects.requireNonNull(requirement.source(), "source");
+	}
+
+	/**
+	 * Compares complete requirement values across implementations.
+	 * @param first first requirement
+	 * @param second second requirement
+	 * @return true when all common components are equal
+	 */
+	static boolean equivalent(Requirement<?> first, Requirement<?> second) {
+		validate(first);
+		validate(second);
+		return first.id().equals(second.id()) && first.revision().equals(second.revision())
+				&& first.text().equals(second.text()) && first.specification().equals(second.specification())
+				&& first.source().equals(second.source());
+	}
+
+	/**
+	 * Requires nonblank, well-formed Unicode text.
+	 * @param text required value
+	 * @throws IllegalArgumentException if blank or containing an unpaired surrogate
 	 */
 	public static void requireText(String text) {
 		if (Objects.requireNonNull(text).isBlank())
@@ -67,4 +109,5 @@ public record Requirement<S>(String id, String revision, String text, S specific
 				throw new IllegalArgumentException("Unpaired surrogate in requirement");
 		}
 	}
+
 }

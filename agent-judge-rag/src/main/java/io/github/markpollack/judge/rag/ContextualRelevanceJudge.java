@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.rag;
 
 import java.util.Optional;
@@ -30,19 +35,22 @@ public class ContextualRelevanceJudge extends LLMJudge<RagEvidence> {
 	/**
 	 * Create a contextual-relevance judge.
 	 * @param chatClientBuilder Spring AI client used for judging
+	 * @param evidence fresh evidence acquisition provider, invoked once per direct
+	 * execution
 	 */
-	public ContextualRelevanceJudge(ChatClient.Builder chatClientBuilder) {
-		super("ContextualRelevance", "Evaluates whether retrieved context is relevant to the question",
+	public ContextualRelevanceJudge(java.util.function.Supplier<? extends RagEvidence> evidence,
+			ChatClient.Builder chatClientBuilder) {
+		super(evidence, "ContextualRelevance", "Evaluates whether retrieved context is relevant to the question",
 				chatClientBuilder);
 	}
 
 	@Override
-	public Judgment judge(RagEvidence context) {
+	protected Judgment evaluate(RagEvidence context) {
 		Optional<String> ctx = java.util.Optional.of(context.retrievedContext()).filter(value -> !value.isBlank());
 		if (ctx.isEmpty()) {
 			return Judgment.abstain("No context provided — cannot evaluate relevance");
 		}
-		return super.judge(context);
+		return super.evaluate(context);
 	}
 
 	@Override
@@ -94,6 +102,17 @@ public class ContextualRelevanceJudge extends LLMJudge<RagEvidence> {
 			return text.substring(idx + marker.length()).trim();
 		}
 		return "";
+	}
+
+	/**
+	 * Configures native judging without acquiring evidence.
+	 * @param client Spring AI client configuration
+	 * @return typed evidence stage
+	 */
+	public static io.github.markpollack.judge.construction.EvidenceStep<RagEvidence> builder(
+			ChatClient.Builder client) {
+		return io.github.markpollack.judge.construction.EvidenceSteps
+			.of(evidence -> new ContextualRelevanceJudge(evidence, client));
 	}
 
 }

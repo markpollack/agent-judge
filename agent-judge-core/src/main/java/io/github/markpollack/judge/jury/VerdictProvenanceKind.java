@@ -26,6 +26,8 @@ public enum VerdictProvenanceKind {
 
 	/** Logical composition of distinct required constituents. */
 	CONSTITUENTS("CONSTITUENTS"),
+	/** Coverage audit of an explicitly declared requirement roster. */
+	ROSTER("ROSTER"),
 
 	/**
 	 * This jury's own reduction, or a policy outcome of it.

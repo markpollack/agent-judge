@@ -51,10 +51,10 @@ class SeatNameValidityTest {
 	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder().request("name the seats").build();
 
 	/** A judge whose metadata is only built when it is asked for. */
-	private record LazilyNamed(String name, Judgment judgment) implements JudgeWithMetadata<CompletionEvidence> {
+	private record LazilyNamed(String name, Judgment judgment) implements JudgeWithMetadata {
 
 		@Override
-		public Judgment judge(CompletionEvidence context) {
+		public Judgment judge() {
 			return this.judgment;
 		}
 
@@ -65,9 +65,9 @@ class SeatNameValidityTest {
 
 	}
 
-	private static SimpleJury<CompletionEvidence> juryWith(Judge<CompletionEvidence> blankNamed, boolean parallel) {
-		return SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> Judgment.pass("the build succeeded"), "healthy"))
+	private static SimpleJury juryWith(Judge blankNamed, boolean parallel) {
+		return SimpleJury.builder()
+			.judge(Judges.named(() -> Judgment.pass("the build succeeded"), "healthy"))
 			.judge(blankNamed)
 			.votingStrategy(new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN))
 			.parallel(parallel)
@@ -90,7 +90,7 @@ class SeatNameValidityTest {
 		@Test
 		@DisplayName("a blank name is refused by the naming wrapper, before any jury is assembled")
 		void namedRefusesABlankName() {
-			Judge<CompletionEvidence> judge = context -> Judgment.pass("ok");
+			Judge judge = () -> Judgment.pass("ok");
 
 			assertThatThrownBy(() -> Judges.named(judge, "   ")).isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("name must be non-blank");
@@ -122,8 +122,8 @@ class SeatNameValidityTest {
 					juryWith(new LazilyNamed("   ", Judgment.pass("a judgment the jury must not keep")), false));
 		}
 
-		private static void assertContained(SimpleJury<CompletionEvidence> jury) {
-			Verdict verdict = jury.vote(CONTEXT);
+		private static void assertContained(SimpleJury jury) {
+			Verdict verdict = jury.vote();
 
 			assertThat(verdict.individual()).as("every configured judge is represented").hasSize(2);
 			assertThat(verdict.individual().get(0).status()).as("the healthy judge's result survives")
@@ -143,7 +143,7 @@ class SeatNameValidityTest {
 		@Test
 		@DisplayName("the jury still builds, and describing it fails loudly naming the seat")
 		void buildAndDescribeAgreeWithTheVote() {
-			SimpleJury<CompletionEvidence> jury = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
+			SimpleJury jury = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
 
 			assertThatThrownBy(jury::describe).isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("seats[1]")
@@ -159,22 +159,11 @@ class SeatNameValidityTest {
 		@Test
 		@DisplayName("a blank-named seat does not collapse its tier")
 		void aBlankNameDoesNotCollapseItsTier() {
-			Jury<CompletionEvidence> tier = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
-
-			Verdict verdict = CascadedJury.<CompletionEvidence>builder()
-				.tier("gate", tier, RoutingRule.REJECT_ON_ANY_FAIL)
-				.tier("final",
-						SimpleJury.<CompletionEvidence>builder()
-							.judge(Judges.named(context -> Judgment.pass("also fine"), "backstop"))
-							.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN))
-							.build(),
-						RoutingRule.FINAL_TIER)
-				.build()
-				.vote(CONTEXT);
-
-			assertThat(verdict.compositeAttempts()).isNotEmpty();
-			assertThat(verdict.compositeAttempts().get(0).verdict()).as("the tier produced a verdict").isNotNull();
-			assertThat(verdict.compositeAttempts().get(0).verdict().individual()).hasSize(2);
+			Jury tier = juryWith(new LazilyNamed("   ", Judgment.pass("unused")), false);
+			assertThatThrownBy(() -> CascadedJury.builder()
+				.tier("gate", tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
+				.tier("final", tier, RoutingRule.FINAL_TIER)
+				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("name must be non-blank");
 		}
 
 	}

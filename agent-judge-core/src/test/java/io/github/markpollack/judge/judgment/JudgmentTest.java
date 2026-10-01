@@ -374,7 +374,7 @@ class JudgmentTest {
 		@DisplayName("boolean verdict omits absent optionals")
 		void booleanWire() throws Exception {
 			assertThat(MAPPER.writeValueAsString(Judgment.pass("All checks passed"))).isEqualTo(
-					"{\"schemaVersion\":4,\"producerStatus\":\"pass\",\"reasoning\":\"All checks passed\",\"checks\":[],\"metadata\":{}}");
+					"{\"schemaVersion\":5,\"producerStatus\":\"pass\",\"reasoning\":\"All checks passed\",\"checks\":[],\"metadata\":{},\"invocations\":[],\"invocationIds\":[]}");
 		}
 
 		@Test
@@ -387,8 +387,8 @@ class JudgmentTest {
 				.build();
 
 			assertThat(MAPPER.writeValueAsString(judgment)).isEqualTo(
-					"{\"schemaVersion\":4,\"producerStatus\":\"pass\",\"finding\":{\"numeric\":{\"value\":0.82,\"kind\":\"MEASUREMENT\",\"scaleId\":\"normalized-quality:v1\",\"lower\":0.0,\"upper\":1.0,\"levels\":[],\"qualityDirection\":\"INCREASING\"}},"
-							+ "\"reasoning\":\"Quality exceeded the acceptance threshold\",\"checks\":[],\"metadata\":{}}");
+					"{\"schemaVersion\":5,\"producerStatus\":\"pass\",\"finding\":{\"numeric\":{\"value\":0.82,\"kind\":\"MEASUREMENT\",\"scaleId\":\"normalized-quality:v1\",\"lower\":0.0,\"upper\":1.0,\"levels\":[],\"qualityDirection\":\"INCREASING\"}},"
+							+ "\"reasoning\":\"Quality exceeded the acceptance threshold\",\"checks\":[],\"metadata\":{},\"invocations\":[],\"invocationIds\":[]}");
 		}
 
 		@Test
@@ -401,8 +401,8 @@ class JudgmentTest {
 				.build();
 
 			assertThat(MAPPER.writeValueAsString(judgment)).isEqualTo(
-					"{\"schemaVersion\":4,\"producerStatus\":\"pass\",\"finding\":{\"category\":{\"selected\":\"relevant\",\"alternatives\":[\"relevant\"]}},"
-							+ "\"reasoning\":\"The document directly supports the claim\",\"checks\":[],\"metadata\":{}}");
+					"{\"schemaVersion\":5,\"producerStatus\":\"pass\",\"finding\":{\"category\":{\"selected\":\"relevant\",\"alternatives\":[\"relevant\"]}},"
+							+ "\"reasoning\":\"The document directly supports the claim\",\"checks\":[],\"metadata\":{},\"invocations\":[],\"invocationIds\":[]}");
 		}
 
 		@Test
@@ -411,8 +411,8 @@ class JudgmentTest {
 			String json = MAPPER.writeValueAsString(Judgment.error("Judge invocation timed out"));
 
 			assertThat(json)
-				.isEqualTo("{\"schemaVersion\":4,\"producerStatus\":\"error\",\"reasonCode\":\"judge_reported\","
-						+ "\"reasoning\":\"Judge invocation timed out\",\"checks\":[],\"metadata\":{}}");
+				.isEqualTo("{\"schemaVersion\":5,\"producerStatus\":\"error\",\"reasonCode\":\"judge_reported\","
+						+ "\"reasoning\":\"Judge invocation timed out\",\"checks\":[],\"metadata\":{},\"invocations\":[],\"invocationIds\":[]}");
 			assertThat(json).doesNotContain("stackTrace").doesNotContain("cause").doesNotContain("Exception");
 		}
 

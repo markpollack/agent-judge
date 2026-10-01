@@ -55,15 +55,13 @@ public final class NotApplicableGuard {
 	 * @param verdict the verdict the child returned
 	 * @return the reason the verdict cannot be used, or null when the parent may use it
 	 */
-	public static @Nullable DispositionReason stageFailure(Jury<?> child, Verdict verdict) {
+	public static @Nullable DispositionReason stageFailure(Jury child, Verdict verdict) {
 		Objects.requireNonNull(child, "child must not be null");
 		Objects.requireNonNull(verdict, "verdict must not be null");
-		if (verdict.provenance().kind() == VerdictProvenanceKind.UNDECIDED) {
-			return DispositionReason.CHILD_UNDECIDED;
-		}
-		if (verdict.judgment().status() == JudgmentStatus.NOT_APPLICABLE && !child.aggregateMayBeNotApplicable()) {
+		if (verdict.judgment().status() == JudgmentStatus.NOT_APPLICABLE && !child.aggregateMayBeNotApplicable())
 			return DispositionReason.UNDECLARED_NOT_APPLICABLE;
-		}
+		if (verdict.provenance().kind() == VerdictProvenanceKind.UNDECIDED)
+			return DispositionReason.CHILD_UNDECIDED;
 		return null;
 	}
 

@@ -27,8 +27,9 @@ class FileContentJudgeTest {
 		Path testFile = tempDir.resolve("test.txt");
 		Files.writeString(testFile, "Hello World");
 
-		FileContentJudge judge = new FileContentJudge("test.txt", "Hello World", MatchMode.EXACT);
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = FileContentJudge.builder("test.txt",
+				"Hello World", MatchMode.EXACT);
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 		assertThat(judgment.reasoning()).contains("exact").contains("matches");
@@ -41,8 +42,9 @@ class FileContentJudgeTest {
 		Path testFile = tempDir.resolve("test.txt");
 		Files.writeString(testFile, "Hello World");
 
-		FileContentJudge judge = new FileContentJudge("test.txt", "Goodbye World", MatchMode.EXACT);
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = FileContentJudge.builder("test.txt",
+				"Goodbye World", MatchMode.EXACT);
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(judgment.checks()).hasSize(3);
@@ -53,9 +55,10 @@ class FileContentJudgeTest {
 	@Test
 	void readFailureProducesErrorRatherThanFail() throws IOException {
 		Files.createDirectory(tempDir.resolve("directory.txt"));
-		FileContentJudge judge = new FileContentJudge("directory.txt", "content", MatchMode.EXACT);
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = FileContentJudge.builder("directory.txt",
+				"content", MatchMode.EXACT);
 
-		Judgment judgment = judge.judge(createContext());
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).contains("Failed to read file");
@@ -69,8 +72,9 @@ class FileContentJudgeTest {
 		Path testFile = tempDir.resolve("log.txt");
 		Files.writeString(testFile, "Build completed successfully at 10:30 AM");
 
-		FileContentJudge judge = new FileContentJudge("log.txt", "successfully", MatchMode.CONTAINS);
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = FileContentJudge.builder("log.txt",
+				"successfully", MatchMode.CONTAINS);
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 		assertThat(judgment.reasoning()).contains("contains").contains("matches");
@@ -81,8 +85,9 @@ class FileContentJudgeTest {
 		Path testFile = tempDir.resolve("log.txt");
 		Files.writeString(testFile, "Build failed");
 
-		FileContentJudge judge = new FileContentJudge("log.txt", "successfully", MatchMode.CONTAINS);
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = FileContentJudge.builder("log.txt",
+				"successfully", MatchMode.CONTAINS);
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isFalse();
 	}
@@ -92,8 +97,9 @@ class FileContentJudgeTest {
 		Path testFile = tempDir.resolve("data.json");
 		Files.writeString(testFile, "{\"status\": \"success\", \"count\": 42}");
 
-		FileContentJudge judge = new FileContentJudge("data.json", "\\{.*\"status\".*\\}", MatchMode.REGEX);
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = FileContentJudge.builder("data.json",
+				"\\{.*\"status\".*\\}", MatchMode.REGEX);
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 		assertThat(judgment.reasoning()).contains("regex").contains("matches");
@@ -104,16 +110,18 @@ class FileContentJudgeTest {
 		Path testFile = tempDir.resolve("data.txt");
 		Files.writeString(testFile, "plain text");
 
-		FileContentJudge judge = new FileContentJudge("data.txt", "^\\d+$", MatchMode.REGEX);
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = FileContentJudge.builder("data.txt",
+				"^\\d+$", MatchMode.REGEX);
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isFalse();
 	}
 
 	@Test
 	void failsWhenFileDoesNotExist() {
-		FileContentJudge judge = new FileContentJudge("missing.txt", "content", MatchMode.EXACT);
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = FileContentJudge.builder("missing.txt",
+				"content", MatchMode.EXACT);
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isFalse();
 		assertThat(judgment.reasoning()).contains("not found");
@@ -127,8 +135,9 @@ class FileContentJudgeTest {
 		Path testFile = tempDir.resolve("test.txt");
 		Files.writeString(testFile, "exact");
 
-		FileContentJudge judge = new FileContentJudge("test.txt", "exact");
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = FileContentJudge.builder("test.txt",
+				"exact");
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 	}

@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.springai;
 
 import java.util.Map;
@@ -41,7 +46,8 @@ public final class SpringAiEvaluator {
 	 * @param judge judge to apply
 	 * @return the judgment
 	 */
-	public static Judgment evaluate(String goal, Supplier<ChatResponse> call, Judge<CompletionEvidence> judge) {
+	public static Judgment evaluate(String goal, Supplier<ChatResponse> call,
+			java.util.function.Function<CompletionEvidence, Judge> judge) {
 		return evaluate(goal, call, judge, Map.of());
 	}
 
@@ -54,10 +60,10 @@ public final class SpringAiEvaluator {
 	 * @param extraMetadata additional context metadata
 	 * @return the judgment
 	 */
-	public static Judgment evaluate(String goal, Supplier<ChatResponse> call, Judge<CompletionEvidence> judge,
-			Map<String, Object> extraMetadata) {
+	public static Judgment evaluate(String goal, Supplier<ChatResponse> call,
+			java.util.function.Function<CompletionEvidence, Judge> judge, Map<String, Object> extraMetadata) {
 		CompletionEvidence context = SpringAiCompletionEvidenceBuilder.execute(goal, call, extraMetadata);
-		return judge.judge(context);
+		return java.util.Objects.requireNonNull(judge.apply(context)).judge();
 	}
 
 	/**
@@ -67,8 +73,9 @@ public final class SpringAiEvaluator {
 	 * @param jury jury to apply
 	 * @return the verdict
 	 */
-	public static Verdict evaluate(String goal, Supplier<ChatResponse> call, Jury<CompletionEvidence> jury) {
-		return evaluate(goal, call, jury, Map.of());
+	public static Verdict evaluateJury(String goal, Supplier<ChatResponse> call,
+			java.util.function.Function<CompletionEvidence, Jury> jury) {
+		return evaluateJury(goal, call, jury, Map.of());
 	}
 
 	/**
@@ -80,10 +87,10 @@ public final class SpringAiEvaluator {
 	 * @param extraMetadata additional context metadata
 	 * @return the verdict
 	 */
-	public static Verdict evaluate(String goal, Supplier<ChatResponse> call, Jury<CompletionEvidence> jury,
-			Map<String, Object> extraMetadata) {
+	public static Verdict evaluateJury(String goal, Supplier<ChatResponse> call,
+			java.util.function.Function<CompletionEvidence, Jury> jury, Map<String, Object> extraMetadata) {
 		CompletionEvidence context = SpringAiCompletionEvidenceBuilder.execute(goal, call, extraMetadata);
-		return jury.vote(context);
+		return java.util.Objects.requireNonNull(jury.apply(context)).vote();
 	}
 
 }

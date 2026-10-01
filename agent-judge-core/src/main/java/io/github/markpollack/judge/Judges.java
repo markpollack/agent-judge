@@ -113,20 +113,18 @@ public final class Judges {
 	 * Useful for lambda judges that need identifiable names for logging, monitoring, or
 	 * display purposes.
 	 * </p>
-	 * @param <E> evidence type
 	 * @param judge the judge to wrap
 	 * @param name the judge name; must be non-blank, since a jury stores the judgment
 	 * under it
 	 * @return named judge with metadata
 	 * @throws IllegalArgumentException if the name is blank
 	 */
-	public static <E> NamedJudge<E> named(Judge<E> judge, String name) {
+	public static NamedJudge named(Judge judge, String name) {
 		return named(judge, name, null, JudgeType.DETERMINISTIC);
 	}
 
 	/**
 	 * Wrap a judge with name and description.
-	 * @param <E> evidence type
 	 * @param judge the judge to wrap
 	 * @param name the judge name; must be non-blank, since a jury stores the judgment
 	 * under it
@@ -134,13 +132,12 @@ public final class Judges {
 	 * @return named judge with metadata
 	 * @throws IllegalArgumentException if the name is blank
 	 */
-	public static <E> NamedJudge<E> named(Judge<E> judge, String name, String description) {
+	public static NamedJudge named(Judge judge, String name, String description) {
 		return named(judge, name, description, JudgeType.DETERMINISTIC);
 	}
 
 	/**
 	 * Wrap a judge with complete metadata.
-	 * @param <E> evidence type
 	 * @param judge the judge to wrap
 	 * @param name the judge name; must be non-blank, since a jury stores the judgment
 	 * under it
@@ -149,31 +146,29 @@ public final class Judges {
 	 * @return named judge with metadata
 	 * @throws IllegalArgumentException if the name is blank
 	 */
-	public static <E> NamedJudge<E> named(Judge<E> judge, String name, String description, JudgeType type) {
+	public static NamedJudge named(Judge judge, String name, String description, JudgeType type) {
 		// Absence, deliberately: a wrapper that manufactured a capability would let any
 		// judge
 		// exclude a criterion simply by being renamed.
-		return new NamedJudge<E>(judge, new JudgeMetadata(name, description, type, null));
+		return new NamedJudge(judge, new JudgeMetadata(name, description, type, null));
 	}
 
 	/**
 	 * Create a judge that always passes with the given reasoning.
-	 * @param <E> evidence type
 	 * @param reasoning the reasoning to include in judgment
 	 * @return judge that always passes
 	 */
-	public static <E> Judge<E> alwaysPass(String reasoning) {
-		return ctx -> Judgment.pass(reasoning);
+	public static Judge alwaysPass(String reasoning) {
+		return () -> Judgment.pass(reasoning);
 	}
 
 	/**
 	 * Create a judge that always fails with the given reasoning.
-	 * @param <E> evidence type
 	 * @param reasoning the reasoning to include in judgment
 	 * @return judge that always fails
 	 */
-	public static <E> Judge<E> alwaysFail(String reasoning) {
-		return ctx -> Judgment.fail(reasoning);
+	public static Judge alwaysFail(String reasoning) {
+		return () -> Judgment.fail(reasoning);
 	}
 
 	/**
@@ -187,8 +182,8 @@ public final class Judges {
 	 * @param judge the judge to extract metadata from
 	 * @return metadata if available, otherwise empty
 	 */
-	public static Optional<JudgeMetadata> tryMetadata(Judge<?> judge) {
-		return (judge instanceof JudgeWithMetadata<?> jwm) ? Optional.of(jwm.metadata()) : Optional.empty();
+	public static Optional<JudgeMetadata> tryMetadata(Judge judge) {
+		return (judge instanceof JudgeWithMetadata jwm) ? Optional.of(jwm.metadata()) : Optional.empty();
 	}
 
 	/**
@@ -220,18 +215,19 @@ public final class Judges {
 	 * {@link JudgeWithMetadata} whose {@code metadata()} returns null or throws, since
 	 * reading that as absence would silently turn an unreadable judge into an incapable
 	 * one
+	 *
 	 * @since 0.17.0
 	 */
-	public static Optional<String> notApplicableCapability(Judge<?> judge) {
+	public static Optional<String> notApplicableCapability(Judge judge) {
 		Objects.requireNonNull(judge, "judge must not be null");
-		Judge<?> current = judge;
+		Judge current = judge;
 		while (true) {
 			JudgeMetadata metadata = readableMetadataOf(current,
 					"Judge implemented by " + ImplementationIdentity.of(current.getClass()).toPortable());
 			if (metadata != null && metadata.notApplicableWhen() != null) {
 				return Optional.of(metadata.notApplicableWhen());
 			}
-			if (!(current instanceof NamedJudge<?> wrapper)) {
+			if (!(current instanceof NamedJudge wrapper)) {
 				return Optional.empty();
 			}
 			current = Objects.requireNonNull(wrapper.delegate(), "a NamedJudge must wrap a judge");
@@ -261,12 +257,13 @@ public final class Judges {
 	 * the judge, or the judge a {@code NamedJudge} wraps directly, is a
 	 * {@link JudgeWithMetadata} whose {@code metadata()} returns null or throws, since
 	 * describing it as undeclared would misstate it
+	 *
 	 * @since 0.17.0
 	 */
-	public static JudgeDescription describe(Judge<?> judge) {
+	public static JudgeDescription describe(Judge judge) {
 		Objects.requireNonNull(judge, "judge must not be null");
-		Judge<?> innermost = judge;
-		while (innermost instanceof NamedJudge<?> named) {
+		Judge innermost = judge;
+		while (innermost instanceof NamedJudge named) {
 			innermost = Objects.requireNonNull(named.delegate(), "a NamedJudge must wrap a judge");
 		}
 		ImplementationIdentity implementation = ImplementationIdentity.of(innermost.getClass());
@@ -277,13 +274,13 @@ public final class Judges {
 		// the
 		// caller's own label and type, not the innermost implementation's (usually none).
 		JudgeMetadata inner = null;
-		if (judge instanceof NamedJudge<?> wrapper) {
+		if (judge instanceof NamedJudge wrapper) {
 			String outerLabel = (outer != null && outer.name() != null) ? "'" + outer.name() + "'"
 					: "implemented by " + implementation.toPortable();
 			inner = readableMetadataOf(wrapper.delegate(), "The judge wrapped by judge " + outerLabel);
 		}
 		Map<String, Object> configuration = null;
-		if (innermost instanceof ConfiguredJudge<?> configured) {
+		if (innermost instanceof ConfiguredJudge configured) {
 			configuration = configured.configuration();
 			if (configuration == null) {
 				throw new NullPointerException("ConfiguredJudge " + implementation.toPortable()
@@ -311,8 +308,8 @@ public final class Judges {
 	 * {@link JudgeWithMetadata}
 	 * @throws IllegalArgumentException if {@code metadata()} returns null or throws
 	 */
-	private static JudgeMetadata readableMetadataOf(Judge<?> judge, String subject) {
-		if (!(judge instanceof JudgeWithMetadata<?> withMetadata)) {
+	private static JudgeMetadata readableMetadataOf(Judge judge, String subject) {
+		if (!(judge instanceof JudgeWithMetadata withMetadata)) {
 			return null;
 		}
 		JudgeMetadata metadata;
@@ -343,15 +340,14 @@ public final class Judges {
 	 * Example usage:
 	 * </p>
 	 * See the Agent Judge Tutorial for compiled composition examples.
-	 * @param <E> evidence type
 	 * @param first the first judge to execute
 	 * @param second the second judge to execute (only if first passes)
 	 * @return composed judge with AND logic
 	 */
-	public static <E> Judge<E> and(Judge<? super E> first, Judge<? super E> second) {
-		return ctx -> {
-			Judgment firstResult = first.judge(ctx);
-			return firstResult.pass() ? second.judge(ctx) : firstResult;
+	public static Judge and(Judge first, Judge second) {
+		return () -> {
+			Judgment firstResult = first.judge();
+			return firstResult.pass() ? second.judge() : firstResult;
 		};
 	}
 
@@ -368,15 +364,14 @@ public final class Judges {
 	 * Example usage:
 	 * </p>
 	 * See the Agent Judge Tutorial for compiled composition examples.
-	 * @param <E> evidence type
 	 * @param first the first judge to execute
 	 * @param second the second judge to execute (only if the first does not pass)
 	 * @return composed judge with OR logic
 	 */
-	public static <E> Judge<E> or(Judge<? super E> first, Judge<? super E> second) {
-		return ctx -> {
-			Judgment firstResult = first.judge(ctx);
-			return firstResult.pass() ? firstResult : second.judge(ctx);
+	public static Judge or(Judge first, Judge second) {
+		return () -> {
+			Judgment firstResult = first.judge();
+			return firstResult.pass() ? firstResult : second.judge();
 		};
 	}
 
@@ -391,14 +386,13 @@ public final class Judges {
 	 * Example usage:
 	 * </p>
 	 * See the Agent Judge Tutorial for compiled composition examples.
-	 * @param <E> evidence type
 	 * @param judges the judges to compose (varargs)
 	 * @return composed judge with AND logic
 	 */
-	public static <E> Judge<E> allOf(Judge<? super E>... judges) {
-		return ctx -> {
-			for (Judge<? super E> judge : judges) {
-				Judgment judgment = judge.judge(ctx);
+	public static Judge allOf(Judge... judges) {
+		return () -> {
+			for (Judge judge : judges) {
+				Judgment judgment = judge.judge();
 				if (!judgment.pass()) {
 					return judgment;
 				}
@@ -420,14 +414,13 @@ public final class Judges {
 	 * Example usage:
 	 * </p>
 	 * See the Agent Judge Tutorial for compiled composition examples.
-	 * @param <E> evidence type
 	 * @param judges the judges to compose (varargs)
 	 * @return composed judge with OR logic
 	 */
-	public static <E> Judge<E> anyOf(Judge<? super E>... judges) {
-		return ctx -> {
-			for (Judge<? super E> judge : judges) {
-				Judgment judgment = judge.judge(ctx);
+	public static Judge anyOf(Judge... judges) {
+		return () -> {
+			for (Judge judge : judges) {
+				Judgment judgment = judge.judge();
 				if (judgment.pass()) {
 					return judgment;
 				}

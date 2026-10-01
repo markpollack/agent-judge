@@ -27,11 +27,11 @@ class FileExistsJudgeTest {
 		Path testFile = tempDir.resolve("test.txt");
 		Files.writeString(testFile, "test content");
 
-		FileExistsJudge judge = new FileExistsJudge("test.txt");
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = FileExistsJudge.builder("test.txt");
 
 		Path context = tempDir;
 
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 		assertThat(judgment.score()).isNull();
@@ -43,11 +43,11 @@ class FileExistsJudgeTest {
 
 	@Test
 	void failsWhenFileDoesNotExist() {
-		FileExistsJudge judge = new FileExistsJudge("nonexistent.txt");
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = FileExistsJudge.builder("nonexistent.txt");
 
 		Path context = tempDir;
 
-		Judgment judgment = judge.judge(context);
+		Judgment judgment = judge.evidence(context).build().judge();
 
 		assertThat(judgment.pass()).isFalse();
 		assertThat(judgment.effectiveScore()).hasValue(0.0);
@@ -58,11 +58,14 @@ class FileExistsJudgeTest {
 
 	@Test
 	void hasCorrectMetadata() {
-		FileExistsJudge judge = new FileExistsJudge("test.txt");
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = FileExistsJudge.builder("test.txt");
 
-		assertThat(judge.metadata().name()).isEqualTo("FileExistsJudge");
-		assertThat(judge.metadata().description()).contains("test.txt");
-		assertThat(judge.metadata().type()).isEqualTo(JudgeType.DETERMINISTIC);
+		assertThat(((io.github.markpollack.judge.JudgeWithMetadata) judge.evidence(tempDir).build()).metadata().name())
+			.isEqualTo("FileExistsJudge");
+		assertThat(((io.github.markpollack.judge.JudgeWithMetadata) judge.evidence(tempDir).build()).metadata()
+			.description()).contains("test.txt");
+		assertThat(((io.github.markpollack.judge.JudgeWithMetadata) judge.evidence(tempDir).build()).metadata().type())
+			.isEqualTo(JudgeType.DETERMINISTIC);
 	}
 
 }

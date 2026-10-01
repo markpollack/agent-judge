@@ -1,0 +1,29 @@
+Captured 2026-09-06 from a live AgentClient run. Verbatim agent output follows the blank line.
+
+I'll start by getting oriented in the codebase.Assessed all 13 against the implementation.
+
+RULE-1: FAIL - No centralized transition policy exists anywhere; `SchedulingRequest.setStatus` (`src/main/java/org/springframework/samples/petclinic/scheduling/model/SchedulingRequest.java:151`) is an unguarded setter and each permitted transition is re-encoded inline across six classes (`SchedulingRequestService`, `ReservationService`, `StaffFallbackService`, `LifecycleProcessor`, `AppointmentService`, `StartupRecoveryRunner`), though controllers, repositories and JPA callbacks do stay out of it.
+
+RULE-2: FAIL - The `Instant`/`LocalDate`/`LocalTime` split and the single-offset DST rule are implemented in `src/main/java/org/springframework/samples/petclinic/scheduling/service/SchedulingTimeService.java:66`, but current time is not all Clock-derived: `src/main/java/org/springframework/samples/petclinic/security/UserPrincipal.java:93` evaluates the account-lock deadline against `Instant.now()`, as do eight `@PrePersist`/`@PreUpdate` callbacks.
+
+RULE-3: PASS - One `reservations` table holds both `GUIDED_HOLD` and `STAFF_OFFER` rows with type, status, request, owner, pet, vet, half-open start/end and `expires_at` (`src/main/java/org/springframework/samples/petclinic/scheduling/model/Reservation.java:22-63`), while confirmed bookings are separate `Appointment` rows created only on accept.
+
+RULE-4: FAIL - `LockCoordinator.lockResources` implements the mandated order, but `StaffFallbackService.createStaffOffer` takes a `PESSIMISTIC_WRITE` lock on `SchedulingRequest` at `src/main/java/org/springframework/samples/petclinic/scheduling/service/StaffFallbackService.java:247` before locking Owner/Pet/Vet at `:258` (same inversion at `:336`/`:346`).
+
+RULE-5: FAIL - Hard feasibility is defined twice rather than once: `LiveFeasibilityService` re-derives it imperatively from repositories and omits the solver's `exactRejectedPair` hard constraint at `src/main/java/org/springframework/samples/petclinic/scheduling/matching/AppointmentPlanningConstraintProvider.java:91`, so the two paths can disagree.
+
+RULE-6: PASS - `OperationToken` persists token, kind, `dispatchedAt`, `deadline` and `attemptCount` before dispatch; `MatchingCoordinator` dispatches only in `afterCommit`, completes under a conditional token+state check, falls back on `RejectedExecutionException` (`src/main/java/org/springframework/samples/petclinic/scheduling/matching/MatchingCoordinator.java:174-201`), and `StartupRecoveryRunner` cancels tokens rather than redispatching.
+
+RULE-7: PASS - Mutation, audit and notification are written together inside one `@Transactional` service method (e.g. `src/main/java/org/springframework/samples/petclinic/scheduling/service/AppointmentService.java:128-180`), and the only `@EventListener` in the codebase is `DemoScheduleInitializer`, so no listener or outbox sources a notification.
+
+RULE-8: FAIL - Route rules and owner-scoped queries are in place, but the `SchedulingRequest` JPA entity itself is bound into both the owner and staff views (`src/main/java/org/springframework/samples/petclinic/scheduling/controller/SchedulingRequestController.java:101` and `StaffQueueController.java:102-106`, which also pass `Reservation`, `StaffClaim`, `Vet` and `Specialty` entities) instead of role-specific DTOs.
+
+RULE-9: PASS - `spring.sql.init.mode=never` with `baseline-on-migrate=false` in `src/main/resources/application.properties`, vendor-specific `V1__legacy_baseline.sql` for h2/mysql/postgres plus scheduling at V2, and `src/test/java/org/springframework/samples/petclinic/system/FlywayMigrationTests.java` proves both the explicit-baseline path and that an unknown non-empty schema fails.
+
+RULE-10: FAIL - `src/main/java/org/springframework/samples/petclinic/scheduling/service/AIInterpretationClient.java:138` logs the full prompt (which embeds the owner's raw request text) and `:140` logs the raw AI response, both as structured log arguments.
+
+RULE-11: FAIL - Both builds are on Java 21 with Spring AI 2.0.1 and Timefold 2.5.0, but `.github/workflows/maven-build.yml` runs only a `java: ['21']` matrix and never exercises an H2/MySQL/PostgreSQL migration-and-concurrency matrix, so Maven does not own the matrix it is required to.
+
+RULE-12: FAIL - `requestVersion` is threaded into `ReservationService.acceptGuidedHold`/`rejectGuidedHold` (`src/main/java/org/springframework/samples/petclinic/scheduling/service/ReservationService.java:223`) and never read, and the stale-hold outcome is thrown as `IllegalStateException` at `:260` rather than returned as a typed outcome; no outcome type exists in the scheduling package.
+
+RULE-13: PASS - Symbolic rows live in `request_availability_windows` and their confirmation-time expansion in `request_availability_intervals` as half-open `Instant` rows kinded ALLOWED/PREFERRED/EXCLUDED, replaced transactionally in `AvailabilityWindowResolver.materialize` (`src/main/java/org/springframework/samples/petclinic/scheduling/service/AvailabilityWindowResolver.java:50-78`), and both the solver (`SchedulingProblemFactory.java:151`) and `LiveFeasibilityService.java:76` read those rows through the shared `OwnerWindowPolicy`.

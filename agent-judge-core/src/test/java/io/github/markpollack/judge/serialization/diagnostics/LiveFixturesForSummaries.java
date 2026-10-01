@@ -28,33 +28,30 @@ final class LiveFixturesForSummaries {
 	}
 
 	static Verdict childUndecidedRejection() {
-		return CascadedJury.<CompletionEvidence>builder()
+		return CascadedJury.builder()
 			.tier("gate", Fixtures.undecidedTier(Judgment.pass("a"), Judgment.fail("b")),
-					RoutingRule.REJECT_ON_ANY_FAIL)
+					RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", Fixtures.passingTier("ok", "OK"), RoutingRule.FINAL_TIER)
 			.build()
-			.vote(CONTEXT);
+			.vote();
 	}
 
 	static Verdict nestedRejection() {
-		Jury<CompletionEvidence> inner = CascadedJury.<CompletionEvidence>builder()
+		Jury inner = CascadedJury.builder()
 			.tier("rubric", Fixtures.opaqueExcludingTier(Judgment.pass("a"), Judgment.fail("b")),
-					RoutingRule.REJECT_ON_ANY_FAIL)
+					RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("semantic", Fixtures.passingTier("ok", "OK"), RoutingRule.FINAL_TIER)
 			.build();
-		return CascadedJury.<CompletionEvidence>builder()
-			.tier("inner", inner, RoutingRule.FINAL_TIER)
-			.build()
-			.vote(CONTEXT);
+		return CascadedJury.builder().tier("inner", inner, RoutingRule.FINAL_TIER).build().vote();
 	}
 
 	static Verdict propagatedError() {
-		return SimpleJury.<CompletionEvidence>builder()
-			.judge(Judges.named(context -> Judgment.error("the index was unreachable"), "flaky"))
-			.judge(Judges.named(context -> Judgment.pass("fine"), "ok"))
+		return SimpleJury.builder()
+			.judge(Judges.named(() -> Judgment.error("the index was unreachable"), "flaky"))
+			.judge(Judges.named(() -> Judgment.pass("fine"), "ok"))
 			.votingStrategy(new ConsensusStrategy())
 			.build()
-			.vote(CONTEXT);
+			.vote();
 	}
 
 }

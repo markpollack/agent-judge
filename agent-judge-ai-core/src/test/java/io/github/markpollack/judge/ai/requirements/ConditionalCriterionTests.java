@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
 package io.github.markpollack.judge.ai.requirements;
 
 import java.util.List;
@@ -165,7 +170,7 @@ class ConditionalCriterionTests {
 					""");
 
 			assertThat(judgment.checks()).extracting(Check::id).containsExactly("UC1-AC1", "UC1-AC2", "UC1-AC3");
-			assertThat(judgment.metadata()).containsEntry("criteriaTotal", 3).containsEntry("established", 1L);
+			assertThat(judgment.metadata()).containsEntry("criteriaTotal", 3).containsEntry("established", 1);
 		}
 
 		@Test
@@ -203,10 +208,9 @@ class ConditionalCriterionTests {
 		@Test
 		@DisplayName("a roster with a conditional criterion declares it, naming the ids")
 		void conditionalRostersDeclare() {
-			assertThat(Judges.notApplicableCapability(EarsJudge.create("audit", MIXED, model(""))))
-				.hasValueSatisfying(declared -> assertThat(declared).contains("UC1-AC2").doesNotContain("UC1-AC1"));
-			assertThat(Judges.notApplicableCapability(Rfc2119Judge.create("audit", CONSTRAINTS, model(""))))
-				.hasValueSatisfying(declared -> assertThat(declared).contains("RULE-2"));
+			assertThat(earsRoster(MIXED).describe().aggregateMayBeNotApplicable()).isFalse();
+			assertThat(earsRoster(List.of(MIXED.get(1))).describe().aggregateMayBeNotApplicable()).isTrue();
+
 		}
 
 		@Test
@@ -215,15 +219,15 @@ class ConditionalCriterionTests {
 			List<EarsCriterion> unconditional = List
 				.of(new EarsCriterion("UC1-AC1", "first", "The system shall do the first thing."));
 
-			assertThat(Judges.notApplicableCapability(EarsJudge.create("audit", unconditional, model("")))).isEmpty();
+			assertThat(earsRoster(unconditional).describe().aggregateMayBeNotApplicable()).isFalse();
 		}
 
 		@Test
 		@DisplayName("the prompt offers the exclusion only where the document authorized one")
 		void thePromptOffersItOnlyWhereAuthorized() {
-			assertThat(EarsJudge.templateFor("audit", MIXED).source().load()).contains("NOT_APPLICABLE")
+			assertThat(EarsParser.templateFor("audit", MIXED).source().load()).contains("NOT_APPLICABLE")
 				.contains("UC1-AC2");
-			assertThat(EarsJudge
+			assertThat(EarsParser
 				.templateFor("audit", List.of(new EarsCriterion("UC1-AC1", "first", "The system shall do it.")))
 				.source()
 				.load()).doesNotContain("NOT_APPLICABLE");
@@ -266,11 +270,22 @@ class ConditionalCriterionTests {
 	}
 
 	private static Judgment judgeWith(List<EarsCriterion> criteria, String answers) {
-		return EarsJudge.create("audit", criteria, model(answers)).judge(context());
+		return EarsParser.rollupFor(criteria,
+				model(answers).generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
 	}
 
 	private static Judgment rfc(String answers) {
-		return Rfc2119Judge.create("audit", CONSTRAINTS, model(answers)).judge(context());
+		return Rfc2119Parser.rollupFor(CONSTRAINTS,
+				model(answers).generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
+	}
+
+	private static EarsJury earsRoster(List<EarsCriterion> source) {
+		return EarsJury.builder()
+			.runtime(model(""))
+			.requirements(source.stream()
+				.map(c -> EarsRequirement.of(c.id(), "test", c.title(), c.requirement(), c.applicability()))
+				.toList())
+			.build();
 	}
 
 	private static Path context() {

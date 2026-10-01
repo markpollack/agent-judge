@@ -15,7 +15,7 @@ import io.github.markpollack.judge.judgment.Judgment;
  * A consumer judge that opts in to declaring configuration, returning whatever map it was
  * given — including, in tests, maps a description must refuse.
  */
-public class DeclaringJudge implements ConfiguredJudge<CompletionEvidence> {
+public class DeclaringJudge implements ConfiguredJudge {
 
 	private final Map<String, Object> configuration;
 
@@ -29,7 +29,7 @@ public class DeclaringJudge implements ConfiguredJudge<CompletionEvidence> {
 	}
 
 	@Override
-	public Judgment judge(CompletionEvidence context) {
+	public Judgment judge() {
 		return Judgment.pass("declared");
 	}
 

@@ -24,8 +24,9 @@ class BuildSuccessJudgeTest {
 
 	@Test
 	void customBuildCommandExecutes() {
-		BuildSuccessJudge judge = new BuildSuccessJudge("echo 'Building...'");
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = BuildSuccessJudge
+			.builder("echo 'Building...'");
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 		assertThat(judgment.reasoning()).contains("succeeded");
@@ -38,8 +39,8 @@ class BuildSuccessJudgeTest {
 		Files.writeString(mvnw, "#!/bin/bash\necho 'Maven wrapper'\nexit 0");
 		makeExecutable(mvnw);
 
-		BuildSuccessJudge judge = BuildSuccessJudge.maven("--version");
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = BuildSuccessJudge.maven("--version");
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 		// Verify it used wrapper (check output contains wrapper script output)
@@ -50,8 +51,8 @@ class BuildSuccessJudgeTest {
 	@Test
 	void mavenFallsBackToMvnWhenWrapperMissing() {
 		// No mvnw in tempDir
-		BuildSuccessJudge judge = BuildSuccessJudge.maven("--version");
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = BuildSuccessJudge.maven("--version");
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		// This will use system 'mvn' which may or may not exist
 		// We just verify the judge executes (pass/fail depends on system)
@@ -66,8 +67,8 @@ class BuildSuccessJudgeTest {
 		Files.writeString(gradlew, "#!/bin/bash\necho 'Gradle wrapper'\nexit 0");
 		makeExecutable(gradlew);
 
-		BuildSuccessJudge judge = BuildSuccessJudge.gradle("--version");
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = BuildSuccessJudge.gradle("--version");
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 		String output = (String) judgment.metadata().get("output");
@@ -77,8 +78,8 @@ class BuildSuccessJudgeTest {
 	@Test
 	void gradleFallsBackToGradleWhenWrapperMissing() {
 		// No gradlew in tempDir
-		BuildSuccessJudge judge = BuildSuccessJudge.gradle("--version");
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = BuildSuccessJudge.gradle("--version");
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		// This will use system 'gradle' which may or may not exist
 		assertThat(judgment).isNotNull();
@@ -91,8 +92,9 @@ class BuildSuccessJudgeTest {
 		Files.writeString(mvnw, "#!/bin/bash\necho \"Goals: $@\"\nexit 0");
 		makeExecutable(mvnw);
 
-		BuildSuccessJudge judge = BuildSuccessJudge.maven("clean", "compile", "test");
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = BuildSuccessJudge.maven("clean", "compile",
+				"test");
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 		String output = (String) judgment.metadata().get("output");
@@ -105,8 +107,9 @@ class BuildSuccessJudgeTest {
 		Files.writeString(gradlew, "#!/bin/bash\necho \"Tasks: $@\"\nexit 0");
 		makeExecutable(gradlew);
 
-		BuildSuccessJudge judge = BuildSuccessJudge.gradle("clean", "build", "test");
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = BuildSuccessJudge.gradle("clean", "build",
+				"test");
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isTrue();
 		String output = (String) judgment.metadata().get("output");
@@ -120,8 +123,8 @@ class BuildSuccessJudgeTest {
 		Files.writeString(mvnw, "#!/bin/bash\necho 'BUILD FAILURE'\nexit 1");
 		makeExecutable(mvnw);
 
-		BuildSuccessJudge judge = BuildSuccessJudge.maven("compile");
-		Judgment judgment = judge.judge(createContext());
+		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = BuildSuccessJudge.maven("compile");
+		Judgment judgment = judge.evidence(createContext()).build().judge();
 
 		assertThat(judgment.pass()).isFalse();
 		assertThat(judgment.reasoning()).contains("failed");

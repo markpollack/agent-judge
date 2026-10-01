@@ -8,9 +8,8 @@ package io.github.markpollack.judge.jury;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.description.JuryDescription;
 
-
 /**
- * Jury of judges evaluating the same typed evidence.
+ * Configured composition or declared requirement audit returning a complete Verdict.
  *
  * <p>
  * A Jury is a separate abstraction from Judge that aggregates judgments from multiple
@@ -30,21 +29,19 @@ import io.github.markpollack.judge.description.JuryDescription;
  * Executable examples are maintained in the Agent Judge Tutorial:
  * https://github.com/markpollack/agent-judge-tutorial.
  *
- * @param <E> evidence accepted by every participating judge
  * @author Mark Pollack
  * @since 0.1.0
  * @see SimpleJury
  * @see VotingStrategy
  * @see Verdict
  */
-public interface Jury<E> {
+public interface Jury {
 
 	/**
 	 * Evaluate the configured composition, which may stop before every tier executes.
-	 * @param context typed evidence for this evaluation
 	 * @return verdict with judgment and individual judgments
 	 */
-	Verdict vote(E context);
+	Verdict vote();
 
 	/**
 	 * Describe this jury's configured structure, available before any vote.
@@ -58,6 +55,7 @@ public interface Jury<E> {
 	 * @return the jury's description
 	 * @throws IllegalArgumentException if a judge declares a configuration that is not
 	 * portable; the message names where
+	 *
 	 * @since 0.17.0
 	 */
 	default JuryDescription describe() {
@@ -73,18 +71,16 @@ public interface Jury<E> {
 	 * aggregate from it will treat that as a stage failure rather than honour it.
 	 * </p>
 	 * <p>
-	 * The default is {@code false}, which is the safe direction and the honest one: a
-	 * jury this library cannot inspect has made no pre-spend guarantee about its own
-	 * denominator, so it is checked at runtime wherever a built-in parent receives its
-	 * output. Override it only if the jury really can return an excluded aggregate — and
-	 * then it must, because otherwise its legitimate exclusions will be contained as
-	 * errors.
+	 * The bound derives from {@link #describe()}. Opaque structures grant no permission.
+	 * Custom implementations declare a typed description; they must keep it stable for
+	 * the configured lifetime. Judge seats own their local exclusion permissions.
 	 * </p>
 	 * @return true when the aggregate may be not applicable; false by default
+	 *
 	 * @since 0.17.0
 	 */
 	default boolean aggregateMayBeNotApplicable() {
-		return false;
+		return describe().aggregateMayBeNotApplicable();
 	}
 
 }

@@ -1,23 +1,22 @@
-# Requirement assertions with AssertJ
+# Configured assertions with AssertJ
 
 ```java
 import static io.github.markpollack.judge.assertj.Assertions.assertThat;
-import io.github.markpollack.judge.RequirementJudge;
-import io.github.markpollack.judge.judgment.Judgment;
-import io.github.markpollack.judge.requirement.Requirement;
+import io.github.markpollack.judge.NonEmptyJudge;
+import io.github.markpollack.judge.jury.SimpleJury;
 
-var requirement = Requirement.text("ready", "1", "READY");
-RequirementJudge<String, String> matches = (actual, response) -> actual.specification().equals(response)
-    ? Judgment.pass("matches") : Judgment.fail("differs");
-assertThat(requirement).judgedBy(matches).withEvidence("READY").isSatisfied();
+var judge = NonEmptyJudge.builder().evidence("READY").build();
+var jury = SimpleJury.builder().judge("ready", judge).build();
+assertThat(judge).isPassed();
+assertThat(jury).isPassed();
+var result = assertThat(jury).evaluate();
+assertThat(result).isPassed();
 ```
 
-The grammar is `Requirement<S> → RequirementJudge<S,E> or RequirementJury<S,E> → E → optional Policy → terminal`. `evaluate()` retains a result without asserting; `isSatisfied()` asserts it. Stages do not execute until a terminal. Repeating terminals on the same stage reuses its completed result, including any policy failure. Select `withPolicy(...)` before execution; changing it afterward is refused. Separate branches configured before execution are separate evaluations.
+Ready Judge/Jury stages optionally select `withPolicy(policy)` before execution. Requirement-first assertions use `assertThat(actual).judgedBy(typedRecipe).withEvidence(evidence).isSatisfied()`. The recipe constructs the actual public producer; it cannot silently discard the Requirement. Evidence suppliers are also supported.
 
-The requirement path rejects ordinary Judges/Juries instead of discarding a supplied specification. Use `assertThatEvidence(evidence).judgedBy(ordinaryJudgeOrJury).isPassed()` for an evidence-only check. Both retained `Verdict` and `EvaluationResult` have `assertThat(...)` overloads with `hasConclusion(...)`.
+Construction and incomplete chains execute nothing. Each completed stage executes once and caches either its complete evaluation or thrown failure, including cancellation/fatal errors. Separate branches prepared before execution are separate evaluations. Policy sees the whole usable Verdict once. Changing policy after execution is refused.
 
-No policy is requested by default. `withPolicy(v -> new PolicyDecision(PolicyAction.RELY, "reviewed"))` receives the entire usable Verdict. RELY preserves negative conclusions; ABSTAIN/ESCALATE withhold reliance; a thrown exception or null return becomes a failed requested policy. None rewrite producer judgments or restart routing.
+Retained Verdict/EvaluationResult assertions inspect `hasConclusion(...)` and `isPassed()` only; they cannot attach a policy or request new satisfaction evaluation. Use core `Evaluations.apply(verdict, policy)` to make a new, explicit policy decision. Reporting and retained assertions invoke nothing.
 
-`isSatisfied()` requires PASS plus either no requested policy or RELY, and an actual Requirement association. `isPassed()` checks the conclusion alone. Failures preserve the complete evaluation; an AssertJ description wraps the retained `RequirementAssertionError` as its cause. Reporting or asserting a retained result invokes no evaluator.
-
-The compiler rejects evidence/specification mismatches, premature terminals, ordinary-Judge misuse, Jury-as-Judge assignment, and selector output mismatches. Dynamic all-of coverage is validated at runtime before execution. [API examples](src/test/java/io/github/markpollack/judge/assertj/AssertJApiExperienceTest.java), [compiler probes](src/test/java/io/github/markpollack/judge/assertj/CompileGrammarTest.java), and the [root tutorial](../README.md) exercise these paths.
+Live `isSatisfied()` requires actual requirement context, PASS, and either no requested policy or RELY. RELY on FAIL remains rejection. Requested policy failures retain the original cause. Compiler tests reject premature terminals, wrong specification/evidence, double evidence selection and input arguments on ready execution. Ordinary ready Juries can mix independently configured requirements/evidence.

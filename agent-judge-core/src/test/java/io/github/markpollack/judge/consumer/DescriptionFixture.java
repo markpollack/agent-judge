@@ -61,39 +61,37 @@ public final class DescriptionFixture {
 		return new ObjectMapper().writeValueAsBytes(jury().describe().toPortable());
 	}
 
-	static Jury<CompletionEvidence> jury() {
-		Judge<CompletionEvidence> lambda = ctx -> Judgment.pass("lambda");
-		Judge<CompletionEvidence> anonymous = new Judge<CompletionEvidence>() {
+	static Jury jury() {
+		Judge lambda = () -> Judgment.pass("lambda");
+		Judge anonymous = new Judge() {
 			@Override
-			public Judgment judge(CompletionEvidence context) {
+			public Judgment judge() {
 				return Judgment.fail("anonymous");
 			}
 		};
 		Map<String, Object> rubric = Map.of("passMark", 0.75, "criteria", List.of("correct", "complete"), "version", 3,
 				"strict", true, "levels", Map.of("high", 1.0, "mid", 0.5, "low", 0.0));
 
-		Jury<CompletionEvidence> gate = SimpleJury.<CompletionEvidence>builder()
+		Jury gate = SimpleJury.builder()
 			.judge(lambda)
 			.judge(anonymous, 2.0)
 			.judge(Judges.allOf(lambda, anonymous), 0.5)
 			.votingStrategy(new WeightedAverageStrategy(0.5, ErrorHandling.IGNORE))
 			.build();
-		Jury<CompletionEvidence> rubricJury = SimpleJury.<CompletionEvidence>builder()
+		Jury rubricJury = SimpleJury.builder()
 			.judge(Judges.named(new DeclaringJudge(rubric), "rubric", "declares its rubric", JudgeType.LLM_POWERED))
 			.votingStrategy(new AverageVotingStrategy(0.8))
 			.build();
-		Jury<CompletionEvidence> duplicates = Juries.fromJudges(new ConsensusStrategy(), Judges.named(lambda, "same"),
+		Jury duplicates = Juries.fromJudges(new ConsensusStrategy(), Judges.named(lambda, "same"),
 				Judges.named(anonymous, "same"));
-		Jury<CompletionEvidence> review = Juries.meta(
-				new MajorityVotingStrategy(TieBreakRule.ABSTAIN, ErrorHandling.TREAT_AS_ABSTAIN),
-				new NamedJury<CompletionEvidence>("rubric", rubricJury),
-				new NamedJury<CompletionEvidence>("duplicates", duplicates));
-		Jury<CompletionEvidence> last = Juries.fromJudges(new ConjunctiveStrategy(0.6), new KeywordJudge("done"),
-				lambda);
+		Jury review = Juries.meta(new MajorityVotingStrategy(TieBreakRule.ABSTAIN, ErrorHandling.TREAT_AS_ABSTAIN),
+				new NamedJury("rubric", rubricJury), new NamedJury("duplicates", duplicates));
+		Jury last = Juries.fromJudges(new ConjunctiveStrategy(0.6),
+				new KeywordJudge(CompletionEvidence.builder().request("test").build(), "done"), lambda);
 
-		return CascadedJury.<CompletionEvidence>builder()
-			.tier("gate", gate, RoutingRule.REJECT_ON_ANY_FAIL)
-			.tier("review", review, RoutingRule.ACCEPT_ON_ALL_PASS)
+		return CascadedJury.builder()
+			.tier("gate", gate, RoutingRule.STOP_ON_ANY_OPINION_FAIL)
+			.tier("review", review, RoutingRule.STOP_ON_ALL_OPINIONS_PASS)
 			.tier("final", last, RoutingRule.FINAL_TIER)
 			.build();
 	}

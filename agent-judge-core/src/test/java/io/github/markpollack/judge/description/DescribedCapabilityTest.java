@@ -60,10 +60,10 @@ class DescribedCapabilityTest {
 	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder().request("describe").build();
 
 	/** A judge that declares, in advance, that it may exclude a subject. */
-	private record Conditional(String name) implements JudgeWithMetadata<CompletionEvidence> {
+	private record Conditional(String name) implements JudgeWithMetadata {
 
 		@Override
-		public Judgment judge(CompletionEvidence context) {
+		public Judgment judge() {
 			return Judgment.notApplicable(CONDITION);
 		}
 
@@ -99,11 +99,16 @@ class DescribedCapabilityTest {
 			return ExclusionHandling.EXCLUDE;
 		}
 
+		@Override
+		public StrategyDescription describe() {
+			return StrategyDescription.declared(this, null, ExclusionHandling.EXCLUDE, null, Map.of());
+		}
+
 	}
 
-	private static SimpleJury<CompletionEvidence> capableJury() {
-		return SimpleJury.<CompletionEvidence>builder()
-			.judge(new Conditional("conditional"))
+	private static SimpleJury capableJury() {
+		return SimpleJury.builder()
+			.seat(declared(new Conditional("conditional")))
 			.votingStrategy(new DelegatingExcluder())
 			.build();
 	}
@@ -115,7 +120,7 @@ class DescribedCapabilityTest {
 		@Test
 		@DisplayName("the jury and its description agree about the capability")
 		void theJuryAndItsDescriptionAgree() {
-			SimpleJury<CompletionEvidence> jury = capableJury();
+			SimpleJury jury = capableJury();
 
 			assertThat(jury.aggregateMayBeNotApplicable()).as("the jury can emit NOT_APPLICABLE").isTrue();
 			assertThat(jury.describe().aggregateMayBeNotApplicable()).as("and says so").isTrue();
@@ -130,14 +135,13 @@ class DescribedCapabilityTest {
 		@Test
 		@DisplayName("the jury really does produce the excluded aggregate the description promises")
 		void theCapabilityIsReal() {
-			assertThat(capableJury().vote(CONTEXT).judgment().notApplicable()).isTrue();
+			assertThat(capableJury().vote().judgment().notApplicable()).isTrue();
 		}
 
 		@Test
 		@DisplayName("a meta-jury over it agrees too")
 		void aMetaJuryAgrees() {
-			Jury<CompletionEvidence> meta = Juries.meta(new DelegatingExcluder(),
-					new NamedJury<CompletionEvidence>("panel", capableJury()));
+			Jury meta = Juries.meta(new DelegatingExcluder(), new NamedJury("panel", capableJury()));
 
 			assertThat(meta.aggregateMayBeNotApplicable()).isTrue();
 			assertThat(meta.describe().aggregateMayBeNotApplicable()).isTrue();
@@ -153,12 +157,12 @@ class DescribedCapabilityTest {
 		@Test
 		@DisplayName("still describes its capability exactly as before")
 		void builtInsAreUnchanged() {
-			SimpleJury<CompletionEvidence> excluding = SimpleJury.<CompletionEvidence>builder()
-				.judge(new Conditional("conditional"))
+			SimpleJury excluding = SimpleJury.builder()
+				.seat(declared(new Conditional("conditional")))
 				.votingStrategy(new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 				.build();
-			SimpleJury<CompletionEvidence> failing = SimpleJury.<CompletionEvidence>builder()
-				.judge(new Conditional("conditional"))
+			SimpleJury failing = SimpleJury.builder()
+				.seat(declared(new Conditional("conditional")))
 				.votingStrategy(new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.TREAT_AS_FAIL))
 				.build();
 
@@ -170,24 +174,20 @@ class DescribedCapabilityTest {
 		}
 
 		@Test
-		@DisplayName("a description that contradicts a declared policy is refused, not stored")
-		void aContradictionIsRefused() {
-			StrategyDescription declaredExcluder = new AllMustPassStrategy(ErrorHandling.PROPAGATE,
-					ExclusionHandling.EXCLUDE)
-				.describe();
-			List<SeatDescription> capableSeat = List.of(new SeatDescription(0, "conditional", KeySource.DECLARED, 1.0,
+		void applicabilityHasOneStructuredSource() {
+			var strategy = new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE).describe();
+			var seats = List.of(new SeatDescription(0, "conditional", KeySource.DECLARED, 1.0,
 					Judges.describe(new Conditional("conditional"))));
-
-			assertThatThrownBy(() -> new SimpleJuryDescription(declaredExcluder, capableSeat, false))
-				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("aggregateMayBeNotApplicable");
-			assertThatThrownBy(() -> new SimpleJuryDescription(declaredExcluder, List.of(), true))
-				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("aggregateMayBeNotApplicable");
-			assertThatCode(() -> new SimpleJuryDescription(declaredExcluder, capableSeat, true))
-				.doesNotThrowAnyException();
+			assertThat(new SimpleJuryDescription(strategy, seats).aggregateMayBeNotApplicable()).isTrue();
+			assertThat(new SimpleJuryDescription(strategy, List.of()).aggregateMayBeNotApplicable()).isFalse();
 		}
 
+	}
+
+	private static io.github.markpollack.judge.jury.JudgeSeat declared(io.github.markpollack.judge.Judge producer) {
+		return io.github.markpollack.judge.jury.JudgeSeat
+			.named(((io.github.markpollack.judge.JudgeWithMetadata) producer).metadata().name(), producer)
+			.notApplicableWhen(io.github.markpollack.judge.Judges.notApplicableCapability(producer).orElseThrow());
 	}
 
 }

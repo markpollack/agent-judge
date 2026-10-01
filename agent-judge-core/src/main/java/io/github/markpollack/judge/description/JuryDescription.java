@@ -13,7 +13,8 @@ import io.github.markpollack.judge.jury.Jury;
  * A jury as configured, available before it votes.
  *
  * <p>
- * Obtained from {@link Jury#describe()}. The four variants mirror the library's juries:
+ * Obtained from {@link Jury#describe()}. The built-in variants mirror the library's
+ * juries:
  * </p>
  * <ul>
  * <li>{@link SimpleJuryDescription} — a strategy and its seats, each with position,
@@ -21,6 +22,8 @@ import io.github.markpollack.judge.jury.Jury;
  * <li>{@link CascadedJuryDescription} — named tiers in order, each with its policy and
  * jury;</li>
  * <li>{@link MetaJuryDescription} — a strategy over named member juries;</li>
+ * <li>{@link AuditJuryDescription} — pure declared requirement coverage with no routing
+ * opinions;</li>
  * <li>{@link OpaqueJuryDescription} — a jury that does not describe its own
  * structure.</li>
  * </ul>
@@ -36,8 +39,7 @@ import io.github.markpollack.judge.jury.Jury;
  * @author Mark Pollack
  * @since 0.17.0
  */
-public sealed interface JuryDescription
-		permits SimpleJuryDescription, CascadedJuryDescription, MetaJuryDescription, OpaqueJuryDescription {
+public interface JuryDescription {
 
 	/**
 	 * The format version, carried as the root {@code "descriptionVersion"} key of every
@@ -73,8 +75,14 @@ public sealed interface JuryDescription
 	 * {@code aggregateMayBeNotApplicable}. The same configured jury produces a different
 	 * map than it did at version 1, which is what the version is for.
 	 * </p>
+	 * <p>
+	 * Version 3 makes seat declarations authoritative, derives Jury applicability, adds
+	 * routing-opinion bounds and explicit audit descriptions, and uses canonical current
+	 * routing names. Unknown structures declare UNKNOWN opinions and grant no exclusion
+	 * permission.
+	 * </p>
 	 */
-	int DESCRIPTION_VERSION = 2;
+	int DESCRIPTION_VERSION = 3;
 
 	/**
 	 * The portable form: an ordered map of JSON-compatible values, validated by the same
@@ -85,6 +93,14 @@ public sealed interface JuryDescription
 	 * portable; the message names its path from {@code jury}
 	 */
 	Map<String, Object> toPortable();
+
+	/**
+	 * Returns the construction bound on routing opinions.
+	 * @return declared bound
+	 */
+	default OpinionBound routingOpinionBound() {
+		return OpinionBound.UNKNOWN;
+	}
 
 	/**
 	 * A conservative bound on whether this jury's aggregate may be
@@ -103,6 +119,7 @@ public sealed interface JuryDescription
 	 * jury does, without running it.
 	 * </p>
 	 * @return true when the aggregate may be not applicable
+	 *
 	 * @since 0.17.0
 	 */
 	boolean aggregateMayBeNotApplicable();
@@ -117,7 +134,7 @@ public sealed interface JuryDescription
 	 * @param jury the jury
 	 * @return an opaque description
 	 */
-	static JuryDescription opaque(Jury<?> jury) {
+	static JuryDescription opaque(Jury jury) {
 		return OpaqueJuryDescription.of(jury);
 	}
 
