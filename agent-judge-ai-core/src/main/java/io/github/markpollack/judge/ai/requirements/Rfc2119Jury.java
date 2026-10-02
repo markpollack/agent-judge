@@ -248,14 +248,26 @@ public final class Rfc2119Jury implements Jury {
 						throw new IllegalArgumentException(
 								"Native execution reused invocation identity: " + result.invocation().id());
 					invocations.add(result.invocation());
-					Judgment associated = result.answer().forRequirement(req);
+					Judgment associated = result.answer();
 					invocations.addAll(associated.invocations());
 					var references = new LinkedHashSet<>(associated.invocationIds());
 					associated.invocations().forEach(nativeFact -> references.add(nativeFact.id()));
 					references.add(result.invocation().id());
 					Judgment original = associated.withInvocationIds(new ArrayList<>(references));
-					attempts.add(
-							CompositeAttempt.used(req.id(), CompositeRelation.ROSTER_ITEM, null, child(req, original)));
+					try {
+						attempts.add(CompositeAttempt.used(req.id(), CompositeRelation.ROSTER_ITEM, null,
+								child(req, original.forRequirement(req))));
+					}
+					catch (IllegalArgumentException rejected) {
+						// The native call returned. Preserve its actual association and
+						// observations without claiming an invocation failure or
+						// violation.
+						Verdict unbound = Verdict.observed(req.id(), original, req.specification().applicability());
+						if (original.requirement() != null)
+							unbound = unbound.forRequirement(original.requirement());
+						attempts.add(CompositeAttempt.stageFailed(req.id(), CompositeRelation.ROSTER_ITEM, null,
+								DispositionReason.PROTOCOL_UNBOUND, unbound));
+					}
 				}
 				catch (java.util.concurrent.CancellationException cancellation) {
 					throw cancellation;

@@ -24,7 +24,7 @@ final class VerdictSemantics {
 			boolean incomplete = false;
 			for (CompositeAttempt attempt : v.compositeAttempts()) {
 				Verdict child = attempt.verdict();
-				if (child == null) {
+				if (child == null || attempt.dispositionReason() == DispositionReason.INVALID_TIER_RESULT) {
 					incomplete = true;
 					continue;
 				}
@@ -179,8 +179,12 @@ final class VerdictSemantics {
 				defect(path, "roster", "Order/identity mismatch");
 			Verdict child = attempt.verdict();
 			if (child != null) {
-				if (child.requirement() == null || !Requirement.equivalent(requirement, child.requirement()))
+				if (attempt.disposition() == AttemptDisposition.USED
+						&& (child.requirement() == null || !Requirement.equivalent(requirement, child.requirement())))
 					defect(path, "requirement", "Roster association mismatch");
+				if (attempt.disposition() != AttemptDisposition.USED
+						&& attempt.dispositionReason() != DispositionReason.PROTOCOL_UNBOUND)
+					defect(path, "roster", "Unsupported returned roster refusal");
 				child.conclusion();
 				if (!invocationIds.containsAll(child.judgment().invocationIds()))
 					defect(path, "invocations", "Unknown shared invocation reference");
@@ -198,6 +202,26 @@ final class VerdictSemantics {
 
 	private static void defect(String path, String field, String explanation) {
 		throw new IllegalArgumentException(path + "." + field + ": " + explanation);
+	}
+
+	// A returned constituent is checked before its conclusion can contribute. The
+	// rejected record remains unchanged; this temporary association is only validation.
+	record CheckedConstituent(Verdict verdict, Verdict.Conclusion conclusion) {
+	}
+
+	static CheckedConstituent associateConstituent(Requirement<?> requirement, Verdict original) {
+		Verdict associated = original.forRequirement(requirement);
+		return new CheckedConstituent(associated, associated.conclusion());
+	}
+
+	private static boolean invalidConstituent(Requirement<?> requirement, Verdict original) {
+		try {
+			associateConstituent(requirement, original);
+			return false;
+		}
+		catch (IllegalArgumentException rejected) {
+			return true;
+		}
 	}
 
 	private void validateConstituents(Verdict v, String path) {
@@ -228,6 +252,15 @@ final class VerdictSemantics {
 				incomplete = true;
 				continue;
 			}
+			if (attempt.dispositionReason() == DispositionReason.INVALID_TIER_RESULT) {
+				if (!invalidConstituent(requirement, child))
+					defect(path, "constituents", "Invalid-result refusal requires an invalid original or association");
+				incomplete = true;
+				continue;
+			}
+			if (attempt.disposition() != AttemptDisposition.USED
+					&& attempt.dispositionReason() != DispositionReason.CHILD_UNDECIDED)
+				defect(path, "constituents", "Unsupported returned constituent refusal");
 			if (child.requirement() == null || !Requirement.equivalent(requirement, child.requirement()))
 				defect(path, "requirement", "Child association differs from parent specification");
 			Verdict.Conclusion c = child.conclusion();

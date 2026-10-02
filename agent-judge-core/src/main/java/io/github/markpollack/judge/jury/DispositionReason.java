@@ -25,7 +25,9 @@ import com.fasterxml.jackson.annotation.JsonValue;
  */
 public enum DispositionReason {
 
-	/** Native envelope cannot reliably bind observations to the declared roster. */
+	/**
+	 * Native envelope or returned association cannot bind the answer to its roster item.
+	 */
 	PROTOCOL_UNBOUND("protocol_unbound"),
 
 	/**
@@ -33,7 +35,7 @@ public enum DispositionReason {
 	 */
 	EXECUTION_FAILED("execution_failed"),
 
-	/** The finding tier violated its single-seat identity or policy contract. */
+	/** The returned stage violates structural semantics or its required association. */
 	INVALID_TIER_RESULT("invalid_tier_result"),
 
 	/**

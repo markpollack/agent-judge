@@ -128,6 +128,8 @@ public final class VerdictReport {
 							: "; rejected=" + Objects.requireNonNull(verdict.seats().get(i).rejection()).reasonCode()));
 		for (var entry : attempts())
 			lines.add(entry.path() + ": " + entry.attempt().disposition() + "; "
+					+ (entry.attempt().dispositionReason() == null ? ""
+							: "reason=" + entry.attempt().dispositionReason() + "; ")
 					+ (entry.attempt().verdict() == null ? entry.attempt().failure()
 							: entry.attempt().verdict().judgment().status())
 					+ (entry.attempt().routingDecision() == null ? ""

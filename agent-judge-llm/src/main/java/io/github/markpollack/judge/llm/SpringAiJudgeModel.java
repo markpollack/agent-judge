@@ -108,7 +108,6 @@ public final class SpringAiJudgeModel implements JudgeModel {
 			if (responseMeta.getId() != null) {
 				metadata.put("responseId", responseMeta.getId());
 			}
-			usage = tokenUsage(responseMeta.getUsage());
 		}
 
 		String finish = chatResponse.getResult() == null ? null
@@ -117,7 +116,7 @@ public final class SpringAiJudgeModel implements JudgeModel {
 			metadata.put("finishReason", finish);
 		boolean completed = chatResponse.getResult() != null && (finish == null || finish.isBlank()
 				|| java.util.Set.of("stop", "STOP", "SUCCESS", "COMPLETE").contains(finish));
-		Throwable captureFailure = null;
+		Throwable responseFailure = null;
 		java.util.List<io.github.markpollack.judge.provenance.ArtifactRef> artifacts = java.util.List.of();
 		try {
 			var snapshot = capture.capture(chatResponse);
@@ -130,13 +129,31 @@ public final class SpringAiJudgeModel implements JudgeModel {
 		catch (RuntimeException failure) {
 			if (Thread.currentThread().isInterrupted())
 				throw new java.util.concurrent.CancellationException("Native capture interrupted");
-			captureFailure = failure;
+			responseFailure = failure;
 			metadata.put("captureFailure",
 					failure.getClass().getName() + ": " + java.util.Objects.toString(failure.getMessage(), ""));
 			completed = false;
 		}
+		// Normalize only after native capture. A malformed common quantity must not
+		// replace the returned SDK answer with an invocation-failure description.
+		try {
+			if (responseMeta != null)
+				usage = tokenUsage(responseMeta.getUsage());
+		}
+		catch (java.util.concurrent.CancellationException cancelled) {
+			throw cancelled;
+		}
+		catch (RuntimeException failure) {
+			if (Thread.currentThread().isInterrupted())
+				throw new java.util.concurrent.CancellationException("Native response mapping interrupted");
+			if (responseFailure == null)
+				responseFailure = failure;
+			metadata.put("mappingFailure",
+					failure.getClass().getName() + ": " + java.util.Objects.toString(failure.getMessage(), ""));
+			completed = false;
+		}
 		return new JudgeModelResponse(text == null ? "" : text, model, usage, metadata, completed, artifacts,
-				captureFailure);
+				responseFailure);
 	}
 
 	/**
@@ -149,12 +166,14 @@ public final class SpringAiJudgeModel implements JudgeModel {
 	 * total from a derived one — and a derived total is exactly what
 	 * {@code reportedTotalTokens} must never hold. Reasoning tokens have no category on
 	 * the Spring AI interface; a provider that reports them puts them in its native usage
-	 * object, which is provider-specific and not read here.
+	 * object, which is provider-specific and not read here. Spring AI's
+	 * {@code EmptyUsage} denotes absence; its default zero getters remain native detail
+	 * and are never promoted to reported quantities.
 	 * @param springUsage the Spring AI usage, or null when the response carried none
-	 * @return the reported quantities, or null when the response carried no usage
+	 * @return the reported quantities, or null for absent/empty SDK usage
 	 */
 	private static Usage tokenUsage(org.springframework.ai.chat.metadata.Usage springUsage) {
-		if (springUsage == null) {
+		if (springUsage == null || springUsage instanceof org.springframework.ai.chat.metadata.EmptyUsage) {
 			return null;
 		}
 		Usage.Builder usage = Usage.builder();

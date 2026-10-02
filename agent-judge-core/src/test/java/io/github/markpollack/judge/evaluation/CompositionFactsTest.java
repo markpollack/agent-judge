@@ -124,7 +124,7 @@ class CompositionFactsTest {
 	}
 
 	@Test
-	void invalidConstituentResultThrowsInsteadOfBecomingAnExecutionFailure() {
+	void invalidConstituentResultIsRetainedAsARefusalAndReachesPolicy() {
 		var child = Requirement.text("child", "1", "child");
 		var parent = new GeneralRequirement<>("parent", "1", "child required", new AllOf(List.of(child)),
 				child.source());
@@ -132,20 +132,26 @@ class CompositionFactsTest {
 			.jury((r, e) -> Verdict.of(Judgment.pass("forged"), Map.of("original", Judgment.fail("actual"))));
 		var prepared = Assignments.<String>forRequirement(parent).jury(child, invalid).validate();
 		var policies = new AtomicInteger();
-		assertThatThrownBy(() -> Evaluations.apply(prepared.evidence("e").build().vote(), v -> {
+		var result = Evaluations.apply(prepared.evidence("e").build().vote(), v -> {
 			policies.incrementAndGet();
 			return new PolicyDecision(PolicyAction.RELY, "yes");
-		})).isInstanceOf(IllegalArgumentException.class);
-		assertThat(policies).hasValue(0);
+		});
+		assertThat(result.verdict().conclusion()).isEqualTo(Verdict.Conclusion.INCONCLUSIVE);
+		assertThat(result.verdict().compositeAttempts().getFirst().dispositionReason())
+			.isEqualTo(DispositionReason.INVALID_TIER_RESULT);
+		assertThat(result.verdict().compositeAttempts().getFirst().failure()).isNull();
+		assertThat(policies).hasValue(1);
 		JuryRecipe<String, String> wrongAssociation = TestRecipes
 			.jury((r, e) -> Verdict.single("seat", Judgment.pass("yes"))
 				.forRequirement(Requirement.text("other", "1", "other")));
-		assertThatThrownBy(() -> Assignments.<String>forRequirement(parent)
+		var unbound = Assignments.<String>forRequirement(parent)
 			.jury(child, wrongAssociation)
 			.validate()
 			.evidence("e")
 			.build()
-			.vote()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("another requirement");
+			.vote();
+		assertThat(unbound.conclusion()).isEqualTo(Verdict.Conclusion.INCONCLUSIVE);
+		assertThat(unbound.compositeAttempts().getFirst().verdict().requirement().id()).isEqualTo("other");
 	}
 
 	@Test

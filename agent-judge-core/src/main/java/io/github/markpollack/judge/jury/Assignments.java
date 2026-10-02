@@ -196,8 +196,10 @@ public final class Assignments<E> {
 				for (Requirement<?> child : parent.specification().constituents()) {
 					Verdict verdict;
 					try {
-						verdict = CompositeExecutionScope.invokeChild(child.id(),
-								() -> assignments.get(child.id()).apply(evidence));
+						verdict = Objects.requireNonNull(
+								CompositeExecutionScope.invokeChild(child.id(),
+										() -> assignments.get(child.id()).apply(evidence)),
+								"Child returned no verdict");
 					}
 					catch (CompositeLimitExceededException ex) {
 						throw ex;
@@ -209,8 +211,18 @@ public final class Assignments<E> {
 								new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED, ex)));
 						continue;
 					}
-					verdict = verdict.forRequirement(child);
-					Verdict.Conclusion conclusion = verdict.conclusion();
+					VerdictSemantics.CheckedConstituent checked;
+					try {
+						checked = VerdictSemantics.associateConstituent(child, verdict);
+					}
+					catch (IllegalArgumentException rejected) {
+						incomplete = true;
+						attempts.add(CompositeAttempt.stageFailed(child.id(), CompositeRelation.CONSTITUENT, null,
+								DispositionReason.INVALID_TIER_RESULT, verdict));
+						continue;
+					}
+					verdict = checked.verdict();
+					Verdict.Conclusion conclusion = checked.conclusion();
 					failed |= conclusion == Verdict.Conclusion.FAIL;
 					incomplete |= conclusion != Verdict.Conclusion.PASS;
 					if (verdict.provenance().kind() == VerdictProvenanceKind.UNDECIDED)
