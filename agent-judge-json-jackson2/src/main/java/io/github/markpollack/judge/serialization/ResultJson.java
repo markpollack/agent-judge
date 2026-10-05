@@ -3,6 +3,8 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.serialization;
+
+import io.github.markpollack.judge.judgment.RefusedReturn;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.CompositeFailure;
 import io.github.markpollack.judge.verdict.Seat;
@@ -29,33 +31,60 @@ import org.jspecify.annotations.Nullable;
 public final class ResultJson {
 
 	/** Current Judgment, Verdict and EvaluationResult format. */
-	public static final int VERSION = 5;
+	public static final int VERSION = 6;
 	static final String SPECIFICATIONS = ResultJson.class.getName() + ".specifications";
 
- /** Explicit domain converters; raw POJO binding is not the storage contract.
-  * @return converter module */
- @SuppressWarnings({"unchecked", "rawtypes"})
- public static com.fasterxml.jackson.databind.Module module() {
-  var module = new com.fasterxml.jackson.databind.module.SimpleModule("agent-eval-results");
-  module.addSerializer(Judgment.class, new JudgmentWriter());
-  module.addDeserializer(Judgment.class, new JudgmentReader());
-  module.addSerializer(Verdict.class, new VerdictWriter());
-  module.addDeserializer(Verdict.class, new VerdictReader());
-  module.addSerializer((Class) Requirement.class, new RequirementWriter());
-  module.addDeserializer(Requirement.class, new RequirementReader());
-  module.setMixInAnnotation(Seat.class, SeatMixin.class);
-  return module;
- }
+	/**
+	 * Explicit domain converters; raw POJO binding is not the storage contract.
+	 * @return converter module
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public static com.fasterxml.jackson.databind.Module module() {
+		var module = new com.fasterxml.jackson.databind.module.SimpleModule("agent-eval-results");
+		module.addSerializer(Judgment.class, new JudgmentWriter());
+		module.addDeserializer(Judgment.class, new JudgmentReader());
+		module.addSerializer(Verdict.class, new VerdictWriter());
+		module.addDeserializer(Verdict.class, new VerdictReader());
+		module.addSerializer((Class) Requirement.class, new RequirementWriter());
+		module.addDeserializer(Requirement.class, new RequirementReader());
+		module.setMixInAnnotation(Seat.class, SeatMixin.class);
+		return module;
+	}
 
- /** Engine-owned strict seat integer registration. */
- public abstract static class SeatMixin {
-  /** Strict integer mixin registration. */
-  protected SeatMixin() {}
-  /** Seat position.
-   * @return explicit integral position
-   */
-  @JsonDeserialize(using=StrictIntegerDeserializer.class) public abstract int position();
- }
+	/** Engine-owned strict seat integer registration. */
+	public abstract static class SeatMixin {
+
+		/** Strict integer mixin registration. */
+		protected SeatMixin() {
+		}
+
+		/**
+		 * Seat position.
+		 * @return explicit integral position
+		 */
+		@JsonDeserialize(using = StrictIntegerDeserializer.class)
+		public abstract int position();
+
+	}
+
+	/** Context attribute containing the explicitly trusted rule vocabulary. */
+	public static final String RULES = "agent-eval.votingRules";
+
+	/**
+	 * Wire-only complete rule declaration.
+	 *
+	 * @param token stable reconstruction token
+	 * @param configuration complete portable settings
+	 */
+	public record RuleDocument(String token, Map<String, Object> configuration) {
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Map<String, io.github.markpollack.judge.voting.VotingRuleFactory> rules(@Nullable Object attribute) {
+		return attribute instanceof Map<?, ?> map
+				? (Map<String, io.github.markpollack.judge.voting.VotingRuleFactory>) map
+				: io.github.markpollack.judge.voting.VotingRules.builtIns();
+	}
 
 	private ResultJson() {
 	}
@@ -63,7 +92,7 @@ public final class ResultJson {
 	private static void version(int version) {
 		if (version != VERSION)
 			throw new IllegalArgumentException("Unsupported result schemaVersion: " + version + "; expected " + VERSION
-					+ ". Versions 2/3/4 require archival reading with baseline 7387aab1bf9d3bd56e4d9a932f2f40e2978d676d; no current typed migration is provided");
+					+ ". V5 requires archival reading with c0ae61dda4a65e9278485cb528925d71f27a1007; V2/3/4 use 7387aab1bf9d3bd56e4d9a932f2f40e2978d676d; no current typed migration is provided");
 	}
 
 	private static JsonNode currentTree(JsonParser parser, DeserializationContext context) throws IOException {
@@ -92,6 +121,7 @@ public final class ResultJson {
 	 * @param requirement actual configured requirement, absent for rule-only producers
 	 * @param invocations owned immutable native execution observations
 	 * @param invocationIds references to shared native execution observations
+	 * @param refusedReturn complete separately refused original, or null
 	 */
 	@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
 	public record JudgmentDocument(
@@ -100,7 +130,8 @@ public final class ResultJson {
 			JudgmentStatus producerStatus, @Nullable Finding finding, @Nullable Confidence confidence,
 			@Nullable ProbabilityDistribution probabilityDistribution, @Nullable JudgmentReasonCode reasonCode,
 			String reasoning, List<Check> checks, @Nullable Provenance provenance, Map<String, Object> metadata,
-			@Nullable Requirement<?> requirement, List<Invocation> invocations, List<String> invocationIds) {
+			@Nullable Requirement<?> requirement, List<Invocation> invocations, List<String> invocationIds,
+			@Nullable RefusedReturn refusedReturn) {
 	}
 
 	/**
@@ -110,7 +141,6 @@ public final class ResultJson {
 	 * @param judgment collective judgment
 	 * @param individual ordered opinions
 	 * @param individualByName keyed opinions
-	 * @param weights weights
 	 * @param seats execution seats
 	 * @param provenance composition origin
 	 * @param compositeAttempts complete child attempts
@@ -120,18 +150,19 @@ public final class ResultJson {
 	 * @param roster complete ordered independent requirements, empty for ordinary
 	 * composition
 	 * @param invocations owned immutable native execution observations
+	 * @param rule complete stable rule identity/configuration, or null when no reduction
+	 * happened
 	 */
 	@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
 	public record VerdictDocument(
 			@com.fasterxml.jackson.annotation.JsonProperty(required = true) @JsonDeserialize(
 					using = StrictIntegerDeserializer.class) int schemaVersion,
-			Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
-			Map<String, Double> weights, List<Seat> seats, VerdictProvenance provenance,
-			List<CompositeAttempt> compositeAttempts,
+			Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName, List<Seat> seats,
+			VerdictProvenance provenance, List<CompositeAttempt> compositeAttempts,
 			@com.fasterxml.jackson.annotation.JsonProperty(required = true) @JsonDeserialize(
 					using = StrictIntegerDeserializer.class) int declaredCardinality,
 			@Nullable Requirement<?> requirement, @Nullable CompositeFailure reductionFailure,
-			List<Requirement<?>> roster, List<Invocation> invocations) {
+			List<Requirement<?>> roster, List<Invocation> invocations, @Nullable RuleDocument rule) {
 	}
 
 	/** Writes current Judgment documents. */
@@ -143,9 +174,12 @@ public final class ResultJson {
 
 		@Override
 		public void serialize(Judgment j, JsonGenerator g, SerializerProvider provider) throws IOException {
-			provider.defaultSerializeValue(new JudgmentDocument(VERSION, j.producerStatus(), j.finding(),
-					j.confidence(), j.probabilityDistribution(), j.reasonCode(), j.reasoning(), j.checks(),
-					j.provenance(), j.metadata(), j.requirement(), j.invocations(), j.invocationIds()), g);
+			provider
+				.defaultSerializeValue(
+						new JudgmentDocument(VERSION, j.producerStatus(), j.finding(), j.confidence(),
+								j.probabilityDistribution(), j.reasonCode(), j.reasoning(), j.checks(), j.provenance(),
+								j.metadata(), j.requirement(), j.invocations(), j.invocationIds(), j.refusedReturn()),
+						g);
 		}
 
 	}
@@ -164,9 +198,10 @@ public final class ResultJson {
 			try {
 				return new Judgment(j.producerStatus(), j.finding(), j.confidence(), j.probabilityDistribution(),
 						j.reasonCode(), j.reasoning(), j.checks(), j.provenance(), j.metadata(), j.requirement(),
-						j.invocations(), j.invocationIds());
+						j.invocations(), j.invocationIds(), j.refusedReturn());
 			}
 			catch (RuntimeException ex) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 				throw JsonMappingException.from(parser, ex.getMessage(), ex);
 			}
 		}
@@ -182,9 +217,13 @@ public final class ResultJson {
 
 		@Override
 		public void serialize(Verdict v, JsonGenerator g, SerializerProvider provider) throws IOException {
+			if (v.rule() != null)
+				io.github.markpollack.judge.voting.VotingRules.reconstruct(v.rule().token(), v.rule().configuration(),
+						rules(provider.getAttribute(RULES)));
 			provider.defaultSerializeValue(new VerdictDocument(VERSION, v.judgment(), v.individual(),
-					v.individualByName(), v.weights(), v.seats(), v.provenance(), v.compositeAttempts(),
-					v.declaredCardinality(), v.requirement(), v.reductionFailure(), v.roster(), v.invocations()), g);
+					v.individualByName(), v.seats(), v.provenance(), v.compositeAttempts(), v.declaredCardinality(),
+					v.requirement(), v.reductionFailure(), v.roster(), v.invocations(),
+					v.rule() == null ? null : new RuleDocument(v.rule().token(), v.rule().configuration())), g);
 		}
 
 	}
@@ -203,12 +242,15 @@ public final class ResultJson {
 			VerdictDocument v = context.readTreeAsValue(currentTree(parser, context), VerdictDocument.class);
 			version(v.schemaVersion());
 			try {
-				Verdict result = new Verdict(v.judgment(), v.individual(), v.individualByName(), v.weights(), v.seats(),
+				Verdict result = new Verdict(v.judgment(), v.individual(), v.individualByName(), v.seats(),
 						v.provenance(), v.compositeAttempts(), v.declaredCardinality(), v.requirement(),
-						v.reductionFailure(), v.roster(), v.invocations());
+						v.reductionFailure(), v.roster(), v.invocations(),
+						v.rule() == null ? null : io.github.markpollack.judge.voting.VotingRules.reconstruct(
+								v.rule().token(), v.rule().configuration(), rules(context.getAttribute(RULES))));
 				return result;
 			}
 			catch (RuntimeException ex) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 				throw JsonMappingException.from(parser, ex.getMessage(), ex);
 			}
 		}

@@ -4,14 +4,15 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.DispositionReason;
-import io.github.markpollack.judge.verdict.Participation;
+import io.github.markpollack.judge.voting.Participation;
 import io.github.markpollack.judge.verdict.Seat;
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.verdict.VerdictProvenance;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.voting.ExclusionHandling;
@@ -68,7 +69,8 @@ class ContainmentTest {
 	private record Misbehaving(String name, java.util.function.Supplier<Judgment> behaviour) implements VotingStrategy {
 
 		@Override
-		public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
+		public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+			var judgments = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 			return this.behaviour.get();
 		}
 
@@ -193,7 +195,8 @@ class ContainmentTest {
 		void theStrategyIsNamedEvenWhenItCannotNameItself() {
 			VotingStrategy nameless = new VotingStrategy() {
 				@Override
-				public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
+				public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+					var judgments = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 					throw new IllegalStateException("boom");
 				}
 
@@ -319,13 +322,13 @@ class ContainmentTest {
 		@EnumSource(ErrorHandling.class)
 		@DisplayName("a machinery error reaching a member's strategy is never charged to the subject")
 		void aMachineryErrorMemberIsNeverScored(ErrorHandling errorPolicy) {
-			Verdict machinery = Verdict.builder()
+			Verdict machinery = Verdict.advancedBuilder()
 				.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
 				.provenance(VerdictProvenance.undecided())
 				.build();
 
 			Verdict verdict = Juries
-				.meta(new AllMustPassStrategy(errorPolicy, ExclusionHandling.EXCLUDE),
+				.meta(new AllEligiblePassStrategy(errorPolicy, ExclusionHandling.EXCLUDE),
 						new NamedJury("broken", returning(machinery)),
 						new NamedJury("healthy", returning(Verdict.single("b", PASS))))
 				.vote();
@@ -342,8 +345,8 @@ class ContainmentTest {
 			Jury member = memberFailing(reason, machineryCode);
 
 			Verdict verdict = Juries
-				.meta(new AllMustPassStrategy(errorPolicy, ExclusionHandling.EXCLUDE), new NamedJury("broken", member),
-						new NamedJury("healthy", returning(Verdict.single("b", PASS))))
+				.meta(new AllEligiblePassStrategy(errorPolicy, ExclusionHandling.EXCLUDE),
+						new NamedJury("broken", member), new NamedJury("healthy", returning(Verdict.single("b", PASS))))
 				.vote();
 
 			CompositeAttempt attempt = verdict.compositeAttempts().get(0);
@@ -364,7 +367,7 @@ class ContainmentTest {
 				case INVALID_TIER_RESULT, PROTOCOL_UNBOUND ->
 					throw new IllegalArgumentException("Only assessment cascade tiers use this reason");
 				case EXECUTION_FAILED -> throwing(new IllegalStateException("boom"));
-				case CHILD_UNDECIDED -> returning(Verdict.builder()
+				case CHILD_UNDECIDED -> returning(Verdict.advancedBuilder()
 					.judgment(Judgment.error(machineryCode, "the stage reached no outcome"))
 					.provenance(VerdictProvenance.undecided())
 					.build());
@@ -418,7 +421,7 @@ class ContainmentTest {
 	}
 
 	static Verdict undecidedVerdict() {
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
 			.provenance(VerdictProvenance.undecided())
 			.build();

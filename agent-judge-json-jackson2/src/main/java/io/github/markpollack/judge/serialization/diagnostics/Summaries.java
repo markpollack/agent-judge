@@ -55,7 +55,7 @@ public final class Summaries {
 		sentences.add(readingSentence(interpretation.outcome()));
 		sentences.add(supportSentence(interpretation.readingSupport()));
 		sentences.add(switch (interpretation.sourceVersion()) {
-			case 5 -> "Source: explicit version-5 domain results (sourceVersion 5).";
+			case 6 -> "Source: explicit version-6 domain results (sourceVersion 6).";
 			case 1 -> "Source: the seven-component form 0.17 writes (sourceVersion 1).";
 			case 0 -> "Source: an unstamped record written before 0.17 (sourceVersion 0).";
 			default -> "Source: unsupported version " + interpretation.sourceVersion() + ".";

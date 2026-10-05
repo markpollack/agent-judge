@@ -62,7 +62,8 @@ public final class AgentClientEvalModel implements EvalModel {
 	@Override
 	public void validateRequest(EvalModelRequest request) {
 		java.util.Objects.requireNonNull(request);
-		if(!request.metadata().isEmpty()) throw new IllegalArgumentException("This configured adapter does not transmit request metadata");
+		if (!request.metadata().isEmpty())
+			throw new IllegalArgumentException("This configured adapter does not transmit request metadata");
 		if (request.messages().size() != 1 || request.messages().getFirst().role() != EvalMessageRole.USER
 				|| !request.options().equals(io.github.markpollack.judge.ai.model.EvalModelOptions.defaults()))
 			throw new IllegalArgumentException(
@@ -81,40 +82,61 @@ public final class AgentClientEvalModel implements EvalModel {
 			.orElse("");
 
 		AgentClientResponse response = agentClient.run(goal);
-		if(response==null) return EvalModelResponse.noAnswer(new IllegalStateException("AgentClient returned no response"));
+		if (response == null)
+			return EvalModelResponse.noAnswer(new IllegalStateException("AgentClient returned no response"));
 
-        Map<String,Object> metadata = new HashMap<>();
-        java.util.List<io.github.markpollack.judge.provenance.ArtifactRef> artifacts=java.util.List.of();
-        Throwable captureFailure = null;
-        try {
-            var snapshot=capture.capture(response); metadata.putAll(snapshot.facts()); artifacts=snapshot.artifacts();
-        } catch(java.util.concurrent.CancellationException cancelled) {throw cancelled;}
-        catch(RuntimeException failure) {
-            if(Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("Native capture interrupted");
-            captureFailure=failure;
-            metadata.put("captureFailure",failure.getClass().getName()+": "+java.util.Objects.toString(failure.getMessage(),""));
-        }
-        String text="";
-        String model=null;
-        boolean completed=false;
-        try {
-            text=java.util.Objects.toString(response.getResult(),"");
-            var meta=response.getMetadata();
-            if(meta!=null) {
-                model=meta.getModel();
-                if(meta.getSessionId()!=null) metadata.put("sessionId",meta.getSessionId());
-                if(meta.getDuration()!=null) metadata.put("nativeDuration",Map.of("value",meta.getDuration().toString(),"provenance","native-default-or-reported"));
-            }
-            var nativeResult=response.getAgentResponse();
-            if(nativeResult!=null && nativeResult.getResult()!=null && nativeResult.getResult().getMetadata().getFinishReason()!=null)
-                metadata.put("finishReason",nativeResult.getResult().getMetadata().getFinishReason());
-            completed=captureFailure==null && (nativeResult!=null ? nativeResult.isSuccessful():response.isSuccessful());
-        } catch(java.util.concurrent.CancellationException cancelled) {throw cancelled;}
-        catch(RuntimeException failure) {
-            if(Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("Native response mapping interrupted");
-            if(captureFailure==null) captureFailure=failure;
-            metadata.put("mappingFailure",failure.getClass().getName()+": "+java.util.Objects.toString(failure.getMessage(),""));
-        }
+		Map<String, Object> metadata = new HashMap<>();
+		java.util.List<io.github.markpollack.judge.provenance.ArtifactRef> artifacts = java.util.List.of();
+		Throwable captureFailure = null;
+		try {
+			var snapshot = capture.capture(response);
+			metadata.putAll(snapshot.facts());
+			artifacts = snapshot.artifacts();
+		}
+		catch (java.util.concurrent.CancellationException cancelled) {
+			throw cancelled;
+		}
+		catch (RuntimeException failure) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
+			if (Thread.currentThread().isInterrupted())
+				throw new java.util.concurrent.CancellationException("Native capture interrupted");
+			captureFailure = failure;
+			metadata.put("captureFailure",
+					failure.getClass().getName() + ": " + java.util.Objects.toString(failure.getMessage(), ""));
+		}
+		String text = "";
+		String model = null;
+		boolean completed = false;
+		try {
+			text = java.util.Objects.toString(response.getResult(), "");
+			var meta = response.getMetadata();
+			if (meta != null) {
+				model = meta.getModel();
+				if (meta.getSessionId() != null)
+					metadata.put("sessionId", meta.getSessionId());
+				if (meta.getDuration() != null)
+					metadata.put("nativeDuration",
+							Map.of("value", meta.getDuration().toString(), "provenance", "native-default-or-reported"));
+			}
+			var nativeResult = response.getAgentResponse();
+			if (nativeResult != null && nativeResult.getResult() != null
+					&& nativeResult.getResult().getMetadata().getFinishReason() != null)
+				metadata.put("finishReason", nativeResult.getResult().getMetadata().getFinishReason());
+			completed = captureFailure == null
+					&& (nativeResult != null ? nativeResult.isSuccessful() : response.isSuccessful());
+		}
+		catch (java.util.concurrent.CancellationException cancelled) {
+			throw cancelled;
+		}
+		catch (RuntimeException failure) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
+			if (Thread.currentThread().isInterrupted())
+				throw new java.util.concurrent.CancellationException("Native response mapping interrupted");
+			if (captureFailure == null)
+				captureFailure = failure;
+			metadata.put("mappingFailure",
+					failure.getClass().getName() + ": " + java.util.Objects.toString(failure.getMessage(), ""));
+		}
 
 		// Native provider quantities/cost/phases remain in the versioned SDK snapshot. No
 		// unversioned guesses turn provider-specific keys into common usage or cost.

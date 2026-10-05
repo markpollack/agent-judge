@@ -4,8 +4,9 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.AggregationEvidence;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.AverageVotingStrategy;
 import io.github.markpollack.judge.voting.ConjunctiveStrategy;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
@@ -75,7 +76,8 @@ class PolicyPairAccountingTest {
 
 	private static Judgment aggregate(ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy,
 			List<Judgment> judgments) {
-		return strategy(errorPolicy, notApplicablePolicy).aggregate(judgments, Map.of());
+		return strategy(errorPolicy, notApplicablePolicy)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -162,8 +164,8 @@ class PolicyPairAccountingTest {
 		void treatErrorsAsFail() {
 			// A gate rather than consensus, so the failing contribution is visible in the
 			// aggregate rather than absorbed into a "the judges disagree" abstention.
-			Judgment aggregate = new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE)
-				.aggregate(MIXED, Map.of());
+			Judgment aggregate = new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE)
+				.aggregate(io.github.markpollack.judge.voting.Ballots.of(MIXED));
 			Map<String, Object> evidence = evidenceOf(aggregate);
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.FAIL);
@@ -254,7 +256,8 @@ class PolicyPairAccountingTest {
 			// Treating the exclusion as a failure at its own weight gives 1/4, not 1/2.
 			Judgment aggregate = new WeightedAverageStrategy(0.5, ErrorHandling.PROPAGATE,
 					ExclusionHandling.TREAT_AS_FAIL)
-				.aggregate(List.of(EXCLUDED, PASS), Map.of("0", 3.0, "1", 1.0));
+				.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(List.of(EXCLUDED, PASS),
+						Map.of("0", 3.0, "1", 1.0)));
 
 			assertThat(aggregate.score()).isEqualTo(0.25);
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.FAIL);
@@ -357,8 +360,8 @@ class PolicyPairAccountingTest {
 		@Test
 		@DisplayName("a judge-origin error still becomes a failing contribution under TREAT_AS_FAIL")
 		void judgeOriginIsStillGoverned() {
-			Judgment aggregate = new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE)
-				.aggregate(List.of(PASS, JUDGE_ERROR), Map.of());
+			Judgment aggregate = new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE)
+				.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(PASS, JUDGE_ERROR)));
 
 			assertThat(aggregate.status()).isEqualTo(JudgmentStatus.FAIL);
 			assertThat(evidenceOf(aggregate)).containsEntry(AggregationEvidence.ERRORS_TREATED_AS_FAIL_COUNT, 1);
@@ -400,7 +403,7 @@ class PolicyPairAccountingTest {
 		List<VotingStrategy> strategies = new ArrayList<>(
 				List.of(new ConsensusStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 						new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
-						new AllMustPassStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
+						new AllEligiblePassStrategy(ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 						new AverageVotingStrategy(0.5, ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 						new MedianVotingStrategy(0.5, ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
 						new WeightedAverageStrategy(0.5, ErrorHandling.IGNORE, ExclusionHandling.EXCLUDE),
@@ -410,7 +413,8 @@ class PolicyPairAccountingTest {
 			assertThat(strategy.exclusionHandling()).as("%s declares its policy", strategy.getName())
 				.isEqualTo(ExclusionHandling.EXCLUDE);
 
-			Map<String, Object> evidence = evidenceOf(strategy.aggregate(MIXED, Map.of()));
+			Map<String, Object> evidence = evidenceOf(
+					strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(MIXED)));
 			assertThat(evidence).as("%s writes the universal keys", strategy.getName())
 				.containsEntry(AggregationEvidence.NOT_APPLICABLE_POLICY, ExclusionHandling.EXCLUDE.token())
 				.containsEntry(AggregationEvidence.NOT_APPLICABLE_COUNT, 1)
@@ -424,7 +428,8 @@ class PolicyPairAccountingTest {
 	void theDefaultIsRefuse() {
 		VotingStrategy silent = new VotingStrategy() {
 			@Override
-			public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
+			public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+				var judgments = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 				return Judgment.pass("ok");
 			}
 

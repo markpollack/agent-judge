@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.AggregationEvidence;
 import io.github.markpollack.judge.voting.MedianVotingStrategy;
 
@@ -33,7 +34,7 @@ class MedianVotingStrategyTest {
 		List<Judgment> judgments = List.of(passJudgment(0.3), passJudgment(0.7), // median
 				passJudgment(0.9));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		double score = result.score();
@@ -49,7 +50,7 @@ class MedianVotingStrategyTest {
 				passJudgment(0.7), // middle values
 				passJudgment(0.9));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// Median of even count: (0.5 + 0.7) / 2 = 0.6
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -64,7 +65,7 @@ class MedianVotingStrategyTest {
 		// Unsorted input
 		List<Judgment> judgments = List.of(passJudgment(0.9), passJudgment(0.3), passJudgment(0.7));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// After sorting: [0.3, 0.7, 0.9] → median = 0.7
 		double score = result.score();
@@ -81,7 +82,7 @@ class MedianVotingStrategyTest {
 				passJudgment(1.0) // outlier
 		);
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// Sorted: [0.0, 0.5, 0.6, 1.0] → median = (0.5 + 0.6) / 2 = 0.55
 		double score = result.score();
@@ -97,7 +98,7 @@ class MedianVotingStrategyTest {
 				booleanPass("Judge 3") // 1.0
 		);
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// Sorted: [0.0, 1.0, 1.0] → median = 1.0
 		double score = result.score();
@@ -112,7 +113,7 @@ class MedianVotingStrategyTest {
 				passJudgment(0.6), booleanPass("Judge 3") // 1.0
 		);
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// Sorted: [0.0, 0.6, 1.0] → median = 0.6
 		double score = result.score();
@@ -125,7 +126,7 @@ class MedianVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(failJudgment(0.1), failJudgment(0.3), failJudgment(0.4));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// Median = 0.3 < 0.5 → FAIL
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
@@ -139,7 +140,7 @@ class MedianVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(failJudgment(0.0), passJudgment(0.5), passJudgment(1.0));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// Median = 0.5 >= 0.5 → PASS
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -156,7 +157,8 @@ class MedianVotingStrategyTest {
 		// Weights are ignored in MedianVotingStrategy
 		Map<String, Double> weights = Map.of("0", 10.0, "1", 1.0, "2", 1.0);
 
-		Judgment result = strategy.aggregate(judgments, weights);
+		Judgment result = strategy
+			.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, weights));
 
 		// Median calculation ignores weights → 0.7
 		double score = result.score();
@@ -169,7 +171,8 @@ class MedianVotingStrategyTest {
 	void emptyJudgmentListShouldThrowException() {
 		MedianVotingStrategy strategy = new MedianVotingStrategy();
 
-		assertThatThrownBy(() -> strategy.aggregate(List.of(), Map.of())).isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of())))
+			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("empty");
 	}
 
@@ -177,14 +180,15 @@ class MedianVotingStrategyTest {
 	void nullJudgmentListShouldThrowException() {
 		MedianVotingStrategy strategy = new MedianVotingStrategy();
 
-		assertThatThrownBy(() -> strategy.aggregate(null, Map.of())).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(null)))
+			.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
 	void singleJudgmentShouldReturnItsScore() {
 		MedianVotingStrategy strategy = new MedianVotingStrategy();
 
-		Judgment result = strategy.aggregate(List.of(passJudgment(0.8)), Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(passJudgment(0.8))));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		double score = result.score();
@@ -197,7 +201,7 @@ class MedianVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(passJudgment(0.4), passJudgment(0.8));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// Even count: (0.4 + 0.8) / 2 = 0.6
 		double score = result.score();
@@ -210,7 +214,7 @@ class MedianVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(passJudgment(0.7), passJudgment(0.7), passJudgment(0.7));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		double score = result.score();
 		assertThat(score).isEqualTo(0.7);
@@ -222,7 +226,7 @@ class MedianVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(passJudgment(0.8), Judgment.abstain("Cannot evaluate"), passJudgment(0.6));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// DELTA-1: the abstention does not sort into the sample as a zero. The median is
 		// over {0.6, 0.8} = 0.70, not over {0.0, 0.6, 0.8} = 0.60.
@@ -239,7 +243,8 @@ class MedianVotingStrategyTest {
 		// DELTA-3: names are stable lower-camel-case tokens, so the identifier used in
 		// diagnostics is the same one recorded in the aggregation evidence.
 		assertThat(strategy.getName()).isEqualTo("median");
-		assertThat(evidence(strategy.aggregate(List.of(passJudgment(0.8)), Map.of())))
+		assertThat(
+				evidence(strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(passJudgment(0.8))))))
 			.containsEntry(AggregationEvidence.STRATEGY, "median");
 	}
 

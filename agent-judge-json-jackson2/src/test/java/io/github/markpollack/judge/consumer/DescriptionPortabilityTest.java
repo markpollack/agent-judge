@@ -25,7 +25,7 @@ import io.github.markpollack.judge.portable.ImplementationIdentity;
 import io.github.markpollack.judge.description.JudgeDescription;
 import io.github.markpollack.judge.description.JuryDescription;
 import io.github.markpollack.judge.voting.StrategyDescription;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.jury.Juries;
 import io.github.markpollack.judge.jury.Jury;
@@ -46,7 +46,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("A description is portable, or it is refused with the path that is not")
 class DescriptionPortabilityTest {
 
-	private static final ObjectMapper JSON = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+	private static final ObjectMapper JSON = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	private static final String DECLARING_JUDGE = "{form=NAMED, className=" + DeclaringJudge.class.getName() + "}";
 
@@ -69,7 +70,8 @@ class DescriptionPortabilityTest {
 		Map<String, Object> configuration = new LinkedHashMap<>();
 		configuration.put("passMark", Double.NaN);
 
-		assertThatThrownBy(() -> io.github.markpollack.judge.description.JudgeDescription.of(new DeclaringJudge(configuration)))
+		assertThatThrownBy(
+				() -> io.github.markpollack.judge.description.JudgeDescription.of(new DeclaringJudge(configuration)))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("Judge implemented by " + DECLARING_JUDGE + " declared a configuration that is not portable: "
 					+ "configuration.passMark: NaN has no JSON representation. Numbers must be finite.");
@@ -77,8 +79,8 @@ class DescriptionPortabilityTest {
 
 	@Test
 	void aNullElementIsRefusedWithItsPath() {
-		assertThatThrownBy(
-				() -> io.github.markpollack.judge.description.JudgeDescription.of(new DeclaringJudge(Map.of("criteria", Arrays.asList("correct", null)))))
+		assertThatThrownBy(() -> io.github.markpollack.judge.description.JudgeDescription
+			.of(new DeclaringJudge(Map.of("criteria", Arrays.asList("correct", null)))))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("configuration.criteria[1]: null is not a portable metadata element");
 	}
@@ -88,7 +90,8 @@ class DescriptionPortabilityTest {
 		Map<String, Object> configuration = new HashMap<>();
 		configuration.put("model", null);
 
-		assertThatThrownBy(() -> io.github.markpollack.judge.description.JudgeDescription.of(new DeclaringJudge(configuration)))
+		assertThatThrownBy(
+				() -> io.github.markpollack.judge.description.JudgeDescription.of(new DeclaringJudge(configuration)))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("configuration.model: null is not a portable metadata value");
 	}
@@ -142,7 +145,7 @@ class DescriptionPortabilityTest {
 			.build();
 		Jury cascade = CascadedJury.builder()
 			.tier("gate",
-					Juries.fromJudges(new AllMustPassStrategy(),
+					Juries.fromJudges(new AllEligiblePassStrategy(),
 							new KeywordJudge(CompletionEvidence.builder().request("test").build(), "ok")),
 					RoutingRule.STOP_ON_ANY_OPINION_FAIL)
 			.tier("review", Juries.meta(new MajorityVotingStrategy(), new NamedJury("review", review)),
@@ -183,7 +186,8 @@ class DescriptionPortabilityTest {
 	void aDescriptionIsDetachedFromTheMapTheJudgeReturned() {
 		Map<String, Object> configuration = new LinkedHashMap<>();
 		configuration.put("version", 1);
-		JudgeDescription description = io.github.markpollack.judge.description.JudgeDescription.of(new DeclaringJudge(configuration));
+		JudgeDescription description = io.github.markpollack.judge.description.JudgeDescription
+			.of(new DeclaringJudge(configuration));
 
 		configuration.put("version", 2);
 

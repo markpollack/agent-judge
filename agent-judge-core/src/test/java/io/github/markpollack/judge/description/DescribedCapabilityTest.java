@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.description;
+
 import io.github.markpollack.judge.verdict.KeySource;
 import io.github.markpollack.judge.voting.StrategyDescription;
 
@@ -19,7 +20,7 @@ import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.jury.Juries;
 import io.github.markpollack.judge.jury.Jury;
@@ -83,12 +84,13 @@ class DescribedCapabilityTest {
 	 */
 	private static final class DelegatingExcluder implements VotingStrategy {
 
-		private final VotingStrategy delegate = new AllMustPassStrategy(ErrorHandling.PROPAGATE,
+		private final VotingStrategy delegate = new AllEligiblePassStrategy(ErrorHandling.PROPAGATE,
 				ExclusionHandling.EXCLUDE);
 
 		@Override
-		public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
-			return this.delegate.aggregate(judgments, weights);
+		public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+			var judgments = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
+			return this.delegate.aggregate(ballots);
 		}
 
 		@Override
@@ -161,11 +163,11 @@ class DescribedCapabilityTest {
 		void builtInsAreUnchanged() {
 			SimpleJury excluding = SimpleJury.builder()
 				.seat(declared(new Conditional("conditional")))
-				.votingStrategy(new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
+				.votingStrategy(new AllEligiblePassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 				.build();
 			SimpleJury failing = SimpleJury.builder()
 				.seat(declared(new Conditional("conditional")))
-				.votingStrategy(new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.TREAT_AS_FAIL))
+				.votingStrategy(new AllEligiblePassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.TREAT_AS_FAIL))
 				.build();
 
 			assertThat(excluding.describe().aggregateMayBeNotApplicable()).isTrue();
@@ -177,7 +179,7 @@ class DescribedCapabilityTest {
 
 		@Test
 		void applicabilityHasOneStructuredSource() {
-			var strategy = new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE).describe();
+			var strategy = new AllEligiblePassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE).describe();
 			var seats = List.of(new SeatDescription(0, "conditional", KeySource.DECLARED, 1.0,
 					io.github.markpollack.judge.description.JudgeDescription.of(new Conditional("conditional"))));
 			assertThat(new SimpleJuryDescription(strategy, seats).aggregateMayBeNotApplicable()).isTrue();

@@ -3,6 +3,7 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.assertj;
+
 import io.github.markpollack.judge.verdict.Verdict;
 
 import java.util.*;
@@ -31,7 +32,7 @@ class CorrectiveRetentionTest {
 		var parent = new GeneralRequirement<>("parent", "1", "A and B", new AllOf(List.of(a, b)), a.source());
 		var returned = Verdict.single("B", Judgment.fail("Unusable apparent violation"));
 		var invalid = new Verdict(returned.judgment(), returned.individual(), returned.individualByName(),
-				returned.weights(), returned.seats(), returned.provenance(), returned.compositeAttempts(), 2, b);
+				returned.seats(), returned.provenance(), returned.compositeAttempts(), 2, b);
 		var calls = new AtomicInteger();
 		var jury = Assignments.<String>forRequirement(parent).jury(a, TestRecipes.jury((r, e) -> {
 			calls.incrementAndGet();

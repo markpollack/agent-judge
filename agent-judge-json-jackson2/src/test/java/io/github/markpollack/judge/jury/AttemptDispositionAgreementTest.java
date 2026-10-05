@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.CompositeFailure;
@@ -56,7 +57,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("Attempt disposition agreement")
 class AttemptDispositionAgreementTest {
 
-	private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+	private static final ObjectMapper MAPPER = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	private static final Judgment FAILING = Judgment.fail("a requirement was not met");
 
@@ -67,7 +69,7 @@ class AttemptDispositionAgreementTest {
 
 	/** A child whose reduction broke, so it determined nothing. */
 	private static Verdict undecided() {
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
 			.individual(List.of(FAILING, Judgment.pass("other")))
 			.individualByName(Map.of("strict", FAILING, "other", Judgment.pass("other")))

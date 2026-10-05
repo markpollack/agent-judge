@@ -6,7 +6,6 @@ package io.github.markpollack.judge.judgment;
 
 import io.github.markpollack.judge.provenance.ArtifactRef;
 import io.github.markpollack.judge.provenance.CalibrationClaim;
-import io.github.markpollack.judge.provenance.PolicyRef;
 import io.github.markpollack.judge.provenance.Provenance;
 
 import io.github.markpollack.judge.completion.CompletionEvidence;
@@ -31,12 +30,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ModernResultValuesTest {
 
-	private static final ObjectMapper JSON = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+	private static final ObjectMapper JSON = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	private static final ArtifactRef CONFIG = ArtifactRef.ofBytes("config", "{}".getBytes(StandardCharsets.UTF_8),
 			null);
-
-	private static final PolicyRef POLICY = new PolicyRef("critical-requirement", "1", CONFIG.sha256());
 
 	private static final Finding PRODUCT = new Finding(new BooleanFinding(false),
 			new NumericFinding(2, NumericKind.MEASUREMENT, "violations:v1", 0, 10, List.of(),

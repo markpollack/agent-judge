@@ -4,7 +4,8 @@
  */
 
 package io.github.markpollack.judge.jury;
-import io.github.markpollack.judge.verdict.Participation;
+
+import io.github.markpollack.judge.voting.Participation;
 import io.github.markpollack.judge.verdict.Seat;
 import io.github.markpollack.judge.verdict.SeatExecution;
 import io.github.markpollack.judge.verdict.Verdict;
@@ -39,7 +40,6 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.stream.IntStream;
 
 import java.lang.System.Logger;
-
 
 /**
  * Simple jury implementation with parallel judge execution.
@@ -95,7 +95,7 @@ public class SimpleJury implements VotingJury {
 
 	private final VotingStrategy votingStrategy;
 
-	private final Map<String, Double> weights;
+	private final Map<Integer, Double> weights;
 
 	private final boolean parallel;
 
@@ -120,8 +120,8 @@ public class SimpleJury implements VotingJury {
 
 	private final Map<Integer, JudgeSeat> declarations;
 
-	private SimpleJury(List<Judge> judges, VotingStrategy votingStrategy, Map<String, Double> weights, boolean parallel,
-			Executor executor, Set<Integer> deduplicatedPositions, boolean requireDeclaredNames,
+	private SimpleJury(List<Judge> judges, VotingStrategy votingStrategy, Map<Integer, Double> weights,
+			boolean parallel, Executor executor, Set<Integer> deduplicatedPositions, boolean requireDeclaredNames,
 			Map<Integer, JudgeSeat> declarations) {
 		if (judges == null || judges.isEmpty()) {
 			throw new IllegalArgumentException("Jury must have at least one judge");
@@ -179,6 +179,7 @@ public class SimpleJury implements VotingJury {
 				declared = Judges.notApplicableCapability(judge).orElse(null);
 			}
 			catch (IllegalArgumentException ex) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 				declared = null;
 			}
 			capabilities.add(declared);
@@ -270,12 +271,12 @@ public class SimpleJury implements VotingJury {
 	 * Describe this jury's strategy and seats, before any vote.
 	 * <p>
 	 * Each seat pairs a zero-based position, which is the index of
-	 * {@link Verdict#individual()} and the key of {@link Verdict#weights()}, with the
-	 * verdict key its judgment is stored under in {@link Verdict#individualByName()} and
-	 * the weight it votes with. The key is {@link KeySource#DECLARED} when the judge
-	 * declares a name, {@link KeySource#DEDUPLICATED} when {@link Juries#fromJudges}
-	 * suffixed a colliding name, and {@link KeySource#POSITIONAL} when the judge declares
-	 * no name and the key is {@code "Judge#" + (position + 1)}.
+	 * {@link Verdict#individual()}, with the verdict key its judgment is stored under in
+	 * {@link Verdict#individualByName()} and the weight it votes with. The key is
+	 * {@link KeySource#DECLARED} when the judge declares a name,
+	 * {@link KeySource#DEDUPLICATED} when {@link Juries#fromJudges} suffixed a colliding
+	 * name, and {@link KeySource#POSITIONAL} when the judge declares no name and the key
+	 * is {@code "Judge#" + (position + 1)}.
 	 * </p>
 	 * @return a simple jury description
 	 * @throws IllegalArgumentException if a seat cannot be described, for example because
@@ -300,7 +301,7 @@ public class SimpleJury implements VotingJury {
 			else {
 				keySource = KeySource.POSITIONAL;
 			}
-			double weight = weights.getOrDefault(String.valueOf(position), 1.0);
+			double weight = weights.getOrDefault(position, 1.0);
 			try {
 				// Judges.describe refuses metadata it cannot read, rather than describing
 				// the
@@ -311,6 +312,7 @@ public class SimpleJury implements VotingJury {
 				seats.add(seat);
 			}
 			catch (IllegalArgumentException ex) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 				throw new IllegalArgumentException(
 						"seats[" + position + "] ('" + key.verdictKey() + "'): " + ex.getMessage(), ex);
 			}
@@ -377,7 +379,15 @@ public class SimpleJury implements VotingJury {
 			CompletableFuture<Void> allOf = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
 
 			// Collect results
-			invocations = allOf.thenApply(v -> futures.stream().map(CompletableFuture::join).toList()).join();
+			try {
+				invocations = allOf.thenApply(v -> futures.stream().map(CompletableFuture::join).toList()).join();
+			}
+			catch (java.util.concurrent.CompletionException failure) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
+				if (failure.getCause() instanceof java.util.concurrent.CancellationException cancellation)
+					throw cancellation;
+				throw failure;
+			}
 		}
 		else {
 			// Sequential execution
@@ -400,23 +410,27 @@ public class SimpleJury implements VotingJury {
 					invocations.get(i).rejection() != null ? SeatExecution.RETURNED_REJECTED
 							: invocations.get(i).returned() ? SeatExecution.RETURNED : SeatExecution.CONTAINED_FAILURE,
 					Participation.NOT_RECORDED, invocations.get(i).cause(), declaredCapabilities.get(i),
-					invocations.get(i).rejection()));
+					invocations.get(i).rejection(), weights.get(i)));
 		}
 
 		List<Judgment> reductionInputs = invocations.stream().map(Invocation::judgment).toList();
 		var reduction = identity ? new AggregationBoundary.Reduction(individualJudgments.get(0), null)
-				: aggregateWithinBoundary(reductionInputs);
+				: AggregationBoundary.aggregate(votingStrategy, ballots(seats, individualJudgments),
+						aggregateMayBeNotApplicable(), logger);
 		Judgment judgment = reduction.judgment();
 		for (int i = 0; i < seats.size(); i++)
-			seats.set(i, seats.get(i).treated(Participation.forJudgment(reductionInputs.get(i), judgment, identity)));
+			seats.set(i,
+					seats.get(i)
+						.treated(reductionInputs.get(i).refusedReturn() != null ? Participation.NOT_RECORDED
+								: Participation.forJudgment(reductionInputs.get(i), judgment, identity)));
 
-		Verdict verdict = Verdict.builder()
+		Verdict verdict = Verdict.advancedBuilder()
 			.reductionFailure(reduction.failure())
 			.declaredCardinality(judges.size())
 			.judgment(judgment)
 			.individual(individualJudgments)
 			.individualByName(judgmentByName)
-			.weights(weights)
+			.rule(reduction.rule())
 			.seats(seats)
 			.provenance(identity ? VerdictProvenance.own() : VerdictProvenance.decisionFor(judgment))
 			.compositeAttempts(List.of())
@@ -459,9 +473,11 @@ public class SimpleJury implements VotingJury {
 	 * @param individualJudgments the judgments to reduce
 	 * @return the strategy's aggregate, or the contained error that replaces it
 	 */
-	private AggregationBoundary.Reduction aggregateWithinBoundary(List<Judgment> individualJudgments) {
-		return AggregationBoundary.aggregate(votingStrategy, individualJudgments, weights,
-				aggregateMayBeNotApplicable(), logger);
+	private static List<io.github.markpollack.judge.voting.Ballot> ballots(List<Seat> seats, List<Judgment> original) {
+		var result = new ArrayList<io.github.markpollack.judge.voting.Ballot>();
+		for (int i = 0; i < seats.size(); i++)
+			result.add(seats.get(i).ballot(original.get(i)));
+		return List.copyOf(result);
 	}
 
 	/**
@@ -481,7 +497,8 @@ public class SimpleJury implements VotingJury {
 	private Invocation invokeJudge(int index, SeatKey key) {
 		if (key.metadataFailure() != null) {
 			String reasoning = key.unreadableMetadata();
-			logger.log(System.Logger.Level.WARNING, "{0}; recording an ERROR for the error policy to resolve", reasoning, key.cause());
+			logger.log(System.Logger.Level.WARNING, "{0}; recording an ERROR for the error policy to resolve",
+					reasoning, key.cause());
 			return new Invocation(Judgment.error(JudgmentReasonCode.JUDGE_METADATA_UNREADABLE, reasoning), false,
 					key.cause());
 		}
@@ -489,10 +506,16 @@ public class SimpleJury implements VotingJury {
 		String name = key.verdictKey();
 		try {
 			Judgment raw = judge.judge();
+			if (Thread.currentThread().isInterrupted())
+				throw new java.util.concurrent.CancellationException("Judging interrupted after return");
+			if (raw != null)
+				io.github.markpollack.judge.judgment.JudgmentBounds.validate(raw, 0, raw);
+			if (raw != null && raw.refusedReturn() != null)
+				return new Invocation(raw, false, null, raw.refusedReturn().original());
 			Judgment judgment = guardExclusion(index, name, raw);
 			if (judgment == null) {
-				logger.log(System.Logger.Level.WARNING, "Judge {0} returned no judgment; recording an ERROR for the error policy to resolve",
-						name);
+				logger.log(System.Logger.Level.WARNING,
+						"Judge {0} returned no judgment; recording an ERROR for the error policy to resolve", name);
 				return new Invocation(
 						Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "Judge '" + name + "' returned no judgment"),
 						false);
@@ -500,8 +523,10 @@ public class SimpleJury implements VotingJury {
 			return new Invocation(judgment, judgment == raw, null, judgment == raw ? null : raw);
 		}
 		catch (Exception ex) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 			preserveCancellation(ex);
-			logger.log(System.Logger.Level.WARNING, "Judge {0} threw {1}; recording an ERROR for the error policy to resolve", name,
+			logger.log(System.Logger.Level.WARNING,
+					"Judge {0} threw {1}; recording an ERROR for the error policy to resolve", name,
 					ex.getClass().getName(), ex);
 			return new Invocation(Judgment.error(JudgmentReasonCode.JUDGE_FAILED,
 					"Judge '" + name + "' threw " + ex.getClass().getName() + describeCause(ex)), false, ex);
@@ -572,6 +597,7 @@ public class SimpleJury implements VotingJury {
 				metadata = withMetadata.metadata();
 			}
 			catch (Exception ex) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 				return new SeatKey(position, positional, false,
 						"metadata() threw " + ex.getClass().getName() + describeCause(ex), ex);
 			}
@@ -615,7 +641,7 @@ public class SimpleJury implements VotingJury {
 
 		private final List<Judge> judges = new ArrayList<>();
 
-		private final Map<String, Double> weights = new LinkedHashMap<>();
+		private final Map<Integer, Double> weights = new LinkedHashMap<>();
 
 		private VotingStrategy votingStrategy;
 
@@ -655,7 +681,10 @@ public class SimpleJury implements VotingJury {
 		 * @return this builder
 		 */
 		public Builder judge(Judge judge) {
-			return judge(judge, 1.0);
+			if (judge == null)
+				throw new IllegalArgumentException("Judge cannot be null");
+			judges.add(judge);
+			return this;
 		}
 
 		/**
@@ -675,11 +704,11 @@ public class SimpleJury implements VotingJury {
 			if (!Double.isFinite(weight)) {
 				throw new IllegalArgumentException("Weight must be finite, but was " + weight);
 			}
-			if (weight < 0) {
-				throw new IllegalArgumentException("Weight must be non-negative");
+			if (weight <= 0) {
+				throw new IllegalArgumentException("Weight must be positive");
 			}
 			judges.add(judge);
-			weights.put(String.valueOf(judges.size() - 1), weight);
+			weights.put(judges.size() - 1, weight);
 			return this;
 		}
 

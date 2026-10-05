@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.verdict.DispositionReason;
 import io.github.markpollack.judge.verdict.RoutingDecision;
@@ -50,7 +51,8 @@ class ConfiguredRoutingTest {
 					return "broken";
 				}
 
-				public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
+				public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+					var input = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 					throw new IllegalStateException("reduction unavailable");
 				}
 			})
@@ -139,7 +141,7 @@ class ConfiguredRoutingTest {
 	@ParameterizedTest
 	@EnumSource(value = RoutingRule.class, names = { "STOP_ON_ANY_OPINION_FAIL", "STOP_ON_ALL_OPINIONS_PASS" })
 	void unknownEmptyHasDerivedContinuationReason(RoutingRule rule) {
-		Verdict empty = Verdict.builder()
+		Verdict empty = Verdict.advancedBuilder()
 			.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "no opinions"))
 			.provenance(VerdictProvenance.undecided())
 			.build();
@@ -183,7 +185,8 @@ class ConfiguredRoutingTest {
 					return "broken reduction";
 				}
 
-				public Judgment aggregate(List<Judgment> inputs, Map<String, Double> weights) {
+				public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+					var inputs = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 					throw new IllegalStateException("reduction unavailable");
 				}
 			})

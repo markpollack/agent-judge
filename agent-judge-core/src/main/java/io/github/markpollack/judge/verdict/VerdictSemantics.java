@@ -3,7 +3,10 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.verdict;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+
+import io.github.markpollack.judge.voting.Participation;
+import io.github.markpollack.judge.voting.Ballot;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.AverageVotingStrategy;
 import io.github.markpollack.judge.voting.ConjunctiveStrategy;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
@@ -108,7 +111,7 @@ final class VerdictSemantics {
 				.verdict();
 			return routingOpinions(Objects.requireNonNull(selected));
 		}
-		return v.individual();
+		return reductionInputs(v);
 	}
 
 	public static boolean routingStops(RoutingRule rule, Verdict child, boolean accepted) {
@@ -125,6 +128,7 @@ final class VerdictSemantics {
 			conclusion = child.conclusion();
 		}
 		catch (IllegalArgumentException invalid) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(invalid);
 			return new RoutingDecision(false, RoutingDecision.Reason.INVALID_TIER);
 		}
 		if (rule == RoutingRule.STOP_ON_ANY_OPINION_FAIL || rule == RoutingRule.STOP_ON_ALL_OPINIONS_PASS) {
@@ -172,7 +176,7 @@ final class VerdictSemantics {
 	}
 
 	private void validateRoster(Verdict v, String path) {
-		if (v.requirement() != null || !v.individual().isEmpty() || !v.seats().isEmpty() || !v.weights().isEmpty())
+		if (v.requirement() != null || !v.individual().isEmpty() || !v.seats().isEmpty())
 			defect(path, "roster",
 					"A roster has actual requirements and complete constituent records, without parent/opinion seats");
 		if (v.roster().isEmpty() || v.roster().size() != v.declaredCardinality()
@@ -231,6 +235,7 @@ final class VerdictSemantics {
 			return false;
 		}
 		catch (IllegalArgumentException rejected) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(rejected);
 			return true;
 		}
 	}
@@ -240,7 +245,7 @@ final class VerdictSemantics {
 		AllOf spec = (AllOf) parent.specification();
 		if (v.provenance().kind() != VerdictProvenanceKind.CONSTITUENTS)
 			defect(path, "provenance", "All-of requires constituent provenance");
-		if (!v.individual().isEmpty() || !v.seats().isEmpty() || !v.weights().isEmpty())
+		if (!v.individual().isEmpty() || !v.seats().isEmpty())
 			defect(path, "seats", "Constituents retain child Verdicts, not flattened opinions");
 		if (v.declaredCardinality() != spec.constituents().size())
 			defect(path, "declaredCardinality", "All-of roster cardinality differs");
@@ -321,11 +326,13 @@ final class VerdictSemantics {
 			expectedNames.put(seat.verdictKey(), j);
 			if (seat.execution() == SeatExecution.RETURNED_REJECTED) {
 				Judgment rejected = Objects.requireNonNull(seat.rejection());
-				if (j.status() != JudgmentStatus.NOT_APPLICABLE || seat.notApplicableWhen() != null
-						|| !contained(rejected)
-						|| rejected.reasonCode() != JudgmentReasonCode.UNDECLARED_NOT_APPLICABLE)
-					defect(path, "seats.rejection",
-							"Rejection must preserve an undeclared excluded original and ERROR treatment");
+				boolean complete = rejected.refusedReturn() != null && rejected.refusedReturn().original().equals(j)
+						&& rejected.reasonCode() == JudgmentReasonCode.RETURNED_RESULT_REJECTED && seat.cause() == null
+						&& seat.participation() == Participation.NOT_RECORDED;
+				boolean exclusion = j.status() == JudgmentStatus.NOT_APPLICABLE && seat.notApplicableWhen() == null
+						&& contained(rejected) && rejected.reasonCode() == JudgmentReasonCode.UNDECLARED_NOT_APPLICABLE;
+				if (!complete && !exclusion)
+					defect(path, "seats.rejection", "Rejection contradicts complete original and separate treatment");
 			}
 			if (seat.execution() == SeatExecution.RETURNED && j.status() == JudgmentStatus.NOT_APPLICABLE
 					&& seat.notApplicableWhen() == null
@@ -339,15 +346,6 @@ final class VerdictSemantics {
 		}
 		if (!expectedNames.equals(v.individualByName()))
 			defect(path, "individualByName", "Named inputs differ from ordered inputs");
-		if (!v.weights().isEmpty()) {
-			if (v.weights().size() != count)
-				defect(path, "weights", "Weight population differs from declared population");
-			for (int i = 0; i < v.weights().size(); i++) {
-				Double weight = v.weights().get(Integer.toString(i));
-				if (weight == null || !Double.isFinite(weight) || weight < 0)
-					defect(path, "weights", "Invalid configured weight");
-			}
-		}
 		boolean meta = v.compositeAttempts().stream().anyMatch(a -> a.relation() == CompositeRelation.META_MEMBER);
 		boolean cascade = v.compositeAttempts().stream().anyMatch(a -> a.relation() == CompositeRelation.CASCADE_TIER);
 		if (meta && cascade)
@@ -394,29 +392,12 @@ final class VerdictSemantics {
 		Judgment aggregate = v.judgment();
 		if (!(aggregate.metadata().get(Judgment.AGGREGATION_KEY) instanceof Map<?, ?> e))
 			throw new IllegalArgumentException(path + ": missing aggregation semantics");
-		ErrorHandling errors = java.util.Arrays.stream(ErrorHandling.values())
-			.filter(x -> x.token().equals(e.get("errorPolicy")))
-			.findFirst()
-			.orElseThrow(() -> new IllegalArgumentException("Unavailable error handling"));
-		ExclusionHandling exclusions = java.util.Arrays.stream(ExclusionHandling.values())
-			.filter(x -> x.token().equals(e.get("notApplicablePolicy")))
-			.findFirst()
-			.orElseThrow(() -> new IllegalArgumentException("Unavailable exclusion handling"));
-		double threshold = e.get("threshold") instanceof Number n ? n.doubleValue() : 0.5;
-		TieBreakRule tie = aggregate.status() == JudgmentStatus.PASS ? TieBreakRule.PASS
-				: aggregate.status() == JudgmentStatus.FAIL ? TieBreakRule.FAIL : TieBreakRule.ABSTAIN;
-		VotingStrategy strategy = switch (Objects.toString(e.get("strategy"))) {
-			case "consensus" -> new ConsensusStrategy(errors, exclusions);
-			case "majority" -> new MajorityVotingStrategy(tie, errors, exclusions);
-			case "allMustPass" -> new AllMustPassStrategy(errors, exclusions);
-			case "average" -> new AverageVotingStrategy(threshold, errors, exclusions);
-			case "median" -> new MedianVotingStrategy(threshold, errors, exclusions);
-			case "weightedAverage" -> new WeightedAverageStrategy(threshold, errors, exclusions);
-			case "conjunctive" -> new ConjunctiveStrategy(threshold, errors, exclusions);
-			default ->
-				throw new IllegalArgumentException(path + ": unavailable aggregation semantics: " + e.get("strategy"));
-		};
-		Judgment recomputed = strategy.aggregate(reductionInputs(v), v.weights());
+		if (v.rule() == null)
+			throw new IllegalArgumentException(path + ": missing retained voting rule");
+		var ballots = new ArrayList<Ballot>();
+		for (int i = 0; i < v.seats().size(); i++)
+			ballots.add(v.seats().get(i).ballot(v.individual().get(i)));
+		Judgment recomputed = v.rule().aggregate(ballots);
 		if (aggregate.status() != recomputed.status() || !Objects.equals(aggregate.finding(), recomputed.finding())
 				|| aggregate.reasonCode() != recomputed.reasonCode()
 				|| !Objects.equals(e, recomputed.metadata().get(Judgment.AGGREGATION_KEY)))

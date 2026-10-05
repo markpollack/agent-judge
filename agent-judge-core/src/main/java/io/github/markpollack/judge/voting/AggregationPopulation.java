@@ -59,10 +59,24 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * {@link ErrorHandling#TREAT_AS_FAIL}; that combination propagates instead.
  * </p>
  *
+ * @param eligible ordered effective treatments after policy resolution
+ * @param eligibleIndices indices in the submitted population
+ * @param inputCount complete submitted count
+ * @param explicitAbstainCount submitted explicit abstentions
+ * @param notApplicableCount submitted exclusions
+ * @param errorCount submitted errors
+ * @param errorCodeCounts flattened terminal error causes
+ * @param ignoredErrorCount errors omitted by IGNORE
+ * @param errorsTreatedAsAbstainCount errors omitted as abstentions
+ * @param errorsTreatedAsFailCount judge errors contributing FAIL
+ * @param notApplicableTreatedAsFailCount exclusions contributing FAIL
+ * @param errorPolicy configured error treatment
+ * @param notApplicablePolicy configured exclusion treatment
+ * @param policyExit early policy determination, or null
  * @author Mark Pollack
  * @since 0.14.0
  */
-record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndices, int inputCount,
+public record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndices, int inputCount,
 		int explicitAbstainCount, int notApplicableCount, int errorCount, Map<JudgmentReasonCode, Long> errorCodeCounts,
 		int ignoredErrorCount, int errorsTreatedAsAbstainCount, int errorsTreatedAsFailCount,
 		int notApplicableTreatedAsFailCount, ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy,
@@ -74,7 +88,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @param code the instrument code the aggregate carries
 	 * @param reasoning the aggregate's explanation
 	 */
-	record PolicyExit(JudgmentReasonCode code, String reasoning) {
+	public record PolicyExit(JudgmentReasonCode code, String reasoning) {
 	}
 
 	/**
@@ -89,7 +103,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @param notApplicablePolicy how excluded judgments are handled
 	 * @return the resolved population
 	 */
-	static AggregationPopulation resolve(List<Judgment> judgments, ErrorHandling errorPolicy,
+	public static AggregationPopulation resolve(List<Judgment> judgments, ErrorHandling errorPolicy,
 			ExclusionHandling notApplicablePolicy) {
 		if (judgments == null || judgments.isEmpty()) {
 			throw new IllegalArgumentException("Cannot aggregate empty judgment list");
@@ -240,7 +254,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @param judgment an errored judgment
 	 * @return true when the error came from machinery
 	 */
-	static boolean hasMachineryOrigin(Judgment judgment) {
+	public static boolean hasMachineryOrigin(Judgment judgment) {
 		JudgmentReasonCode code = judgment.reasonCode();
 		if (code == null) {
 			return true;
@@ -320,14 +334,35 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 		return counts.isEmpty() ? Map.of() : Collections.unmodifiableMap(new EnumMap<>(counts));
 	}
 
-	boolean isEmpty() {
+	/**
+	 * Project resolved opinions back onto their original configured seats.
+	 * @param submitted exactly the typed inputs supplied to resolve
+	 * @return eligible treatments with unchanged position, original, label and weight
+	 */
+	public List<Ballot> eligibleBallots(List<Ballot> submitted) {
+		if (submitted.size() != inputCount)
+			throw new IllegalArgumentException("Ballot population differs from resolved input count");
+		var result = new ArrayList<Ballot>();
+		for (int i = 0; i < eligibleIndices.size(); i++) {
+			var seat = submitted.get(eligibleIndices.get(i));
+			result.add(new Ballot(seat.position(), seat.label(), seat.original(), eligible.get(i), seat.participation(),
+					seat.declaredWeight()));
+		}
+		return List.copyOf(result);
+	}
+
+	/**
+	 * Whether policy resolution left any eligible treatment.
+	 * @return true when no treatment can be reduced
+	 */
+	public boolean isEmpty() {
 		return this.eligible.isEmpty();
 	}
 
 	/**
 	 * @return true when a policy decided the aggregate before anything was reduced
 	 */
-	boolean hasPolicyExit() {
+	public boolean hasPolicyExit() {
 		return this.policyExit != null;
 	}
 
@@ -336,7 +371,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @param strategyToken the strategy's stable identifier
 	 * @return an evidence builder for the strategy to extend
 	 */
-	AggregationEvidence.Builder evidence(String strategyToken) {
+	public AggregationEvidence.Builder evidence(String strategyToken) {
 		return AggregationEvidence.builder()
 			.put(AggregationEvidence.STRATEGY, strategyToken)
 			.put(AggregationEvidence.ERROR_POLICY, this.errorPolicy.token())
@@ -373,7 +408,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @param strategyToken the strategy's stable identifier
 	 * @return an error judgment carrying the evidence
 	 */
-	Judgment policyExitAggregate(String strategyToken) {
+	public Judgment policyExitAggregate(String strategyToken) {
 		PolicyExit exit = Objects.requireNonNull(this.policyExit, "there is no policy exit to build");
 		Judgment aggregate = exit.code() == JudgmentReasonCode.ERRORS_PROPAGATED
 				? Judgment.propagatedError(this.errorCodeCounts, exit.reasoning())
@@ -393,7 +428,7 @@ record AggregationPopulation(List<Judgment> eligible, List<Integer> eligibleIndi
 	 * @param extraEvidence additional strategy-specific evidence, may be empty
 	 * @return an abstaining or not-applicable judgment carrying the evidence
 	 */
-	Judgment noResult(String strategyToken, Map<String, Object> extraEvidence) {
+	public Judgment noResult(String strategyToken, Map<String, Object> extraEvidence) {
 		AggregationEvidence.Builder evidence = evidence(strategyToken);
 		extraEvidence.forEach((key, value) -> {
 			if (value instanceof Integer i) {

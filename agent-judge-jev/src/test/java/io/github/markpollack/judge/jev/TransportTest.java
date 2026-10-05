@@ -117,6 +117,76 @@ class TransportTest {
 	}
 
 	@Test
+	void asyncPreservationRefusalCompletesExposedFutureWithOriginalFailure() throws Exception {
+		try (var http = new PendingHttp()) {
+			var original = Map.of("complete", "native return");
+			var limit = new io.github.markpollack.judge.portable.PreservationLimitException("capture bound", original);
+			var observer = new ObservedHttpClient(http, 32000, b -> {
+			});
+			var request = HttpRequest.newBuilder(ENDPOINT)
+				.POST(HttpRequest.BodyPublishers.ofByteArray(new byte[] { 1 }))
+				.build();
+			var returned = observer.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray());
+			http.actual.completeExceptionally(new CompletionException(limit));
+			assertThatThrownBy(() -> returned.get(1, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+				.hasCause(limit);
+			assertThat(limit.original()).isSameAs(original);
+		}
+	}
+
+	@Test
+	void callbackPreservationRefusalCompletesExposedFutureInsteadOfHanging() throws Exception {
+		try (var http = new PendingHttp()) {
+			var bytes = new byte[] { 1, 2, 3 };
+			var limit = new io.github.markpollack.judge.portable.PreservationLimitException("capture bound", bytes);
+			var observer = new ObservedHttpClient(http, 32000, b -> {
+				throw limit;
+			});
+			var request = HttpRequest.newBuilder(ENDPOINT)
+				.POST(HttpRequest.BodyPublishers.ofByteArray(new byte[] { 1 }))
+				.build();
+			var returned = observer.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray());
+			HttpResponse<byte[]> response = new HttpResponse<>() {
+				public byte[] body() {
+					return bytes;
+				}
+
+				public int statusCode() {
+					return 200;
+				}
+
+				public HttpHeaders headers() {
+					return HttpHeaders.of(Map.of(), (a, b) -> true);
+				}
+
+				public HttpRequest request() {
+					return request;
+				}
+
+				public Optional<HttpResponse<byte[]>> previousResponse() {
+					return Optional.empty();
+				}
+
+				public Optional<SSLSession> sslSession() {
+					return Optional.empty();
+				}
+
+				public URI uri() {
+					return ENDPOINT;
+				}
+
+				public HttpClient.Version version() {
+					return HttpClient.Version.HTTP_1_1;
+				}
+			};
+			http.actual.complete(response);
+			assertThatThrownBy(() -> returned.get(1, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+				.hasCause(limit);
+			assertThat(limit.original()).isSameAs(bytes);
+		}
+	}
+
+	@Test
 	void sdkDeadlineCancelsActualHttpFuture() {
 		try (var http = new PendingHttp()) {
 			long start = System.nanoTime();

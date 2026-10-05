@@ -66,7 +66,8 @@ public final class SpringAiEvalModel implements EvalModel {
 	@Override
 	public void validateRequest(EvalModelRequest request) {
 		java.util.Objects.requireNonNull(request);
-		if(!request.metadata().isEmpty()) throw new IllegalArgumentException("This configured adapter does not transmit request metadata");
+		if (!request.metadata().isEmpty())
+			throw new IllegalArgumentException("This configured adapter does not transmit request metadata");
 		if (request.options().timeout() != null || request.options().responseFormat() != null)
 			throw new IllegalArgumentException(
 					"Spring AI timeout/responseFormat must be configured on the native harness");
@@ -91,43 +92,64 @@ public final class SpringAiEvalModel implements EvalModel {
 				.maxTokens(options.maxTokens()));
 
 		ChatResponse chatResponse = spec.call().chatResponse();
-		if(chatResponse==null) return EvalModelResponse.noAnswer(new IllegalStateException("Spring AI returned no response"));
+		if (chatResponse == null)
+			return EvalModelResponse.noAnswer(new IllegalStateException("Spring AI returned no response"));
 
-        // Capture the complete native return before normalizing provider fields.
-        Map<String,Object> metadata = new HashMap<>();
-        java.util.List<io.github.markpollack.judge.provenance.ArtifactRef> artifacts = java.util.List.of();
-        Throwable responseFailure = null;
-        try {
-            var snapshot = capture.capture(chatResponse);
-            metadata.putAll(snapshot.facts()); artifacts = snapshot.artifacts();
-        } catch (java.util.concurrent.CancellationException cancelled) { throw cancelled; }
-        catch (RuntimeException failure) {
-            if (Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("Native capture interrupted");
-            responseFailure = failure;
-            metadata.put("captureFailure", failure.getClass().getName()+": "+java.util.Objects.toString(failure.getMessage(),""));
-        }
-        String text = "";
-        String model = null;
-        Usage usage = null;
-        boolean completed = false;
-        try {
-            var result = chatResponse.getResult();
-            if(result != null && result.getOutput() != null) text = result.getOutput().getText();
-            var responseMeta = chatResponse.getMetadata();
-            if(responseMeta != null) {
-                model = responseMeta.getModel();
-                if(responseMeta.getId()!=null) metadata.put("responseId",responseMeta.getId());
-            }
-            String finish = result==null || result.getMetadata()==null ? null : result.getMetadata().getFinishReason();
-            if(finish!=null) metadata.put("finishReason",finish);
-            if(responseMeta!=null) usage=tokenUsage(responseMeta.getUsage());
-            completed=result!=null && responseFailure==null && (finish==null || finish.isBlank() || java.util.Set.of("stop","STOP","SUCCESS","COMPLETE").contains(finish));
-        } catch (java.util.concurrent.CancellationException cancelled) { throw cancelled; }
-        catch(RuntimeException failure) {
-            if(Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("Native response mapping interrupted");
-            if(responseFailure==null) responseFailure=failure;
-            metadata.put("mappingFailure", failure.getClass().getName()+": "+java.util.Objects.toString(failure.getMessage(),""));
-        }
+		// Capture the complete native return before normalizing provider fields.
+		Map<String, Object> metadata = new HashMap<>();
+		java.util.List<io.github.markpollack.judge.provenance.ArtifactRef> artifacts = java.util.List.of();
+		Throwable responseFailure = null;
+		try {
+			var snapshot = capture.capture(chatResponse);
+			metadata.putAll(snapshot.facts());
+			artifacts = snapshot.artifacts();
+		}
+		catch (java.util.concurrent.CancellationException cancelled) {
+			throw cancelled;
+		}
+		catch (RuntimeException failure) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
+			if (Thread.currentThread().isInterrupted())
+				throw new java.util.concurrent.CancellationException("Native capture interrupted");
+			responseFailure = failure;
+			metadata.put("captureFailure",
+					failure.getClass().getName() + ": " + java.util.Objects.toString(failure.getMessage(), ""));
+		}
+		String text = "";
+		String model = null;
+		Usage usage = null;
+		boolean completed = false;
+		try {
+			var result = chatResponse.getResult();
+			if (result != null && result.getOutput() != null)
+				text = result.getOutput().getText();
+			var responseMeta = chatResponse.getMetadata();
+			if (responseMeta != null) {
+				model = responseMeta.getModel();
+				if (responseMeta.getId() != null)
+					metadata.put("responseId", responseMeta.getId());
+			}
+			String finish = result == null || result.getMetadata() == null ? null
+					: result.getMetadata().getFinishReason();
+			if (finish != null)
+				metadata.put("finishReason", finish);
+			if (responseMeta != null)
+				usage = tokenUsage(responseMeta.getUsage());
+			completed = result != null && responseFailure == null && (finish == null || finish.isBlank()
+					|| java.util.Set.of("stop", "STOP", "SUCCESS", "COMPLETE").contains(finish));
+		}
+		catch (java.util.concurrent.CancellationException cancelled) {
+			throw cancelled;
+		}
+		catch (RuntimeException failure) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
+			if (Thread.currentThread().isInterrupted())
+				throw new java.util.concurrent.CancellationException("Native response mapping interrupted");
+			if (responseFailure == null)
+				responseFailure = failure;
+			metadata.put("mappingFailure",
+					failure.getClass().getName() + ": " + java.util.Objects.toString(failure.getMessage(), ""));
+		}
 
 		return new EvalModelResponse(text == null ? "" : text, model, usage, metadata, completed, artifacts,
 				responseFailure);

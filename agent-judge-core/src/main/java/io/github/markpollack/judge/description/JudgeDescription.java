@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.description;
+
 import io.github.markpollack.judge.portable.ImplementationIdentity;
 import io.github.markpollack.judge.portable.PortableForm;
 
@@ -17,20 +18,20 @@ import org.jspecify.annotations.Nullable;
 import io.github.markpollack.judge.JudgeType;
 
 /**
- * One judge as configured: its metadata, the metadata of the judge it wraps, the class that
- * actually implements it, and the configuration it declared.
+ * One judge as configured: its metadata, the metadata of the judge it wraps, the class
+ * that actually implements it, and the configuration it declared.
  *
  * <p>
- * Obtained from {@link io.github.markpollack.judge.description.JudgeDescription#of(io.github.markpollack.judge.Judge)},
+ * Obtained from
+ * {@link io.github.markpollack.judge.description.JudgeDescription#of(io.github.markpollack.judge.Judge)},
  * which looks through {@link io.github.markpollack.judge.NamedJudge} wrappers. The outer
- * metadata names the judge in a verdict; the delegate metadata is what the wrapped judge says
- * about itself, which can differ. {@code Juries.fromJudges} wraps a judge whose name collides
- * with an earlier one as {@code DETERMINISTIC}, whatever the judge really is, and the
- * delegate type is where the real type is still visible.
+ * metadata names the judge in a verdict; the delegate metadata is what the wrapped judge
+ * says about itself, which can differ. {@code Juries.fromJudges} wraps a judge whose name
+ * collides with an earlier one as {@code DETERMINISTIC}, whatever the judge really is,
+ * and the delegate type is where the real type is still visible.
  * </p>
  *
- * <h2>Portable form</h2>
- * <pre>
+ * <h2>Portable form</h2> <pre>
  * {
  *   "descriptionVersion": 1,
  *   "metadata":           {"declared": true, "values": {"name": "...", "type": "LLM_POWERED"}},
@@ -41,16 +42,16 @@ import io.github.markpollack.judge.JudgeType;
  * }
  * </pre>
  * <p>
- * {@code notApplicableWhen} is the <em>effective</em> declaration — the first one found walking
- * the wrapper chain outward in, which is the one a jury honours — rather than whatever the
- * outermost wrapper happens to hold. A reader can therefore tell from the description alone
- * whether this seat is permitted to leave the denominator.
+ * {@code notApplicableWhen} is the <em>effective</em> declaration — the first one found
+ * walking the wrapper chain outward in, which is the one a jury honours — rather than
+ * whatever the outermost wrapper happens to hold. A reader can therefore tell from the
+ * description alone whether this seat is permitted to leave the denominator.
  * </p>
  * <p>
- * A metadata node is declared when a name or a type is present, and its {@code values} hold
- * only those present. {@code "configuration": {"declared": false}} means the judge does not
- * implement {@link ConfiguredJudge}; {@code {"declared": true, "values": {}}} means it does and
- * declared nothing.
+ * A metadata node is declared when a name or a type is present, and its {@code values}
+ * hold only those present. {@code "configuration": {"declared": false}} means the judge
+ * does not implement {@link ConfiguredJudge}; {@code {"declared": true, "values": {}}}
+ * means it does and declared nothing.
  * </p>
  *
  * @param name the judge's name from its outer metadata, or null when it declares none
@@ -84,8 +85,8 @@ public record JudgeDescription(@Nullable String name, @Nullable JudgeType type, 
 	 * with no class name. The configuration is that judge's
 	 * {@link ConfiguredJudge#configuration()}, or undeclared when it does not implement
 	 * {@link ConfiguredJudge}. The exclusion capability is the effective one from
-	 * {@link Judges#notApplicableCapability(Judge)}, so the description says what a jury would
-	 * actually honour rather than what the outermost wrapper happens to hold.
+	 * {@link Judges#notApplicableCapability(Judge)}, so the description says what a jury
+	 * would actually honour rather than what the outermost wrapper happens to hold.
 	 * </p>
 	 * @param judge the judge to describe
 	 * @return its description
@@ -130,6 +131,7 @@ public record JudgeDescription(@Nullable String name, @Nullable JudgeType type, 
 					Judges.notApplicableCapability(judge).orElse(null), implementation, configuration);
 		}
 		catch (IllegalArgumentException ex) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 			String label = (outer != null && outer.name() != null) ? "'" + outer.name() + "'"
 					: "implemented by " + implementation.toPortable();
 			throw new IllegalArgumentException(
@@ -139,8 +141,8 @@ public record JudgeDescription(@Nullable String name, @Nullable JudgeType type, 
 
 	/**
 	 * Validate the implementation and freeze the configuration.
-	 * @throws IllegalArgumentException if the configuration holds a non-portable value; the
-	 * message names its path from {@code configuration}
+	 * @throws IllegalArgumentException if the configuration holds a non-portable value;
+	 * the message names its path from {@code configuration}
 	 */
 	public JudgeDescription {
 		Objects.requireNonNull(implementation, "implementation must not be null");

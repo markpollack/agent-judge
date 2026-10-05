@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.voting.AggregationEvidence;
 import io.github.markpollack.judge.voting.ErrorHandling;
@@ -62,8 +63,8 @@ class WeightedAverageOverflowTest {
 
 	@Test
 	void twoJudgesWeightedMaxValueProduceTheirWeightedMean() {
-		Judgment result = new WeightedAverageStrategy().aggregate(List.of(passJudgment(0.8), failJudgment(0.4)),
-				Map.of("0", MAX, "1", MAX));
+		Judgment result = new WeightedAverageStrategy().aggregate(io.github.markpollack.judge.testing.TestBallots
+			.legacy(List.of(passJudgment(0.8), failJudgment(0.4)), Map.of("0", MAX, "1", MAX)));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(result.score()).isCloseTo(0.6, within(1e-15));
@@ -78,14 +79,14 @@ class WeightedAverageOverflowTest {
 	@Test
 	void unequalOverflowingWeightsKeepTheirProportions() {
 		// MAX : MAX/2 is 2 : 1, so a PASS and a FAIL average to 2/3.
-		Judgment result = new WeightedAverageStrategy().aggregate(List.of(booleanPass("a"), booleanFail("b")),
-				Map.of("0", MAX, "1", MAX / 2));
+		Judgment result = new WeightedAverageStrategy().aggregate(io.github.markpollack.judge.testing.TestBallots
+			.legacy(List.of(booleanPass("a"), booleanFail("b")), Map.of("0", MAX, "1", MAX / 2)));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(result.score()).isCloseTo(2.0 / 3.0, within(1e-15));
 
-		Judgment reversed = new WeightedAverageStrategy().aggregate(List.of(booleanPass("a"), booleanFail("b")),
-				Map.of("0", MAX / 2, "1", MAX));
+		Judgment reversed = new WeightedAverageStrategy().aggregate(io.github.markpollack.judge.testing.TestBallots
+			.legacy(List.of(booleanPass("a"), booleanFail("b")), Map.of("0", MAX / 2, "1", MAX)));
 		assertThat(reversed.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(reversed.score()).isCloseTo(1.0 / 3.0, within(1e-15));
 	}
@@ -93,9 +94,9 @@ class WeightedAverageOverflowTest {
 	@Test
 	void manyLargeWeightsWithATinyOneStillAverageCorrectly() {
 		// Three weights of MAX/2 overflow; the tiny weight is negligible beside them.
-		Judgment result = new WeightedAverageStrategy().aggregate(
-				List.of(passJudgment(1.0), passJudgment(0.5), failJudgment(0.0), passJudgment(1.0)),
-				Map.of("0", MAX / 2, "1", MAX / 2, "2", MAX / 2, "3", Double.MIN_VALUE));
+		Judgment result = new WeightedAverageStrategy().aggregate(io.github.markpollack.judge.testing.TestBallots
+			.legacy(List.of(passJudgment(1.0), passJudgment(0.5), failJudgment(0.0), passJudgment(1.0)),
+					Map.of("0", MAX / 2, "1", MAX / 2, "2", MAX / 2, "3", Double.MIN_VALUE)));
 
 		assertThat(result.score()).isCloseTo(0.5, within(1e-15));
 		assertThat(evidence(result)).containsEntry(AggregationEvidence.INPUT_WEIGHT, MAX)
@@ -107,9 +108,9 @@ class WeightedAverageOverflowTest {
 		// The abstaining judge's weight pushes the input total past MAX; the eligible
 		// total is
 		// MAX/2 and is reported as computed.
-		Judgment result = new WeightedAverageStrategy().aggregate(
-				List.of(Judgment.abstain("not applicable"), passJudgment(0.8), failJudgment(0.2)),
-				Map.of("0", MAX, "1", MAX / 4, "2", MAX / 4));
+		Judgment result = new WeightedAverageStrategy().aggregate(io.github.markpollack.judge.testing.TestBallots
+			.legacy(List.of(Judgment.abstain("not applicable"), passJudgment(0.8), failJudgment(0.2)),
+					Map.of("0", MAX, "1", MAX / 4, "2", MAX / 4)));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(result.score()).isEqualTo(0.5);
@@ -119,9 +120,9 @@ class WeightedAverageOverflowTest {
 
 	@Test
 	void anOverflowingInputTotalWithNothingEligibleAbstainsWithFiniteEvidence() {
-		Judgment result = new WeightedAverageStrategy().aggregate(
-				List.of(Judgment.abstain("not applicable"), Judgment.abstain("not applicable")),
-				Map.of("0", MAX, "1", MAX));
+		Judgment result = new WeightedAverageStrategy().aggregate(io.github.markpollack.judge.testing.TestBallots
+			.legacy(List.of(Judgment.abstain("not applicable"), Judgment.abstain("not applicable")),
+					Map.of("0", MAX, "1", MAX)));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.score()).isNull();
@@ -132,7 +133,8 @@ class WeightedAverageOverflowTest {
 	@Test
 	void anErrorTreatedAsFailParticipatesWithItsOverflowingWeight() {
 		Judgment result = new WeightedAverageStrategy(ErrorHandling.TREAT_AS_FAIL)
-			.aggregate(List.of(Judgment.error("judge threw"), booleanPass("ok")), Map.of("0", MAX, "1", MAX));
+			.aggregate(io.github.markpollack.judge.testing.TestBallots
+				.legacy(List.of(Judgment.error("judge threw"), booleanPass("ok")), Map.of("0", MAX, "1", MAX)));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(result.score()).isCloseTo(0.5, within(1e-15));

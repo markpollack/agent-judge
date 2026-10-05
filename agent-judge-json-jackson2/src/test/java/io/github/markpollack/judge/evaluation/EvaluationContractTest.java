@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.evaluation;
+
 import io.github.markpollack.judge.jury.JuryRecipe;
 import io.github.markpollack.judge.verdict.RoutingRule;
 import io.github.markpollack.judge.verdict.Verdict;
@@ -347,7 +348,7 @@ class EvaluationContractTest {
 			calls.incrementAndGet();
 			return new PolicyDecision(PolicyAction.RELY, "yes");
 		};
-		for (String invalid : List.of(good.replace("\"schemaVersion\":5", "\"schemaVersion\":99"),
+		for (String invalid : List.of(good.replace("\"schemaVersion\":6", "\"schemaVersion\":99"),
 				good.replaceFirst("\"producerStatus\":\"pass\"", "\"producerStatus\":\"fail\""),
 				good.replace("\"declaredCardinality\":1", "\"declaredCardinality\":2")))
 			assertThatThrownBy(() -> Evaluations.apply(codec.read(invalid), policy))

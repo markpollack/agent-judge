@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.AggregationEvidence;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
@@ -39,7 +40,7 @@ class ConsensusStrategyTest {
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), booleanPass("Judge 2"), booleanPass("Judge 3"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(result.score()).isNull();
@@ -54,7 +55,7 @@ class ConsensusStrategyTest {
 
 		List<Judgment> judgments = List.of(booleanFail("Judge 1"), booleanFail("Judge 2"), booleanFail("Judge 3"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(result.score()).isNull();
@@ -72,7 +73,8 @@ class ConsensusStrategyTest {
 	void mixedApplicableVotesAbstain() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		Judgment result = strategy.aggregate(List.of(booleanPass("Judge 1"), booleanFail("Judge 2")), Map.of());
+		Judgment result = strategy.aggregate(
+				io.github.markpollack.judge.voting.Ballots.of(List.of(booleanPass("Judge 1"), booleanFail("Judge 2"))));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.score()).isNull();
@@ -87,10 +89,10 @@ class ConsensusStrategyTest {
 	void disagreementIsDistinguishedFromUnanimousFailure() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		Judgment disagreed = strategy
-			.aggregate(List.of(booleanPass("Judge 1"), booleanPass("Judge 2"), booleanFail("Judge 3")), Map.of());
-		Judgment unanimouslyFailed = strategy.aggregate(List.of(booleanFail("Judge 1"), booleanFail("Judge 2")),
-				Map.of());
+		Judgment disagreed = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(booleanPass("Judge 1"), booleanPass("Judge 2"), booleanFail("Judge 3"))));
+		Judgment unanimouslyFailed = strategy.aggregate(
+				io.github.markpollack.judge.voting.Ballots.of(List.of(booleanFail("Judge 1"), booleanFail("Judge 2"))));
 
 		assertThat(disagreed.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(disagreed.reasoning()).contains("No consensus").contains("2 passed, 1 failed");
@@ -113,9 +115,10 @@ class ConsensusStrategyTest {
 	void disagreementIsDistinguishedFromNoApplicableJudges() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		Judgment disagreed = strategy.aggregate(List.of(booleanPass("Judge 1"), booleanFail("Judge 2")), Map.of());
-		Judgment noneApplicable = strategy.aggregate(List.of(Judgment.abstain("n/a"), Judgment.abstain("n/a")),
-				Map.of());
+		Judgment disagreed = strategy.aggregate(
+				io.github.markpollack.judge.voting.Ballots.of(List.of(booleanPass("Judge 1"), booleanFail("Judge 2"))));
+		Judgment noneApplicable = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(Judgment.abstain("n/a"), Judgment.abstain("n/a"))));
 
 		assertThat(disagreed.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(noneApplicable.status()).isEqualTo(JudgmentStatus.ABSTAIN);
@@ -136,7 +139,8 @@ class ConsensusStrategyTest {
 	void shouldHandleSingleJudge() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		Judgment result = strategy.aggregate(List.of(booleanPass("Only judge")), Map.of());
+		Judgment result = strategy
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(booleanPass("Only judge"))));
 
 		// Single judge → unanimous → pass
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -149,7 +153,7 @@ class ConsensusStrategyTest {
 
 		List<Judgment> judgments = List.of(passJudgment(0.8), passJudgment(0.9), passJudgment(0.6));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// DELTA-1: the scores are along for the ride. Consensus reads status, so what
 		// makes
@@ -163,7 +167,7 @@ class ConsensusStrategyTest {
 
 		List<Judgment> judgments = List.of(failJudgment(0.3), failJudgment(0.2), failJudgment(0.1));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(result.reasoning()).contains("all 3 applicable judge(s) failed");
@@ -175,7 +179,7 @@ class ConsensusStrategyTest {
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), passJudgment(0.8), booleanPass("Judge 3"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// A scored judgment and a status-only one are substitutable here: both declare
 		// PASS.
@@ -188,7 +192,7 @@ class ConsensusStrategyTest {
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), failJudgment(0.3), booleanPass("Judge 3"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.reasoning()).contains("No consensus");
@@ -205,7 +209,7 @@ class ConsensusStrategyTest {
 		List<Judgment> judgments = List.of(Judgment.builder().pass().score(0.1).reasoning("low but ok").build(),
 				Judgment.builder().pass().score(0.2).reasoning("low but ok").build());
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 	}
@@ -219,8 +223,8 @@ class ConsensusStrategyTest {
 	void abstentionDoesNotBreakUnanimity() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		Judgment result = strategy.aggregate(
-				List.of(booleanPass("Judge 1"), Judgment.abstain("Cannot evaluate"), booleanPass("Judge 3")), Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(booleanPass("Judge 1"), Judgment.abstain("Cannot evaluate"), booleanPass("Judge 3"))));
 
 		// Was FAIL: the abstention's absent score fell through to a fail vote.
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -238,8 +242,8 @@ class ConsensusStrategyTest {
 	void abstentionAlongsideFailIsUnanimousFail() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		Judgment result = strategy.aggregate(List.of(booleanFail("Judge 1"), Judgment.abstain("Cannot evaluate")),
-				Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(booleanFail("Judge 1"), Judgment.abstain("Cannot evaluate"))));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(result.reasoning()).contains("all 1 applicable judge(s) failed");
@@ -254,7 +258,8 @@ class ConsensusStrategyTest {
 		// Weights are ignored in ConsensusStrategy
 		Map<String, Double> weights = Map.of("0", 100.0, "1", 1.0);
 
-		Judgment result = strategy.aggregate(judgments, weights);
+		Judgment result = strategy
+			.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, weights));
 
 		// Unanimous pass regardless of weights
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -266,7 +271,8 @@ class ConsensusStrategyTest {
 	void emptyJudgmentListShouldThrowException() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		assertThatThrownBy(() -> strategy.aggregate(List.of(), Map.of())).isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of())))
+			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("empty");
 	}
 
@@ -274,7 +280,8 @@ class ConsensusStrategyTest {
 	void nullJudgmentListShouldThrowException() {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
-		assertThatThrownBy(() -> strategy.aggregate(null, Map.of())).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(null)))
+			.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
@@ -284,7 +291,7 @@ class ConsensusStrategyTest {
 		// 2 pass, 1 fail → no consensus
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), booleanPass("Judge 2"), booleanFail("Judge 3"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 	}
@@ -296,7 +303,7 @@ class ConsensusStrategyTest {
 		// 2 fail, 1 pass → no consensus
 		List<Judgment> judgments = List.of(booleanFail("Judge 1"), booleanFail("Judge 2"), booleanPass("Judge 3"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// A fail-leaning majority is still disagreement, not a collective failure.
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
@@ -315,7 +322,8 @@ class ConsensusStrategyTest {
 	@DisplayName("the consensus truth table holds under every error policy")
 	void consensusTruthTableHoldsUnderEveryErrorHandling(String row, ErrorHandling policy, List<Judgment> judgments,
 			JudgmentStatus expected) {
-		Judgment result = new ConsensusStrategy(policy).aggregate(judgments, Map.of());
+		Judgment result = new ConsensusStrategy(policy)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).as("%s under %s", row, policy).isEqualTo(expected);
 	}
@@ -348,9 +356,12 @@ class ConsensusStrategyTest {
 	void errorRowFollowsTheErrorHandling(ErrorHandling policy) {
 		ConsensusStrategy strategy = new ConsensusStrategy(policy);
 
-		Judgment passPlusError = strategy.aggregate(List.of(booleanPass("Judge 1"), Judgment.error("boom")), Map.of());
-		Judgment failPlusError = strategy.aggregate(List.of(booleanFail("Judge 1"), Judgment.error("boom")), Map.of());
-		Judgment allError = strategy.aggregate(List.of(Judgment.error("one"), Judgment.error("two")), Map.of());
+		Judgment passPlusError = strategy.aggregate(
+				io.github.markpollack.judge.voting.Ballots.of(List.of(booleanPass("Judge 1"), Judgment.error("boom"))));
+		Judgment failPlusError = strategy.aggregate(
+				io.github.markpollack.judge.voting.Ballots.of(List.of(booleanFail("Judge 1"), Judgment.error("boom"))));
+		Judgment allError = strategy.aggregate(
+				io.github.markpollack.judge.voting.Ballots.of(List.of(Judgment.error("one"), Judgment.error("two"))));
 
 		JudgmentStatus expectedPassPlusError = switch (policy) {
 			case PROPAGATE -> JudgmentStatus.ERROR;
@@ -379,8 +390,8 @@ class ConsensusStrategyTest {
 	 */
 	@Test
 	void errorTreatedAsFailCanProduceDisagreement() {
-		Judgment result = new ConsensusStrategy(ErrorHandling.TREAT_AS_FAIL)
-			.aggregate(List.of(booleanPass("Judge 1"), Judgment.error("boom")), Map.of());
+		Judgment result = new ConsensusStrategy(ErrorHandling.TREAT_AS_FAIL).aggregate(
+				io.github.markpollack.judge.voting.Ballots.of(List.of(booleanPass("Judge 1"), Judgment.error("boom"))));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.reasoning()).contains("No consensus").contains("1 passed, 1 failed");
@@ -399,7 +410,8 @@ class ConsensusStrategyTest {
 		ConsensusStrategy strategy = new ConsensusStrategy();
 
 		assertThat(strategy.getName()).isEqualTo("consensus");
-		assertThat(evidence(strategy.aggregate(List.of(booleanPass("Judge 1")), Map.of())))
+		assertThat(evidence(
+				strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(booleanPass("Judge 1"))))))
 			.containsEntry(AggregationEvidence.STRATEGY, "consensus");
 	}
 

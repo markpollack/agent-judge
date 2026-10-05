@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.verdict.VerdictProvenance;
@@ -92,7 +92,7 @@ class SubjectCauseTest {
 	void aCopiedLeafKeepsItsCause() {
 		Jury tier = SimpleJury.builder()
 			.judge(Judges.named(() -> emptySubject(), "diff-size"))
-			.votingStrategy(new AllMustPassStrategy())
+			.votingStrategy(new AllEligiblePassStrategy())
 			.build();
 
 		Verdict verdict = CascadedJury.builder()
@@ -116,7 +116,7 @@ class SubjectCauseTest {
 		Verdict verdict = SimpleJury.builder()
 			.judge(Judges.named(() -> emptySubject(), "diff-size"))
 			.judge(Judges.named(() -> Judgment.fail("the answer contradicted its sources"), "faithfulness"))
-			.votingStrategy(new AllMustPassStrategy())
+			.votingStrategy(new AllEligiblePassStrategy())
 			.build()
 			.vote();
 
@@ -141,7 +141,8 @@ class SubjectCauseTest {
 	@DisplayName("an exclusion treated as a failure produces an uncoded rejection, not a manufactured cause")
 	void exclusionsTreatedAsFailuresAreUncoded() {
 		Judgment aggregate = new ConsensusStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.TREAT_AS_FAIL)
-			.aggregate(List.of(Judgment.notApplicable("the repository contains no Java")), Map.of());
+			.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(Judgment.notApplicable("the repository contains no Java"))));
 
 		assertThat(aggregate.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(aggregate.reasonCode()).as("the strategy observed no cause; it applied a policy").isNull();

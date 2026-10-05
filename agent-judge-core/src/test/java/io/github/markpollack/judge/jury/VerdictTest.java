@@ -4,13 +4,14 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.CompositeFailure;
 import io.github.markpollack.judge.verdict.CompositeFailureCode;
 import io.github.markpollack.judge.verdict.CompositeRelation;
 import io.github.markpollack.judge.verdict.DispositionReason;
-import io.github.markpollack.judge.verdict.Participation;
+import io.github.markpollack.judge.voting.Participation;
 import io.github.markpollack.judge.verdict.RoutingRule;
 import io.github.markpollack.judge.verdict.Seat;
 import io.github.markpollack.judge.verdict.Verdict;
@@ -66,7 +67,7 @@ class VerdictTest {
 	}
 
 	private static Verdict.Builder leaf(Judgment judgment, Map<String, Judgment> byName) {
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(judgment)
 			.individual(List.copyOf(byName.values()))
 			.individualByName(byName)
@@ -91,14 +92,16 @@ class VerdictTest {
 			Judgment one = booleanPass("Judge 1");
 			Judgment two = booleanFail("Judge 2");
 			Verdict verdict = leaf(booleanPass("Majority passed"), named("first", one, "second", two))
-				.weights(Map.of("0", 0.3, "1", 0.7))
+				.seats(List.of(new Seat(0, "first", KeySource.DECLARED).weighted(0.3),
+						new Seat(1, "second", KeySource.DECLARED).weighted(0.7)))
 				.build();
 
 			assertThat(verdict.individual()).containsExactly(one, two);
 			assertThat(verdict.individualByName()).containsExactly(Map.entry("first", one), Map.entry("second", two));
-			assertThat(verdict.weights()).containsEntry("0", 0.3).containsEntry("1", 0.7);
-			assertThat(verdict.seats()).containsExactly(new Seat(0, "first", KeySource.DECLARED),
-					new Seat(1, "second", KeySource.DECLARED));
+			assertThat(io.github.markpollack.judge.testing.TestBallots.weights(verdict)).containsEntry("0", 0.3)
+				.containsEntry("1", 0.7);
+			assertThat(verdict.seats()).containsExactly(new Seat(0, "first", KeySource.DECLARED).weighted(0.3),
+					new Seat(1, "second", KeySource.DECLARED).weighted(0.7));
 			assertThat(verdict.provenance()).isEqualTo(VerdictProvenance.own());
 			assertThat(verdict.compositeAttempts()).isEmpty();
 		}
@@ -106,23 +109,23 @@ class VerdictTest {
 		@Test
 		@DisplayName("a verdict must say what produced its aggregate; no default would be true")
 		void aDecisionIsRequired() {
-			assertThatThrownBy(() -> Verdict.builder().judgment(booleanPass("ok")).build())
+			assertThatThrownBy(() -> Verdict.advancedBuilder().judgment(booleanPass("ok")).build())
 				.isInstanceOf(IllegalStateException.class)
 				.hasMessageContaining("what produced its aggregate");
 		}
 
 		@Test
 		void rejectsMissingAggregatedJudgment() {
-			assertThatThrownBy(() -> Verdict.builder().provenance(VerdictProvenance.own()).build())
+			assertThatThrownBy(() -> Verdict.advancedBuilder().provenance(VerdictProvenance.own()).build())
 				.isInstanceOf(NullPointerException.class)
 				.hasMessageContaining("aggregated judgment");
-			assertThatThrownBy(() -> Verdict.builder().judgment(null)).isInstanceOf(NullPointerException.class)
+			assertThatThrownBy(() -> Verdict.advancedBuilder().judgment(null)).isInstanceOf(NullPointerException.class)
 				.hasMessageContaining("aggregated judgment");
 		}
 
 		@Test
 		void rejectsNullCompositeAttemptsOnTheCanonicalConstructor() {
-			assertThatThrownBy(() -> new Verdict(booleanPass("Aggregated"), List.of(), Map.of(), Map.of(), List.of(),
+			assertThatThrownBy(() -> new Verdict(booleanPass("Aggregated"), List.of(), Map.of(), List.of(),
 					VerdictProvenance.own(), null))
 				.isInstanceOf(NullPointerException.class)
 				.hasMessageContaining("compositeAttempts");
@@ -130,14 +133,14 @@ class VerdictTest {
 
 		@Test
 		void anEmptyVerdictIsLegalWhenNothingWasReduced() {
-			Verdict verdict = Verdict.builder()
+			Verdict verdict = Verdict.advancedBuilder()
 				.judgment(Judgment.error(JudgmentReasonCode.NO_TIER_DECIDED, "no tier decided"))
 				.provenance(VerdictProvenance.undecided())
 				.build();
 
 			assertThat(verdict.individual()).isEmpty();
 			assertThat(verdict.seats()).isEmpty();
-			assertThat(verdict.weights()).isEmpty();
+			assertThat(io.github.markpollack.judge.testing.TestBallots.weights(verdict)).isEmpty();
 			assertThat(verdict.compositeAttempts()).isEmpty();
 		}
 
@@ -149,7 +152,7 @@ class VerdictTest {
 			byName.put("first", only);
 			List<Seat> seats = new ArrayList<>(declaredSeats("first"));
 
-			Verdict verdict = Verdict.builder()
+			Verdict verdict = Verdict.advancedBuilder()
 				.judgment(booleanPass("Aggregated"))
 				.individual(individual)
 				.individualByName(byName)
@@ -184,7 +187,7 @@ class VerdictTest {
 		@Test
 		@DisplayName("one seat per judgment, or the join is a guess")
 		void oneSeatPerJudgment() {
-			assertThatThrownBy(() -> Verdict.builder()
+			assertThatThrownBy(() -> Verdict.advancedBuilder()
 				.judgment(booleanPass("agg"))
 				.individual(List.of(booleanPass("J1"), booleanPass("J2")))
 				.individualByName(Map.of("a", booleanPass("J1")))
@@ -197,7 +200,7 @@ class VerdictTest {
 		@Test
 		@DisplayName("positions are unique and strictly increasing")
 		void positionsAreOrdered() {
-			assertThatThrownBy(() -> Verdict.builder()
+			assertThatThrownBy(() -> Verdict.advancedBuilder()
 				.judgment(booleanPass("agg"))
 				.individual(List.of(booleanPass("J1"), booleanPass("J2")))
 				.individualByName(named("a", booleanPass("J1"), "b", booleanPass("J2")))
@@ -211,7 +214,7 @@ class VerdictTest {
 		@Test
 		@DisplayName("a seat key that is not in the map would attribute a judgment to nothing")
 		void seatKeysMustExist() {
-			assertThatThrownBy(() -> Verdict.builder()
+			assertThatThrownBy(() -> Verdict.advancedBuilder()
 				.judgment(booleanPass("agg"))
 				.individual(List.of(booleanPass("J1")))
 				.individualByName(Map.of("a", booleanPass("J1")))
@@ -227,7 +230,7 @@ class VerdictTest {
 			Judgment first = booleanPass("J1");
 			Judgment second = booleanFail("J2");
 
-			Verdict verdict = Verdict.builder()
+			Verdict verdict = Verdict.advancedBuilder()
 				.judgment(booleanFail("agg"))
 				.individual(List.of(first, second))
 				.individualByName(Map.of("same", second))
@@ -246,7 +249,7 @@ class VerdictTest {
 			Judgment first = booleanPass("first");
 			Judgment third = booleanPass("third");
 
-			Verdict verdict = Verdict.builder()
+			Verdict verdict = Verdict.advancedBuilder()
 				.judgment(booleanPass("agg"))
 				.individual(List.of(first, third))
 				.individualByName(named("first", first, "third", third))
@@ -311,7 +314,7 @@ class VerdictTest {
 			Map<String, Judgment> byName = named("style", style, "coverage", coverage);
 
 			Verdict shorthand = Verdict.of(booleanFail("one judge was not satisfied"), byName);
-			Verdict longhand = Verdict.builder()
+			Verdict longhand = Verdict.advancedBuilder()
 				.judgment(booleanFail("one judge was not satisfied"))
 				.individual(List.of(style, coverage))
 				.individualByName(byName)
@@ -320,7 +323,9 @@ class VerdictTest {
 				.build();
 
 			assertThat(shorthand).isEqualTo(longhand).hasSameHashCodeAs(longhand);
-			assertThat(shorthand.weights()).as("it configures no weights, because nobody configured any").isEmpty();
+			assertThat(io.github.markpollack.judge.testing.TestBallots.weights(shorthand))
+				.as("it configures no weights, because nobody configured any")
+				.isEmpty();
 			assertThat(shorthand.compositeAttempts()).as("a leaf entered no stage").isEmpty();
 		}
 
@@ -336,7 +341,7 @@ class VerdictTest {
 			byName.put("licence", licence);
 
 			Verdict shorthand = Verdict.of(booleanFail("one judge of three was not satisfied"), byName);
-			Verdict longhand = Verdict.builder()
+			Verdict longhand = Verdict.advancedBuilder()
 				.judgment(booleanFail("one judge of three was not satisfied"))
 				.individual(List.of(style, coverage, licence))
 				.individualByName(byName)
@@ -450,16 +455,16 @@ class VerdictTest {
 		@Test
 		@DisplayName("an UNDECIDED verdict must actually carry a machinery failure")
 		void undecidedRequiresAMachineryError() {
-			assertThatThrownBy(() -> Verdict.builder()
+			assertThatThrownBy(() -> Verdict.advancedBuilder()
 				.judgment(booleanPass("ok"))
 				.provenance(VerdictProvenance.undecided())
 				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("machinery reason code");
-			assertThatThrownBy(() -> Verdict.builder()
+			assertThatThrownBy(() -> Verdict.advancedBuilder()
 				.judgment(Judgment.error(JudgmentReasonCode.JUDGE_REPORTED, "a judge failed"))
 				.provenance(VerdictProvenance.undecided())
 				.build(), "a judge's failure is not the instrument reaching no outcome")
 				.isInstanceOf(IllegalArgumentException.class);
-			assertThatCode(() -> Verdict.builder()
+			assertThatCode(() -> Verdict.advancedBuilder()
 				.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
 				.provenance(VerdictProvenance.undecided())
 				.build()).doesNotThrowAnyException();
@@ -485,7 +490,7 @@ class VerdictTest {
 		@Test
 		@DisplayName("names are local: a decision must name a direct tier of this verdict")
 		void tierNamesAreLocal() {
-			assertThatThrownBy(() -> Verdict.builder()
+			assertThatThrownBy(() -> Verdict.advancedBuilder()
 				.judgment(booleanPass("ok"))
 				.provenance(VerdictProvenance.tier("elsewhere", VerdictProvenanceBasis.TIER_OUTCOME))
 				.build()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("tier names are local");
@@ -498,7 +503,7 @@ class VerdictTest {
 					RoutingRule.STOP_ON_ANY_OPINION_FAIL,
 					new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED));
 
-			assertThatThrownBy(() -> Verdict.builder()
+			assertThatThrownBy(() -> Verdict.advancedBuilder()
 				.judgment(booleanPass("ok"))
 				.provenance(VerdictProvenance.tier("gate", VerdictProvenanceBasis.TIER_OUTCOME))
 				.compositeAttempts(List.of(threw))
@@ -558,7 +563,7 @@ class VerdictTest {
 		 */
 		private static Verdict tier(Judgment aggregate, VerdictProvenance provenance, Judgment second) {
 			Map<String, Judgment> byName = individuals(second);
-			return Verdict.builder()
+			return Verdict.advancedBuilder()
 				.judgment(aggregate)
 				.individual(List.copyOf(byName.values()))
 				.individualByName(byName)
@@ -593,11 +598,11 @@ class VerdictTest {
 		 */
 		private static Verdict.Builder root(Judgment aggregate, Verdict tier, CompositeAttempt attempt,
 				VerdictProvenanceBasis basis) {
-			return Verdict.builder()
+			return Verdict.advancedBuilder()
 				.judgment(aggregate)
 				.individual(tier.individual())
 				.individualByName(tier.individualByName())
-				.weights(tier.weights())
+				.rule(tier.rule())
 				.seats(tier.seats())
 				.provenance(VerdictProvenance.tier("gate", basis))
 				.compositeAttempts(List.of(attempt));
@@ -717,7 +722,7 @@ class VerdictTest {
 			Verdict decided = tier(booleanPass("the tier was satisfied"), VerdictProvenance.own(), PASSED);
 			assertThatThrownBy(
 					() -> root(decided.judgment(), decided, used(decided), VerdictProvenanceBasis.TIER_OUTCOME)
-						.weights(Map.of("0", 2.0))
+						.seats(decided.seats().stream().map(seat -> seat.weighted(2.0)).toList())
 						.build(),
 					"the weights are part of the copy, because they are the join to the seats")
 				.isInstanceOf(IllegalArgumentException.class)
@@ -771,12 +776,11 @@ class VerdictTest {
 			Verdict tier = undecidedTier();
 			CompositeAttempt attempt = refused(tier, RoutingRule.STOP_ON_ANY_OPINION_FAIL);
 
-			assertThatThrownBy(
-					() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
-						.seats(List.of(new Seat(2, "first", KeySource.DECLARED),
-								new Seat(3, "second", KeySource.DECLARED)))
-						.build(),
-					"positions are what the weights join to, so moving them reports a configuration nobody set")
+			assertThatThrownBy(() -> root(tier.judgment(), tier, attempt, VerdictProvenanceBasis.INDIVIDUAL_REJECTION)
+				.seats(io.github.markpollack.judge.testing.TestBallots.weighted(
+						List.of(new Seat(2, "first", KeySource.DECLARED), new Seat(3, "second", KeySource.DECLARED)),
+						Map.of("0", 2.0)))
+				.build(), "positions are what the weights join to, so moving them reports a configuration nobody set")
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("copies its individuals, map, weights and seats");
 		}
@@ -792,7 +796,7 @@ class VerdictTest {
 			Verdict first = unanimousPass(2);
 			Verdict second = split(1, 1);
 
-			Verdict meta = Verdict.builder()
+			Verdict meta = Verdict.advancedBuilder()
 				.judgment(booleanPass("Meta-jury passed"))
 				.individual(List.of(first.judgment(), second.judgment()))
 				.individualByName(named("first", first.judgment(), "second", second.judgment()))
@@ -857,7 +861,7 @@ class VerdictTest {
 		@Test
 		@DisplayName("a stage-failed attempt keeps the child's actual verdict, unchanged")
 		void stageFailedKeepsTheChildVerdict() {
-			Verdict undecided = Verdict.builder()
+			Verdict undecided = Verdict.advancedBuilder()
 				.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "the strategy threw"))
 				.provenance(VerdictProvenance.undecided())
 				.build();

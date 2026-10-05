@@ -45,12 +45,14 @@ public interface NativeCapture<T> {
 			try {
 				byte[] json = mapper.writeValueAsBytes(response);
 				if (json.length > maximumBytes)
-					throw new IllegalArgumentException("Native SDK snapshot exceeds capture bound");
+					throw new io.github.markpollack.judge.portable.PreservationLimitException(
+							"Native SDK snapshot exceeds capture bound", response);
 				return new NativeSnapshot(
 						Map.of("nativeResponseJson", new String(json, java.nio.charset.StandardCharsets.UTF_8)),
 						List.of());
 			}
 			catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
 				throw new IllegalArgumentException("Native SDK response cannot be captured", failure);
 			}
 		};

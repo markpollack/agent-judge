@@ -283,7 +283,7 @@ public final class JudgeTestFixtures {
 			byName.put("Judge#" + (i + 1), j);
 		}
 
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(booleanPass("Unanimous pass"))
 			.individual(individual)
 			.individualByName(byName)
@@ -335,7 +335,7 @@ public final class JudgeTestFixtures {
 		boolean majorityPass = passCount > failCount;
 		Judgment judgment = majorityPass ? booleanPass("Majority passed") : booleanFail("Majority failed");
 
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(judgment)
 			.individual(individual)
 			.individualByName(byName)
@@ -359,7 +359,7 @@ public final class JudgeTestFixtures {
 			byName.put("Judge#" + (i + 1), j);
 		}
 
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(Judgment.abstain("All judges abstained"))
 			.individual(individual)
 			.individualByName(byName)

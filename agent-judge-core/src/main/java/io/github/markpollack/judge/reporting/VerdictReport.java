@@ -3,6 +3,7 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.reporting;
+
 import io.github.markpollack.judge.verdict.CompositePathEntry;
 import io.github.markpollack.judge.verdict.CompositePaths;
 import io.github.markpollack.judge.verdict.InvocationRecords;
@@ -26,7 +27,7 @@ public final class VerdictReport {
 
 	private VerdictReport(Verdict verdict) {
 		this.verdict = Objects.requireNonNull(verdict);
-		verdict.conclusion();
+		verdict.requireUsable();
 	}
 
 	/**

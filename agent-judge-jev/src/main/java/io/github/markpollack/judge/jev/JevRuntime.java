@@ -189,6 +189,7 @@ public final class JevRuntime {
 			success = true;
 		}
 		catch (RuntimeException e) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(e);
 			failure.set(e);
 			if (e instanceof java.util.concurrent.CancellationException cancellation)
 				throw cancellation;
@@ -289,6 +290,7 @@ public final class JevRuntime {
 					List.of(), provenance, metadata);
 		}
 		catch (RuntimeException e) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(e);
 			failure.set(e);
 			if (e instanceof java.util.concurrent.CancellationException cancellation)
 				throw cancellation;

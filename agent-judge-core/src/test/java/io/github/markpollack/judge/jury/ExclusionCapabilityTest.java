@@ -4,10 +4,11 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.RoutingRule;
 import io.github.markpollack.judge.verdict.Seat;
 import io.github.markpollack.judge.verdict.Verdict;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.voting.ExclusionHandling;
@@ -405,7 +406,7 @@ class ExclusionCapabilityTest {
 			Judgment treatedAsFail = SimpleJury.builder()
 				.judge(Judges.named(() -> excluded(), "sneaky"))
 				.judge(Judges.named(() -> Judgment.pass("ok"), "honest"))
-				.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE))
+				.votingStrategy(new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE))
 				.build()
 				.vote()
 				.judgment();
@@ -518,13 +519,15 @@ class ExclusionCapabilityTest {
 	@Test
 	@DisplayName("the description carries the effective capability, so a reader need not run the jury")
 	void theDescriptionCarriesTheCapability() {
-		JudgeDescription described = io.github.markpollack.judge.description.JudgeDescription.of(Judges.named(new Conditional("inner", excluded()), "renamed"));
+		JudgeDescription described = io.github.markpollack.judge.description.JudgeDescription
+			.of(Judges.named(new Conditional("inner", excluded()), "renamed"));
 
 		assertThat(described.notApplicableWhen()).isEqualTo(CONDITION);
 		assertThat(described.toPortable()).containsEntry("notApplicableWhen",
 				Map.of("declared", true, "value", CONDITION));
-		assertThat(io.github.markpollack.judge.description.JudgeDescription.of(new Unconditional("plain", Judgment.pass("ok"))).toPortable())
-			.containsEntry("notApplicableWhen", Map.of("declared", false));
+		assertThat(io.github.markpollack.judge.description.JudgeDescription
+			.of(new Unconditional("plain", Judgment.pass("ok")))
+			.toPortable()).containsEntry("notApplicableWhen", Map.of("declared", false));
 	}
 
 	private static Jury capableJury() {
@@ -556,8 +559,9 @@ class ExclusionCapabilityTest {
 				ExclusionHandling.EXCLUDE);
 
 		@Override
-		public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
-			return this.delegate.aggregate(judgments, weights);
+		public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+			var judgments = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
+			return this.delegate.aggregate(ballots);
 		}
 
 		@Override

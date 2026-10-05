@@ -20,15 +20,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class V3InterpretationTest {
 
-	private final ObjectMapper mapper = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+	private final ObjectMapper mapper = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	@Test
 	void liveRootsAreExplicitVersionFour() {
 		Map<String, Object> wire = mapper.convertValue(Verdict.single("seat", Judgment.pass("ok")),
 				new TypeReference<>() {
 				});
-		assertThat(wire).containsEntry("schemaVersion", 5);
-		assertThat(((Map<?, ?>) wire.get("judgment")).get("schemaVersion")).isEqualTo(5);
+		assertThat(wire).containsEntry("schemaVersion", 6);
+		assertThat(((Map<?, ?>) wire.get("judgment")).get("schemaVersion")).isEqualTo(6);
 	}
 
 	@Test
@@ -38,7 +39,7 @@ class V3InterpretationTest {
 		StoredReading reading = StoredVerdicts.interpret(Verdict.single("seat", judgment));
 		assertThat(reading.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
 		assertThat(reading.schemaVersion()).isEqualTo(3);
-		assertThat(reading.sourceVersion()).isEqualTo(5);
+		assertThat(reading.sourceVersion()).isEqualTo(6);
 		assertThat(reading.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
 	}
 

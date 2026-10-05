@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.AggregationEvidence;
 import io.github.markpollack.judge.voting.AverageVotingStrategy;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
@@ -44,7 +45,7 @@ class AggregationErrorHandlingTest {
 		List<Judgment> judgments = List.of(Judgment.pass("ok"), Judgment.error("boom"),
 				Judgment.abstain("not applicable"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 		Map<String, Object> evidence = evidence(result);
 
 		// Under TREAT_AS_FAIL the surviving population is one PASS and one converted
@@ -84,8 +85,8 @@ class AggregationErrorHandlingTest {
 	@MethodSource("strategyPolicyMatrix")
 	@DisplayName("all strategies handle all-error populations under every error policy")
 	void allErrorMatrix(String strategyName, ErrorHandling policy) {
-		Judgment result = strategy(strategyName, policy)
-			.aggregate(List.of(Judgment.error("one"), Judgment.error("two")), Map.of());
+		Judgment result = strategy(strategyName, policy).aggregate(
+				io.github.markpollack.judge.voting.Ballots.of(List.of(Judgment.error("one"), Judgment.error("two"))));
 
 		JudgmentStatus expectedStatus = switch (policy) {
 			case PROPAGATE -> JudgmentStatus.ERROR;
@@ -104,10 +105,10 @@ class AggregationErrorHandlingTest {
 	@DisplayName("PROPAGATE evidence is invariant under input order")
 	void propagateEvidenceIsOrderIndependent(String strategyName) {
 		VotingStrategy strategy = strategy(strategyName, ErrorHandling.PROPAGATE);
-		Judgment errorThenAbstain = strategy
-			.aggregate(List.of(Judgment.error("boom"), Judgment.abstain("not applicable")), Map.of());
-		Judgment abstainThenError = strategy
-			.aggregate(List.of(Judgment.abstain("not applicable"), Judgment.error("boom")), Map.of());
+		Judgment errorThenAbstain = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(Judgment.error("boom"), Judgment.abstain("not applicable"))));
+		Judgment abstainThenError = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(Judgment.abstain("not applicable"), Judgment.error("boom"))));
 
 		assertThat(errorThenAbstain.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(errorThenAbstain.reasoning()).isEqualTo(abstainThenError.reasoning());
@@ -119,7 +120,8 @@ class AggregationErrorHandlingTest {
 	@Test
 	@DisplayName("aggregation evidence is immutable after attachment")
 	void aggregationEvidenceIsImmutable() {
-		Judgment result = new AverageVotingStrategy().aggregate(List.of(Judgment.pass("ok")), Map.of());
+		Judgment result = new AverageVotingStrategy()
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(Judgment.pass("ok"))));
 
 		assertThatThrownBy(() -> evidence(result).put(AggregationEvidence.INPUT_COUNT, 99))
 			.isInstanceOf(UnsupportedOperationException.class);

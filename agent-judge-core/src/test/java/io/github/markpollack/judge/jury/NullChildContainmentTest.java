@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.CompositeLimitExceededException;
@@ -11,7 +12,7 @@ import io.github.markpollack.judge.verdict.DispositionReason;
 import io.github.markpollack.judge.verdict.RoutingRule;
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.voting.VotingStrategy;
@@ -66,7 +67,7 @@ class NullChildContainmentTest {
 	private static Jury passing(String judgeName) {
 		return SimpleJury.builder()
 			.judge(Judges.named(() -> Judgment.pass("all good"), judgeName))
-			.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN))
+			.votingStrategy(new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_ABSTAIN))
 			.build();
 	}
 
@@ -77,7 +78,7 @@ class NullChildContainmentTest {
 		@Test
 		@DisplayName("is a stage failure, and every member that succeeded is kept")
 		void isAStageFailureThatKeepsItsOtherMembers() {
-			Jury meta = Juries.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
+			Jury meta = Juries.meta(new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
 					new NamedJury("healthy", passing("first")), new NamedJury("silent", silent()));
 
 			Verdict verdict = meta.vote();
@@ -147,7 +148,7 @@ class NullChildContainmentTest {
 				.throwing(new CompositeLimitExceededException("Composite attempt limit of 64 exceeded"));
 
 			assertThatThrownBy(() -> Juries
-				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
+				.meta(new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_ABSTAIN),
 						new NamedJury("healthy", passing("first")), new NamedJury("limit", overLimit))
 				.vote()).isInstanceOf(CompositeLimitExceededException.class);
 
@@ -179,7 +180,7 @@ class NullChildContainmentTest {
 			};
 
 			assertThatThrownBy(() -> Juries
-				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN), new NamedJury("broken", broken))
+				.meta(new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_ABSTAIN), new NamedJury("broken", broken))
 				.vote()).isInstanceOf(StackOverflowError.class);
 
 			assertThatThrownBy(

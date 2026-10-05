@@ -97,7 +97,7 @@ class ExampleOneTest {
 		StoredReading fromStore = StoredVerdicts.interpret(stored(EXAMPLE_ONE));
 		StoredReading fromJury = StoredVerdicts.interpret(sameJury());
 
-		assertThat(fromJury.sourceVersion()).isEqualTo(5);
+		assertThat(fromJury.sourceVersion()).isEqualTo(6);
 		assertThat(fromStore.sourceVersion()).isEqualTo(1);
 		assertThat(fromJury.outcome()).isEqualTo(fromStore.outcome());
 		assertThat(fromJury).isEqualTo(StoredVerdicts.interpret(Fixtures.asMap(sameJury())));

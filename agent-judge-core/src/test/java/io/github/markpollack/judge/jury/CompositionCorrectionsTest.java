@@ -4,11 +4,12 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.RoutingRule;
 import io.github.markpollack.judge.verdict.SeatExecution;
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.verdict.VerdictProvenance;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.voting.ExclusionHandling;
@@ -26,7 +27,7 @@ class CompositionCorrectionsTest {
 
 	VotingStrategy broken() {
 		return new VotingStrategy() {
-			public Judgment aggregate(List<Judgment> j, Map<String, Double> w) {
+			public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
 				throw new IllegalStateException("reduction unavailable");
 			}
 
@@ -62,7 +63,7 @@ class CompositionCorrectionsTest {
 		Verdict v = SimpleJury.builder()
 			.judge(() -> original)
 			.parallel(false)
-			.votingStrategy(new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
+			.votingStrategy(new AllEligiblePassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 			.build()
 			.vote();
 		assertThat(v.individual()).containsExactly(original);
@@ -74,7 +75,7 @@ class CompositionCorrectionsTest {
 
 	@Test
 	void emptyOpinionsContinueAndRemainReadable() {
-		Verdict empty = Verdict.builder()
+		Verdict empty = Verdict.advancedBuilder()
 			.judgment(Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, "no opinions"))
 			.provenance(VerdictProvenance.undecided())
 			.build();

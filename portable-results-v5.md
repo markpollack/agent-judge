@@ -1,6 +1,8 @@
-# Portable retained results V5
+# Historical retained results V5
 
-Current `Judgment`, `Verdict` and `EvaluationResult` JSON uses integer `schemaVersion: 5`. Descriptions use `descriptionVersion: 3`. Domain values contain no writable format version or duplicate conclusion. `VerdictCodec` validates current domain semantics and complete invocation ownership before returning or writing a usable result.
+This document describes the archived V5 contract at `c0ae61dda4a65e9278485cb528925d71f27a1007`. Current storage uses [V6](portable-results-v6.md) and explicitly refuses V5; preserve original historical bytes.
+
+V5 `Judgment`, `Verdict` and `EvaluationResult` JSON uses integer `schemaVersion: 5`. Descriptions use `descriptionVersion: 3`. Domain values contain no writable format version or duplicate conclusion. `VerdictCodec` validates current domain semantics and complete invocation ownership before returning or writing a usable result.
 
 Typed V2/V3/V4 documents are refused before nested decoding. For archival V4 reading, use Agent Judge commit `7387aab1bf9d3bd56e4d9a932f2f40e2978d676d` and its original codec/routing semantics. Do not change historical version tags, fill missing originals, or treat historical routing as current execution. `serialization.diagnostics.StoredVerdicts` still diagnoses unversioned archival shapes without converting them into current domain Verdicts.
 

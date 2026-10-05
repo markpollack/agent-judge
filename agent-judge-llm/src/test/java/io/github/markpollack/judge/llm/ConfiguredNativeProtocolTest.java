@@ -97,27 +97,32 @@ class ConfiguredNativeProtocolTest {
 	void unsupportedOptionsAndMetadataAreRefusedBeforeNativeCalls() {
 		var client = mock(ChatClient.class);
 		var runtime = new SpringAiEvalModel(client);
-        assertThatThrownBy(() -> runtime.execute(new EvalModelRequest(List.of(new EvalMessage(EvalMessageRole.USER,"request")),EvalModelOptions.defaults(),Map.of("correlation","local")))).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(
+				() -> runtime.execute(new EvalModelRequest(List.of(new EvalMessage(EvalMessageRole.USER, "request")),
+						EvalModelOptions.defaults(), Map.of("correlation", "local"))))
+			.isInstanceOf(IllegalArgumentException.class);
 		for (var options : List.of(new EvalModelOptions(null, null, null, java.time.Duration.ofSeconds(1), null),
 				new EvalModelOptions(null, null, null, null, "json"))) {
-			assertThatThrownBy(() -> runtime.execute(new EvalModelRequest(
-					List.of(new EvalMessage(EvalMessageRole.USER, "request")), options, Map.of())))
+			assertThatThrownBy(() -> runtime.execute(
+					new EvalModelRequest(List.of(new EvalMessage(EvalMessageRole.USER, "request")), options, Map.of())))
 				.isInstanceOf(IllegalArgumentException.class);
 		}
 		verifyNoInteractions(client);
 	}
 
 	@Test
-	void captureFailurePreservesNativeTextAndUsage() {
+	void preservationLimitEscapesNativeCaptureAndConfiguredJudgingWithOriginalSdkObject() {
 		var h = harness("R: PASS - Foo.java:7 retained");
-		var runtime = new SpringAiEvalModel(h.client(), NativeCapture.json(1));
+		var captured = new java.util.concurrent.atomic.AtomicReference<ChatResponse>();
+		var runtime = new SpringAiEvalModel(h.client(), response -> {
+			captured.set(response);
+			return NativeCapture.<ChatResponse>json(1).capture(response);
+		});
 		var actual = Rfc2119Requirement.of("R", "7", "MUST", "retain evidence", "audit", null);
-		var result = Rfc2119Judge.builder().runtime(runtime).requirement(actual).build().judge();
-		assertThat(result.requirement()).isSameAs(actual);
-		assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
-		var original = result.invocations().getFirst();
-		assertThat(original.completed()).isFalse();
-		assertThat(original.nativeFacts()).containsKeys("text", "usage", "captureFailure");
+		assertThatThrownBy(() -> Rfc2119Judge.builder().runtime(runtime).requirement(actual).build().judge())
+			.isInstanceOfSatisfying(io.github.markpollack.judge.portable.PreservationLimitException.class,
+					limit -> assertThat(limit.original()).isSameAs(captured.get()));
+		assertThat(captured.get().getResult().getOutput().getText()).isEqualTo("R: PASS - Foo.java:7 retained");
 		verify(h.call(), times(1)).chatResponse();
 	}
 

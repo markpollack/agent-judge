@@ -74,9 +74,15 @@ public final class JevJudge implements Judge {
 					public ReadyJudge evidenceSupplier(Supplier<? extends JevEvidence> evidence) {
 						Objects.requireNonNull(evidence);
 						return () -> new JevJudge(() -> {
+							if (Thread.currentThread().isInterrupted())
+								throw new java.util.concurrent.CancellationException(
+										"Judging interrupted before invocation");
 							NativeExecution<Judgment> result = runtime.execute(new RequirementRequest<>(requirement,
 									Objects.requireNonNull(evidence.get(), "acquired evidence")));
-							return result.answer().forRequirement(requirement).withInvocation(result.invocation());
+							if (Thread.currentThread().isInterrupted())
+								throw new java.util.concurrent.CancellationException(
+										"Judging interrupted after return");
+							return Judgment.refuse(result.answer(), requirement, result.invocation());
 						});
 					}
 				};

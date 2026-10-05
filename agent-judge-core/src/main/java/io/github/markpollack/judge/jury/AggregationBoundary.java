@@ -4,11 +4,13 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.CompositeFailure;
 import io.github.markpollack.judge.verdict.CompositeFailureCode;
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.verdict.VerdictProvenance;
 import io.github.markpollack.judge.voting.VotingStrategy;
+import io.github.markpollack.judge.voting.RetainedRule;
 
 import java.util.List;
 import java.util.Map;
@@ -76,24 +78,26 @@ final class AggregationBoundary {
 	/**
 	 * Reduce within the boundary.
 	 * @param strategy the configured strategy
-	 * @param judgments the judgments to reduce
-	 * @param weights the configured weights
+	 * @param ballots complete typed reduction input
 	 * @param mayBeNotApplicable whether this jury is entitled to an excluded aggregate
 	 * @param logger the calling jury's logger, so a contained failure is reported where
 	 * it happened
 	 * @return the strategy's aggregate, or the contained error that replaces it
 	 */
-	static Reduction aggregate(VotingStrategy strategy, List<Judgment> judgments, Map<String, Double> weights,
+	static Reduction aggregate(VotingStrategy strategy, List<io.github.markpollack.judge.voting.Ballot> ballots,
 			boolean mayBeNotApplicable, Logger logger) {
 		// Resolved before the call, so a strategy whose own getName() throws still has a
 		// name in
 		// the diagnostic that reports it.
 		String name = safeName(strategy);
 		Judgment aggregate;
+		RetainedRule retained;
 		try {
-			aggregate = strategy.aggregate(judgments, weights);
+			retained = RetainedRule.of(strategy);
+			aggregate = retained.aggregate(ballots);
 		}
 		catch (Exception ex) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 			SimpleJury.preserveCancellation(ex);
 			String cause = ex.getMessage();
 			return new Reduction(
@@ -103,11 +107,15 @@ final class AggregationBoundary {
 					new CompositeFailure(CompositeFailureCode.AGGREGATION_FAILED, ex));
 		}
 		String rejection = allowListRejection(aggregate, mayBeNotApplicable);
-		return rejection == null ? new Reduction(aggregate, null) : new Reduction(contained(logger, name, rejection),
+		return rejection == null ? new Reduction(aggregate, null, retained) : new Reduction(
+				contained(logger, name, rejection),
 				new CompositeFailure(CompositeFailureCode.AGGREGATION_FAILED, new IllegalStateException(rejection)));
 	}
 
-	record Reduction(Judgment judgment, @Nullable CompositeFailure failure) {
+	record Reduction(Judgment judgment, @Nullable CompositeFailure failure, @Nullable RetainedRule rule) {
+		Reduction(Judgment judgment, @Nullable CompositeFailure failure) {
+			this(judgment, failure, null);
+		}
 	}
 
 	/**
@@ -147,6 +155,7 @@ final class AggregationBoundary {
 			name = strategy.getName();
 		}
 		catch (Exception ex) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 			return strategy.getClass().getName();
 		}
 		return (name == null || name.isBlank()) ? strategy.getClass().getName() : name;
@@ -162,4 +171,5 @@ final class AggregationBoundary {
 	 * @param judgment the aggregate
 	 * @return the provenance
 	 */
+
 }

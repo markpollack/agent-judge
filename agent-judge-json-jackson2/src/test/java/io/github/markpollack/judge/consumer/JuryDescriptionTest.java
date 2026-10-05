@@ -36,7 +36,7 @@ import io.github.markpollack.judge.description.SimpleJuryDescription;
 import io.github.markpollack.judge.voting.StrategyDescription;
 import io.github.markpollack.judge.description.TierDescription;
 import io.github.markpollack.judge.voting.AggregationEvidence;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.AverageVotingStrategy;
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
@@ -70,7 +70,8 @@ import static org.assertj.core.api.Assertions.tuple;
 @DisplayName("A jury describes its configuration before it votes")
 class JuryDescriptionTest {
 
-	private static final ObjectMapper JSON = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+	private static final ObjectMapper JSON = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	private static ImplementationIdentity named(Class<?> type) {
 		return new ImplementationIdentity(Form.NAMED, type.getName(), null);
@@ -148,7 +149,10 @@ class JuryDescriptionTest {
 			assertThat(verdict.individualByName().keySet())
 				.containsExactlyElementsOf(seats.stream().map(SeatDescription::verdictKey).toList());
 			for (SeatDescription seat : seats) {
-				assertThat(verdict.weights()).containsEntry(String.valueOf(seat.position()), seat.weight());
+				assertThat(verdict.seats()
+					.get(seat.position())
+					.ballot(verdict.individual().get(seat.position()))
+					.effectiveWeight()).isEqualTo(seat.weight());
 			}
 			Map<?, ?> evidence = (Map<String, Object>) verdict.judgment().metadata().get(Judgment.AGGREGATION_KEY);
 			assertThat(evidence.get(AggregationEvidence.INPUT_COUNT)).isEqualTo(seats.size());
@@ -190,7 +194,9 @@ class JuryDescriptionTest {
 
 			assertThat(List.of(Judges.and(a, b), Judges.or(a, b), Judges.allOf(a, b), Judges.anyOf(a, b),
 					Judges.alwaysPass("p"), Judges.alwaysFail("f")))
-				.allSatisfy(judge -> assertThat(io.github.markpollack.judge.description.JudgeDescription.of(judge).implementation().form()).isEqualTo(Form.HIDDEN));
+				.allSatisfy(judge -> assertThat(
+						io.github.markpollack.judge.description.JudgeDescription.of(judge).implementation().form())
+					.isEqualTo(Form.HIDDEN));
 		}
 
 		@Test
@@ -260,7 +266,7 @@ class JuryDescriptionTest {
 				.judge(Judges.named(
 						new KeywordJudge(CompletionEvidence.builder().request("test").build(), "BUILD SUCCESS"),
 						"build"))
-				.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL))
+				.votingStrategy(new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_FAIL))
 				.parallel(false)
 				.build();
 			Jury style = SimpleJury.builder()
@@ -335,7 +341,8 @@ class JuryDescriptionTest {
 			assertThat((List<Object>) portable.get("tiers"))
 				.allSatisfy(tier -> assertThat((Map<String, Object>) ((Map<String, Object>) tier).get("jury"))
 					.doesNotContainKey("descriptionVersion"));
-			assertThat(io.github.markpollack.judge.description.JudgeDescription.of(new KeywordJudge(CompletionEvidence.builder().request("test").build(), "k"))
+			assertThat(io.github.markpollack.judge.description.JudgeDescription
+				.of(new KeywordJudge(CompletionEvidence.builder().request("test").build(), "k"))
 				.toPortable()).containsEntry("descriptionVersion", 3);
 			assertThat(new ConsensusStrategy().describe().toPortable()).containsEntry("descriptionVersion", 3);
 			assertThat(ImplementationIdentity.of(KeywordJudge.class).toPortable())
@@ -401,8 +408,10 @@ class JuryDescriptionTest {
 
 		@Test
 		void notOptingInIsUndeclaredAndAnEmptyMapIsADeclaration() {
-			JudgeDescription undeclared = io.github.markpollack.judge.description.JudgeDescription.of(new KeywordJudge(CompletionEvidence.builder().request("test").build(), "x"));
-			JudgeDescription declaredEmpty = io.github.markpollack.judge.description.JudgeDescription.of(new DeclaringJudge(Map.of()));
+			JudgeDescription undeclared = io.github.markpollack.judge.description.JudgeDescription
+				.of(new KeywordJudge(CompletionEvidence.builder().request("test").build(), "x"));
+			JudgeDescription declaredEmpty = io.github.markpollack.judge.description.JudgeDescription
+				.of(new DeclaringJudge(Map.of()));
 
 			assertThat(undeclared.configuration()).isNull();
 			assertThat(declaredEmpty.configuration()).isNotNull().isEmpty();
@@ -433,8 +442,10 @@ class JuryDescriptionTest {
 			Map<String, Object> otherOrder = Map.of("mid", List.of(Map.of("k1", 1, "k2", 2)), "zeta", 1, "alpha",
 					Map.of("b", "text", "y", true));
 
-			JudgeDescription first = io.github.markpollack.judge.description.JudgeDescription.of(new DeclaringJudge(insertionOrder));
-			JudgeDescription second = io.github.markpollack.judge.description.JudgeDescription.of(new DeclaringJudge(otherOrder));
+			JudgeDescription first = io.github.markpollack.judge.description.JudgeDescription
+				.of(new DeclaringJudge(insertionOrder));
+			JudgeDescription second = io.github.markpollack.judge.description.JudgeDescription
+				.of(new DeclaringJudge(otherOrder));
 
 			assertThat(first.configuration()).containsOnlyKeys("alpha", "mid", "zeta");
 			assertThat(first.configuration().keySet()).containsExactly("alpha", "mid", "zeta");
@@ -462,7 +473,9 @@ class JuryDescriptionTest {
 
 		@Test
 		void aConfiguredJudgeReturningNullIsRefused() {
-			assertThatThrownBy(() -> io.github.markpollack.judge.description.JudgeDescription.of(new DeclaringJudge(null))).isInstanceOf(NullPointerException.class)
+			assertThatThrownBy(
+					() -> io.github.markpollack.judge.description.JudgeDescription.of(new DeclaringJudge(null)))
+				.isInstanceOf(NullPointerException.class)
 				.hasMessageContaining("return an empty map");
 		}
 
@@ -517,7 +530,8 @@ class JuryDescriptionTest {
 		void aStrategyThatDoesNotOverrideDescribeIsUndeclared() {
 			VotingStrategy custom = new VotingStrategy() {
 				@Override
-				public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
+				public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+					var judgments = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 					return judgments.get(0);
 				}
 
@@ -580,8 +594,8 @@ class JuryDescriptionTest {
 
 		@Test
 		void everyBuiltInDeclaresItsErrorHandlingThresholdAndTieBreakRule() {
-			assertThat(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN).describe()).isEqualTo(
-					declared("allMustPass", AllMustPassStrategy.class, ErrorHandling.TREAT_AS_ABSTAIN, null, Map.of()));
+			assertThat(new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_ABSTAIN).describe()).isEqualTo(declared(
+					"allMustPass", AllEligiblePassStrategy.class, ErrorHandling.TREAT_AS_ABSTAIN, null, Map.of()));
 			assertThat(new AverageVotingStrategy(0.25, ErrorHandling.IGNORE).describe())
 				.isEqualTo(declared("average", AverageVotingStrategy.class, ErrorHandling.IGNORE, 0.25, Map.of()));
 			assertThat(new MedianVotingStrategy(0.9, ErrorHandling.TREAT_AS_FAIL).describe())
@@ -751,7 +765,8 @@ class JuryDescriptionTest {
 
 		@Test
 		void aSeatDescriptionRefusesImpossibleSeats() {
-			JudgeDescription judge = io.github.markpollack.judge.description.JudgeDescription.of(new KeywordJudge(CompletionEvidence.builder().request("test").build(), "k"));
+			JudgeDescription judge = io.github.markpollack.judge.description.JudgeDescription
+				.of(new KeywordJudge(CompletionEvidence.builder().request("test").build(), "k"));
 
 			assertThatThrownBy(() -> new SeatDescription(-1, "k", KeySource.DECLARED, 1.0, judge))
 				.isInstanceOf(IllegalArgumentException.class);
@@ -765,7 +780,8 @@ class JuryDescriptionTest {
 		void seatPositionsMustMatchSeatOrder() {
 			StrategyDescription strategy = new ConsensusStrategy().describe();
 			SeatDescription misplaced = new SeatDescription(1, "k", KeySource.DECLARED, 1.0,
-					io.github.markpollack.judge.description.JudgeDescription.of(new KeywordJudge(CompletionEvidence.builder().request("test").build(), "k")));
+					io.github.markpollack.judge.description.JudgeDescription
+						.of(new KeywordJudge(CompletionEvidence.builder().request("test").build(), "k")));
 
 			assertThatThrownBy(() -> new SimpleJuryDescription(strategy, List.of(misplaced)))
 				.isInstanceOf(IllegalArgumentException.class)
@@ -775,7 +791,8 @@ class JuryDescriptionTest {
 		@Test
 		void descriptionsCopyTheListsTheyAreGiven() {
 			List<SeatDescription> seats = new ArrayList<>(List.of(new SeatDescription(0, "k", KeySource.DECLARED, 1.0,
-					io.github.markpollack.judge.description.JudgeDescription.of(new KeywordJudge(CompletionEvidence.builder().request("test").build(), "k")))));
+					io.github.markpollack.judge.description.JudgeDescription
+						.of(new KeywordJudge(CompletionEvidence.builder().request("test").build(), "k")))));
 			SimpleJuryDescription description = new SimpleJuryDescription(new ConsensusStrategy().describe(), seats);
 
 			seats.clear();
@@ -814,7 +831,7 @@ class JuryDescriptionTest {
 		@Override
 		public Verdict vote() {
 			Judgment first = this.judges.get(0).judge();
-			return Verdict.builder().judgment(first).individual(List.of(first)).build();
+			return Verdict.advancedBuilder().judgment(first).individual(List.of(first)).build();
 		}
 
 	}

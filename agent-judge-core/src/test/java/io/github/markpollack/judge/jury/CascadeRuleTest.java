@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.CompositeRelation;
@@ -16,7 +17,7 @@ import io.github.markpollack.judge.verdict.VerdictProvenance;
 import io.github.markpollack.judge.verdict.VerdictProvenanceBasis;
 import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
 import io.github.markpollack.judge.voting.AggregationEvidence;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.voting.ExclusionHandling;
@@ -93,7 +94,8 @@ class CascadeRuleTest {
 	private static Jury undecidedTier(Judgment... judgments) {
 		SimpleJury.Builder builder = SimpleJury.builder().votingStrategy(new VotingStrategy() {
 			@Override
-			public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
+			public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+				var input = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 				throw new IllegalStateException("the reduction broke");
 			}
 
@@ -113,7 +115,8 @@ class CascadeRuleTest {
 	private static Jury nullReducingTier(Judgment... judgments) {
 		SimpleJury.Builder builder = SimpleJury.builder().votingStrategy(new VotingStrategy() {
 			@Override
-			public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
+			public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+				var input = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 				return null;
 			}
 
@@ -465,7 +468,7 @@ class CascadeRuleTest {
 	private static Verdict refusedVerdict() {
 		Judgment excluded = Judgment.notApplicable(EXCLUSION);
 		Judgment failed = Judgment.fail("a requirement was not met");
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(Judgment.error(JudgmentReasonCode.NOT_APPLICABLE_REFUSED,
 					"1 of 2 judgment(s) were not applicable and the not-applicable policy is refuse"))
 			.individual(List.of(excluded, failed))
@@ -635,7 +638,7 @@ class CascadeRuleTest {
 		Jury inner = acceptedRejectingCascade(passingTier("OK"));
 
 		Verdict verdict = Juries
-			.meta(new AllMustPassStrategy(errorPolicy, ExclusionHandling.EXCLUDE), new NamedJury("inner", inner),
+			.meta(new AllEligiblePassStrategy(errorPolicy, ExclusionHandling.EXCLUDE), new NamedJury("inner", inner),
 					new NamedJury("healthy", returning(Verdict.single("b", Judgment.pass("ok")))))
 			.vote();
 
@@ -708,14 +711,14 @@ class CascadeRuleTest {
 		Jury errorDerived = SimpleJury.builder()
 			.judge(Judges.named(() -> Judgment.error("the index was unreachable"), "flaky"))
 			.judge(Judges.named(() -> Judgment.pass("another seat"), "other"))
-			.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE))
+			.votingStrategy(new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_FAIL, ExclusionHandling.EXCLUDE))
 			.build();
 		// A member whose exclusion policy turned an exclusion into a failing
 		// contribution.
 		Jury exclusionDerived = SimpleJury.builder()
 			.seat(declared(new Conditional("conditional", Judgment.notApplicable(EXCLUSION))))
 			.judge(Judges.named(() -> Judgment.pass("another seat"), "other"))
-			.votingStrategy(new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.TREAT_AS_FAIL))
+			.votingStrategy(new AllEligiblePassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.TREAT_AS_FAIL))
 			.build();
 
 		for (Jury member : List.of(errorDerived, exclusionDerived)) {

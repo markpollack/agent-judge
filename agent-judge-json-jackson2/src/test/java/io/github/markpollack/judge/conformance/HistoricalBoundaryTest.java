@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.verdict.KeySource;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
@@ -65,11 +65,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("The historical boundary")
 class HistoricalBoundaryTest {
 
-	private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+	private static final ObjectMapper MAPPER = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
-	private static final String VOCABULARY_GOLDEN = "/conformance/result-vocabulary-v5.json";
+	private static final String VOCABULARY_GOLDEN = "/conformance/result-vocabulary-v6.json";
 
-	private static final String BOUNDARY_GOLDEN = "/conformance/boundary-refusal-v5.json";
+	private static final String BOUNDARY_GOLDEN = "/conformance/boundary-refusal-v6.json";
 
 	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder()
 		.request("pin the result format")
@@ -194,7 +195,7 @@ class HistoricalBoundaryTest {
 			assertThatThrownBy(() -> MAPPER.readValue(without(boundaryRejection(), "seats"), Verdict.class))
 				.hasRootCauseInstanceOf(NullPointerException.class)
 				.hasMessageContaining("seats");
-			assertThatCode(() -> Verdict.builder()
+			assertThatCode(() -> Verdict.advancedBuilder()
 				.judgment(Judgment.error(JudgmentReasonCode.NO_TIER_DECIDED, "no tier decided"))
 				.provenance(VerdictProvenance.undecided())
 				.build()).as("a recorded empty seat list is legal, and says something different")
@@ -353,7 +354,7 @@ class HistoricalBoundaryTest {
 
 			@Override
 			public @Nullable VotingStrategy getVotingStrategy() {
-				return new AllMustPassStrategy();
+				return new AllEligiblePassStrategy();
 			}
 
 			@Override

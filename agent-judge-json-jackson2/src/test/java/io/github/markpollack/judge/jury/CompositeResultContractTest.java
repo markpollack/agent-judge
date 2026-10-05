@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.CompositeFailure;
@@ -45,7 +46,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** Contract tests for complete, portable composite-result evidence. */
 class CompositeResultContractTest {
 
-	private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+	private static final ObjectMapper MAPPER = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder()
 		.request("test composite result")
@@ -54,13 +56,13 @@ class CompositeResultContractTest {
 	@Test
 	void verdictDeclarationAndJsonExposeOnlyTheCorrectedSevenComponentTruth() throws Exception {
 		assertThat(Arrays.stream(Verdict.class.getRecordComponents()).map(RecordComponent::getName)).containsExactly(
-				"judgment", "individual", "individualByName", "weights", "seats", "provenance", "compositeAttempts",
-				"declaredCardinality", "requirement", "reductionFailure", "roster", "invocations");
+				"judgment", "individual", "individualByName", "seats", "provenance", "compositeAttempts",
+				"declaredCardinality", "requirement", "reductionFailure", "roster", "invocations", "rule");
 
 		JsonNode json = MAPPER.readTree(MAPPER.writeValueAsString(Verdict.single("leaf", booleanPass("passed"))));
 		assertThat(json.fieldNames()).toIterable()
-			.containsExactly("schemaVersion", "judgment", "individual", "individualByName", "weights", "seats",
-					"provenance", "compositeAttempts", "declaredCardinality", "roster", "invocations");
+			.containsExactly("schemaVersion", "judgment", "individual", "individualByName", "seats", "provenance",
+					"compositeAttempts", "declaredCardinality", "roster", "invocations");
 		assertThat(json.at("/seats/0").toString()).isEqualTo(
 				"{\"position\":0,\"verdictKey\":\"leaf\",\"keySource\":\"DECLARED\",\"execution\":\"RETURNED\",\"participation\":\"IDENTITY\"}");
 		assertThat(json.at("/provenance").toString()).isEqualTo("{\"kind\":\"own\"}");
@@ -115,7 +117,8 @@ class CompositeResultContractTest {
 				"0123456789abcdef0123456789abcdef", "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=", "bad\uD800text");
 		for (String message : hostileMessages) {
 			Verdict verdict = Juries
-				.combine(throwing(new IllegalStateException(message)), returning(leaf("ok")), new ConsensusStrategy())
+				.meta(new ConsensusStrategy(), new NamedJury("member-1", throwing(new IllegalStateException(message))),
+						new NamedJury("member-2", returning(leaf("ok"))))
 				.vote();
 			String json = MAPPER.writeValueAsString(verdict.compositeAttempts().get(0).failure());
 			assertThat(json).isEqualTo("{\"code\":\"jury_execution_failed\"}");
@@ -209,12 +212,13 @@ class CompositeResultContractTest {
 		byName.put("second", contained);
 		Map<String, Double> weights = new LinkedHashMap<>();
 		weights.put("0", 0.75);
-		Verdict stopping = Verdict.builder()
+		Verdict stopping = Verdict.advancedBuilder()
 			.judgment(contained)
 			.individual(List.of(contained))
 			.individualByName(byName)
-			.weights(weights)
-			.seats(List.of(new Seat(0, "second", KeySource.DECLARED)))
+
+			.seats(io.github.markpollack.judge.testing.TestBallots
+				.weighted(List.of(new Seat(0, "second", KeySource.DECLARED)), weights))
 			.provenance(VerdictProvenance.own())
 			.build();
 		CascadedJury cascade = CascadedJury.builder()
@@ -231,7 +235,7 @@ class CompositeResultContractTest {
 		assertThat(verdict.judgment()).isSameAs(contained);
 		assertThat(verdict.individual().get(0)).isSameAs(contained);
 		assertThat(verdict.individualByName()).containsExactlyEntriesOf(byName);
-		assertThat(verdict.weights()).containsExactlyEntriesOf(weights);
+		assertThat(io.github.markpollack.judge.testing.TestBallots.weights(verdict)).containsExactlyEntriesOf(weights);
 
 		CascadedJury errorCascade = CascadedJury.builder()
 			.tier("fatal", throwingError(new AssertionError("fatal")), RoutingRule.FINAL_TIER)
@@ -260,7 +264,8 @@ class CompositeResultContractTest {
 		AtomicInteger strategyCalls = new AtomicInteger();
 		VotingStrategy forbiddenStrategy = new VotingStrategy() {
 			@Override
-			public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
+			public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+				var judgments = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 				strategyCalls.incrementAndGet();
 				return booleanPass("must not aggregate");
 			}
@@ -286,7 +291,7 @@ class CompositeResultContractTest {
 			.containsExactly("first", "broken", "last");
 		assertThat(verdict.individual()).containsExactly(first, last);
 		assertThat(verdict.individualByName()).containsExactly(Map.entry("first", first), Map.entry("last", last));
-		assertThat(verdict.weights()).isEmpty();
+		assertThat(io.github.markpollack.judge.testing.TestBallots.weights(verdict)).isEmpty();
 	}
 
 	@Test
@@ -385,7 +390,7 @@ class CompositeResultContractTest {
 
 		CompositeAttempt first = successAttempt("same", leaf("one"), CompositeRelation.META_MEMBER, null);
 		CompositeAttempt second = successAttempt("same", leaf("two"), CompositeRelation.META_MEMBER, null);
-		assertThatThrownBy(() -> Verdict.builder()
+		assertThatThrownBy(() -> Verdict.advancedBuilder()
 			.judgment(booleanPass("root"))
 			.provenance(VerdictProvenance.own())
 			.compositeAttempts(List.of(first, second))
@@ -395,7 +400,7 @@ class CompositeResultContractTest {
 	private static Verdict manualChain(int depth) {
 		Verdict verdict = leaf("leaf");
 		for (int current = depth; current > 0; current--) {
-			verdict = Verdict.builder()
+			verdict = Verdict.advancedBuilder()
 				.judgment(verdict.judgment())
 				.provenance(VerdictProvenance.own())
 				.compositeAttempts(
@@ -410,7 +415,7 @@ class CompositeResultContractTest {
 		for (int index = 1; index <= attempts; index++) {
 			authored.add(successAttempt("member-" + index, leaf("leaf"), CompositeRelation.META_MEMBER, null));
 		}
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(booleanPass("root"))
 			.provenance(VerdictProvenance.own())
 			.compositeAttempts(authored)
@@ -420,7 +425,7 @@ class CompositeResultContractTest {
 	private static Verdict manualBranched(int rootAttempts, int descendantDepth) {
 		Verdict descendant = leaf("leaf");
 		for (int level = descendantDepth; level > 0; level--) {
-			descendant = Verdict.builder()
+			descendant = Verdict.advancedBuilder()
 				.judgment(descendant.judgment())
 				.provenance(VerdictProvenance.own())
 				.compositeAttempts(
@@ -432,7 +437,7 @@ class CompositeResultContractTest {
 			authored.add(successAttempt("member-" + index, leaf("leaf"), CompositeRelation.META_MEMBER, null));
 		}
 		authored.add(successAttempt("member-" + rootAttempts, descendant, CompositeRelation.META_MEMBER, null));
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(booleanPass("root"))
 			.provenance(VerdictProvenance.own())
 			.compositeAttempts(authored)
@@ -498,7 +503,8 @@ class CompositeResultContractTest {
 	private static VotingStrategy countingStrategy(AtomicInteger calls) {
 		return new VotingStrategy() {
 			@Override
-			public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
+			public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+				var judgments = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 				calls.incrementAndGet();
 				return booleanPass("judgment");
 			}

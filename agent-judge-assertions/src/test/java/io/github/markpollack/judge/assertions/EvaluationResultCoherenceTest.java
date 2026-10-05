@@ -3,6 +3,7 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.assertions;
+
 import io.github.markpollack.judge.verdict.Verdict;
 
 import java.util.*;
@@ -71,7 +72,7 @@ class EvaluationResultCoherenceTest {
 	void unsupportedOrContradictoryRecordsCannotCreateAnEvaluationOrRunPolicy() {
 		var calls = new AtomicInteger();
 		var codec = new VerdictCodec();
-		for (String malformed : List.of(codec.write(verdict).replace("\"schemaVersion\":5", "\"schemaVersion\":99"),
+		for (String malformed : List.of(codec.write(verdict).replace("\"schemaVersion\":6", "\"schemaVersion\":99"),
 				"{}")) {
 			assertThatThrownBy(() -> Evaluations.apply(codec.read(malformed), v -> {
 				calls.incrementAndGet();

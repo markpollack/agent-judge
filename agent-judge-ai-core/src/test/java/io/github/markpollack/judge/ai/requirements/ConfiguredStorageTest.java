@@ -3,6 +3,7 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.ai.requirements;
+
 import io.github.markpollack.judge.verdict.InvocationRecords;
 import io.github.markpollack.judge.verdict.SeatExecution;
 import io.github.markpollack.judge.verdict.Verdict;
@@ -84,8 +85,8 @@ class ConfiguredStorageTest {
 		for (String applicability : Arrays.asList(null, "feature exists")) {
 			var requirement = Rfc2119Requirement.of("C", "rev7", "MUST", "retain", "audit", applicability);
 			Verdict result = Rfc2119Jury.builder()
-				.runtime((EvalModel) request -> new EvalModelResponse("C: NOT_APPLICABLE - feature absent", null,
-						null, Map.of()))
+				.runtime((EvalModel) request -> new EvalModelResponse("C: NOT_APPLICABLE - feature absent", null, null,
+						Map.of()))
 				.requirements(List.of(requirement))
 				.build()
 				.vote();
@@ -197,9 +198,8 @@ class ConfiguredStorageTest {
 		for (int version : List.of(2, 3, 4)) {
 			var historical = tree.deepCopy();
 			historical.put("schemaVersion", version);
-			assertThatThrownBy(() -> codec.read(historical.toString()))
-				.hasMessageContaining("archival reading with baseline")
-				.hasMessageContaining("expected 5");
+			assertThatThrownBy(() -> codec.read(historical.toString())).hasMessageContaining("V2/3/4 use")
+				.hasMessageContaining("expected 6");
 		}
 		for (String key : List.of("roster", "invocations")) {
 			var incomplete = tree.deepCopy();

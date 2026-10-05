@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.AggregationEvidence;
 import io.github.markpollack.judge.voting.AverageVotingStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
@@ -55,40 +56,54 @@ class NumericStrategyThresholdTest {
 	@Test
 	void aStatedBarChangesTheOutcomeOnTheSameScores() {
 		// 0.6 clears the inherited 0.5 and misses a deliberately chosen 0.8.
-		assertThat(new AverageVotingStrategy().aggregate(SCORES, Map.of()).status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(new AverageVotingStrategy(0.8).aggregate(SCORES, Map.of()).status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(
+				new AverageVotingStrategy().aggregate(io.github.markpollack.judge.voting.Ballots.of(SCORES)).status())
+			.isEqualTo(JudgmentStatus.PASS);
+		assertThat(new AverageVotingStrategy(0.8).aggregate(io.github.markpollack.judge.voting.Ballots.of(SCORES))
+			.status()).isEqualTo(JudgmentStatus.FAIL);
 
-		assertThat(new MedianVotingStrategy().aggregate(SCORES, Map.of()).status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(new MedianVotingStrategy(0.8).aggregate(SCORES, Map.of()).status()).isEqualTo(JudgmentStatus.FAIL);
-
-		assertThat(new WeightedAverageStrategy().aggregate(SCORES, Map.of()).status()).isEqualTo(JudgmentStatus.PASS);
-		assertThat(new WeightedAverageStrategy(0.8).aggregate(SCORES, Map.of()).status())
+		assertThat(new MedianVotingStrategy().aggregate(io.github.markpollack.judge.voting.Ballots.of(SCORES)).status())
+			.isEqualTo(JudgmentStatus.PASS);
+		assertThat(
+				new MedianVotingStrategy(0.8).aggregate(io.github.markpollack.judge.voting.Ballots.of(SCORES)).status())
 			.isEqualTo(JudgmentStatus.FAIL);
+
+		assertThat(
+				new WeightedAverageStrategy().aggregate(io.github.markpollack.judge.voting.Ballots.of(SCORES)).status())
+			.isEqualTo(JudgmentStatus.PASS);
+		assertThat(new WeightedAverageStrategy(0.8).aggregate(io.github.markpollack.judge.voting.Ballots.of(SCORES))
+			.status()).isEqualTo(JudgmentStatus.FAIL);
 	}
 
 	@Test
 	void theBarIsRecordedInTheEvidenceSoAStoredVerdictCanBeAudited() {
-		assertThat(aggregation(new AverageVotingStrategy(0.8).aggregate(SCORES, Map.of())))
+		assertThat(aggregation(
+				new AverageVotingStrategy(0.8).aggregate(io.github.markpollack.judge.voting.Ballots.of(SCORES))))
 			.containsEntry(AggregationEvidence.THRESHOLD, 0.8);
-		assertThat(aggregation(new MedianVotingStrategy(0.25).aggregate(SCORES, Map.of())))
+		assertThat(aggregation(
+				new MedianVotingStrategy(0.25).aggregate(io.github.markpollack.judge.voting.Ballots.of(SCORES))))
 			.containsEntry(AggregationEvidence.THRESHOLD, 0.25);
-		assertThat(aggregation(new WeightedAverageStrategy(0.9).aggregate(SCORES, Map.of())))
+		assertThat(aggregation(
+				new WeightedAverageStrategy(0.9).aggregate(io.github.markpollack.judge.voting.Ballots.of(SCORES))))
 			.containsEntry(AggregationEvidence.THRESHOLD, 0.9);
 	}
 
 	@Test
 	void reasoningNamesTheBarThatWasApplied() {
-		assertThat(new AverageVotingStrategy(0.8).aggregate(SCORES, Map.of()).reasoning()).contains("threshold: 0.80");
+		assertThat(new AverageVotingStrategy(0.8).aggregate(io.github.markpollack.judge.voting.Ballots.of(SCORES))
+			.reasoning()).contains("threshold: 0.80");
 	}
 
 	@Test
 	void errorPolicyStillComposesWithAStatedBar() {
 		List<Judgment> withError = List.of(passJudgment(0.6), Judgment.error("model unavailable"));
 
-		assertThat(new AverageVotingStrategy(0.8, ErrorHandling.IGNORE).aggregate(withError, Map.of()).status())
-			.isEqualTo(JudgmentStatus.FAIL);
-		assertThat(new AverageVotingStrategy(0.5, ErrorHandling.IGNORE).aggregate(withError, Map.of()).status())
-			.isEqualTo(JudgmentStatus.PASS);
+		assertThat(new AverageVotingStrategy(0.8, ErrorHandling.IGNORE)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(withError))
+			.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(new AverageVotingStrategy(0.5, ErrorHandling.IGNORE)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(withError))
+			.status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	@Test

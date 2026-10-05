@@ -4,8 +4,12 @@
  */
 
 package io.github.markpollack.judge.verdict;
-import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+
+import io.github.markpollack.judge.voting.Participation;
+import io.github.markpollack.judge.voting.RetainedRule;
+import io.github.markpollack.judge.voting.VotingStrategy;
+import io.github.markpollack.judge.voting.Ballot;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.voting.ExclusionHandling;
 
@@ -56,7 +60,6 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * @param judgment the final collective judgment
  * @param individual the ordered judgments contributing at this root
  * @param individualByName those judgments keyed by configured identity in insertion order
- * @param weights the configured weights in insertion order, keyed by configured position
  * @param seats one seat per entry of {@code individual}, joining position to verdict key
  * @param provenance what produced {@code judgment}
  * @param compositeAttempts complete ordered direct composite attempts
@@ -65,24 +68,69 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  * @param roster complete ordered independent requirement coverage, empty for ordinary
  * composition
  * @param invocations owned immutable shared native observations
+ * @param rule complete retained reduction rule, or null when no reduction happened
  */
-@JsonPropertyOrder({ "schemaVersion", "declaredCardinality", "judgment", "individual", "individualByName", "weights",
-		"seats", "provenance", "compositeAttempts" })
-
+@JsonPropertyOrder({ "schemaVersion", "declaredCardinality", "judgment", "individual", "individualByName", "seats",
+		"provenance", "compositeAttempts" })
 
 public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
-		Map<String, Double> weights, List<Seat> seats, VerdictProvenance provenance,
-		List<CompositeAttempt> compositeAttempts,
-		@JsonProperty(required = true)  int declaredCardinality,
-		@Nullable Requirement<?> requirement, @Nullable CompositeFailure reductionFailure, List<Requirement<?>> roster,
-		List<Invocation> invocations) {
+		List<Seat> seats, VerdictProvenance provenance, List<CompositeAttempt> compositeAttempts,
+		@JsonProperty(required = true) int declaredCardinality, @Nullable Requirement<?> requirement,
+		@Nullable CompositeFailure reductionFailure, List<Requirement<?>> roster, List<Invocation> invocations,
+		@Nullable RetainedRule rule) {
+
+	/**
+	 * Construct a complete advanced record with no declared reduction rule. This path can
+	 * retain refused records; requireUsable refuses unsupported reductions.
+	 * @param judgment aggregate
+	 * @param individual originals
+	 * @param individualByName named originals
+	 * @param seats complete seat facts
+	 * @param provenance origin
+	 * @param compositeAttempts retained children
+	 * @param declaredCardinality configured population
+	 * @param requirement actual requirement
+	 * @param reductionFailure failed reduction
+	 * @param roster ordered coverage
+	 * @param invocations shared native owners
+	 */
+	public Verdict(Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
+			List<Seat> seats, VerdictProvenance provenance, List<CompositeAttempt> compositeAttempts,
+			int declaredCardinality, @Nullable Requirement<?> requirement, @Nullable CompositeFailure reductionFailure,
+			List<Requirement<?>> roster, List<Invocation> invocations) {
+		this(judgment, individual, individualByName, seats, provenance, compositeAttempts, declaredCardinality,
+				requirement, reductionFailure, roster, invocations, null);
+	}
+
+	/**
+	 * Validate conclusion, complete preservation bounds and native-reference closure.
+	 * @return this unchanged complete Verdict
+	 */
+	public Verdict requireUsable() {
+		var roots = new ArrayList<Judgment>();
+		collectJudgments(this, roots);
+		io.github.markpollack.judge.judgment.JudgmentBounds.validateForest(roots, this);
+		conclusion();
+		InvocationRecords.of(this);
+		return this;
+	}
+
+	private static void collectJudgments(Verdict node, List<Judgment> roots) {
+		roots.add(node.judgment());
+		roots.addAll(node.individual());
+		for (var seat : node.seats())
+			if (seat.rejection() != null)
+				roots.add(seat.rejection());
+		for (var attempt : node.compositeAttempts())
+			if (attempt.verdict() != null)
+				collectJudgments(attempt.verdict(), roots);
+	}
 
 	/**
 	 * Constructs a non-roster record with no shared invocation ownership.
 	 * @param judgment collective judgment
 	 * @param individual ordered opinions
 	 * @param individualByName names
-	 * @param weights weights
 	 * @param seats seats
 	 * @param provenance composition provenance
 	 * @param compositeAttempts entered children
@@ -91,10 +139,10 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 	 * @param reductionFailure original reduction failure, if any
 	 */
 	public Verdict(Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
-			Map<String, Double> weights, List<Seat> seats, VerdictProvenance provenance,
-			List<CompositeAttempt> compositeAttempts, int declaredCardinality, @Nullable Requirement<?> requirement,
+			List<Seat> seats, VerdictProvenance provenance, List<CompositeAttempt> compositeAttempts,
+			int declaredCardinality, @Nullable Requirement<?> requirement,
 			@Nullable CompositeFailure reductionFailure) {
-		this(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts, declaredCardinality,
+		this(judgment, individual, individualByName, seats, provenance, compositeAttempts, declaredCardinality,
 				requirement, reductionFailure, List.of(), List.of());
 	}
 
@@ -133,8 +181,8 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 		Objects.requireNonNull(supplied, "requirement");
 		if (requirement != null && !Requirement.equivalent(requirement, supplied))
 			throw new IllegalArgumentException("Verdict already belongs to another requirement");
-		return new Verdict(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts,
-				declaredCardinality, supplied, reductionFailure, roster, invocations);
+		return new Verdict(judgment, individual, individualByName, seats, provenance, compositeAttempts,
+				declaredCardinality, supplied, reductionFailure, roster, invocations, rule);
 	}
 
 	/**
@@ -142,7 +190,6 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 	 * @param judgment collective judgment
 	 * @param individual ordered producer judgments
 	 * @param individualByName named judgments
-	 * @param weights voting weights
 	 * @param seats seat facts
 	 * @param provenance collective origin
 	 * @param compositeAttempts entered children
@@ -150,9 +197,9 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 	 * @param requirement actual requirement or null for ordinary checks
 	 */
 	public Verdict(Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
-			Map<String, Double> weights, List<Seat> seats, VerdictProvenance provenance,
-			List<CompositeAttempt> compositeAttempts, int declaredCardinality, @Nullable Requirement<?> requirement) {
-		this(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts, declaredCardinality,
+			List<Seat> seats, VerdictProvenance provenance, List<CompositeAttempt> compositeAttempts,
+			int declaredCardinality, @Nullable Requirement<?> requirement) {
+		this(judgment, individual, individualByName, seats, provenance, compositeAttempts, declaredCardinality,
 				requirement, null);
 	}
 
@@ -161,17 +208,15 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 	 * @param judgment collective judgment
 	 * @param individual individual judgments
 	 * @param individualByName keyed judgments
-	 * @param weights configured weights
 	 * @param seats seat facts
 	 * @param provenance collective origin
 	 * @param compositeAttempts complete attempts
 	 * @param declaredCardinality configured population
 	 */
 	public Verdict(Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
-			Map<String, Double> weights, List<Seat> seats, VerdictProvenance provenance,
-			List<CompositeAttempt> compositeAttempts, int declaredCardinality) {
-		this(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts, declaredCardinality,
-				null);
+			List<Seat> seats, VerdictProvenance provenance, List<CompositeAttempt> compositeAttempts,
+			int declaredCardinality) {
+		this(judgment, individual, individualByName, seats, provenance, compositeAttempts, declaredCardinality, null);
 	}
 
 	/**
@@ -179,15 +224,13 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 	 * @param judgment aggregate
 	 * @param individual ordered inputs
 	 * @param individualByName named inputs
-	 * @param weights weights
 	 * @param seats seats
 	 * @param provenance provenance
 	 * @param compositeAttempts attempts
 	 */
 	public Verdict(Judgment judgment, List<Judgment> individual, Map<String, Judgment> individualByName,
-			Map<String, Double> weights, List<Seat> seats, VerdictProvenance provenance,
-			List<CompositeAttempt> compositeAttempts) {
-		this(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts, seats.size(), null);
+			List<Seat> seats, VerdictProvenance provenance, List<CompositeAttempt> compositeAttempts) {
+		this(judgment, individual, individualByName, seats, provenance, compositeAttempts, seats.size(), null);
 	}
 
 	/** Validate, bound, and defensively copy all verdict components. */
@@ -207,7 +250,7 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 		individual = List.copyOf(Objects.requireNonNull(individual, "individual must not be null"));
 		individualByName = immutableLinkedMap(
 				Objects.requireNonNull(individualByName, "individualByName must not be null"));
-		weights = immutableLinkedMap(Objects.requireNonNull(weights, "weights must not be null"));
+
 		Objects.requireNonNull(seats, "seats must not be null");
 		seats = List.copyOf(seats);
 		Objects.requireNonNull(provenance, "provenance must not be null");
@@ -215,7 +258,16 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 		compositeAttempts = List.copyOf(compositeAttempts);
 		CompositeBounds.validateTree(compositeAttempts);
 		requireCoherentSeats(individual, individualByName, seats);
-		requireCoherentDecision(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts);
+		requireCoherentDecision(judgment, individual, individualByName, seats, provenance, compositeAttempts);
+		if (provenance.kind() == VerdictProvenanceKind.TIER) {
+			Verdict selected = compositeAttempts.stream()
+				.filter(a -> a.name().equals(provenance.tier()))
+				.findFirst()
+				.orElseThrow()
+				.verdict();
+			if (selected != null && !Objects.equals(rule, selected.rule()))
+				throw new IllegalArgumentException("Selected tier retained rule differs from copied root rule");
+		}
 	}
 
 	/**
@@ -267,14 +319,13 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 	 * @param judgment the aggregate
 	 * @param individual the ordered judgments
 	 * @param individualByName the keyed judgments
-	 * @param weights the configured weights
 	 * @param seats the seats
 	 * @param provenance the provenance
 	 * @param attempts the direct attempts
 	 */
 	private static void requireCoherentDecision(Judgment judgment, List<Judgment> individual,
-			Map<String, Judgment> individualByName, Map<String, Double> weights, List<Seat> seats,
-			VerdictProvenance provenance, List<CompositeAttempt> attempts) {
+			Map<String, Judgment> individualByName, List<Seat> seats, VerdictProvenance provenance,
+			List<CompositeAttempt> attempts) {
 		if (provenance.kind() == VerdictProvenanceKind.UNDECIDED) {
 			JudgmentReasonCode code = judgment.reasonCode();
 			if (judgment.status() != JudgmentStatus.ERROR || code == null
@@ -315,7 +366,7 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 		else {
 			requireIndividualRejection(judgment, name, attempt, tierVerdict);
 		}
-		requireCopiedFrom(name, individual, individualByName, weights, seats, tierVerdict);
+		requireCopiedFrom(name, individual, individualByName, seats, tierVerdict);
 	}
 
 	/**
@@ -369,15 +420,13 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 	 * @param name the tier's name
 	 * @param individual the root's ordered judgments
 	 * @param individualByName the root's keyed judgments
-	 * @param weights the root's weights
 	 * @param seats the root's seats
 	 * @param tierVerdict the tier's verdict
 	 */
 	private static void requireCopiedFrom(String name, List<Judgment> individual,
-			Map<String, Judgment> individualByName, Map<String, Double> weights, List<Seat> seats,
-			Verdict tierVerdict) {
+			Map<String, Judgment> individualByName, List<Seat> seats, Verdict tierVerdict) {
 		if (!individual.equals(tierVerdict.individual()) || !individualByName.equals(tierVerdict.individualByName())
-				|| !weights.equals(tierVerdict.weights()) || !seats.equals(tierVerdict.seats())) {
+				|| !seats.equals(tierVerdict.seats())) {
 			throw new IllegalArgumentException("a cascade that stops on tier '" + name
 					+ "' copies its individuals, map, weights and seats; they differ here");
 		}
@@ -391,10 +440,10 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 	}
 
 	/**
-	 * Create a builder for Verdict.
+	 * Deliberate advanced retained-record construction, including refused children.
 	 * @return new builder instance
 	 */
-	public static Builder builder() {
+	public static Builder advancedBuilder() {
 		return new Builder();
 	}
 
@@ -410,19 +459,27 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 	public static Verdict observed(String name, Judgment original, @Nullable String notApplicableWhen) {
 		name = CompositeNames.requireValidName(name);
 		Objects.requireNonNull(original);
-		boolean rejected = original.notApplicable() && notApplicableWhen == null;
-		Judgment treatment = rejected
-				? Judgment.error(io.github.markpollack.judge.judgment.JudgmentReasonCode.UNDECLARED_NOT_APPLICABLE,
-						"Seat '" + name + "' returned NOT_APPLICABLE without local permission")
-				: original;
-		Judgment collective = rejected ? new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE)
-			.aggregate(List.of(treatment), Map.of("0", 1.0)) : original;
+		Judgment returned = original;
+		boolean complete = original.refusedReturn() != null;
+		if (complete)
+			original = original.refusedReturn().original();
+		boolean rejected = complete || original.notApplicable() && notApplicableWhen == null;
+		Judgment treatment = complete ? returned
+				: rejected ? Judgment.error(
+						io.github.markpollack.judge.judgment.JudgmentReasonCode.UNDECLARED_NOT_APPLICABLE,
+						"Seat '" + name + "' returned NOT_APPLICABLE without local permission") : original;
+		Judgment collective = rejected ? new AllEligiblePassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(treatment))) : original;
 		Seat seat = new Seat(0, name, KeySource.DECLARED,
 				rejected ? SeatExecution.RETURNED_REJECTED : SeatExecution.RETURNED,
-				Participation.forJudgment(treatment, collective, !rejected), null, notApplicableWhen,
-				rejected ? treatment : null);
-		return Verdict.builder()
+				complete ? io.github.markpollack.judge.voting.Participation.NOT_RECORDED
+						: Participation.forJudgment(treatment, collective, !rejected),
+				null, notApplicableWhen, rejected ? treatment : null);
+		return Verdict.advancedBuilder()
 			.judgment(collective)
+			.rule(rejected
+					? RetainedRule.of(new AllEligiblePassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
+					: null)
 			.individual(List.of(original))
 			.individualByName(Map.of(name, original))
 			.seats(List.of(seat))
@@ -440,10 +497,12 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 	public static Verdict single(String name, Judgment judgment) {
 		Objects.requireNonNull(name, "name must not be null");
 		Objects.requireNonNull(judgment, "judgment must not be null");
+		if (judgment.refusedReturn() != null)
+			return observed(name, judgment, null);
 		if (name.isBlank()) {
 			throw new IllegalArgumentException("name must be non-blank");
 		}
-		return builder().judgment(judgment)
+		return advancedBuilder().judgment(judgment)
 			.individual(List.of(judgment))
 			.individualByName(Map.of(name, judgment))
 			.seats(List.of(new Seat(0, name, KeySource.DECLARED).treated(Participation.IDENTITY)))
@@ -469,7 +528,7 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 	 * Verdict.of(aggregate, byName);
 	 *
 	 * // the same verdict, written out
-	 * Verdict.builder()
+	 * Verdict.advancedBuilder()
 	 *     .judgment(aggregate)
 	 *     .individual(List.of(styleResult, coverageResult))
 	 *     .individualByName(byName)
@@ -521,7 +580,7 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 				.add(Objects.requireNonNull(entry.getValue(), "the judgment for '" + name + "' must not be null"));
 			seats.add(new Seat(seats.size(), name, KeySource.DECLARED));
 		}
-		return builder().judgment(judgment)
+		return advancedBuilder().judgment(judgment)
 			.individual(individual)
 			.individualByName(individualByName)
 			.seats(seats)
@@ -529,10 +588,183 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 			.build();
 	}
 
+	/**
+	 * Guided ordinary result construction.
+	 * @return choice of single observation or panel reduction
+	 */
+	public static KindStage builder() {
+		return new KindStage();
+	}
+
+	/**
+	 * Select one compatible composition shape; advanced retained children use
+	 * advancedBuilder.
+	 */
+	public static final class KindStage {
+
+		private KindStage() {
+		}
+
+		/**
+		 * Select a single observed producer.
+		 * @param name retained name
+		 * @return judgment stage
+		 */
+		public SingleStage single(String name) {
+			return judgment -> () -> Verdict.single(name, judgment);
+		}
+
+		/**
+		 * Select an actual immutable pure panel rule.
+		 * @param strategy configured rule
+		 * @return first opinion stage
+		 */
+		public FirstOpinionStage panel(VotingStrategy strategy) {
+			return new PanelBuilder(RetainedRule.of(strategy));
+		}
+
+	}
+
+	/** Supply the actual original before building a single observation. */
+	public interface SingleStage {
+
+		/**
+		 * Retain the original without execution.
+		 * @param judgment complete original
+		 * @return ready single
+		 */
+		ReadyVerdict judgment(Judgment judgment);
+
+	}
+
+	/** Complete inert result construction. */
+	public interface ReadyVerdict {
+
+		/**
+		 * Build a usable completed record.
+		 * @return complete result
+		 */
+		Verdict build();
+
+	}
+
+	/** Add the first observed opinion before a panel can be built. */
+	public interface FirstOpinionStage {
+
+		/**
+		 * Add an unweighted observed opinion.
+		 * @param name label
+		 * @param original complete original
+		 * @return ready panel
+		 */
+		PanelStage opinion(String name, Judgment original);
+
+		/**
+		 * Add a weighted observed opinion.
+		 * @param name label
+		 * @param original complete original
+		 * @param weight positive finite declaration
+		 * @return ready panel
+		 */
+		PanelStage opinion(String name, Judgment original, double weight);
+
+	}
+
+	/**
+	 * Extend or build an observed panel; incompatible provenance fields are not exposed.
+	 */
+	public interface PanelStage extends FirstOpinionStage, ReadyVerdict {
+
+	}
+
+	private static final class PanelBuilder implements PanelStage {
+
+		private final RetainedRule rule;
+
+		private final List<Ballot> ballots = new ArrayList<>();
+
+		PanelBuilder(RetainedRule rule) {
+			this.rule = rule;
+		}
+
+		public PanelStage opinion(String name, Judgment original) {
+			return add(name, original, null);
+		}
+
+		private PanelStage add(String name, Judgment returned, @Nullable Double weight) {
+			var original = returned.refusedReturn() == null ? returned : returned.refusedReturn().original();
+			ballots.add(new Ballot(ballots.size(), CompositeNames.requireValidName(name), original, returned,
+					Participation.NOT_RECORDED, weight));
+			return this;
+		}
+
+		public PanelStage opinion(String name, Judgment original, double weight) {
+			return add(name, original, weight);
+		}
+
+		public Verdict build() {
+			if (ballots.size() == 1) {
+				var ballot = ballots.getFirst();
+				var result = Verdict.single(ballot.label(), ballot.treatment());
+				var seat = result.seats().getFirst();
+				if (ballot.declaredWeight() != null)
+					seat = seat.weighted(ballot.declaredWeight());
+				return advancedBuilder().judgment(result.judgment())
+					.individual(result.individual())
+					.individualByName(result.individualByName())
+					.seats(List.of(seat))
+					.provenance(result.provenance())
+					.rule(result.rule())
+					.build()
+					.requireUsable();
+			}
+			var aggregate = rule.aggregate(ballots);
+			var originals = new ArrayList<Judgment>();
+			var named = new LinkedHashMap<String, Judgment>();
+			var seats = new ArrayList<Seat>();
+			for (var ballot : ballots) {
+				originals.add(ballot.original());
+				named.put(ballot.label(), ballot.original());
+				boolean refused = ballot.treatment().refusedReturn() != null;
+				seats.add(new Seat(ballot.position(), ballot.label(), KeySource.DECLARED,
+						refused ? SeatExecution.RETURNED_REJECTED : SeatExecution.RETURNED,
+						refused ? Participation.NOT_RECORDED
+								: Participation.forJudgment(ballot.treatment(), aggregate, false),
+						null, null, refused ? ballot.treatment() : null, ballot.declaredWeight()));
+			}
+			return advancedBuilder().judgment(aggregate)
+				.individual(originals)
+				.individualByName(named)
+				.seats(seats)
+				.provenance(VerdictProvenance.decisionFor(aggregate))
+				.rule(rule)
+				.build()
+				.requireUsable();
+		}
+
+	}
+
 	/** Builder for {@link Verdict}. */
 	public static class Builder {
 
 		private @Nullable CompositeFailure reductionFailure;
+
+		private @Nullable RetainedRule rule;
+
+		/**
+		 * Retain the actual immutable reduction rule, absent when no reduction happened.
+		 * @param rule bound rule or null
+		 * @return this advanced builder
+		 */
+		/**
+		 * Retain the exact rule that performed this reduction.
+		 * @param rule immutable declaration, or null for identity/failed reduction
+		 * @return this advanced builder
+		 */
+		public Builder rule(@Nullable RetainedRule rule) {
+			this.rule = rule;
+			return this;
+		}
 
 		private List<Requirement<?>> roster = List.of();
 
@@ -545,8 +777,6 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 		private List<Judgment> individual = new ArrayList<>();
 
 		private Map<String, Judgment> individualByName = new LinkedHashMap<>();
-
-		private Map<String, Double> weights = new LinkedHashMap<>();
 
 		private List<Seat> seats = new ArrayList<>();
 
@@ -631,16 +861,6 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 		}
 
 		/**
-		 * Set judge weights.
-		 * @param weights weights by configured position
-		 * @return this builder
-		 */
-		public Builder weights(Map<String, Double> weights) {
-			this.weights = new LinkedHashMap<>(weights);
-			return this;
-		}
-
-		/**
 		 * Set the seats, one per individual judgment.
 		 * @param seats the seats, in position order
 		 * @return this builder
@@ -697,18 +917,22 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 				throw new IllegalStateException("a verdict must say what produced its aggregate; "
 						+ "set a decision (VerdictProvenance.own() for an ordinary reduction)");
 			}
-			return new Verdict(judgment, individual, individualByName, weights, seats, provenance, compositeAttempts,
+			return new Verdict(judgment, individual, individualByName, seats, provenance, compositeAttempts,
 					declaredCardinality == null ? seats.size() : declaredCardinality, requirement, reductionFailure,
-					roster, invocations);
+					roster, invocations, rule);
 		}
 
 	}
 
-	/** Routing decision from a complete retained child.
+	/**
+	 * Routing decision from a complete retained child.
 	 * @param rule configured routing rule
 	 * @param child retained child
 	 * @param accepted whether boundary admission succeeded
-	 * @return whether routing stops */
-	public static boolean routingStops(RoutingRule rule, Verdict child, boolean accepted) { return VerdictSemantics.routingStops(rule,child,accepted); }
+	 * @return whether routing stops
+	 */
+	public static boolean routingStops(RoutingRule rule, Verdict child, boolean accepted) {
+		return VerdictSemantics.routingStops(rule, child, accepted);
+	}
 
 }

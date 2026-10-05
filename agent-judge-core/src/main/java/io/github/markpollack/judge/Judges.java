@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-
 import io.github.markpollack.judge.portable.ImplementationIdentity;
 
 import io.github.markpollack.judge.judgment.Judgment;
@@ -82,9 +81,9 @@ import io.github.markpollack.judge.judgment.Judgment;
  * checking that it declared it may. Use a {@link io.github.markpollack.judge.jury.Jury}
  * with an explicit {@link io.github.markpollack.judge.voting.ErrorHandling}: a jury
  * resolves the population by status, publishes what it actually reduced over in its
- * aggregation evidence, and {@link io.github.markpollack.judge.voting.AllMustPassStrategy}
- * expresses "every applicable judge must pass" without collapsing an abstention into a
- * negative finding.
+ * aggregation evidence, and
+ * {@link io.github.markpollack.judge.voting.AllEligiblePassStrategy} expresses "every
+ * applicable judge must pass" without collapsing an abstention into a negative finding.
  * </p>
  * <p>
  * This behaviour is pinned by tests rather than changed. Widening the combinators to be
@@ -251,6 +250,7 @@ public final class Judges {
 			metadata = withMetadata.metadata();
 		}
 		catch (Exception ex) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 			String message = ex.getMessage();
 			throw new IllegalArgumentException(subject + " cannot be described: metadata() threw "
 					+ ex.getClass().getName() + ((message == null || message.isBlank()) ? "" : ": " + message), ex);

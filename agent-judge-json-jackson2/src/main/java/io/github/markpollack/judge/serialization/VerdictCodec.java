@@ -23,6 +23,15 @@ public final class VerdictCodec {
 
 	private final io.github.markpollack.judge.json.EvalJsonMapper json;
 
+	private final Map<String, SpecificationCodec<?>> specificationRegistrations;
+
+	private final Map<String, io.github.markpollack.judge.voting.VotingRuleFactory> ruleRegistrations;
+
+	/**
+	 * Maximum current typed document size in UTF-8 bytes; originals are never truncated.
+	 */
+	public static final int MAXIMUM_BYTES = 1048576;
+
 	/** Configure only built-in text and all-of specifications. */
 	public VerdictCodec() {
 		this(Map.of());
@@ -54,6 +63,34 @@ public final class VerdictCodec {
 	}
 
 	private VerdictCodec(Map<String, SpecificationCodec<?>> specifications, boolean registered) {
+		this(specifications, registered, Map.of());
+	}
+
+	/**
+	 * Add explicitly trusted pure rule reconstruction to this codec's specification
+	 * setup.
+	 * @param rules additional stable tokens and complete configuration factories
+	 * @return independently configured immutable codec
+	 */
+	public VerdictCodec withVotingRules(Map<String, io.github.markpollack.judge.voting.VotingRuleFactory> rules) {
+		var combined = new LinkedHashMap<>(ruleRegistrations);
+		rules.forEach((token, factory) -> {
+			if (combined.putIfAbsent(token, Objects.requireNonNull(factory)) != null)
+				throw new IllegalArgumentException("Ambiguous voting rule token: " + token);
+		});
+		return new VerdictCodec(specificationRegistrations, true, combined);
+	}
+
+	private VerdictCodec(Map<String, SpecificationCodec<?>> specifications, boolean registered,
+			Map<String, io.github.markpollack.judge.voting.VotingRuleFactory> rules) {
+		specificationRegistrations = Map.copyOf(specifications);
+		ruleRegistrations = Map.copyOf(rules);
+		var ruleTypes = new LinkedHashMap<>(io.github.markpollack.judge.voting.VotingRules.builtIns());
+		rules.forEach((token, factory) -> {
+			if (token.isBlank() || ruleTypes.putIfAbsent(token, Objects.requireNonNull(factory)) != null)
+				throw new IllegalArgumentException("Ambiguous voting rule token: " + token);
+		});
+
 		var types = new LinkedHashMap<String, SpecificationCodec<?>>();
 		types.put("text", SpecificationCodec.general(String.class));
 		types.put("allOf", SpecificationCodec.general(AllOf.class));
@@ -66,7 +103,12 @@ public final class VerdictCodec {
 				throw new IllegalArgumentException("Ambiguous specification codec: " + entry.getKey());
 			types.put(entry.getKey(), entry.getValue());
 		}
-		ObjectMapper mapper = JsonMapper.builder().addModule(io.github.markpollack.judge.serialization.ResultJson.module())
+		ObjectMapper mapper = JsonMapper
+			.builder(JsonFactory.builder()
+				.streamReadConstraints(
+						StreamReadConstraints.builder().maxNestingDepth(64).maxStringLength(MAXIMUM_BYTES).build())
+				.build())
+			.addModule(io.github.markpollack.judge.serialization.ResultJson.module())
 			.disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
 			.withCoercionConfig(LogicalType.Textual,
 					c -> c.setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail)
@@ -79,8 +121,9 @@ public final class VerdictCodec {
 			.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
 			.enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
 			.build();
-		mapper.setDefaultAttributes(
-				ContextAttributes.getEmpty().withSharedAttribute(ResultJson.SPECIFICATIONS, Map.copyOf(types)));
+		mapper.setDefaultAttributes(ContextAttributes.getEmpty()
+			.withSharedAttribute(ResultJson.SPECIFICATIONS, Map.copyOf(types))
+			.withSharedAttribute(ResultJson.RULES, Map.copyOf(ruleTypes)));
 		json = new JacksonEvalJsonMapper(mapper);
 	}
 
@@ -90,8 +133,7 @@ public final class VerdictCodec {
 	 * @return current JSON
 	 */
 	public String write(Verdict verdict) {
-		verdict.conclusion();
-		io.github.markpollack.judge.verdict.InvocationRecords.of(verdict);
+		verdict.requireUsable();
 		return encode(verdict);
 	}
 
@@ -102,8 +144,7 @@ public final class VerdictCodec {
 	 */
 	public Verdict read(String json) {
 		Verdict verdict = decode(json, Verdict.class);
-		verdict.conclusion();
-		io.github.markpollack.judge.verdict.InvocationRecords.of(verdict);
+		verdict.requireUsable();
 		return verdict;
 	}
 
@@ -113,7 +154,13 @@ public final class VerdictCodec {
 	 * @return complete validated verdict
 	 */
 	public Verdict read(Map<String, Object> stored) {
-		return read(encode(stored));
+		try {
+			return read(encode(stored));
+		}
+		catch (io.github.markpollack.judge.portable.PreservationLimitException limit) {
+			throw new io.github.markpollack.judge.portable.PreservationLimitException(
+					Objects.toString(limit.getMessage(), "Preservation bound exceeded"), stored, limit);
+		}
 	}
 
 	/**
@@ -122,17 +169,20 @@ public final class VerdictCodec {
 	 * @return current JSON
 	 */
 	public String write(EvaluationResult result) {
-		result.verdict().conclusion();
-		io.github.markpollack.judge.verdict.InvocationRecords.of(result.verdict());
+		result.verdict().requireUsable();
 		var policy = new LinkedHashMap<String, Object>();
 		switch (result.policyResult()) {
 			case PolicyResult.NotRequested ignored -> policy.put("kind", "notRequested");
 			case PolicyResult.Decided d -> {
 				policy.put("kind", "decided");
 				policy.put("decision", d.decision());
+				if (d.attribution() != null)
+					policy.put("attribution", d.attribution());
 			}
 			case PolicyResult.Failed f -> {
 				policy.put("kind", "failed");
+				if (f.attribution() != null)
+					policy.put("attribution", f.attribution());
 				policy.put("failure",
 						Map.of("type",
 								f.cause() instanceof StoredPolicyFailure stored ? stored.originalType()
@@ -140,7 +190,14 @@ public final class VerdictCodec {
 								"message", Objects.toString(f.cause().getMessage(), "")));
 			}
 		}
-		return encode(Map.of("schemaVersion", ResultJson.VERSION, "verdict", result.verdict(), "policyResult", policy));
+		try {
+			return encode(
+					Map.of("schemaVersion", ResultJson.VERSION, "verdict", result.verdict(), "policyResult", policy));
+		}
+		catch (io.github.markpollack.judge.portable.PreservationLimitException limit) {
+			throw new io.github.markpollack.judge.portable.PreservationLimitException(
+					Objects.toString(limit.getMessage(), "Preservation bound exceeded"), result, limit);
+		}
 	}
 
 	/**
@@ -163,17 +220,23 @@ public final class VerdictCodec {
 				yield new PolicyResult.NotRequested();
 			}
 			case "decided" -> {
-				fields(policy, Set.of("kind", "decision"));
-				yield new PolicyResult.Decided(decode(policy.path("decision").toString(), PolicyDecision.class));
+				fields(policy, policy.has("attribution") ? Set.of("kind", "decision", "attribution")
+						: Set.of("kind", "decision"));
+				yield new PolicyResult.Decided(decode(policy.path("decision").toString(), PolicyDecision.class),
+						policy.has("attribution")
+								? decode(policy.path("attribution").toString(), PolicyAttribution.class) : null);
 			}
 			case "failed" -> {
-				fields(policy, Set.of("kind", "failure"));
+				fields(policy, policy.has("attribution") ? Set.of("kind", "failure", "attribution")
+						: Set.of("kind", "failure"));
 				JsonNode failure = policy.path("failure");
 				fields(failure, Set.of("type", "message"));
 				if (!failure.path("type").isTextual() || !failure.path("message").isTextual())
 					throw new IllegalArgumentException("Invalid stored failure details");
 				yield new PolicyResult.Failed(
-						new StoredPolicyFailure(failure.path("type").textValue(), failure.path("message").textValue()));
+						new StoredPolicyFailure(failure.path("type").textValue(), failure.path("message").textValue()),
+						policy.has("attribution")
+								? decode(policy.path("attribution").toString(), PolicyAttribution.class) : null);
 			}
 			default -> throw new IllegalArgumentException("Unsupported policy-result kind");
 		};
@@ -189,8 +252,50 @@ public final class VerdictCodec {
 		});
 	}
 
-	private String encode(Object value) { return json.write(value); }
- private <T> T decode(String value, Class<T> type) { return json.read(value,type); }
+	private String encode(Object value) {
+		validateContainers(value, value, new IdentityHashMap<>(), 0);
+		String encoded = json.write(value);
+		if (encoded.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAXIMUM_BYTES)
+			throw new io.github.markpollack.judge.portable.PreservationLimitException(
+					"Typed result exceeds UTF-8 preservation bound", value);
+		return encoded;
+	}
+
+	private static void validateContainers(Object node, Object original, IdentityHashMap<Object, Boolean> active,
+			int depth) {
+		if (!(node instanceof Map<?, ?>) && !(node instanceof Collection<?>))
+			return;
+		if (depth > 64 || active.put(node, Boolean.TRUE) != null)
+			throw new io.github.markpollack.judge.portable.PreservationLimitException(
+					"Typed input exceeds nesting/cycle preservation bound", original);
+		if (node instanceof Map<?, ?> map)
+			for (Object child : map.values())
+				validateContainers(child, original, active, depth + 1);
+		else if (node instanceof Collection<?> list)
+			for (Object child : list)
+				validateContainers(child, original, active, depth + 1);
+		active.remove(node);
+	}
+
+	private <T> T decode(String value, Class<T> type) {
+		if (value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAXIMUM_BYTES)
+			throw new io.github.markpollack.judge.portable.PreservationLimitException(
+					"Typed document exceeds UTF-8 preservation bound", value);
+		try {
+			return json.read(value, type);
+		}
+		catch (io.github.markpollack.judge.portable.PreservationLimitException limit) {
+			throw new io.github.markpollack.judge.portable.PreservationLimitException(
+					Objects.toString(limit.getMessage(), "Preservation bound exceeded"), value, limit);
+		}
+		catch (IllegalArgumentException failure) {
+			for (Throwable cause = failure; cause != null; cause = cause.getCause())
+				if (cause instanceof com.fasterxml.jackson.core.exc.StreamConstraintsException)
+					throw new io.github.markpollack.judge.portable.PreservationLimitException(
+							"Typed document exceeds nesting preservation bound", value, failure);
+			throw failure;
+		}
+	}
 
 	/**
 	 * Stored data representing a failed policy; does not load or instantiate the original

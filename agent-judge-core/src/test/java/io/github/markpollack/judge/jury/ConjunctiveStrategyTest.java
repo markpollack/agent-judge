@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.AggregationEvidence;
 import io.github.markpollack.judge.voting.AverageVotingStrategy;
 import io.github.markpollack.judge.voting.ConjunctiveStrategy;
@@ -43,19 +44,22 @@ class ConjunctiveStrategyTest {
 	void meanPassesTheRubricHoleAndTheConjunctionRejectsIt() {
 		// The mean: 6 of 7 criteria perfect, one missed entirely -> 0.857, a comfortable
 		// pass.
-		Judgment byMean = new AverageVotingStrategy().aggregate(SIX_STRONG_ONE_MISSED, Map.of());
+		Judgment byMean = new AverageVotingStrategy()
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(SIX_STRONG_ONE_MISSED));
 		assertThat(byMean.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(byMean.score()).isCloseTo(0.857, org.assertj.core.data.Offset.offset(0.001));
 
 		// The conjunction, on identical input, against a bar of "every criterion >= 2/3".
-		Judgment byConjunction = new ConjunctiveStrategy(2.0 / 3.0).aggregate(SIX_STRONG_ONE_MISSED, Map.of());
+		Judgment byConjunction = new ConjunctiveStrategy(2.0 / 3.0)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(SIX_STRONG_ONE_MISSED));
 		assertThat(byConjunction.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(byConjunction.score()).isEqualTo(0.0);
 	}
 
 	@Test
 	void reportsTheBindingJudgmentByItsSubmittedIndex() {
-		Judgment result = new ConjunctiveStrategy(0.5).aggregate(SIX_STRONG_ONE_MISSED, Map.of());
+		Judgment result = new ConjunctiveStrategy(0.5)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(SIX_STRONG_ONE_MISSED));
 
 		assertThat(result.reasoning()).contains("binding judgment at index 6");
 		assertThat(aggregation(result)).containsEntry(AggregationEvidence.BINDING_ELIGIBLE_INDEX, 6);
@@ -68,7 +72,8 @@ class ConjunctiveStrategyTest {
 		List<Judgment> judgments = List.of(Judgment.abstain("n/a"), Judgment.abstain("n/a"), passJudgment(0.9),
 				failJudgment(0.1));
 
-		Judgment result = new ConjunctiveStrategy(0.5).aggregate(judgments, Map.of());
+		Judgment result = new ConjunctiveStrategy(0.5)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(aggregation(result)).containsEntry(AggregationEvidence.BINDING_ELIGIBLE_INDEX, 3);
@@ -78,16 +83,18 @@ class ConjunctiveStrategyTest {
 	void passesOnlyWhenEveryApplicableJudgmentClearsTheBar() {
 		ConjunctiveStrategy strategy = new ConjunctiveStrategy(0.7);
 
-		assertThat(strategy.aggregate(List.of(passJudgment(0.7), passJudgment(0.9)), Map.of()).status())
-			.isEqualTo(JudgmentStatus.PASS);
-		assertThat(strategy.aggregate(List.of(passJudgment(0.69), passJudgment(0.9)), Map.of()).status())
-			.isEqualTo(JudgmentStatus.FAIL);
+		assertThat(strategy
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(passJudgment(0.7), passJudgment(0.9))))
+			.status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(strategy
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(passJudgment(0.69), passJudgment(0.9))))
+			.status()).isEqualTo(JudgmentStatus.FAIL);
 	}
 
 	@Test
 	void scoreIsTheMinimumNotTheMean() {
-		Judgment result = new ConjunctiveStrategy(0.1).aggregate(List.of(passJudgment(0.9), passJudgment(0.3)),
-				Map.of());
+		Judgment result = new ConjunctiveStrategy(0.1)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(passJudgment(0.9), passJudgment(0.3))));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(result.score()).isEqualTo(0.3);
@@ -95,8 +102,8 @@ class ConjunctiveStrategyTest {
 
 	@Test
 	void abstentionsLeaveThePopulationRatherThanScoringZero() {
-		Judgment result = new ConjunctiveStrategy(0.5)
-			.aggregate(List.of(passJudgment(0.8), Judgment.abstain("not applicable")), Map.of());
+		Judgment result = new ConjunctiveStrategy(0.5).aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(passJudgment(0.8), Judgment.abstain("not applicable"))));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(result.score()).isEqualTo(0.8);
@@ -108,8 +115,8 @@ class ConjunctiveStrategyTest {
 	void anEmptyConjunctionAbstainsRatherThanPassingVacuously() {
 		// The whole point of the strategy: "every one of nothing cleared the bar" is not
 		// a pass.
-		Judgment result = new ConjunctiveStrategy(0.9)
-			.aggregate(List.of(Judgment.abstain("n/a"), Judgment.abstain("n/a")), Map.of());
+		Judgment result = new ConjunctiveStrategy(0.9).aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(Judgment.abstain("n/a"), Judgment.abstain("n/a"))));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.score()).isNull();
@@ -120,18 +127,21 @@ class ConjunctiveStrategyTest {
 	void errorsAreGovernedByTheErrorHandling() {
 		List<Judgment> withError = List.of(passJudgment(0.9), Judgment.error("model unavailable"));
 
-		assertThat(new ConjunctiveStrategy(0.5).aggregate(withError, Map.of()).status())
-			.as("PROPAGATE is the default and must not silently drop the errored judge")
+		assertThat(new ConjunctiveStrategy(0.5).aggregate(io.github.markpollack.judge.voting.Ballots.of(withError))
+			.status()).as("PROPAGATE is the default and must not silently drop the errored judge")
 			.isEqualTo(JudgmentStatus.ERROR);
-		assertThat(new ConjunctiveStrategy(0.5, ErrorHandling.TREAT_AS_FAIL).aggregate(withError, Map.of()).status())
-			.isEqualTo(JudgmentStatus.FAIL);
-		assertThat(new ConjunctiveStrategy(0.5, ErrorHandling.IGNORE).aggregate(withError, Map.of()).status())
-			.isEqualTo(JudgmentStatus.PASS);
+		assertThat(new ConjunctiveStrategy(0.5, ErrorHandling.TREAT_AS_FAIL)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(withError))
+			.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(new ConjunctiveStrategy(0.5, ErrorHandling.IGNORE)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(withError))
+			.status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	@Test
 	void recordsTheBarItAppliedSoAStoredVerdictCanBeAudited() {
-		Judgment result = new ConjunctiveStrategy(0.75).aggregate(List.of(passJudgment(0.8)), Map.of());
+		Judgment result = new ConjunctiveStrategy(0.75)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(passJudgment(0.8))));
 
 		assertThat(aggregation(result)).containsEntry(AggregationEvidence.STRATEGY, "conjunctive")
 			.containsEntry(AggregationEvidence.THRESHOLD, 0.75);

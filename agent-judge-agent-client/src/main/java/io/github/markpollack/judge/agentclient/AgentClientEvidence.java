@@ -136,6 +136,7 @@ public final class AgentClientEvidence {
 						.build());
 		}
 		catch (Exception ex) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 			Duration elapsed = Duration.between(startedAt, Instant.now());
 			return new AgentExecutionEvidence(workspace,
 					CompletionEvidence.builder()
@@ -154,6 +155,7 @@ public final class AgentClientEvidence {
 			return response.getMetadata();
 		}
 		catch (Exception ex) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 			return null;
 		}
 	}
@@ -163,6 +165,7 @@ public final class AgentClientEvidence {
 			return response.getAgentResponse().getResult().getMetadata().getFinishReason();
 		}
 		catch (Exception ex) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 			return null;
 		}
 	}

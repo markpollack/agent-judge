@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.AggregationEvidence;
 import io.github.markpollack.judge.voting.AverageVotingStrategy;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
@@ -158,8 +159,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: numeric-only inputs average their normalized values")
 		void numericOnly() {
-			Judgment result = strategy
-				.aggregate(List.of(numeric(0.8, JudgmentStatus.PASS), numeric(0.6, JudgmentStatus.PASS)), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(numeric(0.8, JudgmentStatus.PASS), numeric(0.6, JudgmentStatus.PASS))));
 
 			assertThat(result.score()).isCloseTo(0.7, within());
 			assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -168,7 +169,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: boolean inputs contribute 1.0/0.0")
 		void booleanOnly() {
-			Judgment result = strategy.aggregate(List.of(booleanJudgment(true), booleanJudgment(false)), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(booleanJudgment(true), booleanJudgment(false))));
 
 			assertThat(result.score()).isCloseTo(0.5, within());
 			assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -177,8 +179,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: mixed boolean and numeric inputs average together")
 		void mixed() {
-			Judgment result = strategy.aggregate(List.of(booleanJudgment(true), numeric(0.5, JudgmentStatus.PASS)),
-					Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(booleanJudgment(true), numeric(0.5, JudgmentStatus.PASS))));
 
 			assertThat(result.score()).isCloseTo(0.75, within());
 		}
@@ -186,7 +188,7 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: empty input is rejected")
 		void emptyRejected() {
-			assertThatThrownBy(() -> strategy.aggregate(List.of(), Map.of()))
+			assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of())))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("empty");
 		}
@@ -194,8 +196,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: a labelled judgment contributes its status, not a silent 0.0")
 		void labelledContributesStatus() {
-			Judgment result = strategy
-				.aggregate(List.of(labelled("excellent", JudgmentStatus.PASS), booleanJudgment(true)), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(labelled("excellent", JudgmentStatus.PASS), booleanJudgment(true))));
 
 			// Was 0.5: the categorical score fell through to 0.0.
 			assertThat(result.score()).isCloseTo(1.0, within());
@@ -204,8 +206,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: a status-only judgment contributes 1.0/0.0, not a silent 0.0")
 		void statusOnlyContributesEffectiveScore() {
-			Judgment result = strategy.aggregate(List.of(statusOnly(JudgmentStatus.PASS), booleanJudgment(true)),
-					Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(statusOnly(JudgmentStatus.PASS), booleanJudgment(true))));
 
 			// Was 0.5: an absent score fell through to 0.0.
 			assertThat(result.score()).isCloseTo(1.0, within());
@@ -214,8 +216,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: ABSTAIN leaves the population entirely (was 0.0, counted in the denominator)")
 		void abstainExcluded() {
-			Judgment result = strategy.aggregate(List.of(booleanJudgment(true), Judgment.abstain("not applicable")),
-					Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(booleanJudgment(true), Judgment.abstain("not applicable"))));
 
 			// Was 0.5, dragging a unanimous pass halfway to failure.
 			assertThat(result.score()).isCloseTo(1.0, within());
@@ -227,9 +229,10 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: ERROR propagates by default and is distinguishable from a real 0.0")
 		void errorPropagates() {
-			Judgment withError = strategy.aggregate(List.of(booleanJudgment(true), Judgment.error("boom")), Map.of());
-			Judgment withRealZero = strategy
-				.aggregate(List.of(booleanJudgment(true), numeric(0.0, JudgmentStatus.FAIL)), Map.of());
+			Judgment withError = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(booleanJudgment(true), Judgment.error("boom"))));
+			Judgment withRealZero = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(booleanJudgment(true), numeric(0.0, JudgmentStatus.FAIL))));
 
 			// Was: both produced an identical 0.5 score.
 			assertThat(withError.status()).isEqualTo(JudgmentStatus.ERROR);
@@ -240,7 +243,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: all-ABSTAIN is a no-result ABSTAIN (was FAIL scored 0.0)")
 		void allAbstainYieldsNoResult() {
-			Judgment result = strategy.aggregate(List.of(Judgment.abstain("a"), Judgment.abstain("b")), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(Judgment.abstain("a"), Judgment.abstain("b"))));
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 			assertThat(result.score()).isNull();
@@ -258,8 +262,9 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: odd count takes the middle value")
 		void oddCount() {
-			Judgment result = strategy.aggregate(List.of(numeric(0.1, JudgmentStatus.FAIL),
-					numeric(0.9, JudgmentStatus.PASS), numeric(0.8, JudgmentStatus.PASS)), Map.of());
+			Judgment result = strategy
+				.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(numeric(0.1, JudgmentStatus.FAIL),
+						numeric(0.9, JudgmentStatus.PASS), numeric(0.8, JudgmentStatus.PASS))));
 
 			assertThat(result.score()).isCloseTo(0.8, within());
 		}
@@ -267,9 +272,9 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: even count averages the two middle values")
 		void evenCount() {
-			Judgment result = strategy
-				.aggregate(List.of(numeric(0.2, JudgmentStatus.FAIL), numeric(0.4, JudgmentStatus.FAIL),
-						numeric(0.6, JudgmentStatus.PASS), numeric(0.8, JudgmentStatus.PASS)), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(numeric(0.2, JudgmentStatus.FAIL), numeric(0.4, JudgmentStatus.FAIL),
+						numeric(0.6, JudgmentStatus.PASS), numeric(0.8, JudgmentStatus.PASS))));
 
 			assertThat(result.score()).isCloseTo(0.5, within());
 		}
@@ -277,8 +282,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: ABSTAIN leaves the population (was participating as 0.0)")
 		void abstainExcluded() {
-			Judgment result = strategy.aggregate(List.of(numeric(0.9, JudgmentStatus.PASS),
-					numeric(0.8, JudgmentStatus.PASS), Judgment.abstain("n/a")), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List
+				.of(numeric(0.9, JudgmentStatus.PASS), numeric(0.8, JudgmentStatus.PASS), Judgment.abstain("n/a"))));
 
 			// Was 0.8, with the abstention sorted in as a zero; now the median of {0.8,
 			// 0.9}.
@@ -288,8 +293,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: abstentions can no longer flip the verdict (was FAIL at 0.0)")
 		void abstainsCannotFlipVerdict() {
-			Judgment result = strategy.aggregate(
-					List.of(numeric(1.0, JudgmentStatus.PASS), Judgment.abstain("a"), Judgment.abstain("b")), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(numeric(1.0, JudgmentStatus.PASS), Judgment.abstain("a"), Judgment.abstain("b"))));
 
 			// Was 0.0 and FAIL: two abstentions dragged the median off a unanimous pass.
 			assertThat(result.score()).isCloseTo(1.0, within());
@@ -307,9 +312,9 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: weights are keyed by judgment index as a string")
 		void weightsByIndex() {
-			Judgment result = strategy.aggregate(
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(
 					List.of(numeric(1.0, JudgmentStatus.PASS), numeric(0.0, JudgmentStatus.FAIL)),
-					Map.of("0", 3.0, "1", 1.0));
+					Map.of("0", 3.0, "1", 1.0)));
 
 			assertThat(result.score()).isCloseTo(0.75, within());
 		}
@@ -317,8 +322,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: an absent weight defaults to 1.0")
 		void absentWeightDefaultsToOne() {
-			Judgment result = strategy.aggregate(
-					List.of(numeric(1.0, JudgmentStatus.PASS), numeric(0.0, JudgmentStatus.FAIL)), Map.of("0", 1.0));
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(
+					List.of(numeric(1.0, JudgmentStatus.PASS), numeric(0.0, JudgmentStatus.FAIL)), Map.of("0", 1.0)));
 
 			assertThat(result.score()).isCloseTo(0.5, within());
 		}
@@ -326,8 +331,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: empty weights still mean equal weighting; evidence now preserves attribution")
 		void emptyWeightsComputeInStrategy() {
-			Judgment result = strategy
-				.aggregate(List.of(numeric(1.0, JudgmentStatus.PASS), numeric(0.0, JudgmentStatus.FAIL)), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(numeric(1.0, JudgmentStatus.PASS), numeric(0.0, JudgmentStatus.FAIL))));
 
 			// The value is unchanged; the attribution is not. Delegating would have
 			// stamped
@@ -339,8 +344,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: an abstention releases its weight (was consuming it as 0.0)")
 		void abstainReleasesWeight() {
-			Judgment result = strategy.aggregate(List.of(numeric(1.0, JudgmentStatus.PASS), Judgment.abstain("n/a")),
-					Map.of("0", 1.0, "1", 1.0));
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(
+					List.of(numeric(1.0, JudgmentStatus.PASS), Judgment.abstain("n/a")), Map.of("0", 1.0, "1", 1.0)));
 
 			// Was 0.5: the abstention consumed its full weight at a score of zero.
 			assertThat(result.score()).isCloseTo(1.0, within());
@@ -351,11 +356,11 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: all-zero weights are rejected (was a NaN score that passed validation)")
 		void allZeroWeightsRejected() {
-			assertThatThrownBy(() -> strategy.aggregate(
+			assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(
 					List.of(numeric(1.0, JudgmentStatus.PASS), numeric(1.0, JudgmentStatus.PASS)),
-					Map.of("0", 0.0, "1", 0.0)))
+					Map.of("0", 0.0, "1", 0.0))))
 				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("All weights are zero");
+				.hasMessageContaining("positive");
 		}
 
 		@Test
@@ -363,35 +368,34 @@ class VotingStrategyCharacterizationTest {
 		void invalidWeightsRejected() {
 			List<Judgment> judgments = List.of(numeric(1.0, JudgmentStatus.PASS), numeric(1.0, JudgmentStatus.PASS));
 
-			assertThatThrownBy(() -> strategy.aggregate(judgments, Map.of("0", -1.0)))
+			assertThatThrownBy(() -> strategy
+				.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, Map.of("0", -1.0))))
 				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("must not be negative");
-			assertThatThrownBy(() -> strategy.aggregate(judgments, Map.of("0", Double.NaN)))
+				.hasMessageContaining("must be positive");
+			assertThatThrownBy(() -> strategy
+				.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, Map.of("0", Double.NaN))))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("must be finite");
-			assertThatThrownBy(() -> strategy.aggregate(judgments, Map.of("0", Double.POSITIVE_INFINITY)))
-				.isInstanceOf(IllegalArgumentException.class)
+			assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.testing.TestBallots
+				.legacy(judgments, Map.of("0", Double.POSITIVE_INFINITY)))).isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("must be finite");
 		}
 
 		@Test
-		@DisplayName("CHANGED: a single zero weight is legal — it means the judge does not count")
-		void singleZeroWeightIsLegal() {
-			Judgment result = strategy.aggregate(
+		@DisplayName("V6: explicit seat weights must be positive")
+		void singleZeroWeightIsRefused() {
+			assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(
 					List.of(numeric(1.0, JudgmentStatus.PASS), numeric(0.0, JudgmentStatus.FAIL)),
-					Map.of("0", 1.0, "1", 0.0));
-
-			assertThat(result.score()).isCloseTo(1.0, within());
+					Map.of("0", 1.0, "1", 0.0))))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("positive");
 		}
 
 		@Test
 		@DisplayName("CHANGED: positive input weight but zero eligible weight yields ABSTAIN, not NaN")
-		void zeroEligibleWeightYieldsAbstain() {
-			// The only positively weighted judge abstains, leaving a zero-weight
-			// survivor.
-			Judgment result = strategy.aggregate(List.of(Judgment.abstain("n/a"), numeric(1.0, JudgmentStatus.PASS)),
-					Map.of("0", 1.0, "1", 0.0));
-
+		void noEligibleOpinionsYieldAbstain() {
+			var result = strategy.aggregate(io.github.markpollack.judge.testing.TestBallots
+				.legacy(List.of(Judgment.abstain("n/a"), Judgment.abstain("no opinion")), Map.of("0", 1.0, "1", 1.0)));
 			assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 			assertThat(result.score()).isNull();
 			assertThat(evidence(result)).containsEntry(AggregationEvidence.ELIGIBLE_WEIGHT, 0.0);
@@ -408,8 +412,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: unanimous pass yields PASS")
 		void unanimousPass() {
-			Judgment result = strategy.aggregate(List.of(booleanJudgment(true), numeric(0.9, JudgmentStatus.PASS)),
-					Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(booleanJudgment(true), numeric(0.9, JudgmentStatus.PASS))));
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		}
@@ -417,7 +421,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: unanimous failure yields FAIL")
 		void unanimousFailure() {
-			Judgment result = strategy.aggregate(List.of(booleanJudgment(false), booleanJudgment(false)), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(booleanJudgment(false), booleanJudgment(false))));
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 			assertThat(result.reasoning()).contains("Unanimous consensus");
@@ -426,9 +431,10 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: disagreement abstains (was FAIL, indistinguishable from unanimous failure)")
 		void disagreementAbstains() {
-			Judgment consensusOnFail = strategy.aggregate(List.of(booleanJudgment(false), booleanJudgment(false)),
-					Map.of());
-			Judgment noConsensus = strategy.aggregate(List.of(booleanJudgment(true), booleanJudgment(false)), Map.of());
+			Judgment consensusOnFail = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(booleanJudgment(false), booleanJudgment(false))));
+			Judgment noConsensus = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(booleanJudgment(true), booleanJudgment(false))));
 
 			// Was FAIL for both, leaving the difference only in the reasoning string.
 			assertThat(consensusOnFail.status()).isEqualTo(JudgmentStatus.FAIL);
@@ -440,8 +446,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: consensus reads the status (was reading the score and ignoring status)")
 		void readsStatus() {
-			Judgment result = strategy
-				.aggregate(List.of(statusOnly(JudgmentStatus.PASS), statusOnly(JudgmentStatus.PASS)), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(statusOnly(JudgmentStatus.PASS), statusOnly(JudgmentStatus.PASS))));
 
 			// Was FAIL: two PASS judgments with no score fell through toBoolean() to
 			// false.
@@ -451,17 +457,21 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: PASS + ABSTAIN passes — an abstention is not a vote")
 		void passPlusAbstainPasses() {
-			assertThat(strategy.aggregate(List.of(booleanJudgment(true), Judgment.abstain("n/a")), Map.of()).status())
-				.isEqualTo(JudgmentStatus.PASS);
 			assertThat(strategy
-				.aggregate(List.of(booleanJudgment(true), booleanJudgment(true), Judgment.abstain("n/a")), Map.of())
+				.aggregate(io.github.markpollack.judge.voting.Ballots
+					.of(List.of(booleanJudgment(true), Judgment.abstain("n/a"))))
+				.status()).isEqualTo(JudgmentStatus.PASS);
+			assertThat(strategy
+				.aggregate(io.github.markpollack.judge.voting.Ballots
+					.of(List.of(booleanJudgment(true), booleanJudgment(true), Judgment.abstain("n/a"))))
 				.status()).isEqualTo(JudgmentStatus.PASS);
 		}
 
 		@Test
 		@DisplayName("CHANGED: FAIL + ABSTAIN fails, and no longer reports false unanimity")
 		void failPlusAbstainFails() {
-			Judgment result = strategy.aggregate(List.of(booleanJudgment(false), Judgment.abstain("n/a")), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(booleanJudgment(false), Judgment.abstain("n/a"))));
 
 			// Was FAIL too, but reported "Unanimous consensus" over a manufactured fail
 			// vote.
@@ -472,7 +482,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: all-ABSTAIN is a no-result ABSTAIN")
 		void allAbstain() {
-			Judgment result = strategy.aggregate(List.of(Judgment.abstain("a"), Judgment.abstain("b")), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(Judgment.abstain("a"), Judgment.abstain("b"))));
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		}
@@ -480,8 +491,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("CHANGED: a labelled judgment is counted by its status (was a fail vote)")
 		void labelledCountedByStatus() {
-			Judgment result = strategy
-				.aggregate(List.of(labelled("excellent", JudgmentStatus.PASS), booleanJudgment(true)), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(labelled("excellent", JudgmentStatus.PASS), booleanJudgment(true))));
 
 			// Was FAIL / "No consensus": the categorical score fell through to false.
 			assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -498,8 +509,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: the majority status wins")
 		void majorityWins() {
-			Judgment result = strategy
-				.aggregate(List.of(booleanJudgment(true), booleanJudgment(true), booleanJudgment(false)), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(booleanJudgment(true), booleanJudgment(true), booleanJudgment(false))));
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		}
@@ -507,7 +518,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: ABSTAIN is excluded from the pass/fail counts")
 		void abstainExcluded() {
-			Judgment result = strategy.aggregate(List.of(booleanJudgment(true), Judgment.abstain("n/a")), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(booleanJudgment(true), Judgment.abstain("n/a"))));
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 			assertThat(result.reasoning()).contains("1 passed, 0 failed");
@@ -516,7 +528,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: all-ABSTAIN yields ABSTAIN")
 		void allAbstain() {
-			Judgment result = strategy.aggregate(List.of(Judgment.abstain("a"), Judgment.abstain("b")), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(Judgment.abstain("a"), Judgment.abstain("b"))));
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		}
@@ -525,9 +538,11 @@ class VotingStrategyCharacterizationTest {
 		@DisplayName("PRESERVED: TieBreakRule resolves an even split")
 		void tiePolicy() {
 			Judgment failOnTie = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL)
-				.aggregate(List.of(booleanJudgment(true), booleanJudgment(false)), Map.of());
+				.aggregate(io.github.markpollack.judge.voting.Ballots
+					.of(List.of(booleanJudgment(true), booleanJudgment(false))));
 			Judgment passOnTie = new MajorityVotingStrategy(TieBreakRule.PASS, ErrorHandling.TREAT_AS_FAIL)
-				.aggregate(List.of(booleanJudgment(true), booleanJudgment(false)), Map.of());
+				.aggregate(io.github.markpollack.judge.voting.Ballots
+					.of(List.of(booleanJudgment(true), booleanJudgment(false))));
 
 			assertThat(failOnTie.status()).isEqualTo(JudgmentStatus.FAIL);
 			assertThat(passOnTie.status()).isEqualTo(JudgmentStatus.PASS);
@@ -537,7 +552,8 @@ class VotingStrategyCharacterizationTest {
 		@DisplayName("PRESERVED: ErrorHandling.TREAT_AS_FAIL converts ERROR to a fail vote")
 		void errorTreatedAsFail() {
 			Judgment result = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL)
-				.aggregate(List.of(booleanJudgment(true), Judgment.error("boom"), Judgment.error("boom")), Map.of());
+				.aggregate(io.github.markpollack.judge.voting.Ballots
+					.of(List.of(booleanJudgment(true), Judgment.error("boom"), Judgment.error("boom"))));
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		}
@@ -546,7 +562,8 @@ class VotingStrategyCharacterizationTest {
 		@DisplayName("PRESERVED: ErrorHandling.IGNORE removes ERROR from the counts")
 		void errorIgnored() {
 			Judgment result = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.IGNORE)
-				.aggregate(List.of(booleanJudgment(true), Judgment.error("boom")), Map.of());
+				.aggregate(io.github.markpollack.judge.voting.Ballots
+					.of(List.of(booleanJudgment(true), Judgment.error("boom"))));
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		}
@@ -554,8 +571,8 @@ class VotingStrategyCharacterizationTest {
 		@Test
 		@DisplayName("PRESERVED: Majority reads status and ignores numeric score magnitude")
 		void numericScoresDoNotOverrideStatus() {
-			Judgment result = strategy
-				.aggregate(List.of(numeric(0.9, JudgmentStatus.FAIL), numeric(0.95, JudgmentStatus.FAIL)), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(numeric(0.9, JudgmentStatus.FAIL), numeric(0.95, JudgmentStatus.FAIL))));
 
 			assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		}
@@ -566,17 +583,21 @@ class VotingStrategyCharacterizationTest {
 			// The pre-migration BASELINE case: the default was demonstrably
 			// TREAT_AS_FAIL,
 			// but nothing recorded that as a choice. Both shapes below returned FAIL.
-			assertThat(strategy.aggregate(List.of(Judgment.error("boom"), Judgment.error("boom")), Map.of()).status())
-				.isEqualTo(JudgmentStatus.ERROR);
-			assertThat(strategy.aggregate(List.of(booleanJudgment(true), Judgment.error("boom")), Map.of()).status())
-				.isEqualTo(JudgmentStatus.ERROR);
+			assertThat(strategy
+				.aggregate(io.github.markpollack.judge.voting.Ballots
+					.of(List.of(Judgment.error("boom"), Judgment.error("boom"))))
+				.status()).isEqualTo(JudgmentStatus.ERROR);
+			assertThat(strategy
+				.aggregate(io.github.markpollack.judge.voting.Ballots
+					.of(List.of(booleanJudgment(true), Judgment.error("boom"))))
+				.status()).isEqualTo(JudgmentStatus.ERROR);
 		}
 
 		@Test
 		@DisplayName("CHANGED: numeric evidence is no longer discarded into a BooleanScore")
 		void carriesNoManufacturedScore() {
-			Judgment result = strategy
-				.aggregate(List.of(numeric(0.9, JudgmentStatus.PASS), numeric(0.95, JudgmentStatus.PASS)), Map.of());
+			Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+				.of(List.of(numeric(0.9, JudgmentStatus.PASS), numeric(0.95, JudgmentStatus.PASS))));
 
 			// Was a BooleanScore(true). A majority verdict's meaning is its outcome; the
 			// counts are evidence, not a quality score a threshold could act on.
@@ -597,10 +618,10 @@ class VotingStrategyCharacterizationTest {
 		void ignoreVersusTreatAsAbstain() {
 			List<Judgment> judgments = List.of(booleanJudgment(true), Judgment.error("boom"));
 
-			Judgment ignored = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.IGNORE).aggregate(judgments,
-					Map.of());
+			Judgment ignored = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.IGNORE)
+				.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 			Judgment abstained = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN)
-				.aggregate(judgments, Map.of());
+				.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 			// Same outcome — which is exactly why a status-only assertion cannot tell the
 			// two policies apart, and why the evidence block exists.
@@ -626,7 +647,7 @@ class VotingStrategyCharacterizationTest {
 					new AverageVotingStrategy(), new MedianVotingStrategy(), new WeightedAverageStrategy());
 
 			for (VotingStrategy strategy : strategies) {
-				Judgment result = strategy.aggregate(judgments, Map.of());
+				Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 				assertThat(result.status()).as("default policy for %s", strategy.getName())
 					.isEqualTo(JudgmentStatus.ERROR);
@@ -642,8 +663,10 @@ class VotingStrategyCharacterizationTest {
 			// weight included — rather than zeroing its contribution while still dividing
 			// by its weight. Consuming the weight would drag the mean toward zero, which
 			// is the silent negative vote the migration exists to remove.
-			Judgment result = new WeightedAverageStrategy(ErrorHandling.IGNORE).aggregate(
-					List.of(numeric(0.8, JudgmentStatus.PASS), Judgment.error("boom")), Map.of("0", 1.0, "1", 3.0));
+			Judgment result = new WeightedAverageStrategy(ErrorHandling.IGNORE)
+				.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(
+						List.of(numeric(0.8, JudgmentStatus.PASS), Judgment.error("boom")),
+						Map.of("0", 1.0, "1", 3.0)));
 
 			assertThat(result.score()).isCloseTo(0.8, within());
 			assertThat(evidence(result)).containsEntry(AggregationEvidence.INPUT_WEIGHT, 4.0)
@@ -656,10 +679,10 @@ class VotingStrategyCharacterizationTest {
 		void noResultReasoningNamesTheCause() {
 			List<Judgment> allErrored = List.of(Judgment.error("boom"), Judgment.error("boom"));
 
-			Judgment ignored = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.IGNORE).aggregate(allErrored,
-					Map.of());
+			Judgment ignored = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.IGNORE)
+				.aggregate(io.github.markpollack.judge.voting.Ballots.of(allErrored));
 			Judgment abstained = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_ABSTAIN)
-				.aggregate(allErrored, Map.of());
+				.aggregate(io.github.markpollack.judge.voting.Ballots.of(allErrored));
 
 			assertThat(ignored.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 			assertThat(ignored.reasoning()).contains("2 error(s) ignored");
@@ -675,7 +698,8 @@ class VotingStrategyCharacterizationTest {
 					new AverageVotingStrategy(), new MedianVotingStrategy(), new WeightedAverageStrategy());
 
 			for (VotingStrategy strategy : strategies) {
-				Map<String, Object> evidence = evidence(strategy.aggregate(judgments, Map.of()));
+				Map<String, Object> evidence = evidence(
+						strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments)));
 
 				assertThat(evidence).as("evidence for %s", strategy.getName())
 					.containsKeys(AggregationEvidence.STRATEGY, AggregationEvidence.ERROR_POLICY,
@@ -695,16 +719,20 @@ class VotingStrategyCharacterizationTest {
 		void statusCountingKeysAreStrategySpecific() {
 			List<Judgment> judgments = List.of(booleanJudgment(true), booleanJudgment(false));
 
-			assertThat(evidence(new MajorityVotingStrategy().aggregate(judgments, Map.of())))
+			assertThat(evidence(
+					new MajorityVotingStrategy().aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments))))
 				.containsKeys(AggregationEvidence.PASS_COUNT, AggregationEvidence.FAIL_COUNT);
-			assertThat(evidence(new ConsensusStrategy().aggregate(judgments, Map.of())))
+			assertThat(evidence(
+					new ConsensusStrategy().aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments))))
 				.containsKeys(AggregationEvidence.PASS_COUNT, AggregationEvidence.FAIL_COUNT);
 
 			// Numeric strategies count no votes; emitting zeros would read as real
 			// counts.
-			assertThat(evidence(new AverageVotingStrategy().aggregate(judgments, Map.of())))
+			assertThat(evidence(
+					new AverageVotingStrategy().aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments))))
 				.doesNotContainKeys(AggregationEvidence.PASS_COUNT, AggregationEvidence.FAIL_COUNT);
-			assertThat(evidence(new MedianVotingStrategy().aggregate(judgments, Map.of())))
+			assertThat(evidence(
+					new MedianVotingStrategy().aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments))))
 				.doesNotContainKeys(AggregationEvidence.PASS_COUNT, AggregationEvidence.FAIL_COUNT);
 		}
 

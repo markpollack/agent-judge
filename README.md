@@ -141,7 +141,7 @@ flowchart LR
   V --> A[Read-only assertions and reports]
 ```
 
-Current retained results use [schema V5](portable-results-v5.md) and descriptions use V3. `NativeRequirementCodecs.codec()` reconstructs RFC2119/EARS requirements, shared invocation ownership and rejected originals. Current codecs refuse typed V2/V3/V4; archival V4 reading uses the pinned baseline and its original semantics. Frozen artifacts retain their original meaning.
+Current retained results use [schema V6](portable-results-v6.md) and descriptions use V3. `NativeRequirementCodecs.codec()` reconstructs RFC2119/EARS requirements, shared invocation ownership and rejected originals. Current codecs refuse typed V2/V3/V4/V5; archival V4 reading uses the pinned baseline and its original semantics. Frozen artifacts retain their original meaning.
 
 ## Build and modules
 
@@ -150,6 +150,7 @@ Run `./mvnw clean verify` with Java 21. Dependencies use matching `0.18.0-SNAPSH
 | Module | Responsibility |
 |---|---|
 | `agent-judge-core` | Pure Requirements, construction, composition, retained results, policy and reporting |
+| `agent-judge-json-jackson2` | Explicit Jackson 2 converters, strict V6 storage and archival diagnostics |
 | `agent-judge-assertions` / `agent-judge-assertj` | Read-only retained assertions / staged live execution |
 | `agent-judge-ai-core` | Native RFC2119/EARS, generated protocols and capture contracts |
 | `agent-judge-jev` | Typed Jev execution and original measurement fidelity |

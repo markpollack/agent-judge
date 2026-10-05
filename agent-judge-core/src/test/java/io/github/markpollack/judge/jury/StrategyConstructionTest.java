@@ -4,7 +4,8 @@
  */
 
 package io.github.markpollack.judge.jury;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.AverageVotingStrategy;
 import io.github.markpollack.judge.voting.ConjunctiveStrategy;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
@@ -57,7 +58,8 @@ class StrategyConstructionTest {
 	@TestFactory
 	Stream<DynamicTest> everyConstructorTakingAnErrorHandlingRefusesNullNamingTheParameter() {
 		Map<String, ThrowingCallable> constructors = new LinkedHashMap<>();
-		constructors.put("AllMustPassStrategy(ErrorHandling)", () -> new AllMustPassStrategy((ErrorHandling) null));
+		constructors.put("AllEligiblePassStrategy(ErrorHandling)",
+				() -> new AllEligiblePassStrategy((ErrorHandling) null));
 		constructors.put("AverageVotingStrategy(ErrorHandling)", () -> new AverageVotingStrategy((ErrorHandling) null));
 		constructors.put("AverageVotingStrategy(double, ErrorHandling)", () -> new AverageVotingStrategy(0.5, null));
 		constructors.put("ConjunctiveStrategy(double, ErrorHandling)", () -> new ConjunctiveStrategy(0.5, null));
@@ -105,7 +107,7 @@ class StrategyConstructionTest {
 
 	@Test
 	void noArgumentConstructorsDeclareNonNullDefaultPolicies() {
-		List<VotingStrategy> defaults = List.of(new AllMustPassStrategy(), new AverageVotingStrategy(),
+		List<VotingStrategy> defaults = List.of(new AllEligiblePassStrategy(), new AverageVotingStrategy(),
 				new ConsensusStrategy(), new MajorityVotingStrategy(), new MedianVotingStrategy(),
 				new WeightedAverageStrategy(), new AverageVotingStrategy(0.7), new MedianVotingStrategy(0.7),
 				new WeightedAverageStrategy(0.7), new ConjunctiveStrategy(0.7));
@@ -114,7 +116,8 @@ class StrategyConstructionTest {
 			StrategyDescription description = strategy.describe();
 			assertThat(description.errorHandling()).as(strategy.getName()).isEqualTo(ErrorHandling.PROPAGATE);
 			assertThat(portableValues(description)).as(strategy.getName()).containsEntry("errorPolicy", "propagate");
-			assertThatCode(() -> strategy.aggregate(ALL_PASS, Map.of())).as(strategy.getName())
+			assertThatCode(() -> strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(ALL_PASS)))
+				.as(strategy.getName())
 				.doesNotThrowAnyException();
 		}
 		assertThat(new MajorityVotingStrategy().describe().parameters()).containsEntry("tiePolicy", "FAIL");
@@ -125,7 +128,7 @@ class StrategyConstructionTest {
 		List<DynamicTest> tests = new ArrayList<>();
 		for (ErrorHandling errorPolicy : ErrorHandling.values()) {
 			Map<String, Function<ErrorHandling, VotingStrategy>> constructors = new LinkedHashMap<>();
-			constructors.put("AllMustPassStrategy(ErrorHandling)", AllMustPassStrategy::new);
+			constructors.put("AllEligiblePassStrategy(ErrorHandling)", AllEligiblePassStrategy::new);
 			constructors.put("AverageVotingStrategy(ErrorHandling)", AverageVotingStrategy::new);
 			constructors.put("AverageVotingStrategy(double, ErrorHandling)", p -> new AverageVotingStrategy(0.6, p));
 			constructors.put("ConjunctiveStrategy(double, ErrorHandling)", p -> new ConjunctiveStrategy(0.6, p));
@@ -143,7 +146,8 @@ class StrategyConstructionTest {
 				.forEach((name, constructor) -> tests.add(DynamicTest.dynamicTest(name + " with " + errorPolicy, () -> {
 					VotingStrategy strategy = constructor.apply(errorPolicy);
 					assertThat(strategy.describe().errorHandling()).isEqualTo(errorPolicy);
-					assertThatCode(() -> strategy.aggregate(ALL_PASS, Map.of())).doesNotThrowAnyException();
+					assertThatCode(() -> strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(ALL_PASS)))
+						.doesNotThrowAnyException();
 				})));
 		}
 		return tests.stream();

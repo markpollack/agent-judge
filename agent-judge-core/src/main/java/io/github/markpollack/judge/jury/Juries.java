@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.VotingStrategy;
 
 import io.github.markpollack.judge.Judge;
@@ -35,13 +36,22 @@ import java.util.Map;
  * @see MetaJury
  */
 public final class Juries {
-	/** Execute a single producer with honest local seat accounting.
-	 * @param judge configured producer
-	 * @return complete retained result */
-	public static io.github.markpollack.judge.verdict.Verdict evaluate(io.github.markpollack.judge.Judge judge) {
-		return SimpleJury.builder().judge(judge).parallel(false).votingStrategy(new io.github.markpollack.judge.voting.AllMustPassStrategy(io.github.markpollack.judge.voting.ErrorHandling.PROPAGATE, io.github.markpollack.judge.voting.ExclusionHandling.EXCLUDE)).build().vote();
-	}
 
+	/**
+	 * Execute a single producer with honest local seat accounting.
+	 * @param judge configured producer
+	 * @return complete retained result
+	 */
+	public static io.github.markpollack.judge.verdict.Verdict evaluate(io.github.markpollack.judge.Judge judge) {
+		return SimpleJury.builder()
+			.judge(judge)
+			.parallel(false)
+			.votingStrategy(new io.github.markpollack.judge.voting.AllEligiblePassStrategy(
+					io.github.markpollack.judge.voting.ErrorHandling.PROPAGATE,
+					io.github.markpollack.judge.voting.ExclusionHandling.EXCLUDE))
+			.build()
+			.vote();
+	}
 
 	private Juries() {
 		// Utility class - no instantiation
@@ -107,41 +117,6 @@ public final class Juries {
 	}
 
 	/**
-	 * Combine two juries into a meta-jury.
-	 * @param first the first jury
-	 * @param second the second jury
-	 * @param metaStrategy the voting strategy for aggregating jury verdicts
-	 * @return a meta-jury combining both juries
-	 * @deprecated use {@link #meta(VotingStrategy, NamedJury...)} with explicit names
-	 */
-	@Deprecated(since = "0.14.0")
-	public static VotingJury combine(Jury first, Jury second, VotingStrategy metaStrategy) {
-		if (first == null || second == null) {
-			throw new IllegalArgumentException("Both juries must be non-null");
-		}
-		return meta(metaStrategy, new NamedJury("member-1", first), new NamedJury("member-2", second));
-	}
-
-	/**
-	 * Create a meta-jury from multiple juries.
-	 * @param strategy the voting strategy for aggregating jury verdicts
-	 * @param juries the juries to combine
-	 * @return a meta-jury combining all juries
-	 * @deprecated use {@link #meta(VotingStrategy, NamedJury...)} with explicit names
-	 */
-	@Deprecated(since = "0.14.0")
-	public static VotingJury allOf(VotingStrategy strategy, Jury... juries) {
-		if (juries == null || juries.length == 0) {
-			throw new IllegalArgumentException("At least one jury is required");
-		}
-		List<NamedJury> members = new java.util.ArrayList<>();
-		for (int index = 0; index < juries.length; index++) {
-			members.add(new NamedJury("member-" + (index + 1), juries[index]));
-		}
-		return new MetaJury(members, strategy);
-	}
-
-	/**
 	 * Create a meta-jury from explicitly named members.
 	 * @param strategy strategy that aggregates successful member aggregates
 	 * @param members named members in execution order
@@ -151,7 +126,7 @@ public final class Juries {
 		if (members == null || members.length == 0) {
 			throw new IllegalArgumentException("At least one named jury is required");
 		}
-		return new MetaJury(List.of(members), strategy);
+		return new MetaJury(java.util.Arrays.asList(members), strategy);
 	}
 
 }

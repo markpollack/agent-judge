@@ -82,6 +82,12 @@ import org.jspecify.annotations.Nullable;
  */
 public enum JudgmentReasonCode {
 
+	/**
+	 * A completed domain return was refused at its configured boundary, with original
+	 * retained.
+	 */
+	RETURNED_RESULT_REJECTED("returned_result_rejected", Family.INSTRUMENT, OriginFamily.MACHINERY),
+
 	/** Application acceptance-policy machinery failed. */
 	POLICY_FAILED("policy_failed", Family.INSTRUMENT, OriginFamily.MACHINERY),
 

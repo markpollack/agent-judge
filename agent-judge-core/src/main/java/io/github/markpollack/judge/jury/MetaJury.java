@@ -4,13 +4,14 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.CompositeFailure;
 import io.github.markpollack.judge.verdict.CompositeFailureCode;
 import io.github.markpollack.judge.verdict.CompositeLimitExceededException;
 import io.github.markpollack.judge.verdict.CompositeRelation;
 import io.github.markpollack.judge.verdict.DispositionReason;
-import io.github.markpollack.judge.verdict.Participation;
+import io.github.markpollack.judge.voting.Participation;
 import io.github.markpollack.judge.verdict.Seat;
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.verdict.VerdictProvenance;
@@ -26,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 
 import java.lang.System.Logger;
-
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.description.JuryDescription;
@@ -119,6 +119,7 @@ class MetaJury implements VotingJury {
 				described.add(new MemberDescription(member.name(), member.jury().describe()));
 			}
 			catch (IllegalArgumentException ex) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 				throw new IllegalArgumentException("member '" + member.name() + "': " + ex.getMessage(), ex);
 			}
 		}
@@ -147,8 +148,10 @@ class MetaJury implements VotingJury {
 				throw ex;
 			}
 			catch (Exception ex) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 				SimpleJury.preserveCancellation(ex);
-				logger.log(System.Logger.Level.WARNING, "Member {0} did not produce a verdict ({1}); recording a stage failure", member.name(),
+				logger.log(System.Logger.Level.WARNING,
+						"Member {0} did not produce a verdict ({1}); recording a stage failure", member.name(),
 						ex.getClass().getName(), ex);
 				attempts.add(CompositeAttempt.executionFailed(member.name(), CompositeRelation.META_MEMBER, null,
 						new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED, ex)));
@@ -161,6 +164,7 @@ class MetaJury implements VotingJury {
 				verdict.conclusion();
 			}
 			catch (IllegalArgumentException ex) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 				attempts.add(CompositeAttempt.stageFailed(member.name(), CompositeRelation.META_MEMBER, null,
 						DispositionReason.INVALID_TIER_RESULT, verdict));
 				anyStageFailed = true;
@@ -202,7 +206,7 @@ class MetaJury implements VotingJury {
 					"One or more jury members did not produce a usable determination, so this jury reduced nothing."
 							+ NotApplicableGuard.refusedExclusionNote(attempts, "Member"));
 			seats.replaceAll(seat -> seat.treated(Participation.NOT_REDUCED));
-			return Verdict.builder()
+			return Verdict.advancedBuilder()
 				.declaredCardinality(members.size())
 				.judgment(aggregate)
 				.individual(successful)
@@ -214,13 +218,14 @@ class MetaJury implements VotingJury {
 		}
 
 		boolean identity = members.size() == 1;
-		var reduction = identity ? new AggregationBoundary.Reduction(successful.get(0), null)
-				: aggregateWithinBoundary(successful);
+		var reduction = identity ? new AggregationBoundary.Reduction(successful.get(0), null) : AggregationBoundary
+			.aggregate(metaStrategy, ballots(seats, successful), aggregateMayBeNotApplicable(), logger);
 		Judgment aggregate = reduction.judgment();
 		for (int i = 0; i < seats.size(); i++)
 			seats.set(i, seats.get(i).treated(Participation.forJudgment(successful.get(i), aggregate, identity)));
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.reductionFailure(reduction.failure())
+			.rule(reduction.rule())
 			.declaredCardinality(members.size())
 			.judgment(aggregate)
 			.individual(successful)
@@ -239,8 +244,11 @@ class MetaJury implements VotingJury {
 	 * @param successful the aggregates of the members that were used
 	 * @return the strategy's aggregate, or the contained error that replaces it
 	 */
-	private AggregationBoundary.Reduction aggregateWithinBoundary(List<Judgment> successful) {
-		return AggregationBoundary.aggregate(metaStrategy, successful, Map.of(), aggregateMayBeNotApplicable(), logger);
+	private static List<io.github.markpollack.judge.voting.Ballot> ballots(List<Seat> seats, List<Judgment> originals) {
+		var result = new ArrayList<io.github.markpollack.judge.voting.Ballot>();
+		for (int i = 0; i < seats.size(); i++)
+			result.add(seats.get(i).ballot(originals.get(i)));
+		return List.copyOf(result);
 	}
 
 }

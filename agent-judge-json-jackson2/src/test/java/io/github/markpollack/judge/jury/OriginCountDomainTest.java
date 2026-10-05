@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.voting;
+
 import io.github.markpollack.judge.jury.*;
 import io.github.markpollack.judge.verdict.*;
 import io.github.markpollack.judge.voting.*;
@@ -62,7 +63,8 @@ class OriginCountDomainTest {
 	 */
 	private static final long HALF_OVER = 5000000000000000L;
 
-	private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+	private static final ObjectMapper MAPPER = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder().request("count origins").build();
 
@@ -102,7 +104,8 @@ class OriginCountDomainTest {
 		@Test
 		@DisplayName("survives a canonical reduction unchanged")
 		void survivesACanonicalReduction() {
-			Judgment aggregate = new AllMustPassStrategy().aggregate(List.of(wrapper(BEYOND_INT)), Map.of());
+			Judgment aggregate = new AllEligiblePassStrategy()
+				.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(wrapper(BEYOND_INT))));
 
 			assertThat(aggregate.reasonCode()).isEqualTo(JudgmentReasonCode.ERRORS_PROPAGATED);
 			assertThat(originOf(aggregate)).containsEntry("judge_reported", BEYOND_INT);
@@ -115,15 +118,16 @@ class OriginCountDomainTest {
 
 			assertThat(originOf(fromWire)).containsEntry("judge_reported", BEYOND_INT);
 
-			Judgment aggregate = new AllMustPassStrategy().aggregate(List.of(fromWire), Map.of());
+			Judgment aggregate = new AllEligiblePassStrategy()
+				.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(fromWire)));
 			assertThat(originOf(aggregate)).containsEntry("judge_reported", BEYOND_INT);
 		}
 
 		@Test
 		@DisplayName("is carried, not narrowed, when two wrappers merge")
 		void mergesWithoutNarrowing() {
-			Judgment aggregate = new AllMustPassStrategy().aggregate(List.of(wrapper(BEYOND_INT), wrapper(3L)),
-					Map.of());
+			Judgment aggregate = new AllEligiblePassStrategy()
+				.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(wrapper(BEYOND_INT), wrapper(3L))));
 
 			assertThat(originOf(aggregate)).containsEntry("judge_reported", BEYOND_INT + 3L);
 		}
@@ -131,7 +135,8 @@ class OriginCountDomainTest {
 		@Test
 		@DisplayName("is honoured at the top of the portable range")
 		void isHonouredAtTheTopOfTheRange() {
-			Judgment aggregate = new AllMustPassStrategy().aggregate(List.of(wrapper(MAX_PORTABLE)), Map.of());
+			Judgment aggregate = new AllEligiblePassStrategy()
+				.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(wrapper(MAX_PORTABLE))));
 
 			assertThat(originOf(aggregate)).containsEntry("judge_reported", MAX_PORTABLE);
 		}
@@ -147,7 +152,8 @@ class OriginCountDomainTest {
 		void failsLoudlyRatherThanWrapping() {
 			List<Judgment> inputs = List.of(wrapper(HALF_OVER), wrapper(HALF_OVER));
 
-			assertThatThrownBy(() -> new AllMustPassStrategy().aggregate(inputs, Map.of()))
+			assertThatThrownBy(() -> new AllEligiblePassStrategy()
+				.aggregate(io.github.markpollack.judge.voting.Ballots.of(inputs)))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("judge_reported")
 				.hasMessageContaining(String.valueOf(MAX_PORTABLE));
@@ -160,7 +166,7 @@ class OriginCountDomainTest {
 				.judge(Judges.named(() -> Judgment.pass("all good"), "healthy"))
 				.judge(Judges.named(() -> wrapper(HALF_OVER), "first"))
 				.judge(Judges.named(() -> wrapper(HALF_OVER), "second"))
-				.votingStrategy(new AllMustPassStrategy())
+				.votingStrategy(new AllEligiblePassStrategy())
 				.build()
 				.vote();
 

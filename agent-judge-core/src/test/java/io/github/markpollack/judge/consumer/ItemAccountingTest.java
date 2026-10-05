@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
@@ -214,7 +214,7 @@ class ItemAccountingTest {
 		static Jury of(Judgment judgment) {
 			return io.github.markpollack.judge.jury.SimpleJury.builder()
 				.judge(Judges.named(() -> judgment, "leaf"))
-				.votingStrategy(new AllMustPassStrategy())
+				.votingStrategy(new AllEligiblePassStrategy())
 				.build();
 		}
 
@@ -226,7 +226,8 @@ class ItemAccountingTest {
 			.<CompletionEvidence>builder()
 			.votingStrategy(new VotingStrategy() {
 				@Override
-				public Judgment aggregate(List<Judgment> input, java.util.Map<String, Double> weights) {
+				public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+					var input = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 					throw new IllegalStateException("the reduction broke");
 				}
 

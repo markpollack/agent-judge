@@ -3,6 +3,7 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.serialization.diagnostics;
+
 import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.Seat;
@@ -28,7 +29,8 @@ final class ModernReader {
 	private ModernReader() {
 	}
 
-	private static final ObjectMapper MAPPER = JsonMapper.builder().addModule(io.github.markpollack.judge.serialization.ResultJson.module())
+	private static final ObjectMapper MAPPER = JsonMapper.builder()
+		.addModule(io.github.markpollack.judge.serialization.ResultJson.module())
 		.disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
 		.disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
 		.enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
@@ -36,7 +38,6 @@ final class ModernReader {
 		.build();
 
 	static Verdict read(Map<String, Object> stored) {
-		bounded(stored, new IdentityHashMap<>(), 0, new int[] { 0 });
 		return new io.github.markpollack.judge.serialization.VerdictCodec().read(stored);
 	}
 
@@ -45,6 +46,7 @@ final class ModernReader {
 			return inspect(read(stored));
 		}
 		catch (IllegalArgumentException ex) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 			int version = stored.get("schemaVersion") instanceof Number n ? n.intValue() : -1;
 			var root = new Stage(null, List.of(), null, null, null, null, null, null, null, null, null, null,
 					List.of());
@@ -56,7 +58,7 @@ final class ModernReader {
 	}
 
 	static StoredReading inspect(Verdict verdict) {
-		Verdict.Conclusion conclusion = verdict.conclusion();
+		Verdict.Conclusion conclusion = verdict.requireUsable().conclusion();
 		ModernReader reader = new ModernReader();
 		Stage root = reader.stage(verdict, null, List.of(), null);
 		reader.attempts(verdict, List.of(), "verdict");
@@ -120,29 +122,6 @@ final class ModernReader {
 				if (check instanceof Map<?, ?> c && c.containsKey("judgment"))
 					return true;
 		return false;
-	}
-
-	private static void bounded(@Nullable Object value, IdentityHashMap<Object, Boolean> active, int depth,
-			int[] count) {
-		if (++count[0] > 100000 || depth > 128)
-			throw new IllegalArgumentException("Result exceeds portable traversal bounds");
-		if (value instanceof Map<?, ?> map) {
-			if (active.put(map, Boolean.TRUE) != null)
-				throw new IllegalArgumentException("Cyclic result");
-			for (var entry : map.entrySet()) {
-				if (!(entry.getKey() instanceof String))
-					throw new IllegalArgumentException("Non-string object key");
-				bounded(entry.getValue(), active, depth + 1, count);
-			}
-			active.remove(map);
-		}
-		else if (value instanceof List<?> list) {
-			if (active.put(list, Boolean.TRUE) != null)
-				throw new IllegalArgumentException("Cyclic result");
-			for (Object element : list)
-				bounded(element, active, depth + 1, count);
-			active.remove(list);
-		}
 	}
 
 	private Stage stage(Verdict verdict, @Nullable String name, List<String> path, @Nullable CompositeAttempt attempt) {

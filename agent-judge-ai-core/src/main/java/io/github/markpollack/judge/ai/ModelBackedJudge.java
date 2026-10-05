@@ -145,6 +145,7 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata, ConfiguredJ
 			throw cancelled;
 		}
 		catch (RuntimeException failure) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
 			if (Thread.currentThread().isInterrupted())
 				throw new java.util.concurrent.CancellationException("Classification interrupted");
 			result = Judgment.error("Answer classification failed: " + failure.getClass().getName() + ": "
@@ -168,9 +169,9 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata, ConfiguredJ
 	 * classifier's implementation ({@value #JUDGMENT_CLASSIFIER_KEY}).
 	 * </p>
 	 * <p>
-	 * There is no model key. A {@link EvalModel} does not state which model it will
-	 * call, and an adapter such as a chat client may choose at call time, so any value
-	 * here would be a guess. The model a call actually used is reported afterwards, in
+	 * There is no model key. A {@link EvalModel} does not state which model it will call,
+	 * and an adapter such as a chat client may choose at call time, so any value here
+	 * would be a guess. The model a call actually used is reported afterwards, in
 	 * {@link EvalModelResponse#model()}.
 	 * </p>
 	 * @return the declared configuration, in declaration order

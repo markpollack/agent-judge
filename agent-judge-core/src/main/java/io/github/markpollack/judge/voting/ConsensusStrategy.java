@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.voting;
+
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.verdict.RoutingRule;
 
@@ -144,7 +145,8 @@ public class ConsensusStrategy implements VotingStrategy {
 	}
 
 	@Override
-	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
+	public Judgment aggregate(List<Ballot> ballots) {
+		List<Judgment> judgments = Ballots.judgments(ballots);
 		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
 				this.notApplicablePolicy);
 

@@ -4,6 +4,8 @@
  */
 
 package io.github.markpollack.judge.assertj;
+
+import io.github.markpollack.judge.policy.PolicyAttribution;
 import io.github.markpollack.judge.jury.JuryEvidenceStep;
 import io.github.markpollack.judge.jury.JuryRecipe;
 import io.github.markpollack.judge.verdict.Verdict;
@@ -148,6 +150,8 @@ public final class Assertions {
 
 		private final @Nullable Policy policy;
 
+		private final @Nullable PolicyAttribution attribution;
+
 		private @Nullable EvaluationResult result;
 
 		private boolean attempted;
@@ -157,6 +161,12 @@ public final class Assertions {
 		private @Nullable Error fatal;
 
 		private LiveStage(Supplier<EvaluationResult> execution, @Nullable Policy policy) {
+			this(execution, policy, null);
+		}
+
+		private LiveStage(Supplier<EvaluationResult> execution, @Nullable Policy policy,
+				@Nullable PolicyAttribution attribution) {
+			this.attribution = attribution;
 			this.execution = execution;
 			this.policy = policy;
 		}
@@ -170,6 +180,17 @@ public final class Assertions {
 		public synchronized LiveStage withPolicy(Policy policy) {
 			requireUnexecuted();
 			return new LiveStage(execution, Objects.requireNonNull(policy));
+		}
+
+		/**
+		 * Select caller policy identity/configuration before execution.
+		 * @param policy independent functional policy
+		 * @param attribution immutable complete caller attribution
+		 * @return attributed live branch
+		 */
+		public synchronized LiveStage withPolicy(Policy policy, PolicyAttribution attribution) {
+			requireUnexecuted();
+			return new LiveStage(execution, Objects.requireNonNull(policy), Objects.requireNonNull(attribution));
 		}
 
 		final void requireUnexecuted() {
@@ -187,7 +208,7 @@ public final class Assertions {
 				attempted = true;
 				try {
 					EvaluationResult completed = Objects.requireNonNull(execution.get());
-					result = policy == null ? completed : Evaluations.apply(completed.verdict(), policy);
+					result = policy == null ? completed : Evaluations.apply(completed.verdict(), policy, attribution);
 				}
 				catch (RuntimeException problem) {
 					failure = problem;
@@ -225,6 +246,19 @@ public final class Assertions {
 			this.execution = execution;
 		}
 
+		private SatisfactionStage(Supplier<EvaluationResult> execution, @Nullable Policy policy,
+				PolicyAttribution attribution) {
+			super(execution, policy, attribution);
+			this.execution = execution;
+		}
+
+		@Override
+		public synchronized SatisfactionStage withPolicy(Policy policy, PolicyAttribution attribution) {
+			requireUnexecuted();
+			return new SatisfactionStage(execution, Objects.requireNonNull(policy),
+					Objects.requireNonNull(attribution));
+		}
+
 		@Override
 		public synchronized SatisfactionStage withPolicy(Policy policy) {
 			requireUnexecuted();
@@ -260,6 +294,7 @@ public final class Assertions {
 		 */
 		public VerdictAssert hasConclusion(Verdict.Conclusion expected) {
 			isNotNull();
+			actual.requireUsable();
 			if (actual.conclusion() != expected)
 				failWithMessage("Expected conclusion <%s> but was <%s>", expected, actual.conclusion());
 			return this;

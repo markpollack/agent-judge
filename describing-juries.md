@@ -68,8 +68,9 @@ For the jury above:
               "configuration": {"declared": false}}}]}
 ```
 
-A seat's `position` is the key of `Verdict.weights()`. Its `verdictKey` is the key of
-`Verdict.individualByName()`. The seat is where the two join.
+A seat's `position` identifies its configured slot in `Verdict.individual()`. Its
+`verdictKey` joins `Verdict.individualByName()`. The optional `Seat.declaredWeight()`
+is retained on that same seat: absent means effective weight 1.0, without claiming an explicit declaration.
 
 ## What the markers mean
 

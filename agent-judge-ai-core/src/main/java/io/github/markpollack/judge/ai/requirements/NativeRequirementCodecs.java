@@ -18,7 +18,7 @@ public final class NativeRequirementCodecs {
 
 	/**
 	 * Registers text/AllOf plus the pure RFC2119/EARS implementations.
-	 * @return strict V5 retained-result codec
+	 * @return strict V6 retained-result codec
 	 */
 	public static VerdictCodec codec() {
 		return VerdictCodec.withSpecifications(specifications());

@@ -4,8 +4,9 @@
  */
 
 package io.github.markpollack.judge.assertj;
+
 import io.github.markpollack.judge.construction.NonEmptyJudge;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -72,7 +73,7 @@ public class ConfiguredBasicsTest {
 		Jury panel = VotingJury.builder()
 			.judge("security", securityJudge)
 			.judge("compatibility", compatibilityJudge)
-			.votingStrategy(new AllMustPassStrategy())
+			.votingStrategy(new AllEligiblePassStrategy())
 			.parallel(false)
 			.build();
 		AtomicInteger policyCalls = new AtomicInteger();

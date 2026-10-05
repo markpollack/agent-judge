@@ -4,8 +4,9 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.AggregationEvidence;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
 
@@ -20,34 +21,36 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for {@link AllMustPassStrategy}.
+ * Tests for {@link AllEligiblePassStrategy}.
  *
  * @author Mark Pollack
  * @since 0.16.0
  */
-class AllMustPassStrategyTest {
+class AllEligiblePassStrategyTest {
 
-	private final AllMustPassStrategy strategy = new AllMustPassStrategy();
+	private final AllEligiblePassStrategy strategy = new AllEligiblePassStrategy();
 
 	@Test
 	void mixedPassAndFailIsARejection_whereConsensusAbstains() {
 		List<Judgment> mixed = List.of(Judgment.pass("build succeeded"), Judgment.fail("coverage dropped"));
 
 		// The distinction that justifies this class existing.
-		assertThat(new ConsensusStrategy().aggregate(mixed, Map.of()).status())
+		assertThat(new ConsensusStrategy().aggregate(io.github.markpollack.judge.voting.Ballots.of(mixed)).status())
 			.as("consensus reports disagreement and leaves rejection to a gate")
 			.isEqualTo(JudgmentStatus.ABSTAIN);
-		assertThat(strategy.aggregate(mixed, Map.of()).status())
+		assertThat(strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(mixed)).status())
 			.as("a definition of done has no notion of its requirements disagreeing")
 			.isEqualTo(JudgmentStatus.FAIL);
 	}
 
 	@Test
 	void everyApplicableRequirementMustPass() {
-		assertThat(strategy.aggregate(List.of(Judgment.pass("a"), Judgment.pass("b")), Map.of()).status())
-			.isEqualTo(JudgmentStatus.PASS);
-		assertThat(strategy.aggregate(List.of(Judgment.fail("a"), Judgment.fail("b")), Map.of()).status())
-			.isEqualTo(JudgmentStatus.FAIL);
+		assertThat(strategy
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(Judgment.pass("a"), Judgment.pass("b"))))
+			.status()).isEqualTo(JudgmentStatus.PASS);
+		assertThat(strategy
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(Judgment.fail("a"), Judgment.fail("b"))))
+			.status()).isEqualTo(JudgmentStatus.FAIL);
 	}
 
 	@Test
@@ -55,8 +58,8 @@ class AllMustPassStrategyTest {
 		// allMatch over an empty stream is true; a gate that lost its requirements must
 		// not
 		// report that everything is done.
-		Judgment result = strategy
-			.aggregate(List.of(Judgment.abstain("not applicable"), Judgment.abstain("not applicable")), Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(Judgment.abstain("not applicable"), Judgment.abstain("not applicable"))));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.status()).isNotEqualTo(JudgmentStatus.PASS);
@@ -66,7 +69,8 @@ class AllMustPassStrategyTest {
 	@Test
 	void carriesNoScore_becauseTheJudgesCarriedNone() {
 		// The whole point: a Boolean gate must not be judgment through effectiveScore().
-		Judgment result = strategy.aggregate(List.of(Judgment.pass("a"), Judgment.pass("b")), Map.of());
+		Judgment result = strategy
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(Judgment.pass("a"), Judgment.pass("b"))));
 
 		assertThat(result.score()).isNull();
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -74,8 +78,8 @@ class AllMustPassStrategyTest {
 
 	@Test
 	void abstainingJudgesLeaveThePopulation() {
-		Judgment result = strategy
-			.aggregate(List.of(Judgment.pass("applies"), Judgment.abstain("no security files changed")), Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(Judgment.pass("applies"), Judgment.abstain("no security files changed"))));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(aggregation(result)).containsEntry(AggregationEvidence.ELIGIBLE_COUNT, 1)
@@ -88,17 +92,20 @@ class AllMustPassStrategyTest {
 	void aRequirementThatCouldNotBeEvaluatedDoesNotQuietlyPass() {
 		List<Judgment> withError = List.of(Judgment.pass("build succeeded"), Judgment.error("judge model unavailable"));
 
-		assertThat(strategy.aggregate(withError, Map.of()).status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(new AllMustPassStrategy(ErrorHandling.TREAT_AS_FAIL).aggregate(withError, Map.of()).status())
-			.isEqualTo(JudgmentStatus.FAIL);
-		assertThat(new AllMustPassStrategy(ErrorHandling.IGNORE).aggregate(withError, Map.of()).status())
-			.isEqualTo(JudgmentStatus.PASS);
+		assertThat(strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(withError)).status())
+			.isEqualTo(JudgmentStatus.ERROR);
+		assertThat(new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_FAIL)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(withError))
+			.status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(new AllEligiblePassStrategy(ErrorHandling.IGNORE)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(withError))
+			.status()).isEqualTo(JudgmentStatus.PASS);
 	}
 
 	@Test
 	void reasoningCountsTheFailuresAgainstTheApplicableTotal() {
-		Judgment result = strategy.aggregate(
-				List.of(Judgment.pass("a"), Judgment.fail("b"), Judgment.fail("c"), Judgment.abstain("n/a")), Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(Judgment.pass("a"), Judgment.fail("b"), Judgment.fail("c"), Judgment.abstain("n/a"))));
 
 		assertThat(result.reasoning()).isEqualTo("2 of 3 applicable requirement(s) failed");
 		assertThat(aggregation(result)).containsEntry(AggregationEvidence.STRATEGY, "allMustPass");

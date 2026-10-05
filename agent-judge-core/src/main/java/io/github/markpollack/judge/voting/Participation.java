@@ -2,7 +2,7 @@
  * Copyright (c) 2024-2026 Mark Pollack
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
-package io.github.markpollack.judge.verdict;
+package io.github.markpollack.judge.voting;
 
 /** How the parent used a seat's unchanged producer judgment. */
 public enum Participation {
@@ -28,12 +28,13 @@ public enum Participation {
 	/** The parent performed no reduction, including a propagated error. */
 	NOT_REDUCED;
 
- /** Derive ordinary participation from a returned judgment.
-  * @param input original opinion
-  * @param aggregate reduced result
-  * @param identity whether this is unreduced identity composition
-  * @return eligible, abstained, excluded or error treatment
-  */
+	/**
+	 * Derive ordinary participation from a returned judgment.
+	 * @param input original opinion
+	 * @param aggregate reduced result
+	 * @param identity whether this is unreduced identity composition
+	 * @return eligible, abstained, excluded or error treatment
+	 */
 	public static Participation forJudgment(io.github.markpollack.judge.judgment.Judgment input,
 			io.github.markpollack.judge.judgment.Judgment aggregate, boolean identity) {
 		if (identity)

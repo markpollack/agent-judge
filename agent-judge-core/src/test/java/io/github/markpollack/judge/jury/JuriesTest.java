@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
@@ -120,12 +121,13 @@ class JuriesTest {
 	// ==================== combine() Tests ====================
 
 	@Test
-	void combineShouldCreateMetaJury() {
+	void namedMetaShouldCreateMetaJury() {
 		Jury jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"), alwaysPass("J2"));
 
 		Jury jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysFail("J3"), alwaysFail("J4"));
 
-		Jury metaJury = Juries.combine(jury1, jury2, new MajorityVotingStrategy());
+		Jury metaJury = Juries.meta(new MajorityVotingStrategy(), new NamedJury("member-1", jury1),
+				new NamedJury("member-2", jury2));
 
 		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote();
@@ -136,27 +138,28 @@ class JuriesTest {
 	}
 
 	@Test
-	void combineShouldRequireNonNullJuries() {
+	void namedMetaShouldRequireNonNullJuries() {
 		Jury jury = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"));
 
-		assertThatThrownBy(() -> Juries.combine(null, jury, new MajorityVotingStrategy()))
+		assertThatThrownBy(() -> Juries.meta(new MajorityVotingStrategy(), null, new NamedJury("member-2", jury)))
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("Both juries must be non-null");
+			.hasMessageContaining("Named jury must not be null");
 
-		assertThatThrownBy(() -> Juries.combine(jury, null, new MajorityVotingStrategy()))
+		assertThatThrownBy(() -> Juries.meta(new MajorityVotingStrategy(), new NamedJury("member-1", jury), null))
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("Both juries must be non-null");
+			.hasMessageContaining("Named jury must not be null");
 	}
 
 	// ==================== allOf() Tests ====================
 
 	@Test
-	void allOfShouldCreateMetaJuryFromMultiple() {
+	void namedPopulationShouldCreateMetaJuryFromMultiple() {
 		Jury jury1 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J1"));
 		Jury jury2 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J2"));
 		Jury jury3 = Juries.fromJudges(new MajorityVotingStrategy(), alwaysPass("J3"));
 
-		Jury metaJury = Juries.allOf(new ConsensusStrategy(), jury1, jury2, jury3);
+		Jury metaJury = Juries.meta(new ConsensusStrategy(), new NamedJury("member-1", jury1),
+				new NamedJury("member-2", jury2), new NamedJury("member-3", jury3));
 
 		CompletionEvidence context = simpleContext("Test goal");
 		Verdict verdict = metaJury.vote();
@@ -168,14 +171,14 @@ class JuriesTest {
 	}
 
 	@Test
-	void allOfShouldRequireAtLeastOneJury() {
-		assertThatThrownBy(() -> Juries.allOf(new ConsensusStrategy())).isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("At least one jury is required");
+	void namedPopulationShouldRequireAtLeastOneJury() {
+		assertThatThrownBy(() -> Juries.meta(new ConsensusStrategy())).isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("At least one named jury is required");
 	}
 
 	@Test
-	void allOfShouldRejectNullJuries() {
-		assertThatThrownBy(() -> Juries.allOf(new ConsensusStrategy(), (Jury[]) null))
+	void namedPopulationShouldRejectNullJuries() {
+		assertThatThrownBy(() -> Juries.meta(new ConsensusStrategy(), (NamedJury[]) null))
 			.isInstanceOf(IllegalArgumentException.class);
 	}
 
@@ -194,7 +197,8 @@ class JuriesTest {
 				alwaysPass("Correctness2"));
 
 		// Combine into meta-jury
-		Jury metaJury = Juries.allOf(new MajorityVotingStrategy(), fileJury, buildJury, correctnessJury);
+		Jury metaJury = Juries.meta(new MajorityVotingStrategy(), new NamedJury("member-1", fileJury),
+				new NamedJury("member-2", buildJury), new NamedJury("member-3", correctnessJury));
 
 		CompletionEvidence context = simpleContext("Complex evaluation");
 		Verdict verdict = metaJury.vote();

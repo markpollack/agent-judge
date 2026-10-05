@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.AggregationEvidence;
 import io.github.markpollack.judge.voting.AverageVotingStrategy;
 
@@ -32,7 +33,7 @@ class AverageVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(passJudgment(0.8), passJudgment(0.7), passJudgment(0.6));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		double score = result.score();
@@ -52,7 +53,7 @@ class AverageVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(failJudgment(0.3), failJudgment(0.2), failJudgment(0.1));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		double score = result.score();
@@ -75,7 +76,7 @@ class AverageVotingStrategyTest {
 				booleanPass("Judge 3") // 1.0
 		);
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// (1.0 + 0.0 + 1.0) / 3 = 0.67 > 0.5 → PASS
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -92,7 +93,7 @@ class AverageVotingStrategyTest {
 				booleanFail("Judge 3") // 0.0
 		);
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// (1.0 + 0.6 + 0.0) / 3 = 0.53 > 0.5 → PASS
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -109,7 +110,7 @@ class AverageVotingStrategyTest {
 				booleanFail("Judge 2") // 0.0
 		);
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// (1.0 + 0.0) / 2 = 0.5 >= 0.5 → PASS
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -123,7 +124,7 @@ class AverageVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(passJudgment(0.8), Judgment.abstain("Cannot evaluate"), passJudgment(0.6));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// DELTA-1: the abstention leaves numerator AND denominator, so the mean is over
 		// the two judges that actually assessed: (0.8 + 0.6) / 2 = 0.70.
@@ -144,7 +145,8 @@ class AverageVotingStrategyTest {
 		// Weights are ignored in AverageVotingStrategy
 		Map<String, Double> weights = Map.of("Judge1", 2.0, "Judge2", 1.0);
 
-		Judgment result = strategy.aggregate(judgments, weights);
+		Judgment result = strategy
+			.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, weights));
 
 		// Simple average: (0.8 + 0.6) / 2 = 0.7 (weights ignored)
 		double score = result.score();
@@ -157,7 +159,8 @@ class AverageVotingStrategyTest {
 	void emptyJudgmentListShouldThrowException() {
 		AverageVotingStrategy strategy = new AverageVotingStrategy();
 
-		assertThatThrownBy(() -> strategy.aggregate(List.of(), Map.of())).isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of())))
+			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("empty");
 	}
 
@@ -165,14 +168,15 @@ class AverageVotingStrategyTest {
 	void nullJudgmentListShouldThrowException() {
 		AverageVotingStrategy strategy = new AverageVotingStrategy();
 
-		assertThatThrownBy(() -> strategy.aggregate(null, Map.of())).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(null)))
+			.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
 	void singleJudgmentShouldReturnItsScore() {
 		AverageVotingStrategy strategy = new AverageVotingStrategy();
 
-		Judgment result = strategy.aggregate(List.of(passJudgment(0.8)), Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(passJudgment(0.8))));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		double score = result.score();
@@ -185,7 +189,7 @@ class AverageVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(failJudgment(0.0), failJudgment(0.0));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		double score = result.score();
@@ -198,7 +202,7 @@ class AverageVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(passJudgment(1.0), passJudgment(1.0));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		double score = result.score();
@@ -214,7 +218,8 @@ class AverageVotingStrategyTest {
 		// DELTA-3: names are stable lower-camel-case tokens, so the identifier used in
 		// diagnostics is the same one recorded in the aggregation evidence.
 		assertThat(strategy.getName()).isEqualTo("average");
-		assertThat(evidence(strategy.aggregate(List.of(passJudgment(0.8)), Map.of())))
+		assertThat(
+				evidence(strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(passJudgment(0.8))))))
 			.containsEntry(AggregationEvidence.STRATEGY, "average");
 	}
 

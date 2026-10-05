@@ -101,8 +101,7 @@ public interface EvalModel
 	 * @return original answer and portable invocation observations
 	 */
 	@Override
-	default io.github.markpollack.judge.execution.NativeExecution<EvalModelResponse> execute(
-			EvalModelRequest request) {
+	default io.github.markpollack.judge.execution.NativeExecution<EvalModelResponse> execute(EvalModelRequest request) {
 		validateRequest(request);
 		if (Thread.currentThread().isInterrupted())
 			throw new java.util.concurrent.CancellationException("Native execution interrupted before invocation");
@@ -115,15 +114,18 @@ public interface EvalModel
 			throw ex;
 		}
 		catch (RuntimeException ex) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 			if (Thread.currentThread().isInterrupted())
 				throw new java.util.concurrent.CancellationException("Native execution interrupted");
 			answer = EvalModelResponse.noAnswer(ex);
 		}
-		if(Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("Native execution interrupted after return");
+		if (Thread.currentThread().isInterrupted())
+			throw new java.util.concurrent.CancellationException("Native execution interrupted after return");
 		java.util.Map<String, Object> facts = new java.util.LinkedHashMap<>(answer.metadata());
-		if(answer.hasAnswer()) facts.put("text", answer.text());
-		facts.put("answerState",answer.answerState().name());
-		facts.put("options",request.options().toPortable());
+		if (answer.hasAnswer())
+			facts.put("text", answer.text());
+		facts.put("answerState", answer.answerState().name());
+		facts.put("options", request.options().toPortable());
 		facts.put("messages",
 				request.messages()
 					.stream()

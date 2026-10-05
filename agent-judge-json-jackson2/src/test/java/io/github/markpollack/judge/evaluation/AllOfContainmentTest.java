@@ -3,6 +3,7 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.evaluation;
+
 import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.CompositeRelation;
@@ -37,9 +38,8 @@ class AllOfContainmentTest {
 		var parent = new GeneralRequirement<>("parent", "1", "A and B", new AllOf(List.of(a, b)), a.source());
 		var answer = Judgment.fail("Rejected apparent violation").forRequirement(wrongAssociation ? alien : b);
 		var leaf = Verdict.single("original", answer);
-		var rejected = new Verdict(leaf.judgment(), leaf.individual(), leaf.individualByName(), leaf.weights(),
-				leaf.seats(), leaf.provenance(), leaf.compositeAttempts(), wrongAssociation ? 1 : 2,
-				wrongAssociation ? alien : b);
+		var rejected = new Verdict(leaf.judgment(), leaf.individual(), leaf.individualByName(), leaf.seats(),
+				leaf.provenance(), leaf.compositeAttempts(), wrongAssociation ? 1 : 2, wrongAssociation ? alien : b);
 		var calls = new AtomicInteger();
 		var accepted = Verdict
 			.single("A", failingSibling ? Judgment.fail("Established violation") : Judgment.pass("A holds"))
@@ -82,7 +82,7 @@ class AllOfContainmentTest {
 		var b = Requirement.text("B", "1", "B");
 		var parent = new GeneralRequirement<>("parent", "1", "B required", new AllOf(List.of(b)), b.source());
 		var valid = Verdict.single("B", Judgment.pass("B holds")).forRequirement(b);
-		var forged = Verdict.builder()
+		var forged = Verdict.advancedBuilder()
 			.requirement(parent)
 			.judgment(Judgment.abstain("fabricated refusal"))
 			.declaredCardinality(1)

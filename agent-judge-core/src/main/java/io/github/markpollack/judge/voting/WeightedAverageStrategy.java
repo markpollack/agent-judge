@@ -187,11 +187,12 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	}
 
 	@Override
-	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
+	public Judgment aggregate(List<Ballot> ballots) {
+		List<Judgment> judgments = Ballots.judgments(ballots);
 		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
 				this.notApplicablePolicy);
 
-		double[] resolved = resolveWeights(population.inputCount(), weights);
+		double[] resolved = resolveWeights(ballots);
 		double inputWeight = 0.0;
 		for (double weight : resolved) {
 			inputWeight += weight;
@@ -286,21 +287,8 @@ public class WeightedAverageStrategy implements VotingStrategy {
 		return Double.isInfinite(total) ? Double.MAX_VALUE : total;
 	}
 
-	private static double[] resolveWeights(int count, Map<String, Double> weights) {
-		double[] resolved = new double[count];
-		for (int i = 0; i < count; i++) {
-			double weight = (weights == null) ? 1.0 : weights.getOrDefault(String.valueOf(i), 1.0);
-			if (!Double.isFinite(weight)) {
-				throw new IllegalArgumentException(
-						String.format("Weight for judge %d must be finite, but was %s", i, weight));
-			}
-			if (weight < 0.0) {
-				throw new IllegalArgumentException(
-						String.format("Weight for judge %d must not be negative, but was %s", i, weight));
-			}
-			resolved[i] = weight;
-		}
-		return resolved;
+	private static double[] resolveWeights(List<Ballot> ballots) {
+		return ballots.stream().mapToDouble(Ballot::effectiveWeight).toArray();
 	}
 
 	@Override

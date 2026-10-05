@@ -3,16 +3,17 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.evaluation;
+
 import io.github.markpollack.judge.jury.JuryRecipe;
 import io.github.markpollack.judge.verdict.CompositeFailureCode;
 import io.github.markpollack.judge.verdict.DispositionReason;
-import io.github.markpollack.judge.verdict.Participation;
+import io.github.markpollack.judge.voting.Participation;
 import io.github.markpollack.judge.verdict.RoutingRule;
 import io.github.markpollack.judge.verdict.Seat;
 import io.github.markpollack.judge.verdict.SeatExecution;
 import io.github.markpollack.judge.verdict.Verdict;
 
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.voting.ExclusionHandling;
@@ -78,7 +79,7 @@ class CompositionFactsTest {
 			var verdict = SimpleJury.<String>builder()
 				.judge(() -> Judgment.abstain("unknown"))
 				.seat(JudgeSeat.named("conditional", conditional).notApplicableWhen("No applicable sources"))
-				.votingStrategy(new AllMustPassStrategy(ErrorHandling.PROPAGATE, rule))
+				.votingStrategy(new AllEligiblePassStrategy(ErrorHandling.PROPAGATE, rule))
 				.build()
 				.vote();
 			assertThat(verdict.individual().get(1)).isSameAs(exclusion);
@@ -102,7 +103,8 @@ class CompositionFactsTest {
 		assertThat(required.seats().getFirst().cause()).isSameAs(failure);
 		assertThat(required.seats().getFirst().execution()).isEqualTo(SeatExecution.CONTAINED_FAILURE);
 		var strategy = new VotingStrategy() {
-			public Judgment aggregate(List<Judgment> inputs, Map<String, Double> weights) {
+			public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+				var inputs = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 				throw failure;
 			}
 

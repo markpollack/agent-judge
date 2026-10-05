@@ -11,7 +11,7 @@ import java.util.Map;
 import io.github.markpollack.judge.ai.model.EvalModel;
 import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import java.nio.file.Path;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.Test;
@@ -70,8 +70,8 @@ class FixedRosterAggregationTests {
 		// roster
 		// is lost with the abstention, and nothing downstream can tell that it ever
 		// existed.
-		Judgment judgment = new AllMustPassStrategy()
-			.aggregate(List.of(almostEverythingEstablished(), somethingElseThatPassed()), Map.of());
+		Judgment judgment = new AllEligiblePassStrategy().aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(almostEverythingEstablished(), somethingElseThatPassed())));
 
 		assertThat(judgment.status())
 			.as("the abstention is removed from the eligible population, and the roster is lost with it")
@@ -83,7 +83,8 @@ class FixedRosterAggregationTests {
 		// The strategy's own empty-population rule still holds, so the absorption above
 		// needs a
 		// second passing judge to appear. That is the shape to watch for.
-		Judgment judgment = new AllMustPassStrategy().aggregate(List.of(almostEverythingEstablished()), Map.of());
+		Judgment judgment = new AllEligiblePassStrategy()
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(almostEverythingEstablished())));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 	}
@@ -93,8 +94,8 @@ class FixedRosterAggregationTests {
 		// The divergence is only about abstention. A requirement the implementation
 		// demonstrably
 		// does not satisfy binds either way.
-		Judgment judgment = new AllMustPassStrategy()
-			.aggregate(List.of(oneRequirementViolated(), somethingElseThatPassed()), Map.of());
+		Judgment judgment = new AllEligiblePassStrategy().aggregate(io.github.markpollack.judge.voting.Ballots
+			.of(List.of(oneRequirementViolated(), somethingElseThatPassed())));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.FAIL);
 	}

@@ -183,7 +183,7 @@ public final class AggregationEvidence {
 	 * @param evidence the replacement evidence block
 	 * @return the aggregate carrying that evidence
 	 */
-	static Judgment attach(Judgment judgment, Map<String, Object> evidence) {
+	public static Judgment attach(Judgment judgment, Map<String, Object> evidence) {
 		Map<String, Object> block = new LinkedHashMap<>(evidence);
 		if (!block.containsKey(Judgment.ERROR_CODE_COUNTS_KEY)
 				&& judgment.metadata().get(Judgment.AGGREGATION_KEY) instanceof Map<?, ?> existing) {
@@ -202,24 +202,42 @@ public final class AggregationEvidence {
 	/**
 	 * Accumulates evidence entries and produces an immutable map.
 	 */
-	static final class Builder {
+	public static final class Builder {
 
 		private final Map<String, Object> entries = new LinkedHashMap<>();
 
 		private Builder() {
 		}
 
-		Builder put(String key, int value) {
+		/**
+		 * Add one portable evidence entry.
+		 * @param key evidence key
+		 * @param value observed value
+		 * @return this builder
+		 */
+		public Builder put(String key, int value) {
 			this.entries.put(key, value);
 			return this;
 		}
 
-		Builder put(String key, double value) {
+		/**
+		 * Add one portable evidence entry.
+		 * @param key evidence key
+		 * @param value observed value
+		 * @return this builder
+		 */
+		public Builder put(String key, double value) {
 			this.entries.put(key, value);
 			return this;
 		}
 
-		Builder put(String key, String value) {
+		/**
+		 * Add one portable evidence entry.
+		 * @param key evidence key
+		 * @param value observed value
+		 * @return this builder
+		 */
+		public Builder put(String key, String value) {
 			this.entries.put(key, value);
 			return this;
 		}
@@ -235,12 +253,16 @@ public final class AggregationEvidence {
 		 * @param value the block, copied in encounter order
 		 * @return this builder
 		 */
-		Builder put(String key, Map<String, Object> value) {
+		public Builder put(String key, Map<String, Object> value) {
 			this.entries.put(key, new LinkedHashMap<>(value));
 			return this;
 		}
 
-		Map<String, Object> build() {
+		/**
+		 * Freeze the evidence in encounter order.
+		 * @return immutable portable evidence block
+		 */
+		public Map<String, Object> build() {
 			// Declared order, not hash order: the block is read by humans as often as by
 			// machines, and Judgment construction freezes it either way.
 			return Collections.unmodifiableMap(new LinkedHashMap<>(this.entries));

@@ -71,16 +71,19 @@ public abstract class LLMJudge<E> implements JudgeWithMetadata {
 		this.runtime = chatClientBuilder != null ? new SpringAiEvalModel(chatClientBuilder) : null;
 	}
 
- /** Configure the portable generated protocol, with fresh evidence acquisition.
-  * @param runtime generated runtime
-  * @param evidence fresh evidence
-  * @param name producer name
-  * @param description producer description */
- protected LLMJudge(io.github.markpollack.judge.ai.model.EvalModel runtime,
-   java.util.function.Supplier<? extends E> evidence,String name,String description) {
-  this.runtime=java.util.Objects.requireNonNull(runtime); this.evidence=java.util.Objects.requireNonNull(evidence);
-  this.metadata=new JudgeMetadata(name,description,JudgeType.LLM_POWERED);
- }
+	/**
+	 * Configure the portable generated protocol, with fresh evidence acquisition.
+	 * @param runtime generated runtime
+	 * @param evidence fresh evidence
+	 * @param name producer name
+	 * @param description producer description
+	 */
+	protected LLMJudge(io.github.markpollack.judge.ai.model.EvalModel runtime,
+			java.util.function.Supplier<? extends E> evidence, String name, String description) {
+		this.runtime = java.util.Objects.requireNonNull(runtime);
+		this.evidence = java.util.Objects.requireNonNull(evidence);
+		this.metadata = new JudgeMetadata(name, description, JudgeType.LLM_POWERED);
+	}
 
 	/**
 	 * Build the prompt to send to the LLM.
@@ -127,17 +130,18 @@ public abstract class LLMJudge<E> implements JudgeWithMetadata {
 	 */
 	protected Judgment evaluate(E context) {
 		String prompt = buildPrompt(context);
-		var result = java.util.Objects.requireNonNull(runtime,"generated runtime")
+		var result = java.util.Objects.requireNonNull(runtime, "generated runtime")
 			.execute(io.github.markpollack.judge.ai.model.EvalModelRequest.user(prompt));
 		Judgment judgment;
 		try {
-			judgment = result.answer().completed() ? parseResponse(result.answer().text(), context)
-					: Judgment.error(result.answer().hasAnswer() ? result.answer().text() : "Native execution returned no answer");
+			judgment = result.answer().completed() ? parseResponse(result.answer().text(), context) : Judgment
+				.error(result.answer().hasAnswer() ? result.answer().text() : "Native execution returned no answer");
 		}
 		catch (java.util.concurrent.CancellationException cancelled) {
 			throw cancelled;
 		}
 		catch (RuntimeException failure) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
 			if (Thread.currentThread().isInterrupted())
 				throw new java.util.concurrent.CancellationException("Native decoding interrupted");
 			judgment = Judgment.error("Native decoding failed: " + failure.getClass().getName() + ": "

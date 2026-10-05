@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.AggregationEvidence;
 import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.voting.WeightedAverageStrategy;
@@ -195,12 +196,23 @@ class WeightedAverageBitIdentityTest {
 	}
 
 	@Test
-	void representativeInputsThatAggregatedBeforeTheFixAreBitIdentical() {
+	void acceptedInputsMatchArchivedArithmeticAndZeroDeclarationsAreRefused() {
 		List<Case> cases = cases();
 		assertThat(cases).hasSize(27);
 		assertSoftly(softly -> {
 			for (Case c : cases) {
-				String actual = fingerprint(inRootLocale(() -> c.strategy().aggregate(c.judgments(), c.weights())));
+				if (c.weights() != null && c.weights().values().stream().anyMatch(w -> w == 0.0)) {
+					softly
+						.assertThatThrownBy(
+								() -> c.strategy()
+									.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(c.judgments(),
+											c.weights())))
+						.as(c.name())
+						.isInstanceOf(IllegalArgumentException.class);
+					continue;
+				}
+				String actual = fingerprint(inRootLocale(() -> c.strategy()
+					.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(c.judgments(), c.weights()))));
 				softly.assertThat(actual).as(c.name()).isEqualTo(c.expected());
 			}
 		});
@@ -222,6 +234,8 @@ class WeightedAverageBitIdentityTest {
 					weights.put(String.valueOf(i), randomWeight(random));
 				}
 			}
+			if (weights.values().stream().anyMatch(w -> w == 0.0))
+				continue;
 			Reference expected = Reference.of(judgments, weights);
 			if (expected == null) {
 				// A zero or overflowing total threw before the fix; it is not a working
@@ -231,7 +245,8 @@ class WeightedAverageBitIdentityTest {
 			if (expected.inputWeight() > 1e307) {
 				nearOverflow++;
 			}
-			Judgment actual = strategy.aggregate(judgments, weights);
+			Judgment actual = strategy
+				.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, weights));
 			Map<String, Object> evidence = evidence(actual);
 
 			String context = "judgments=" + judgments + " weights=" + weights;

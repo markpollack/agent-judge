@@ -571,7 +571,7 @@ not the same thing, and conflating them is the trap.** `[OURS]`
 |---|---|---|
 | Criteria are | Boolean requirements | graded dimensions with real scores |
 | The rule | **conjunction over `status`** — every applicable requirement `PASS` — with advisory criteria reported but not gating | **criticals each clear their own bar, and the remainder average above a bar** |
-| In this library | `AllMustPassStrategy` | `ConjunctiveStrategy` over the criticals, composed with a compensatory jury over the rest |
+| In this library | `AllEligiblePassStrategy` | `ConjunctiveStrategy` over the criticals, composed with a compensatory jury over the rest |
 
 > ⛔ **Do not aggregate a Boolean gate through a numeric threshold.** A requirement judge stores a
 > status and no score; reaching it through `effectiveScore()` derives `1.0`/`0.0` and compares that
@@ -589,7 +589,7 @@ criteria only.
 
 Hybrid scoring is documented practice in the same measurement literature both rules come from.
 `[CORPUS]` No framework we read at source ships it as configuration, so today you express it by
-**composing two juries**, combined with `Juries.combine` or a `CascadedJury` tier. Composition is
+**composing two juries**, combined with explicitly named `Juries.meta` members or a `CascadedJury` tier. Composition is
 arguably the better API: it makes the two rules separate visible objects rather than hiding them in
 one strategy's configuration.
 
@@ -639,7 +639,7 @@ That test is three lines and it is the direct regression guard for defect 5.
 |---|---|---|
 | `ConsensusStrategy` | statuses | Every applicable judge must agree. Mixed applicable PASS/FAIL yields `ABSTAIN` — a reported disagreement, not a silent negative |
 | `MajorityVotingStrategy` | statuses | Judges are noisy samples of one question; ties resolve by `TieBreakRule` |
-| `AllMustPassStrategy` | statuses | Every applicable judge must `PASS`, and a mixed jury is a **rejection** — the gate `ConsensusStrategy` deliberately leaves to you. Carries no score, because its judges carry none |
+| `AllEligiblePassStrategy` | statuses | Every applicable judge must `PASS`, and a mixed jury is a **rejection** — the gate `ConsensusStrategy` deliberately leaves to you. Carries no score, because its judges carry none |
 | `ConjunctiveStrategy` | `effectiveScore()` | Every applicable judge must clear a bar. Non-compensatory: the minimum decides, and the evidence names the judgment that bound it. The threshold is required, not defaulted |
 | `AverageVotingStrategy` / `MedianVotingStrategy` | `effectiveScore()` | The judges measure one quantity and you want its central tendency. Median if you expect outliers |
 | `WeightedAverageStrategy` | `effectiveScore()` | As above, with judges of unequal authority — read §6.2 first |
@@ -699,12 +699,10 @@ In practice:
 
 - Building a jury through `SimpleJury.builder().judge(judge, weight)` binds judge and weight at one
   call site, so moving that line moves its weight with it. The builder path is safer than it looks.
-- The hazard is a weight map assembled anywhere else, and it is real in the serialized result:
-  **`Verdict.weights()` is keyed by position while `Verdict.individualByName()` is keyed by name.**
-  A consumer reading a stored verdict cannot join them, so it cannot say which judge carried which
-  weight. To join them, describe the jury before it votes and store that description beside the
-  verdict. Each seat in `jury.describe()` pairs a position, a verdict key and a weight; see
-  [Describing a jury before it votes](describing-juries.md).
+- Typed `Ballot` inputs bind position, label, complete original, separate treatment and weight.
+  `Seat.declaredWeight()` is the single retained weight owner. An absent declaration has effective
+  weight 1.0; explicit weights must be finite and positive. Unweighted rules retain and ignore them.
+  Duplicate labels do not identify seats; seating the same producer twice executes it twice.
 - **Persist the judge name yourself** into whatever run record you keep. Do not rely on ordinal
   position surviving a configuration change.
 

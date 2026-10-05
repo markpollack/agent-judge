@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.AggregationEvidence;
 import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.voting.MajorityVotingStrategy;
@@ -35,7 +36,7 @@ class MajorityVotingStrategyTest {
 		List<Judgment> judgments = List.of(booleanPass("Judge 1 passed"), booleanPass("Judge 2 passed"),
 				booleanFail("Judge 3 failed"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(result.reasoning()).contains("2 passed");
@@ -48,7 +49,7 @@ class MajorityVotingStrategyTest {
 		List<Judgment> judgments = List.of(booleanPass("Judge 1 passed"), booleanFail("Judge 2 failed"),
 				booleanFail("Judge 3 failed"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(result.reasoning()).contains("2 failed");
@@ -62,7 +63,7 @@ class MajorityVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), booleanFail("Judge 2"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 		assertThat(result.reasoning()).contains("tie");
@@ -74,7 +75,7 @@ class MajorityVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), booleanFail("Judge 2"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(result.reasoning()).contains("tie");
@@ -86,7 +87,7 @@ class MajorityVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), booleanFail("Judge 2"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.reasoning()).contains("tie");
@@ -100,7 +101,7 @@ class MajorityVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(Judgment.error("Error 1"), Judgment.error("Error 2"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(result.reasoning()).contains("Majority vote");
@@ -113,7 +114,7 @@ class MajorityVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(Judgment.error("Error 1"), Judgment.error("Error 2"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// DELTA-3: TREAT_AS_ABSTAIN converts the errors into non-votes, and the reasoning
 		// says so — distinguishing it from IGNORE, which reaches the same ABSTAIN status.
@@ -129,7 +130,7 @@ class MajorityVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(Judgment.error("Error 1"), Judgment.error("Error 2"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// DELTA-3: IGNORE removes the errors from the population entirely. Same ABSTAIN
 		// status as TREAT_AS_ABSTAIN above, but different accounting — which is the whole
@@ -147,7 +148,7 @@ class MajorityVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), Judgment.error("Error"), booleanPass("Judge 3"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// 2 passes + 1 error-as-fail = 2 pass vs 1 fail
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -162,7 +163,7 @@ class MajorityVotingStrategyTest {
 		List<Judgment> judgments = List.of(Judgment.abstain("Cannot evaluate 1"),
 				Judgment.abstain("Cannot evaluate 2"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// A judge's own abstention is reported separately from an error converted into
 		// one.
@@ -178,7 +179,7 @@ class MajorityVotingStrategyTest {
 
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), Judgment.abstain("Judge 2"), booleanFail("Judge 3"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// 1 pass, 1 fail, 1 abstain → tie between pass/fail
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL); // TieBreakRule.FAIL
@@ -193,7 +194,7 @@ class MajorityVotingStrategyTest {
 		List<Judgment> judgments = List.of(booleanPass("Judge 1"), booleanFail("Judge 2"), Judgment.abstain("Judge 3"),
 				Judgment.error("Judge 4"));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// 1 pass, 1 fail, 1 abstain (not counted), 1 error (ignored) = 1 pass vs 1
 		// fail → tie
@@ -206,7 +207,8 @@ class MajorityVotingStrategyTest {
 	void emptyJudgmentListShouldThrowException() {
 		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL);
 
-		assertThatThrownBy(() -> strategy.aggregate(List.of(), Map.of())).isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of())))
+			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("empty");
 	}
 
@@ -214,7 +216,8 @@ class MajorityVotingStrategyTest {
 	void singleJudgmentShouldUseItsStatus() {
 		MajorityVotingStrategy strategy = new MajorityVotingStrategy(TieBreakRule.FAIL, ErrorHandling.TREAT_AS_FAIL);
 
-		Judgment result = strategy.aggregate(List.of(booleanPass("Only judge")), Map.of());
+		Judgment result = strategy
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(booleanPass("Only judge"))));
 
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
 	}

@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.CompositeFailure;
 import io.github.markpollack.judge.verdict.CompositeFailureCode;
@@ -16,14 +17,12 @@ import io.github.markpollack.judge.verdict.VerdictProvenance;
 import io.github.markpollack.judge.verdict.VerdictProvenanceBasis;
 import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
 
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import java.lang.System.Logger;
-
 
 import io.github.markpollack.judge.description.CascadedJuryDescription;
 import io.github.markpollack.judge.description.JuryDescription;
@@ -104,6 +103,7 @@ public class CascadedJury implements Jury {
 				described.add(new TierDescription(tier.name(), tier.routingRule(), tier.jury().describe()));
 			}
 			catch (IllegalArgumentException ex) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 				throw new IllegalArgumentException("tier '" + tier.name() + "': " + ex.getMessage(), ex);
 			}
 		}
@@ -145,9 +145,11 @@ public class CascadedJury implements Jury {
 				throw ex;
 			}
 			catch (Exception ex) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 				SimpleJury.preserveCancellation(ex);
-				logger.log(System.Logger.Level.WARNING, "Tier {0} did not produce a verdict ({1}); continuing according to cascade policy",
-						tier.name(), ex.getClass().getName(), ex);
+				logger.log(System.Logger.Level.WARNING,
+						"Tier {0} did not produce a verdict ({1}); continuing according to cascade policy", tier.name(),
+						ex.getClass().getName(), ex);
 				attempts.add(CompositeAttempt.executionFailed(tier.name(), CompositeRelation.CASCADE_TIER,
 						tier.routingRule(), new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED, ex)));
 				if (tier.routingRule() == RoutingRule.FINAL_TIER) {
@@ -161,6 +163,7 @@ public class CascadedJury implements Jury {
 				tierVerdict.conclusion();
 			}
 			catch (IllegalArgumentException ex) {
+				io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 				attempts.add(CompositeAttempt.stageFailed(tier.name(), CompositeRelation.CASCADE_TIER,
 						tier.routingRule(), DispositionReason.INVALID_TIER_RESULT, tierVerdict));
 				if (tier.routingRule() == RoutingRule.FINAL_TIER)
@@ -210,11 +213,11 @@ public class CascadedJury implements Jury {
 	}
 
 	private Verdict tierOutcome(String name, Verdict stoppingVerdict, List<CompositeAttempt> attempts) {
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(stoppingVerdict.judgment())
 			.individual(stoppingVerdict.individual())
 			.individualByName(stoppingVerdict.individualByName())
-			.weights(stoppingVerdict.weights())
+			.rule(stoppingVerdict.rule())
 			.seats(stoppingVerdict.seats())
 			.declaredCardinality(stoppingVerdict.declaredCardinality())
 			.provenance(VerdictProvenance.tier(name, VerdictProvenanceBasis.TIER_OUTCOME))
@@ -243,11 +246,11 @@ public class CascadedJury implements Jury {
 						+ "' returned NOT_APPLICABLE without declaring that its aggregate may be excluded, so its "
 						+ "reduction is a stage failure; the cascade stopped because a genuine individual FAIL in "
 						+ "that tier established the rejection.");
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(root)
 			.individual(tierVerdict.individual())
 			.individualByName(tierVerdict.individualByName())
-			.weights(tierVerdict.weights())
+			.rule(tierVerdict.rule())
 			.seats(tierVerdict.seats())
 			.declaredCardinality(tierVerdict.declaredCardinality())
 			.provenance(VerdictProvenance.tier(tier.name(), VerdictProvenanceBasis.INDIVIDUAL_REJECTION))
@@ -269,7 +272,7 @@ public class CascadedJury implements Jury {
 	 * @return the undecided verdict
 	 */
 	private Verdict noTierDecided(List<CompositeAttempt> attempts, String reasoning) {
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(Judgment.error(JudgmentReasonCode.NO_TIER_DECIDED,
 					reasoning + NotApplicableGuard.refusedExclusionNote(attempts, "Tier")))
 			.provenance(VerdictProvenance.undecided())

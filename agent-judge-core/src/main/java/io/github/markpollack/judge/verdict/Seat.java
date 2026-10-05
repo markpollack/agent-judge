@@ -5,13 +5,14 @@
 
 package io.github.markpollack.judge.verdict;
 
+import io.github.markpollack.judge.voting.Participation;
+
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import io.github.markpollack.judge.judgment.Judgment;
 
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 
 /**
  * One judgment's place in a verdict: where it sat, what key it is stored under, and where
@@ -36,7 +37,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * </p>
  *
  * @param position the seat's zero-based configured position, which indexes
- * {@link Verdict#individual()} and keys {@link Verdict#weights()}
+ * {@link Verdict#individual()}
  * @param verdictKey the key this judgment is stored under in
  * {@link Verdict#individualByName()}
  * @param execution recorded invocation outcome
@@ -48,14 +49,51 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @since 0.17.0
  * @param notApplicableWhen local configured exclusion permission, or null
  * @param rejection separate ERROR treatment of the retained original, or null
+ * @param declaredWeight optional positive finite seat weight; absent means 1.0
  */
 @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({ "position", "verdictKey", "keySource", "execution", "participation" })
-public record Seat(
-		@JsonProperty(required = true)  int position,
-		String verdictKey, KeySource keySource, SeatExecution execution, Participation participation,
+public record Seat(@JsonProperty(required = true) int position, String verdictKey, KeySource keySource,
+		SeatExecution execution, Participation participation,
 		@com.fasterxml.jackson.annotation.JsonIgnore @org.jspecify.annotations.Nullable Throwable cause,
-		@Nullable String notApplicableWhen, @Nullable Judgment rejection) {
+		@Nullable String notApplicableWhen, @Nullable Judgment rejection, @Nullable Double declaredWeight) {
+
+	/**
+	 * Retain a seat without an explicit weight declaration.
+	 * @param position configured position
+	 * @param verdictKey local label
+	 * @param keySource label origin
+	 * @param execution execution fact
+	 * @param participation reduction treatment
+	 * @param cause memory-only original exception
+	 * @param notApplicableWhen local exclusion permission
+	 * @param rejection separate refusal treatment
+	 */
+	public Seat(int position, String verdictKey, KeySource keySource, SeatExecution execution,
+			Participation participation, @Nullable Throwable cause, @Nullable String notApplicableWhen,
+			@Nullable Judgment rejection) {
+		this(position, verdictKey, keySource, execution, participation, cause, notApplicableWhen, rejection, null);
+	}
+
+	/**
+	 * Declare a positive finite weight, retaining every other seat fact.
+	 * @param weight explicit declaration
+	 * @return weighted seat
+	 */
+	public Seat weighted(double weight) {
+		return new Seat(position, verdictKey, keySource, execution, participation, cause, notApplicableWhen, rejection,
+				weight);
+	}
+
+	/**
+	 * Project one retained seat with the complete original into typed reduction input.
+	 * @param original original opinion
+	 * @return complete ballot
+	 */
+	public io.github.markpollack.judge.voting.Ballot ballot(Judgment original) {
+		return new io.github.markpollack.judge.voting.Ballot(position, verdictKey, original,
+				rejection == null ? original : rejection, participation, declaredWeight);
+	}
 
 	/**
 	 * Construct a seat explicitly asserting a valid returned judgment.
@@ -92,12 +130,14 @@ public record Seat(
 		this(position, verdictKey, keySource, execution, participation, cause, null, null);
 	}
 
- /** Preserve execution facts while recording parent reduction treatment.
-  * @param treatment actual participation
-  * @return updated seat
-  */
+	/**
+	 * Preserve execution facts while recording parent reduction treatment.
+	 * @param treatment actual participation
+	 * @return updated seat
+	 */
 	public Seat treated(Participation treatment) {
-		return new Seat(position, verdictKey, keySource, execution, treatment, cause, notApplicableWhen, rejection);
+		return new Seat(position, verdictKey, keySource, execution, treatment, cause, notApplicableWhen, rejection,
+				declaredWeight);
 	}
 
 	/** Equality concerns portable seat facts; a live Throwable is diagnostic context. */
@@ -106,12 +146,13 @@ public record Seat(
 		return other instanceof Seat seat && position == seat.position && verdictKey.equals(seat.verdictKey)
 				&& keySource == seat.keySource && execution == seat.execution && participation == seat.participation
 				&& Objects.equals(notApplicableWhen, seat.notApplicableWhen)
-				&& Objects.equals(rejection, seat.rejection);
+				&& Objects.equals(rejection, seat.rejection) && Objects.equals(declaredWeight, seat.declaredWeight);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(position, verdictKey, keySource, execution, participation, notApplicableWhen, rejection);
+		return Objects.hash(position, verdictKey, keySource, execution, participation, notApplicableWhen, rejection,
+				declaredWeight);
 	}
 
 	/**
@@ -120,6 +161,8 @@ public record Seat(
 	 * blank
 	 */
 	public Seat {
+		if (declaredWeight != null && (!Double.isFinite(declaredWeight) || declaredWeight <= 0))
+			throw new IllegalArgumentException("Declared weight must be positive and finite");
 		if (notApplicableWhen != null)
 			io.github.markpollack.judge.requirement.Requirement.requireText(notApplicableWhen);
 		if ((execution == SeatExecution.RETURNED_REJECTED) != (rejection != null))

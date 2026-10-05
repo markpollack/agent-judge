@@ -23,7 +23,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import java.util.stream.Stream;
 
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.AverageVotingStrategy;
 import io.github.markpollack.judge.jury.CascadedJury;
 import io.github.markpollack.judge.voting.ConjunctiveStrategy;
@@ -57,7 +57,6 @@ import io.github.markpollack.judge.judgment.QualityDirection;
 import io.github.markpollack.judge.judgment.SupportOrigin;
 import io.github.markpollack.judge.provenance.ArtifactRef;
 import io.github.markpollack.judge.provenance.CalibrationClaim;
-import io.github.markpollack.judge.provenance.PolicyRef;
 import io.github.markpollack.judge.policy.PolicyAction;
 import io.github.markpollack.judge.provenance.Provenance;
 
@@ -65,11 +64,12 @@ import static org.assertj.core.api.Assertions.*;
 
 class ModernInterpretationConformanceTest {
 
-	static final ObjectMapper JSON = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+	static final ObjectMapper JSON = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 	static final CompletionEvidence CONTEXT = CompletionEvidence.builder().request("wire conformance").build();
 	static final ArtifactRef ARTIFACT = ArtifactRef.ofBytes("evidence",
 			"exact bytes\n".getBytes(StandardCharsets.UTF_8), "line:1");
-	static final PolicyRef POLICY = new PolicyRef("critical", "1", ARTIFACT.sha256());
+
 	static final Provenance PROVENANCE = new Provenance("native-evaluator", "rev-7", ARTIFACT.sha256(),
 			List.of(ARTIFACT), ARTIFACT,
 			List.of(new CalibrationClaim("calibrated:v1", "provider", "declared population",
@@ -203,8 +203,8 @@ class ModernInterpretationConformanceTest {
 
 	@Test
 	void carriedReductionEvidenceDoesNotImpersonateCurrentIdentityReduction() {
-		Judgment prior = new AverageVotingStrategy().aggregate(List.of(Judgment.pass("a"), Judgment.pass("b")),
-				Map.of());
+		Judgment prior = new AverageVotingStrategy()
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(Judgment.pass("a"), Judgment.pass("b"))));
 		Verdict identity = leaf(prior).vote();
 		Verdict adopted = CascadedJury.builder().tier("final", leaf(prior), RoutingRule.FINAL_TIER).build().vote();
 		for (Verdict v : List.of(identity, adopted)) {
@@ -371,7 +371,9 @@ class ModernInterpretationConformanceTest {
 	void cyclesAndExcessDepthNeverOverflowTheReader() {
 		Map<String, Object> map = wire(Verdict.single("seat", Judgment.pass("ok")));
 		map.put("loop", map);
-		unsupported(map);
+		assertThatThrownBy(() -> StoredVerdicts.interpret(map)).isInstanceOfSatisfying(
+				io.github.markpollack.judge.portable.PreservationLimitException.class,
+				e -> assertThat(e.original()).isSameAs(map));
 		Map<String, Object> deep = wire(Verdict.single("seat", Judgment.pass("ok")));
 		Map<String, Object> cursor = deep;
 		for (int i = 0; i < 150; i++) {
@@ -379,7 +381,9 @@ class ModernInterpretationConformanceTest {
 			cursor.put("next", next);
 			cursor = next;
 		}
-		unsupported(deep);
+		assertThatThrownBy(() -> StoredVerdicts.interpret(deep)).isInstanceOfSatisfying(
+				io.github.markpollack.judge.portable.PreservationLimitException.class,
+				e -> assertThat(e.original()).isSameAs(deep));
 	}
 
 	@Test
@@ -435,7 +439,8 @@ class ModernInterpretationConformanceTest {
 			for (ExclusionHandling exclusions : ExclusionHandling.values()) {
 				List<VotingStrategy> strategies = List.of(new ConsensusStrategy(errors, exclusions),
 						new MajorityVotingStrategy(TieBreakRule.ABSTAIN, errors, exclusions),
-						new AllMustPassStrategy(errors, exclusions), new AverageVotingStrategy(.5, errors, exclusions),
+						new AllEligiblePassStrategy(errors, exclusions),
+						new AverageVotingStrategy(.5, errors, exclusions),
 						new MedianVotingStrategy(.5, errors, exclusions),
 						new WeightedAverageStrategy(.5, errors, exclusions),
 						new ConjunctiveStrategy(.5, errors, exclusions));
@@ -443,7 +448,16 @@ class ModernInterpretationConformanceTest {
 					Map<String, Judgment> names = new LinkedHashMap<>();
 					for (int i = 0; i < inputs.size(); i++)
 						names.put("judge-" + i, inputs.get(i));
-					Verdict v = Verdict.of(strategy.aggregate(inputs, Map.of()), names);
+					var builder = Verdict.advancedBuilder();
+					Verdict raw = Verdict.of(strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(inputs)),
+							names);
+					Verdict v = builder.judgment(raw.judgment())
+						.individual(raw.individual())
+						.individualByName(raw.individualByName())
+						.seats(raw.seats())
+						.provenance(raw.provenance())
+						.rule(io.github.markpollack.judge.voting.RetainedRule.of(strategy))
+						.build();
 					StoredReading i = StoredVerdicts.interpret(v);
 					assertThat(i.defects()).as("%s / %s / %s", strategy.getName(), errors, exclusions).isEmpty();
 					assertThat(i.readingSupport()).as("%s / %s / %s", strategy.getName(), errors, exclusions)
@@ -484,8 +498,8 @@ class ModernInterpretationConformanceTest {
 			.vote();
 		Map<String, Object> map = wire(meta);
 		((Map<String, Object>) ((List<?>) map.get("seats")).getFirst()).put("execution", "CONTAINED_FAILURE");
-		map.put("judgment",
-				wire(new AverageVotingStrategy(ErrorHandling.TREAT_AS_FAIL).aggregate(List.of(returned), Map.of())));
+		map.put("judgment", wire(new AverageVotingStrategy(ErrorHandling.TREAT_AS_FAIL)
+			.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(returned)))));
 		unsupported(map);
 	}
 

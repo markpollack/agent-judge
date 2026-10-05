@@ -58,6 +58,8 @@ public final class InvocationRecords {
 		value.invocations().forEach(invocation -> add(invocation, facts));
 		references.addAll(value.invocationIds());
 		value.checks().forEach(check -> collect(check.judgment(), facts, references, seen));
+		if (value.refusedReturn() != null)
+			collect(value.refusedReturn().original(), facts, references, seen);
 	}
 
 	private static void add(Invocation value, Map<String, Invocation> facts) {

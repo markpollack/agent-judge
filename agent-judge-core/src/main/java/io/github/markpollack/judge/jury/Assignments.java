@@ -3,6 +3,7 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.CompositeFailure;
 import io.github.markpollack.judge.verdict.CompositeFailureCode;
@@ -12,7 +13,6 @@ import io.github.markpollack.judge.verdict.DispositionReason;
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.verdict.VerdictProvenance;
 import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
-
 
 import java.util.*;
 import java.util.function.Function;
@@ -84,8 +84,7 @@ public final class Assignments<E> {
 		EvidenceStep<C> step = judge.requirement(actual);
 		return add(actual, evidence -> {
 			C selected = Objects.requireNonNull(selectEvidence.apply(evidence), "selected evidence");
-			return Juries.evaluate(step.evidence(selected).build())
-				.forRequirement(actual);
+			return Juries.evaluate(step.evidence(selected).build()).forRequirement(actual);
 		});
 	}
 
@@ -214,6 +213,7 @@ public final class Assignments<E> {
 						throw ex;
 					}
 					catch (Exception ex) {
+						io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 						SimpleJury.preserveCancellation(ex);
 						incomplete = true;
 						attempts.add(CompositeAttempt.executionFailed(child.id(), CompositeRelation.CONSTITUENT, null,
@@ -227,6 +227,7 @@ public final class Assignments<E> {
 						conclusion = checked.conclusion();
 					}
 					catch (IllegalArgumentException rejected) {
+						io.github.markpollack.judge.portable.PreservationLimitException.propagate(rejected);
 						incomplete = true;
 						attempts.add(CompositeAttempt.stageFailed(child.id(), CompositeRelation.CONSTITUENT, null,
 								DispositionReason.INVALID_TIER_RESULT, verdict));
@@ -247,7 +248,7 @@ public final class Assignments<E> {
 					: failed ? Judgment.fail("A required constituent failed")
 							: incomplete ? Judgment.abstain("Not every required constituent established PASS")
 									: Judgment.pass("Every required constituent passed");
-			return Verdict.builder()
+			return Verdict.advancedBuilder()
 				.requirement(parent)
 				.judgment(judgment)
 				.declaredCardinality(parent.specification().constituents().size())

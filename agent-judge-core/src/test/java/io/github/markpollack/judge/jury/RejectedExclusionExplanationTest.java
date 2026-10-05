@@ -4,12 +4,13 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.DispositionReason;
 import io.github.markpollack.judge.verdict.RoutingRule;
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.verdict.VerdictProvenance;
 import io.github.markpollack.judge.verdict.VerdictProvenanceBasis;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
 
 import java.util.Map;
@@ -77,7 +78,7 @@ class RejectedExclusionExplanationTest {
 	private static Jury passing() {
 		return SimpleJury.builder()
 			.judge(Judges.named(() -> PASSING, "backstop"))
-			.votingStrategy(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN))
+			.votingStrategy(new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_ABSTAIN))
 			.build();
 	}
 
@@ -119,7 +120,7 @@ class RejectedExclusionExplanationTest {
 		@DisplayName("a meta member's refused exclusion is named in the root reasoning")
 		void aMetaMemberIsExplained() {
 			Verdict verdict = Juries
-				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN), new NamedJury("healthy", passing()),
+				.meta(new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_ABSTAIN), new NamedJury("healthy", passing()),
 						new NamedJury("rubric", excluding(PASSING)))
 				.vote();
 
@@ -187,7 +188,7 @@ class RejectedExclusionExplanationTest {
 		@DisplayName("a member that threw still reports exactly what it reported before")
 		void aThrownMemberIsUnchanged() {
 			Verdict verdict = Juries
-				.meta(new AllMustPassStrategy(ErrorHandling.TREAT_AS_ABSTAIN), new NamedJury("healthy", passing()),
+				.meta(new AllEligiblePassStrategy(ErrorHandling.TREAT_AS_ABSTAIN), new NamedJury("healthy", passing()),
 						new NamedJury("broken",
 								ContainmentTest.throwing(new IllegalStateException("the backend was unreachable"))))
 				.vote();

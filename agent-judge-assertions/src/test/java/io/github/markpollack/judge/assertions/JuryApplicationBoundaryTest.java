@@ -3,6 +3,7 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.assertions;
+
 import io.github.markpollack.judge.verdict.RoutingRule;
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.voting.MajorityVotingStrategy;
@@ -60,7 +61,8 @@ class JuryApplicationBoundaryTest {
 			.judge("known", () -> Judgment.fail("violation"))
 			.judge("second", () -> Judgment.pass("present"))
 			.votingStrategy(new VotingStrategy() {
-				public Judgment aggregate(List<Judgment> values, Map<String, Double> weights) {
+				public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+					var values = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 					throw new IllegalStateException("reduction broken");
 				}
 

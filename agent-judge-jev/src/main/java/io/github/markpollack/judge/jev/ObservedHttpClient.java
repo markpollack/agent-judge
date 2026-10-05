@@ -120,6 +120,7 @@ final class ObservedHttpClient extends HttpClient {
 			source = delegate.sendAsync(forwarded, info -> new LimitedSubscriber<>(handler.apply(info), limit));
 		}
 		catch (RuntimeException failure) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
 			finish(false);
 			throw new IllegalArgumentException("HTTP send failed");
 		}
@@ -138,6 +139,13 @@ final class ObservedHttpClient extends HttpClient {
 			try {
 				if (failure != null) {
 					finish(false);
+					try {
+						io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
+					}
+					catch (io.github.markpollack.judge.portable.PreservationLimitException limitFailure) {
+						result.completeExceptionally(limitFailure);
+						return;
+					}
 					result.completeExceptionally(new IOException("HTTP transport failed"));
 					return;
 				}
@@ -162,6 +170,13 @@ final class ObservedHttpClient extends HttpClient {
 				}
 				catch (RuntimeException e) {
 					finish(false);
+					try {
+						io.github.markpollack.judge.portable.PreservationLimitException.propagate(e);
+					}
+					catch (io.github.markpollack.judge.portable.PreservationLimitException limitFailure) {
+						result.completeExceptionally(limitFailure);
+						return;
+					}
 					result.completeExceptionally(new IOException("Invalid provider response"));
 				}
 			}

@@ -142,7 +142,8 @@ public class AverageVotingStrategy implements VotingStrategy {
 	}
 
 	@Override
-	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
+	public Judgment aggregate(List<Ballot> ballots) {
+		List<Judgment> judgments = Ballots.judgments(ballots);
 		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
 				this.notApplicablePolicy);
 

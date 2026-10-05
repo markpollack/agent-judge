@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.voting.AggregationEvidence;
 import io.github.markpollack.judge.voting.ErrorHandling;
@@ -116,7 +117,8 @@ class SimpleJuryTest {
 
 		// Weighted: (1.0 * 0.3 + 0.0 * 0.7) / 1.0 = 0.3 < 0.5 → FAIL
 		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
-		assertThat(verdict.weights()).containsEntry("0", 0.3).containsEntry("1", 0.7);
+		assertThat(io.github.markpollack.judge.testing.TestBallots.weights(verdict)).containsEntry("0", 0.3)
+			.containsEntry("1", 0.7);
 	}
 
 	@Test
@@ -205,7 +207,7 @@ class SimpleJuryTest {
 	void builderShouldRejectNegativeWeight() {
 		assertThatThrownBy(() -> SimpleJury.builder().judge(alwaysPass("Judge1"), -1.0))
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("non-negative");
+			.hasMessageContaining("positive");
 	}
 
 	@Test
@@ -221,35 +223,21 @@ class SimpleJuryTest {
 	}
 
 	@Test
-	void builderShouldStillAcceptFiniteAndZeroWeights() {
-		SimpleJury jury = SimpleJury.builder()
-			.judge(alwaysPass("Zero"), 0.0)
+	void builderAcceptsPositiveFiniteWeights() {
+		var jury = SimpleJury.builder()
 			.judge(alwaysPass("Tiny"), Double.MIN_VALUE)
 			.judge(alwaysPass("Heavy"), 2.5)
 			.votingStrategy(new MajorityVotingStrategy())
 			.build();
-
-		Verdict verdict = jury.vote();
-
-		assertThat(verdict.weights()).containsEntry("0", 0.0)
-			.containsEntry("1", Double.MIN_VALUE)
-			.containsEntry("2", 2.5);
+		assertThat(jury.vote().seats()).extracting(io.github.markpollack.judge.verdict.Seat::declaredWeight)
+			.containsExactly(Double.MIN_VALUE, 2.5);
 	}
 
 	@Test
-	void builderShouldAcceptZeroWeight() {
-		// Zero weight is valid - judge participates but with no influence
-		SimpleJury jury = SimpleJury.builder()
-			.judge(alwaysPass("Judge1"), 0.0)
-			.judge(alwaysFail("Judge2"), 1.0)
-			.votingStrategy(new WeightedAverageStrategy())
-			.build();
-
-		CompletionEvidence context = simpleContext("Test goal");
-		Verdict verdict = jury.vote();
-
-		// Only Judge2 has weight → result should be FAIL
-		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
+	void builderRefusesZeroWeightBeforeExecution() {
+		assertThatThrownBy(() -> SimpleJury.builder().judge(alwaysPass("zero"), 0.0))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("positive");
 	}
 
 	@Test

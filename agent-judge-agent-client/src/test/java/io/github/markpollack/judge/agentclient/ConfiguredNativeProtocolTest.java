@@ -56,7 +56,8 @@ class ConfiguredNativeProtocolTest {
 		var client = mock(AgentClient.class);
 		var runtime = new AgentClientEvalModel(client);
 		var requests = new ArrayList<EvalModelRequest>();
-        requests.add(new EvalModelRequest(List.of(new EvalMessage(EvalMessageRole.USER,"request")),EvalModelOptions.defaults(),Map.of("correlation","local")));
+		requests.add(new EvalModelRequest(List.of(new EvalMessage(EvalMessageRole.USER, "request")),
+				EvalModelOptions.defaults(), Map.of("correlation", "local")));
 		requests.add(new EvalModelRequest(List.of(new EvalMessage(EvalMessageRole.SYSTEM, "system")),
 				EvalModelOptions.defaults(), Map.of()));
 		requests.add(new EvalModelRequest(
@@ -66,8 +67,8 @@ class ConfiguredNativeProtocolTest {
 				new EvalModelOptions(null, 0.1, null, null, null), new EvalModelOptions(null, null, 1, null, null),
 				new EvalModelOptions(null, null, null, java.time.Duration.ofSeconds(1), null),
 				new EvalModelOptions(null, null, null, null, "json")))
-			requests.add(new EvalModelRequest(List.of(new EvalMessage(EvalMessageRole.USER, "request")), options,
-					Map.of()));
+			requests.add(
+					new EvalModelRequest(List.of(new EvalMessage(EvalMessageRole.USER, "request")), options, Map.of()));
 		for (var request : requests)
 			assertThatThrownBy(() -> runtime.execute(request)).isInstanceOf(IllegalArgumentException.class);
 		verifyNoInteractions(client);
@@ -76,15 +77,18 @@ class ConfiguredNativeProtocolTest {
 	@Test
 	void nativeFailureAndCaptureFailureKeepOriginalEvidence() {
 		var client = mock(AgentClient.class);
-		when(client.run(anyString())).thenReturn(response("ERROR", "native failure details"));
+		var original = response("ERROR", "native failure details");
+		when(client.run(anyString())).thenReturn(original);
 		var runtime = new AgentClientEvalModel(client);
 		var failure = runtime.execute(EvalModelRequest.user("test"));
 		assertThat(failure.invocation().completed()).isFalse();
 		assertThat(failure.invocation().nativeFacts().get("nativeResponseJson").toString())
 			.contains("native failure details", "providerUsage");
-		var bounded = new AgentClientEvalModel(client, NativeCapture.json(1)).execute(EvalModelRequest.user("test"));
-		assertThat(bounded.invocation().nativeFacts()).containsEntry("text", "native failure details")
-			.containsKey("captureFailure");
+		assertThatThrownBy(
+				() -> new AgentClientEvalModel(client, NativeCapture.json(1)).execute(EvalModelRequest.user("test")))
+			.isInstanceOfSatisfying(io.github.markpollack.judge.portable.PreservationLimitException.class,
+					limit -> assertThat(limit.original()).isSameAs(original));
+
 	}
 
 	@Test

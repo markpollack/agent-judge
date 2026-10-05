@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.ai.requirements;
+
 import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.verdict.CompositeAttempt;
 import io.github.markpollack.judge.verdict.CompositeFailure;
@@ -183,8 +184,7 @@ public final class Rfc2119Jury implements Jury {
 	 *
 	 * @param <E> evidence type
 	 */
-	public static final class StructuredRoster<E>
-			implements io.github.markpollack.judge.jury.JuryEvidenceStep<E> {
+	public static final class StructuredRoster<E> implements io.github.markpollack.judge.jury.JuryEvidenceStep<E> {
 
 		private final EvalRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime;
 
@@ -218,8 +218,7 @@ public final class Rfc2119Jury implements Jury {
 		 * @param evidence complete map keyed by actual requirement identity
 		 * @return ready Jury construction
 		 */
-		public io.github.markpollack.judge.jury.ReadyJury evidenceByRequirement(
-				Map<String, ? extends E> evidence) {
+		public io.github.markpollack.judge.jury.ReadyJury evidenceByRequirement(Map<String, ? extends E> evidence) {
 			Map<String, E> captured = checked(evidence);
 			return evidenceByRequirementSupplier(() -> captured);
 		}
@@ -270,6 +269,7 @@ public final class Rfc2119Jury implements Jury {
 								child(req, original.forRequirement(req))));
 					}
 					catch (IllegalArgumentException rejected) {
+						io.github.markpollack.judge.portable.PreservationLimitException.propagate(rejected);
 						// The native call returned. Preserve its actual association and
 						// observations without claiming an invocation failure or
 						// violation.
@@ -284,6 +284,7 @@ public final class Rfc2119Jury implements Jury {
 					throw cancellation;
 				}
 				catch (RuntimeException failure) {
+					io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
 					if (Thread.currentThread().isInterrupted())
 						throw new java.util.concurrent.CancellationException("Roster interrupted");
 					attempts.add(CompositeAttempt.executionFailed(req.id(), CompositeRelation.ROSTER_ITEM, null,
@@ -360,7 +361,7 @@ public final class Rfc2119Jury implements Jury {
 						: applicable ? Judgment.pass("Every applicable declared requirement passed")
 								: Judgment.notApplicable("Every declared requirement was justifiably excluded");
 		collective = collective.toBuilder().metadata(facts).build();
-		return Verdict.builder()
+		return Verdict.advancedBuilder()
 			.judgment(collective)
 			.roster(roster)
 			.declaredCardinality(roster.size())

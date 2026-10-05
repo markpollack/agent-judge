@@ -22,6 +22,7 @@
         </dependencies>
     </dependencyManagement>
     <dependencies>
+<dependency><groupId>io.github.markpollack</groupId><artifactId>agent-judge-jev</artifactId><version>${project.version}</version><scope>test</scope></dependency>
 <dependency><groupId>io.github.markpollack</groupId><artifactId>agent-judge-json-jackson2</artifactId><version>${project.version}</version><scope>test</scope></dependency>
         <dependency>
             <groupId>io.github.markpollack</groupId>

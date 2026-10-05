@@ -3,9 +3,10 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.serialization;
+
 import io.github.markpollack.judge.verdict.InvocationRecords;
 import io.github.markpollack.judge.verdict.Verdict;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -30,7 +31,7 @@ class ConfiguredStorageBoundaryTest {
 				assertThat(resource).isNotNull();
 				String historical = new String(resource.readAllBytes(), StandardCharsets.UTF_8);
 				assertThat(historical).contains("\"schemaVersion\":4");
-				assertThatThrownBy(() -> new VerdictCodec().read(historical)).hasMessageContaining("expected 5")
+				assertThatThrownBy(() -> new VerdictCodec().read(historical)).hasMessageContaining("expected 6")
 					.hasMessageContaining("7387aab1bf9d3bd56e4d9a932f2f40e2978d676d");
 			}
 		}
@@ -57,7 +58,7 @@ class ConfiguredStorageBoundaryTest {
 		var jury = SimpleJury.builder()
 			.judge(() -> answer)
 			.judge(() -> answer)
-			.votingStrategy(new AllMustPassStrategy())
+			.votingStrategy(new AllEligiblePassStrategy())
 			.build();
 		var result = jury.vote();
 		assertThat(InvocationRecords.of(result)).containsExactly(fact);
@@ -66,7 +67,7 @@ class ConfiguredStorageBoundaryTest {
 		var conflict = SimpleJury.builder()
 			.judge(() -> answer)
 			.judge(() -> Judgment.pass("other").withInvocation(conflicting))
-			.votingStrategy(new AllMustPassStrategy())
+			.votingStrategy(new AllEligiblePassStrategy())
 			.build()
 			.vote();
 		assertThatThrownBy(() -> Evaluations.of(conflict))

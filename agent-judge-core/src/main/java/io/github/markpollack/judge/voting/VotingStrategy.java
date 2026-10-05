@@ -57,11 +57,29 @@ public interface VotingStrategy {
 
 	/**
 	 * Aggregate multiple judgments into a single judgment.
-	 * @param judgments the list of individual judgments from judges
-	 * @param weights optional weights for each judge (empty map for equal weights)
+	 * @param ballots typed original/treatment inputs with their configured weights
 	 * @return judgment judgment
 	 */
-	Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights);
+	Judgment aggregate(List<Ballot> ballots);
+
+	/**
+	 * Complete portable configuration. Custom rules must declare every setting and must
+	 * not invoke Judges, models, suppliers or external services during reduction.
+	 * Unweighted rules retain explicit weights and ignore them by contract.
+	 * @return immutable behavior-affecting configuration
+	 */
+	default Map<String, Object> configuration() {
+		var description = describe();
+		var values = new java.util.LinkedHashMap<String, Object>();
+		if (description.parameters() != null)
+			values.putAll(description.parameters());
+		if (description.errorHandling() != null)
+			values.put("errorPolicy", description.errorHandling().token());
+		values.put("notApplicablePolicy", exclusionHandling().token());
+		if (description.threshold() != null)
+			values.put("threshold", description.threshold());
+		return io.github.markpollack.judge.portable.PortableForm.ordered(values, "rule.configuration");
+	}
 
 	/**
 	 * Get the name of this voting strategy (for debugging and metadata).

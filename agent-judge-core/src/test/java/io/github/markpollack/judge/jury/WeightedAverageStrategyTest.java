@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.voting.AggregationEvidence;
 import io.github.markpollack.judge.voting.AverageVotingStrategy;
 import io.github.markpollack.judge.voting.WeightedAverageStrategy;
@@ -37,7 +38,8 @@ class WeightedAverageStrategyTest {
 
 		Map<String, Double> weights = Map.of("0", 0.3, "1", 0.7);
 
-		Judgment result = strategy.aggregate(judgments, weights);
+		Judgment result = strategy
+			.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, weights));
 
 		// (0.8 * 0.3 + 0.6 * 0.7) / (0.3 + 0.7) = (0.24 + 0.42) / 1.0 = 0.66
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -54,7 +56,8 @@ class WeightedAverageStrategyTest {
 		// Weights don't sum to 1.0 - should be normalized
 		Map<String, Double> weights = Map.of("0", 3.0, "1", 7.0);
 
-		Judgment result = strategy.aggregate(judgments, weights);
+		Judgment result = strategy
+			.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, weights));
 
 		// (0.8 * 3.0 + 0.6 * 7.0) / (3.0 + 7.0) = (2.4 + 4.2) / 10.0 = 0.66
 		double score = result.score();
@@ -70,7 +73,8 @@ class WeightedAverageStrategyTest {
 		// Only provide weight for first judgment - others default to 1.0
 		Map<String, Double> weights = Map.of("0", 2.0);
 
-		Judgment result = strategy.aggregate(judgments, weights);
+		Judgment result = strategy
+			.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, weights));
 
 		// (0.8 * 2.0 + 0.6 * 1.0 + 0.4 * 1.0) / (2.0 + 1.0 + 1.0) = (1.6 + 0.6 + 0.4) /
 		// 4.0 = 0.65
@@ -84,7 +88,7 @@ class WeightedAverageStrategyTest {
 
 		List<Judgment> judgments = List.of(passJudgment(0.8), passJudgment(0.6));
 
-		Judgment result = strategy.aggregate(judgments, Map.of());
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(judgments));
 
 		// DELTA-10: equal weights reduce to the simple mean, but the computation stays in
 		// this strategy rather than delegating to AverageVotingStrategy, so the evidence
@@ -100,7 +104,7 @@ class WeightedAverageStrategyTest {
 
 		List<Judgment> judgments = List.of(passJudgment(0.8), passJudgment(0.6));
 
-		Judgment result = strategy.aggregate(judgments, null);
+		Judgment result = strategy.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, null));
 
 		double score = result.score();
 		assertThat(score).isEqualTo(0.7);
@@ -117,7 +121,8 @@ class WeightedAverageStrategyTest {
 
 		Map<String, Double> weights = Map.of("0", 0.7, "1", 0.3);
 
-		Judgment result = strategy.aggregate(judgments, weights);
+		Judgment result = strategy
+			.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, weights));
 
 		// (1.0 * 0.7 + 0.0 * 0.3) / (0.7 + 0.3) = 0.7 / 1.0 = 0.7
 		double score = result.score();
@@ -125,19 +130,11 @@ class WeightedAverageStrategyTest {
 	}
 
 	@Test
-	void shouldHandleZeroWeight() {
-		WeightedAverageStrategy strategy = new WeightedAverageStrategy();
-
-		List<Judgment> judgments = List.of(passJudgment(0.8), passJudgment(0.2));
-
-		// Second judgment has zero weight - should be ignored
-		Map<String, Double> weights = Map.of("0", 1.0, "1", 0.0);
-
-		Judgment result = strategy.aggregate(judgments, weights);
-
-		// (0.8 * 1.0 + 0.2 * 0.0) / (1.0 + 0.0) = 0.8 / 1.0 = 0.8
-		double score = result.score();
-		assertThat(score).isEqualTo(0.8);
+	void zeroWeightIsRefusedAsAnExplicitDeclaration() {
+		assertThatThrownBy(() -> new WeightedAverageStrategy().aggregate(io.github.markpollack.judge.testing.TestBallots
+			.legacy(List.of(passJudgment(0.8), passJudgment(0.2)), Map.of("0", 1.0, "1", 0.0))))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("positive");
 	}
 
 	@Test
@@ -150,7 +147,8 @@ class WeightedAverageStrategyTest {
 
 		Map<String, Double> weights = Map.of("0", 0.2, "1", 0.8);
 
-		Judgment result = strategy.aggregate(judgments, weights);
+		Judgment result = strategy
+			.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, weights));
 
 		// (0.8 * 0.2 + 0.2 * 0.8) / (0.2 + 0.8) = (0.16 + 0.16) / 1.0 = 0.32 < 0.5
 		assertThat(result.status()).isEqualTo(JudgmentStatus.FAIL);
@@ -167,7 +165,8 @@ class WeightedAverageStrategyTest {
 		// Equal weights → (1.0 + 0.0) / 2 = 0.5
 		Map<String, Double> weights = Map.of("0", 1.0, "1", 1.0);
 
-		Judgment result = strategy.aggregate(judgments, weights);
+		Judgment result = strategy
+			.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, weights));
 
 		// 0.5 >= 0.5 → PASS
 		assertThat(result.status()).isEqualTo(JudgmentStatus.PASS);
@@ -181,7 +180,8 @@ class WeightedAverageStrategyTest {
 	void emptyJudgmentListShouldThrowException() {
 		WeightedAverageStrategy strategy = new WeightedAverageStrategy();
 
-		assertThatThrownBy(() -> strategy.aggregate(List.of(), Map.of())).isInstanceOf(IllegalArgumentException.class)
+		assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of())))
+			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("empty");
 	}
 
@@ -189,14 +189,16 @@ class WeightedAverageStrategyTest {
 	void nullJudgmentListShouldThrowException() {
 		WeightedAverageStrategy strategy = new WeightedAverageStrategy();
 
-		assertThatThrownBy(() -> strategy.aggregate(null, Map.of())).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(null)))
+			.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
 	void singleJudgmentShouldReturnItsScore() {
 		WeightedAverageStrategy strategy = new WeightedAverageStrategy();
 
-		Judgment result = strategy.aggregate(List.of(passJudgment(0.8)), Map.of("0", 5.0));
+		Judgment result = strategy.aggregate(
+				io.github.markpollack.judge.testing.TestBallots.legacy(List.of(passJudgment(0.8)), Map.of("0", 5.0)));
 
 		// Single judgment with any weight → same score
 		double score = result.score();
@@ -216,8 +218,10 @@ class WeightedAverageStrategyTest {
 		// against NaN is false, yielding a FAIL whose reasoning read "NaN". A weight map
 		// in which no judge can influence the result is a caller error, so it now fails
 		// loudly at the call rather than producing a garbage score.
-		assertThatThrownBy(() -> strategy.aggregate(judgments, weights)).isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("All weights are zero");
+		assertThatThrownBy(
+				() -> strategy.aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(judgments, weights)))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("positive");
 	}
 
 	/**
@@ -227,15 +231,13 @@ class WeightedAverageStrategyTest {
 	 * error, and it abstains rather than throwing.
 	 */
 	@Test
-	void positiveInputWeightButNoEligibleWeightAbstains() {
-		WeightedAverageStrategy strategy = new WeightedAverageStrategy();
-
-		Judgment result = strategy.aggregate(List.of(Judgment.abstain("Cannot evaluate"), passJudgment(0.8)),
-				Map.of("0", 1.0, "1", 0.0));
-
+	void positiveWeightsWithNoEligibleOpinionsAbstain() {
+		var result = new WeightedAverageStrategy().aggregate(io.github.markpollack.judge.testing.TestBallots.legacy(
+				List.of(Judgment.abstain("Cannot evaluate"), Judgment.abstain("No opinion")),
+				Map.of("0", 1.0, "1", 2.0)));
 		assertThat(result.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		assertThat(result.score()).isNull();
-		assertThat(evidence(result)).containsEntry(AggregationEvidence.INPUT_WEIGHT, 1.0)
+		assertThat(evidence(result)).containsEntry(AggregationEvidence.INPUT_WEIGHT, 3.0)
 			.containsEntry(AggregationEvidence.ELIGIBLE_WEIGHT, 0.0);
 	}
 
@@ -248,7 +250,8 @@ class WeightedAverageStrategyTest {
 		// DELTA-3: names are stable lower-camel-case tokens, so the identifier used in
 		// diagnostics is the same one recorded in the aggregation evidence.
 		assertThat(strategy.getName()).isEqualTo("weightedAverage");
-		assertThat(evidence(strategy.aggregate(List.of(passJudgment(0.8)), Map.of())))
+		assertThat(
+				evidence(strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(passJudgment(0.8))))))
 			.containsEntry(AggregationEvidence.STRATEGY, "weightedAverage");
 	}
 

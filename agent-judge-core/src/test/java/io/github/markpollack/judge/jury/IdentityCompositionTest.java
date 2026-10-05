@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+
 import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.verdict.VerdictProvenance;
 import io.github.markpollack.judge.voting.AverageVotingStrategy;
@@ -28,7 +29,6 @@ import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
 import io.github.markpollack.judge.judgment.NumericFinding;
 import io.github.markpollack.judge.judgment.NumericKind;
-import io.github.markpollack.judge.provenance.PolicyRef;
 import io.github.markpollack.judge.judgment.QualityDirection;
 import org.junit.jupiter.api.Test;
 
@@ -38,8 +38,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class IdentityCompositionTest {
 
 	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder().request("identity").build();
-
-	private static final PolicyRef POLICY = new PolicyRef("critical", "1", "a".repeat(64));
 
 	@Test
 	void negativeHighOrdinalAssessmentIsNotReversedByOneSeatNumericStrategy() {
@@ -82,7 +80,8 @@ class IdentityCompositionTest {
 		AtomicInteger reductions = new AtomicInteger();
 		VotingStrategy neverReduce = new VotingStrategy() {
 			@Override
-			public Judgment aggregate(List<Judgment> values, Map<String, Double> weights) {
+			public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+				var values = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 				reductions.incrementAndGet();
 				throw new AssertionError("identity must not reduce");
 			}
@@ -137,7 +136,8 @@ class IdentityCompositionTest {
 			.vote();
 		assertThat(verdict.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 		assertThat(verdict.judgment()).isNotEqualTo(lowPositive);
-		assertThat(strategy.aggregate(List.of(lowPositive), Map.of()).status()).isEqualTo(JudgmentStatus.FAIL);
+		assertThat(strategy.aggregate(io.github.markpollack.judge.voting.Ballots.of(List.of(lowPositive))).status())
+			.isEqualTo(JudgmentStatus.FAIL);
 		Jury broken = new io.github.markpollack.judge.jury.VotingJury() {
 			@Override
 			public Verdict vote() {

@@ -3,9 +3,10 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.evaluation;
+
 import io.github.markpollack.judge.verdict.InvocationRecords;
 import io.github.markpollack.judge.verdict.Verdict;
-import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllEligiblePassStrategy;
 import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.voting.ExclusionHandling;
 
@@ -41,19 +42,32 @@ public final class Evaluations {
 	 * @return original verdict and the decision or original failure
 	 */
 	public static EvaluationResult apply(Verdict verdict, Policy policy) {
-		Objects.requireNonNull(verdict, "verdict").conclusion();
-		io.github.markpollack.judge.verdict.InvocationRecords.of(verdict);
+		return apply(verdict, policy, null);
+	}
+
+	/**
+	 * Execute one attributed policy against the unchanged complete usable Verdict.
+	 * @param verdict original result
+	 * @param policy functional policy
+	 * @param attribution caller identity/configuration, or null
+	 * @return original verdict and attributed decision or failure
+	 */
+	public static EvaluationResult apply(Verdict verdict, Policy policy,
+			@org.jspecify.annotations.Nullable PolicyAttribution attribution) {
+		Objects.requireNonNull(verdict, "verdict").requireUsable();
 		Objects.requireNonNull(policy, "policy");
 		checkCancellation();
 		PolicyResult result;
 		try {
 			result = new PolicyResult.Decided(Objects.requireNonNull(policy.decide(verdict),
-					"Policy returned null; a PolicyDecision is required"));
+					"Policy returned null; a PolicyDecision is required"), attribution);
 		}
 		catch (Exception ex) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
 			preserveCancellation(ex);
-			result = new PolicyResult.Failed(ex);
+			result = new PolicyResult.Failed(ex, attribution);
 		}
+		checkCancellation();
 		return new EvaluationResult(verdict, result);
 	}
 
@@ -68,7 +82,7 @@ public final class Evaluations {
 		return of(SimpleJury.builder()
 			.judge(judge)
 			.parallel(false)
-			.votingStrategy(new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
+			.votingStrategy(new AllEligiblePassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE))
 			.build()
 			.vote());
 	}

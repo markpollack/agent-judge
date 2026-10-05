@@ -34,7 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Stored fixtures, live juries and small helpers shared by the interpretation tests. */
 final class Fixtures {
 
-	static final ObjectMapper MAPPER = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+	static final ObjectMapper MAPPER = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {
 	};
@@ -196,7 +197,8 @@ final class Fixtures {
 	static Jury undecidedTier(Judgment... judgments) {
 		SimpleJury.Builder builder = SimpleJury.builder().votingStrategy(new VotingStrategy() {
 			@Override
-			public Judgment aggregate(List<Judgment> input, Map<String, Double> weights) {
+			public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
+				var input = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 				throw new IllegalStateException("the reduction broke");
 			}
 

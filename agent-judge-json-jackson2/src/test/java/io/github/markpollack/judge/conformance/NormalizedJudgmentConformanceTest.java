@@ -84,11 +84,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("Normalized 0.14 contract conformance (M2 + M3 + M5)")
 class NormalizedJudgmentConformanceTest {
 
-	private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+	private static final ObjectMapper MAPPER = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	private static final String GOLDEN_RESOURCE = "/conformance/normalized-judgment-0.14.json";
 
-	private static final String COMPOSITE_GOLDEN_RESOURCE = "/conformance/composite-verdict-v5.json";
+	private static final String COMPOSITE_GOLDEN_RESOURCE = "/conformance/composite-verdict-v6.json";
 
 	/**
 	 * The 0.14 composite document, frozen. It is no longer a projection of anything this
@@ -212,7 +213,8 @@ class NormalizedJudgmentConformanceTest {
 		@Test
 		void realCompositeExecutionPreservesHistoricalStructureWithModernIdentity() {
 			assertThat(compositeFixtureTree())
-				.as("only the declared one-seat identity projections differ from frozen %s", COMPOSITE_GOLDEN_RESOURCE)
+				.as("current V6 execution agrees with its independently generated fixture %s",
+						COMPOSITE_GOLDEN_RESOURCE)
 				.isEqualTo(modernCompositeIdentityExpectation());
 		}
 
@@ -252,8 +254,8 @@ class NormalizedJudgmentConformanceTest {
 		void declarationsDeriveTheCompleteCompositePropertySet() {
 			for (JsonNode verdictNode : allVerdictNodes(compositeFixtureTree())) {
 				assertThat(fieldNames(verdictNode)).containsExactly("schemaVersion", "judgment", "individual",
-						"individualByName", "weights", "seats", "provenance", "compositeAttempts",
-						"declaredCardinality", "roster", "invocations");
+						"individualByName", "seats", "provenance", "compositeAttempts", "declaredCardinality", "roster",
+						"invocations");
 			}
 
 			Set<String> attemptProperties = new LinkedHashSet<>();
@@ -288,7 +290,8 @@ class NormalizedJudgmentConformanceTest {
 			assertThat(fieldNames(compositeFixtureTree().get("individualByName"))).containsExactly("pipeline");
 			JsonNode stopping = compositeFixtureTree().at("/compositeAttempts/0/verdict/compositeAttempts/1/verdict");
 			assertThat(fieldNames(stopping.get("individualByName"))).containsExactly("semantic-check");
-			assertThat(fieldNames(stopping.get("weights"))).containsExactly("0");
+			assertThat(stopping.has("weights")).isFalse();
+			assertThat(stopping.at("/seats/0/declaredWeight").isMissingNode()).isTrue();
 		}
 
 	}
@@ -395,8 +398,8 @@ class NormalizedJudgmentConformanceTest {
 		@DisplayName("every Verdict record component appears in the fixture")
 		void coversEveryVerdictComponent() {
 			assertThat(fieldNames(fixtureTree())).containsExactlyInAnyOrder("schemaVersion", "judgment", "individual",
-					"individualByName", "weights", "seats", "provenance", "compositeAttempts", "declaredCardinality",
-					"roster", "invocations");
+					"individualByName", "seats", "provenance", "compositeAttempts", "declaredCardinality", "roster",
+					"invocations", "rule");
 			assertThat(componentNames(Verdict.class)).doesNotContain("schemaVersion").contains("requirement");
 		}
 
@@ -473,7 +476,7 @@ class NormalizedJudgmentConformanceTest {
 				assertThat(declaredNullable).as("Judgment.%s nullability declaration", component.getName())
 					.isEqualTo(List
 						.of("finding", "confidence", "probabilityDistribution", "reasonCode", "provenance",
-								"policyApplication", "requirement")
+								"policyApplication", "requirement", "refusedReturn")
 						.contains(component.getName()));
 			}
 
@@ -511,7 +514,8 @@ class NormalizedJudgmentConformanceTest {
 		void disagreementIsNotUnanimityAndNotEmptiness() {
 			Judgment disagreement = verdict().judgment();
 			Judgment noResult = new ConsensusStrategy(ErrorHandling.IGNORE)
-				.aggregate(List.of(Judgment.abstain("the retrieval index was empty")), Map.of());
+				.aggregate(io.github.markpollack.judge.voting.Ballots
+					.of(List.of(Judgment.abstain("the retrieval index was empty"))));
 
 			assertThat(disagreement.status()).isEqualTo(JudgmentStatus.ABSTAIN);
 			assertThat(noResult.status()).isEqualTo(JudgmentStatus.ABSTAIN);
@@ -731,7 +735,7 @@ class NormalizedJudgmentConformanceTest {
 		}
 	}
 
-	/** Explicit live identity expectation; the immutable 0.17 bytes remain historical. */
+	/** Explicit live identity expectation; the immutable V5 bytes remain historical. */
 	private static JsonNode modernCompositeIdentityExpectation() {
 		return compositeGoldenTree();
 	}

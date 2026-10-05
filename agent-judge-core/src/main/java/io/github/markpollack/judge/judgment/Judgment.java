@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.judgment;
+
 import io.github.markpollack.judge.portable.ValueRequirements;
 import io.github.markpollack.judge.portable.PortableValues;
 
@@ -45,17 +46,63 @@ import io.github.markpollack.judge.requirement.Requirement;
  * @param requirement actual configured requirement, absent only for rule-only judgments
  * @param invocations owned immutable native observations
  * @param invocationIds references to shared native observations
+ * @param refusedReturn complete original refused at a configured boundary, or null
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({ "schemaVersion", "producerStatus", "finding", "confidence", "probabilityDistribution",
 		"reasonCode", "reasoning", "checks", "provenance", "metadata" })
 
-
 public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding, @Nullable Confidence confidence,
 		@Nullable ProbabilityDistribution probabilityDistribution, @Nullable JudgmentReasonCode reasonCode,
 		String reasoning, List<Check> checks, @Nullable Provenance provenance, Map<String, Object> metadata,
 		@Nullable Requirement<?> requirement, List<io.github.markpollack.judge.provenance.Invocation> invocations,
-		List<String> invocationIds) {
+		List<String> invocationIds, @Nullable RefusedReturn refusedReturn) {
+
+	/**
+	 * Retain an ordinary result without a boundary refusal.
+	 * @param producerStatus producer disposition
+	 * @param finding optional finding
+	 * @param confidence optional support
+	 * @param probabilityDistribution optional distribution
+	 * @param reasonCode cause
+	 * @param reasoning explanation
+	 * @param checks child checks
+	 * @param provenance original source
+	 * @param metadata portable facts
+	 * @param requirement actual requirement
+	 * @param invocations owned observations
+	 * @param invocationIds shared references
+	 */
+	public Judgment(JudgmentStatus producerStatus, @Nullable Finding finding, @Nullable Confidence confidence,
+			@Nullable ProbabilityDistribution probabilityDistribution, @Nullable JudgmentReasonCode reasonCode,
+			String reasoning, List<Check> checks, @Nullable Provenance provenance, Map<String, Object> metadata,
+			@Nullable Requirement<?> requirement, List<io.github.markpollack.judge.provenance.Invocation> invocations,
+			List<String> invocationIds) {
+		this(producerStatus, finding, confidence, probabilityDistribution, reasonCode, reasoning, checks, provenance,
+				metadata, requirement, invocations, invocationIds, null);
+	}
+
+	/**
+	 * Admit a correctly associated return, or retain a complete wrong-associated original
+	 * separately.
+	 * @param original complete native domain return
+	 * @param expected configured requirement
+	 * @param itemInvocation observation owned by this configured operation
+	 * @return admitted original or explicit ERROR refusal carrier
+	 */
+	public static Judgment refuse(Judgment original, Requirement<?> expected,
+			io.github.markpollack.judge.provenance.Invocation itemInvocation) {
+		Objects.requireNonNull(original);
+		Objects.requireNonNull(itemInvocation);
+		Requirement.validate(expected);
+		JudgmentBounds.validate(original, 0, original);
+		if (original.requirement() == null || Requirement.equivalent(original.requirement(), expected))
+			return original.forRequirement(expected).withInvocation(itemInvocation);
+		var carrier = new RefusedReturn(original, expected, RefusalReason.REQUIREMENT_MISMATCH);
+		return new Judgment(JudgmentStatus.ERROR, null, null, null, JudgmentReasonCode.RETURNED_RESULT_REJECTED,
+				"Returned result belongs to a different Requirement", List.of(), null, Map.of(), expected,
+				List.of(itemInvocation), List.of(), carrier);
+	}
 
 	/**
 	 * Metadata key reserved for aggregation evidence written by voting strategies.
@@ -136,7 +183,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		if (requirement != null)
 			return this;
 		return new Judgment(producerStatus, finding, confidence, probabilityDistribution, reasonCode, reasoning, checks,
-				provenance, metadata, actual, invocations, invocationIds);
+				provenance, metadata, actual, invocations, invocationIds, refusedReturn);
 	}
 
 	/**
@@ -164,7 +211,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 	 */
 	public Judgment withInvocations(List<io.github.markpollack.judge.provenance.Invocation> facts) {
 		return new Judgment(producerStatus, finding, confidence, probabilityDistribution, reasonCode, reasoning, checks,
-				provenance, metadata, requirement, facts, invocationIds);
+				provenance, metadata, requirement, facts, invocationIds, refusedReturn);
 	}
 
 	/**
@@ -174,11 +221,19 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 	 */
 	public Judgment withInvocationIds(List<String> ids) {
 		return new Judgment(producerStatus, finding, confidence, probabilityDistribution, reasonCode, reasoning, checks,
-				provenance, metadata, requirement, List.of(), ids);
+				provenance, metadata, requirement, List.of(), ids, refusedReturn);
 	}
 
 	/** Validates original producer facts and freezes retained collections. */
 	public Judgment {
+		if (refusedReturn != null && (producerStatus != JudgmentStatus.ERROR
+				|| reasonCode != JudgmentReasonCode.RETURNED_RESULT_REJECTED || !checks.isEmpty() || requirement == null
+				|| !Requirement.equivalent(requirement, refusedReturn.expected())))
+			throw new IllegalArgumentException(
+					"Complete refusal requires separate ERROR treatment and expected association");
+		if (reasonCode == JudgmentReasonCode.RETURNED_RESULT_REJECTED && refusedReturn == null)
+			throw new IllegalArgumentException("Returned-result rejection requires the complete original");
+
 		invocations = List.copyOf(Objects.requireNonNull(invocations, "invocations"));
 		invocationIds = List.copyOf(Objects.requireNonNull(invocationIds, "invocation IDs"));
 		invocationIds.forEach(io.github.markpollack.judge.requirement.Requirement::requireText);
@@ -717,6 +772,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 	public EnrichmentBuilder toBuilder() {
 		Builder builder = new Builder();
 		builder.status = this.producerStatus;
+		builder.refusedReturn = this.refusedReturn;
 		builder.finding = this.finding;
 		builder.confidence = this.confidence;
 		builder.probabilityDistribution = this.probabilityDistribution;
@@ -1059,6 +1115,8 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		/** Null until an outcome stage is selected; {@link #build()} requires it. */
 		private @Nullable JudgmentStatus status;
 
+		private @Nullable RefusedReturn refusedReturn;
+
 		private @Nullable Finding finding;
 
 		private @Nullable Confidence confidence;
@@ -1245,7 +1303,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 			// matches the one the compact constructor would otherwise raise.
 			return new Judgment(Objects.requireNonNull(status, "status must not be null"), finding, confidence,
 					probabilityDistribution, reasonCode, reasoning, checks, provenance, metadata, requirement,
-					invocations, invocationIds);
+					invocations, invocationIds, refusedReturn);
 		}
 
 	}

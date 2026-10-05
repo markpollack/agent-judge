@@ -3,6 +3,7 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.voting;
+
 import io.github.markpollack.judge.jury.*;
 import io.github.markpollack.judge.verdict.*;
 import io.github.markpollack.judge.voting.*;
@@ -30,7 +31,6 @@ import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
 import io.github.markpollack.judge.judgment.NumericFinding;
 import io.github.markpollack.judge.judgment.NumericKind;
-import io.github.markpollack.judge.provenance.PolicyRef;
 import io.github.markpollack.judge.judgment.ProbabilityMass;
 import io.github.markpollack.judge.judgment.BooleanFinding;
 import io.github.markpollack.judge.judgment.QualityDirection;
@@ -41,7 +41,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ModernProducerMigrationTest {
 
-	private static final ObjectMapper JSON = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+	private static final ObjectMapper JSON = new ObjectMapper()
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	private static final CompletionEvidence CONTEXT = CompletionEvidence.builder()
 		.request("migration fidelity")
@@ -49,8 +50,6 @@ class ModernProducerMigrationTest {
 
 	private static final ArtifactRef ARTIFACT = ArtifactRef.ofBytes("retained",
 			"exact bytes".getBytes(StandardCharsets.UTF_8), null);
-
-	private static final PolicyRef POLICY = new PolicyRef("application", "1", ARTIFACT.sha256());
 
 	private static Judgment rich() {
 		Finding finding = new Finding(new BooleanFinding(false), new NumericFinding(0.3, NumericKind.MEASUREMENT,

@@ -52,6 +52,7 @@ final class Checks {
 			return JSON.writeValueAsBytes(o);
 		}
 		catch (Exception e) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(e);
 			throw new IllegalArgumentException("Invalid portable configuration");
 		}
 	}
@@ -61,6 +62,7 @@ final class Checks {
 			return Objects.requireNonNull(JSON.readTree(b));
 		}
 		catch (Exception e) {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(e);
 			throw new IllegalArgumentException("Invalid provider JSON");
 		}
 	}
