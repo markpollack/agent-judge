@@ -30,9 +30,6 @@ import org.springframework.ai.chat.client.ChatClient;
  */
 public class FaithfulnessJudge extends LLMJudge<RagEvidence> {
 
-	private static final java.util.regex.Pattern ANSWER_PATTERN = java.util.regex.Pattern
-		.compile("(?mi)^\\s*Answer:\\s*(YES|NO)");
-
 	/**
 	 * Create a faithfulness judge.
 	 * @param chatClientBuilder Spring AI client used for judging
@@ -90,26 +87,7 @@ public class FaithfulnessJudge extends LLMJudge<RagEvidence> {
 
 	@Override
 	protected Judgment parseResponse(String response, RagEvidence context) {
-		var matcher = ANSWER_PATTERN.matcher(response);
-		if (!matcher.find()) {
-			return Judgment.abstain("Could not parse LLM response: " + response);
-		}
-
-		boolean pass = "YES".equalsIgnoreCase(matcher.group(1));
-		String reasoning = extractAfter(response, "Reasoning:");
-		if (reasoning.isEmpty()) {
-			reasoning = response;
-		}
-
-		return (pass ? Judgment.builder().pass() : Judgment.builder().fail()).reasoning(reasoning).build();
-	}
-
-	private static String extractAfter(String text, String marker) {
-		int idx = text.indexOf(marker);
-		if (idx >= 0) {
-			return text.substring(idx + marker.length()).trim();
-		}
-		return "";
+		return parseYesNoAnswer(response, false);
 	}
 
 	/**

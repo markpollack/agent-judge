@@ -21,16 +21,14 @@ import org.springframework.ai.chat.client.ChatClient;
  * evaluated for faithfulness or hallucination — making this a natural first-tier judge in
  * a CascadedJury.
  * <p>
- * Returns {@link JudgmentStatus#ABSTAIN} when context is empty or when the LLM response
- * cannot be parsed.
+ * Returns {@link JudgmentStatus#ABSTAIN} when question or context is empty or when the
+ * LLM response cannot be parsed. Only a leading exact Answer: YES or Answer: NO is
+ * admitted; repeated fields and labels appearing solely in reasoning abstain.
  *
  * @author Mark Pollack
  * @since 0.10.0
  */
 public class ContextualRelevanceJudge extends LLMJudge<RagEvidence> {
-
-	private static final java.util.regex.Pattern ANSWER_PATTERN = java.util.regex.Pattern
-		.compile("(?mi)^\\s*Answer:\\s*(YES|NO)");
 
 	/**
 	 * Create a contextual-relevance judge.
@@ -46,6 +44,8 @@ public class ContextualRelevanceJudge extends LLMJudge<RagEvidence> {
 
 	@Override
 	protected Judgment evaluate(RagEvidence context) {
+		if (context.question().isBlank())
+			return Judgment.abstain("No question provided — cannot evaluate relevance");
 		Optional<String> ctx = java.util.Optional.of(context.retrievedContext()).filter(value -> !value.isBlank());
 		if (ctx.isEmpty()) {
 			return Judgment.abstain("No context provided — cannot evaluate relevance");
@@ -82,26 +82,7 @@ public class ContextualRelevanceJudge extends LLMJudge<RagEvidence> {
 
 	@Override
 	protected Judgment parseResponse(String response, RagEvidence context) {
-		var matcher = ANSWER_PATTERN.matcher(response);
-		if (!matcher.find()) {
-			return Judgment.abstain("Could not parse LLM response: " + response);
-		}
-
-		boolean pass = "YES".equalsIgnoreCase(matcher.group(1));
-		String reasoning = extractAfter(response, "Reasoning:");
-		if (reasoning.isEmpty()) {
-			reasoning = response;
-		}
-
-		return (pass ? Judgment.builder().pass() : Judgment.builder().fail()).reasoning(reasoning).build();
-	}
-
-	private static String extractAfter(String text, String marker) {
-		int idx = text.indexOf(marker);
-		if (idx >= 0) {
-			return text.substring(idx + marker.length()).trim();
-		}
-		return "";
+		return parseYesNoAnswer(response, false);
 	}
 
 	/**

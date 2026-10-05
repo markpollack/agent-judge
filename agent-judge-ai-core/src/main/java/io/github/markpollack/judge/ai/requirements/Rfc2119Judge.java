@@ -153,6 +153,11 @@ public final class Rfc2119Judge implements Judge {
 		NativeExecution<JudgeModelResponse> result = runtime
 			.execute(JudgeModelRequest.user(RequirementPrompts.header(requirement) + prompt));
 		Judgment parsed = Rfc2119Parser.rollupFor(List.of(nativeSpec), result.answer());
+		if (!Boolean.TRUE.equals(parsed.metadata().get("protocolIdentityBound"))) {
+			// Preserve the full refused envelope and observed child; never promote
+			// its apparent determination when parser identity admission failed.
+			return parsed.forRequirement(requirement).withInvocation(result.invocation());
+		}
 		Judgment answer = parsed.checks().get(0).judgment();
 		// Single operation retains parser diagnostics, the actual input and the original
 		// native response facts.

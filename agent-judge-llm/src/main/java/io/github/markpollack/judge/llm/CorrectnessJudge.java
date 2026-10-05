@@ -15,8 +15,10 @@ import org.springframework.ai.chat.client.ChatClient;
  * <p>
  * CorrectnessJudge uses an LLM to determine if the agent successfully completed the task
  * specified in the goal. It provides a simple YES/NO judgment with reasoning, making it
- * ideal for cases where semantic understanding is needed but deterministic rules are
- * insufficient.
+ * Missing goal/output or a malformed or ambiguous answer yields ABSTAIN without inventing
+ * a negative assessment. The answer must be the leading exact YES/NO field (or legacy
+ * bare YES/NO, optionally followed by a dash and explanation). It is ideal for cases
+ * where semantic understanding is needed but deterministic rules are insufficient.
  * </p>
  *
  * <p>
@@ -86,47 +88,17 @@ public class CorrectnessJudge extends LLMJudge<CompletionEvidence> {
 	}
 
 	@Override
-	protected Judgment parseResponse(String response, CompletionEvidence context) {
-		// Extract YES/NO answer
-		boolean pass = response.toUpperCase().contains("YES");
-
-		// Extract reasoning (everything after "Reasoning:")
-		String reasoning = extractReasoning(response);
-
-		return (pass ? Judgment.builder().pass() : Judgment.builder().fail()).reasoning(reasoning).build();
+	protected Judgment evaluate(CompletionEvidence context) {
+		if (context.request().isBlank())
+			return Judgment.abstain("No goal provided — cannot evaluate correctness");
+		if (context.response() == null || context.response().isBlank())
+			return Judgment.abstain("No output provided — cannot evaluate correctness");
+		return super.evaluate(context);
 	}
 
-	private String extractReasoning(String response) {
-		// Try to extract reasoning section
-		int reasoningIndex = response.indexOf("Reasoning:");
-		if (reasoningIndex >= 0) {
-			return response.substring(reasoningIndex + "Reasoning:".length()).trim();
-		}
-
-		// Fallback: try to extract everything after YES/NO line
-		String[] lines = response.split("\n");
-		StringBuilder reasoning = new StringBuilder();
-		boolean foundAnswer = false;
-
-		for (String line : lines) {
-			if (line.toUpperCase().contains("YES") || line.toUpperCase().contains("NO")) {
-				foundAnswer = true;
-				continue;
-			}
-			if (foundAnswer && !line.trim().isEmpty()) {
-				if (!reasoning.isEmpty()) {
-					reasoning.append(" ");
-				}
-				reasoning.append(line.trim());
-			}
-		}
-
-		if (!reasoning.isEmpty()) {
-			return reasoning.toString();
-		}
-
-		// Final fallback: return full response
-		return response;
+	@Override
+	protected Judgment parseResponse(String response, CompletionEvidence context) {
+		return parseYesNoAnswer(response, true);
 	}
 
 	/**
