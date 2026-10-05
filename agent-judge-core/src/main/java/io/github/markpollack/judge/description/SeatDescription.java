@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.description;
+
 import io.github.markpollack.judge.verdict.KeySource;
 
 import java.util.LinkedHashMap;
@@ -11,19 +12,19 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * One seat of a {@link io.github.markpollack.judge.jury.SimpleJury}: the judge at a position,
- * the key its judgment is stored under, and the weight it votes with.
+ * One seat of a {@link io.github.markpollack.judge.jury.SimpleJury}: the judge at a
+ * position, the key its judgment is stored under, and the weight it votes with.
  *
  * <p>
  * The position is the zero-based index used by
- * {@link io.github.markpollack.judge.verdict.Verdict#individual()} and by the keys of
- * {@link io.github.markpollack.judge.verdict.Verdict#weights()}. The verdict key is the key of
- * {@link io.github.markpollack.judge.verdict.Verdict#individualByName()}. A seat is where the
- * two join.
+ * {@link io.github.markpollack.judge.verdict.Verdict#individual()} and identifies the
+ * matching retained {@link io.github.markpollack.judge.verdict.Seat}, which owns its
+ * optional declared weight. The verdict key is the key of
+ * {@link io.github.markpollack.judge.verdict.Verdict#individualByName()}. A seat is where
+ * the two join.
  * </p>
  *
- * <h2>Portable form</h2>
- * <pre>
+ * <h2>Portable form</h2> <pre>
  * {"position": 0, "verdictKey": "Judge#1", "keySource": "POSITIONAL", "weight": 1.0, "judge": {...}}
  * </pre>
  *
@@ -41,8 +42,8 @@ public record SeatDescription(int position, String verdictKey, KeySource keySour
 
 	/**
 	 * Validate the seat.
-	 * @throws IllegalArgumentException if the position is negative or the weight is negative
-	 * or not finite
+	 * @throws IllegalArgumentException if the position is negative or the weight is
+	 * negative or not finite
 	 */
 	public SeatDescription {
 		if (position < 0) {

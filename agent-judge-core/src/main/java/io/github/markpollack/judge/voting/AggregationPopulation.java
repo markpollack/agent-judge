@@ -82,6 +82,15 @@ public record AggregationPopulation(List<Judgment> eligible, List<Integer> eligi
 		int notApplicableTreatedAsFailCount, ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy,
 		@Nullable PolicyExit policyExit) {
 
+	/** Freeze the resolved portable population without modifying producer opinions. */
+	public AggregationPopulation {
+		eligible = List.copyOf(eligible);
+		eligibleIndices = List.copyOf(eligibleIndices);
+		errorCodeCounts = Map.copyOf(errorCodeCounts);
+		Objects.requireNonNull(errorPolicy);
+		Objects.requireNonNull(notApplicablePolicy);
+	}
+
 	/**
 	 * A policy that decided the aggregate before anything was reduced.
 	 *
@@ -360,6 +369,7 @@ public record AggregationPopulation(List<Judgment> eligible, List<Integer> eligi
 	}
 
 	/**
+	 * Whether a policy determined the aggregate before reduction.
 	 * @return true when a policy decided the aggregate before anything was reduced
 	 */
 	public boolean hasPolicyExit() {

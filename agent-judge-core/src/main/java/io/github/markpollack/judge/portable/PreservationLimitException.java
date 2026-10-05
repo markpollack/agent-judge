@@ -13,6 +13,7 @@ import java.util.Objects;
  */
 public final class PreservationLimitException extends RuntimeException {
 
+	/** Complete unchanged object/document available at the refused boundary. */
 	private final Object original;
 
 	/**

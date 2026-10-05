@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.ai.requirements;
+
 import io.github.markpollack.judge.verdict.Verdict;
 
 import java.util.*;
@@ -193,7 +194,9 @@ public class ConfiguredRosterTest {
 			assertThat(result.roster()).hasSize(scenario.getValue().size());
 			assertThat(result.compositeAttempts()).hasSameSizeAs(result.roster());
 			assertThat(result.invocations()).hasSize(1);
-			result.conclusion();
+			result.requireUsable();
+			var codec = NativeRequirementCodecs.codec();
+			assertThat(codec.read(codec.write(result))).isEqualTo(result);
 		}
 		var calls = new AtomicInteger();
 		String answer = Files.readString(base.resolve("rfc-all.txt"));
