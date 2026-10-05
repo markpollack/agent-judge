@@ -71,7 +71,7 @@ public final class EarsJury implements Jury {
 		 * @param runtime generated-answer harness
 		 * @return roster stage
 		 */
-		public GeneratedBuilder runtime(JudgeModel runtime) {
+		public GeneratedBuilder runtime(EvalModel runtime) {
 			return new GeneratedBuilder(Objects.requireNonNull(runtime));
 		}
 
@@ -82,7 +82,7 @@ public final class EarsJury implements Jury {
 		 * @return typed roster stage
 		 */
 		public <E> StructuredBuilder<E> runtime(
-				NativeRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime) {
+				EvalRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime) {
 			return new StructuredBuilder<>(runtime);
 		}
 
@@ -91,9 +91,9 @@ public final class EarsJury implements Jury {
 	/** Generated roster construction. */
 	public static final class GeneratedBuilder {
 
-		private final JudgeModel runtime;
+		private final EvalModel runtime;
 
-		private GeneratedBuilder(JudgeModel runtime) {
+		private GeneratedBuilder(EvalModel runtime) {
 			this.runtime = runtime;
 		}
 
@@ -111,11 +111,11 @@ public final class EarsJury implements Jury {
 	/** A roster fixed before execution. */
 	public static final class GeneratedRoster {
 
-		private final JudgeModel runtime;
+		private final EvalModel runtime;
 
 		private final List<Requirement<EarsSpecification>> requirements;
 
-		private GeneratedRoster(JudgeModel runtime, List<Requirement<EarsSpecification>> requirements) {
+		private GeneratedRoster(EvalModel runtime, List<Requirement<EarsSpecification>> requirements) {
 			this.runtime = runtime;
 			this.requirements = requirements;
 		}
@@ -161,9 +161,9 @@ public final class EarsJury implements Jury {
 	 */
 	public static final class StructuredBuilder<E> {
 
-		private final NativeRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime;
+		private final EvalRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime;
 
-		private StructuredBuilder(NativeRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime) {
+		private StructuredBuilder(EvalRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime) {
 			this.runtime = Objects.requireNonNull(runtime);
 		}
 
@@ -186,11 +186,11 @@ public final class EarsJury implements Jury {
 	public static final class StructuredRoster<E>
 			implements io.github.markpollack.judge.jury.JuryEvidenceStep<E> {
 
-		private final NativeRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime;
+		private final EvalRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime;
 
 		private final List<Requirement<EarsSpecification>> requirements;
 
-		private StructuredRoster(NativeRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime,
+		private StructuredRoster(EvalRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime,
 				List<Requirement<EarsSpecification>> requirements) {
 			this.runtime = runtime;
 			this.requirements = requirements;
@@ -313,14 +313,14 @@ public final class EarsJury implements Jury {
 		return Verdict.observed(req.id(), original, req.specification().applicability()).forRequirement(req);
 	}
 
-	private static Verdict generated(JudgeModel runtime, List<Requirement<EarsSpecification>> requirements,
+	private static Verdict generated(EvalModel runtime, List<Requirement<EarsSpecification>> requirements,
 			String input) {
 		List<EarsCriterion> nativeRoster = requirements.stream()
 			.map(req -> new EarsCriterion(req.id(), req.specification().title(), req.specification().requirement(),
 					req.specification().applicability()))
 			.toList();
 		String prompt = EarsParser.templateFor("Ears roster", nativeRoster).render(Map.of("workspace", input));
-		var result = runtime.execute(JudgeModelRequest
+		var result = runtime.execute(EvalModelRequest
 			.user(requirements.stream().map(RequirementPrompts::header).collect(java.util.stream.Collectors.joining())
 					+ prompt));
 		Judgment parsed = EarsParser.rollupFor(nativeRoster, result.answer());

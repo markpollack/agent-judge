@@ -42,6 +42,24 @@ public class ContextualRelevanceJudge extends LLMJudge<RagEvidence> {
 				chatClientBuilder);
 	}
 
+ /** Configure a portable generated runtime.
+  * @param runtime configured runtime
+  * @param evidence fresh evidence provider */
+ public ContextualRelevanceJudge(io.github.markpollack.judge.ai.model.EvalModel runtime,
+   java.util.function.Supplier<? extends RagEvidence> evidence) {
+  super(runtime,evidence,"ContextualRelevance","Evaluates whether retrieved context is relevant to the question");
+ }
+ /** Runtime-first construction without acquiring evidence.
+  * @return runtime stage */
+ public static RuntimeStep builder() { return runtime -> io.github.markpollack.judge.construction.EvidenceSteps.of(evidence -> new ContextualRelevanceJudge(runtime,evidence)); }
+ /** Select the generated runtime before evidence. */
+ public interface RuntimeStep {
+  /** Select the configured runtime without execution.
+  * @param runtime configured generated runtime
+  * @return typed evidence stage */
+  io.github.markpollack.judge.construction.EvidenceStep<RagEvidence> runtime(io.github.markpollack.judge.ai.model.EvalModel runtime);
+ }
+
 	@Override
 	protected Judgment evaluate(RagEvidence context) {
 		if (context.question().isBlank())
@@ -92,8 +110,7 @@ public class ContextualRelevanceJudge extends LLMJudge<RagEvidence> {
 	 */
 	public static io.github.markpollack.judge.construction.EvidenceStep<RagEvidence> builder(
 			ChatClient.Builder client) {
-		return io.github.markpollack.judge.construction.EvidenceSteps
-			.of(evidence -> new ContextualRelevanceJudge(evidence, client));
+		return builder().runtime(new io.github.markpollack.judge.llm.SpringAiEvalModel(client));
 	}
 
 }

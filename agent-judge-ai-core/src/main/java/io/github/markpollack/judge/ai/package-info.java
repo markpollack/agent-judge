@@ -11,7 +11,7 @@
  * <ul>
  * <li>{@link io.github.markpollack.judge.ai.ModelBackedJudge} — composed judge (builder,
  * no subclassing)</li>
- * <li>{@link io.github.markpollack.judge.ai.model.JudgeModel} — framework-agnostic model
+ * <li>{@link io.github.markpollack.judge.ai.model.EvalModel} — framework-agnostic model
  * invocation</li>
  * <li>{@link io.github.markpollack.judge.ai.prompt.JudgePromptTemplate} — externalized
  * prompt templates</li>
@@ -21,6 +21,6 @@
  *
  * <p>
  * Framework adapter modules bridge specific AI runtimes into
- * {@link io.github.markpollack.judge.ai.model.JudgeModel}.
+ * {@link io.github.markpollack.judge.ai.model.EvalModel}.
  */
 package io.github.markpollack.judge.ai;

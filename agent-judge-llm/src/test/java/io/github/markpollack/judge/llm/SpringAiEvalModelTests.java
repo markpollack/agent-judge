@@ -7,8 +7,8 @@ package io.github.markpollack.judge.llm;
 
 import java.util.List;
 
-import io.github.markpollack.judge.ai.model.JudgeModelRequest;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModelRequest;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
@@ -46,8 +46,8 @@ class SpringAiJudgeModelTests {
 		ChatResponse chatResponse = new ChatResponse(List.of(generation), responseMeta);
 		given(callSpec.chatResponse()).willReturn(chatResponse);
 
-		SpringAiJudgeModel model = new SpringAiJudgeModel(chatClient);
-		JudgeModelResponse response = model.generate(JudgeModelRequest.user("Is this relevant?"));
+		SpringAiEvalModel model = new SpringAiEvalModel(chatClient);
+		EvalModelResponse response = model.generate(EvalModelRequest.user("Is this relevant?"));
 
 		assertThat(response.text()).isEqualTo("relevant");
 		assertThat(response.model()).isEqualTo("gpt-4o");
@@ -79,8 +79,8 @@ class SpringAiJudgeModelTests {
 			.build();
 		given(callSpec.chatResponse()).willReturn(new ChatResponse(List.of(generation), responseMeta));
 
-		JudgeModelResponse response = new SpringAiJudgeModel(chatClient)
-			.generate(JudgeModelRequest.user("Is this relevant?"));
+		EvalModelResponse response = new SpringAiEvalModel(chatClient)
+			.generate(EvalModelRequest.user("Is this relevant?"));
 
 		assertThat(response.usage()).isNotNull();
 		assertThat(response.usage().cacheReadTokens()).isEqualTo(40L);
@@ -107,7 +107,7 @@ class SpringAiJudgeModelTests {
 		ChatResponse chatResponse = new ChatResponse(List.of(new Generation(msg)));
 		given(callSpec.chatResponse()).willReturn(chatResponse);
 
-		SpringAiJudgeModel model = new SpringAiJudgeModel(chatClient);
+		SpringAiEvalModel model = new SpringAiEvalModel(chatClient);
 
 		assertThat(model.generateText("hello")).isEqualTo("yes");
 	}

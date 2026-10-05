@@ -41,9 +41,9 @@ class ConfiguredStorageTest {
 	}
 
 	private Verdict roster(String answer, AtomicInteger calls) {
-		JudgeModel runtime = request -> {
+		EvalModel runtime = request -> {
 			calls.incrementAndGet();
-			return new JudgeModelResponse(answer, "model", Usage.builder().inputTokens(11).outputTokens(7).build(),
+			return new EvalModelResponse(answer, "model", Usage.builder().inputTokens(11).outputTokens(7).build(),
 					Map.of("sessionId", "s7"));
 		};
 		return Rfc2119Jury.builder().runtime(runtime).requirements(List.of(a, b)).build().vote();
@@ -84,7 +84,7 @@ class ConfiguredStorageTest {
 		for (String applicability : Arrays.asList(null, "feature exists")) {
 			var requirement = Rfc2119Requirement.of("C", "rev7", "MUST", "retain", "audit", applicability);
 			Verdict result = Rfc2119Jury.builder()
-				.runtime((JudgeModel) request -> new JudgeModelResponse("C: NOT_APPLICABLE - feature absent", null,
+				.runtime((EvalModel) request -> new EvalModelResponse("C: NOT_APPLICABLE - feature absent", null,
 						null, Map.of()))
 				.requirements(List.of(requirement))
 				.build()
@@ -110,7 +110,7 @@ class ConfiguredStorageTest {
 		var failure = new IllegalStateException("decode failed");
 		var nativeFact = new Invocation("i1", "typed:v1", false, null, 4, Map.of("usage", Map.of("inputTokens", 3L)),
 				List.of(), failure);
-		NativeRuntime<RequirementRequest<Rfc2119Specification, String>, Judgment> runtime = request -> new NativeExecution<>(
+		EvalRuntime<RequirementRequest<Rfc2119Specification, String>, Judgment> runtime = request -> new NativeExecution<>(
 				Judgment.error("bad native answer"), nativeFact);
 		var original = Rfc2119Judge.builder().runtime(runtime).requirement(a).evidence("actual").build().judge();
 		assertThat(original.requirement()).isSameAs(a);
@@ -136,7 +136,7 @@ class ConfiguredStorageTest {
 		var acquisitions = new AtomicInteger();
 		var evidence = new ArrayList<String>();
 		var lower = invocation("shared-lower");
-		NativeRuntime<RequirementRequest<Rfc2119Specification, String>, Judgment> runtime = request -> {
+		EvalRuntime<RequirementRequest<Rfc2119Specification, String>, Judgment> runtime = request -> {
 			evidence.add(request.evidence());
 			return new NativeExecution<>(Judgment.pass("satisfied").withInvocation(lower),
 					invocation("call-" + calls.incrementAndGet()));
@@ -164,7 +164,7 @@ class ConfiguredStorageTest {
 	@Test
 	void failedSiblingPreservesOriginalCauseAndCancellationPropagates() {
 		var failure = new IllegalArgumentException("native failed");
-		NativeRuntime<RequirementRequest<Rfc2119Specification, String>, Judgment> runtime = request -> {
+		EvalRuntime<RequirementRequest<Rfc2119Specification, String>, Judgment> runtime = request -> {
 			if (request.requirement().id().equals("B"))
 				throw failure;
 			return new NativeExecution<>(Judgment.fail("bound violation"), invocation("i1"));
@@ -178,7 +178,7 @@ class ConfiguredStorageTest {
 		assertThat(result.conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
 		assertThat(result.compositeAttempts().getLast().failure().cause()).isSameAs(failure);
 		assertThat(codec.read(codec.write(result)).conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
-		NativeRuntime<RequirementRequest<Rfc2119Specification, String>, Judgment> cancelled = request -> {
+		EvalRuntime<RequirementRequest<Rfc2119Specification, String>, Judgment> cancelled = request -> {
 			throw new CancellationException("stop");
 		};
 		assertThatThrownBy(() -> Rfc2119Jury.builder()

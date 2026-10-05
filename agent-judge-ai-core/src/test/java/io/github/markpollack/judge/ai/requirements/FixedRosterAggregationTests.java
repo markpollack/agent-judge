@@ -8,8 +8,8 @@ package io.github.markpollack.judge.ai.requirements;
 import java.util.List;
 import java.util.Map;
 
-import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModel;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import java.nio.file.Path;
 import io.github.markpollack.judge.voting.AllMustPassStrategy;
 import io.github.markpollack.judge.judgment.Judgment;
@@ -120,9 +120,9 @@ class FixedRosterAggregationTests {
 	}
 
 	private static Judgment judge(String answers) {
-		JudgeModel model = request -> new JudgeModelResponse(answers, "stub", null, Map.of());
+		EvalModel model = request -> new EvalModelResponse(answers, "stub", null, Map.of());
 		return EarsParser.rollupFor(THREE,
-				model.generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
+				model.generate(io.github.markpollack.judge.ai.model.EvalModelRequest.user("parser fixture")));
 	}
 
 }

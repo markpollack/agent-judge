@@ -52,7 +52,7 @@ public final class Rfc2119Judge implements Judge {
 		 * @param runtime configured native model or agent
 		 * @return requirement construction
 		 */
-		public GeneratedBuilder runtime(JudgeModel runtime) {
+		public GeneratedBuilder runtime(EvalModel runtime) {
 			return new GeneratedBuilder(Objects.requireNonNull(runtime));
 		}
 
@@ -63,7 +63,7 @@ public final class Rfc2119Judge implements Judge {
 		 * @return requirement construction
 		 */
 		public <E> JudgeRecipe<Rfc2119Specification, E> runtime(
-				NativeRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime) {
+				EvalRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime) {
 			Objects.requireNonNull(runtime);
 			return requirement -> {
 				Requirement.validate(requirement);
@@ -90,9 +90,9 @@ public final class Rfc2119Judge implements Judge {
 	/** Generated judging setup, reusable across independent requirements. */
 	public static final class GeneratedBuilder implements JudgeRecipe<Rfc2119Specification, String> {
 
-		private final JudgeModel runtime;
+		private final EvalModel runtime;
 
-		private GeneratedBuilder(JudgeModel runtime) {
+		private GeneratedBuilder(EvalModel runtime) {
 			this.runtime = runtime;
 		}
 
@@ -109,11 +109,11 @@ public final class Rfc2119Judge implements Judge {
 	 */
 	public static final class GeneratedRequirement implements EvidenceStep<String>, ReadyJudge {
 
-		private final JudgeModel runtime;
+		private final EvalModel runtime;
 
 		private final Requirement<Rfc2119Specification> requirement;
 
-		private GeneratedRequirement(JudgeModel runtime, Requirement<Rfc2119Specification> requirement) {
+		private GeneratedRequirement(EvalModel runtime, Requirement<Rfc2119Specification> requirement) {
 			this.runtime = runtime;
 			this.requirement = requirement;
 		}
@@ -145,13 +145,13 @@ public final class Rfc2119Judge implements Judge {
 
 	}
 
-	private static Judgment generated(JudgeModel runtime, Requirement<Rfc2119Specification> requirement, String input) {
+	private static Judgment generated(EvalModel runtime, Requirement<Rfc2119Specification> requirement, String input) {
 		Rfc2119Constraint nativeSpec = new Rfc2119Constraint(requirement.id(), requirement.specification().keyword(),
 				requirement.specification().requirement(), requirement.specification().reason(),
 				requirement.specification().applicability());
 		String prompt = Rfc2119Parser.templateFor("Rfc2119", List.of(nativeSpec)).render(Map.of("workspace", input));
-		NativeExecution<JudgeModelResponse> result = runtime
-			.execute(JudgeModelRequest.user(RequirementPrompts.header(requirement) + prompt));
+		NativeExecution<EvalModelResponse> result = runtime
+			.execute(EvalModelRequest.user(RequirementPrompts.header(requirement) + prompt));
 		Judgment parsed = Rfc2119Parser.rollupFor(List.of(nativeSpec), result.answer());
 		if (!Boolean.TRUE.equals(parsed.metadata().get("protocolIdentityBound"))) {
 			// Preserve the full refused envelope and observed child; never promote

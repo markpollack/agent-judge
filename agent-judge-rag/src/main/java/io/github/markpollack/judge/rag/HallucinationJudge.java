@@ -43,6 +43,24 @@ public class HallucinationJudge extends LLMJudge<RagEvidence> {
 				chatClientBuilder);
 	}
 
+ /** Configure a portable generated runtime.
+  * @param runtime configured runtime
+  * @param evidence fresh evidence provider */
+ public HallucinationJudge(io.github.markpollack.judge.ai.model.EvalModel runtime,
+   java.util.function.Supplier<? extends RagEvidence> evidence) {
+  super(runtime,evidence,"Hallucination","Evaluates whether the answer contains unsupported claims");
+ }
+ /** Runtime-first construction without acquiring evidence.
+  * @return runtime stage */
+ public static RuntimeStep builder() { return runtime -> io.github.markpollack.judge.construction.EvidenceSteps.of(evidence -> new HallucinationJudge(runtime,evidence)); }
+ /** Select the generated runtime before evidence. */
+ public interface RuntimeStep {
+  /** Select the configured runtime without execution.
+  * @param runtime configured generated runtime
+  * @return typed evidence stage */
+  io.github.markpollack.judge.construction.EvidenceStep<RagEvidence> runtime(io.github.markpollack.judge.ai.model.EvalModel runtime);
+ }
+
 	@Override
 	protected Judgment evaluate(RagEvidence context) {
 		Optional<String> ctx = java.util.Optional.of(context.retrievedContext()).filter(value -> !value.isBlank());
@@ -99,8 +117,7 @@ public class HallucinationJudge extends LLMJudge<RagEvidence> {
 	 */
 	public static io.github.markpollack.judge.construction.EvidenceStep<RagEvidence> builder(
 			ChatClient.Builder client) {
-		return io.github.markpollack.judge.construction.EvidenceSteps
-			.of(evidence -> new HallucinationJudge(evidence, client));
+		return builder().runtime(new io.github.markpollack.judge.llm.SpringAiEvalModel(client));
 	}
 
 }

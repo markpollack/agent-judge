@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModel;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import java.nio.file.Path;
 import io.github.markpollack.judge.judgment.Check;
 import io.github.markpollack.judge.judgment.Judgment;
@@ -261,8 +261,8 @@ class ConditionalCriterionTests {
 		return (List<Map<String, Object>>) judgment.metadata().get("notApplicable");
 	}
 
-	private static JudgeModel model(String answers) {
-		return request -> new JudgeModelResponse(answers, "stub", null, Map.of());
+	private static EvalModel model(String answers) {
+		return request -> new EvalModelResponse(answers, "stub", null, Map.of());
 	}
 
 	private static Judgment ears(String answers) {
@@ -271,12 +271,12 @@ class ConditionalCriterionTests {
 
 	private static Judgment judgeWith(List<EarsCriterion> criteria, String answers) {
 		return EarsParser.rollupFor(criteria,
-				model(answers).generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
+				model(answers).generate(io.github.markpollack.judge.ai.model.EvalModelRequest.user("parser fixture")));
 	}
 
 	private static Judgment rfc(String answers) {
 		return Rfc2119Parser.rollupFor(CONSTRAINTS,
-				model(answers).generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
+				model(answers).generate(io.github.markpollack.judge.ai.model.EvalModelRequest.user("parser fixture")));
 	}
 
 	private static EarsJury earsRoster(List<EarsCriterion> source) {

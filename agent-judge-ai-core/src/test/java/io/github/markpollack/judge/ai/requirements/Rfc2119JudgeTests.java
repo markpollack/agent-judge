@@ -8,8 +8,8 @@ package io.github.markpollack.judge.ai.requirements;
 import java.util.List;
 import java.util.Map;
 
-import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModel;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import java.nio.file.Path;
 import io.github.markpollack.judge.judgment.Check;
 import io.github.markpollack.judge.judgment.Judgment;
@@ -118,10 +118,10 @@ class Rfc2119JudgeTests {
 
 	@Test
 	void aBackendThatCouldNotAnswerBlamesTheJudgeNotTheSubject() {
-		JudgeModel model = request -> new JudgeModelResponse("No API credentials are configured for this backend",
+		EvalModel model = request -> new EvalModelResponse("No API credentials are configured for this backend",
 				"recorded", null, Map.of(), false);
 		Judgment judgment = Rfc2119Parser.rollupFor(THREE,
-				model.generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
+				model.generate(io.github.markpollack.judge.ai.model.EvalModelRequest.user("parser fixture")));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).isEqualTo("No API credentials are configured for this backend");
@@ -129,9 +129,9 @@ class Rfc2119JudgeTests {
 
 	@Test
 	void aSilentlyUnsuccessfulBackendStillNamesItselfAsTheProblem() {
-		JudgeModel model = request -> new JudgeModelResponse("", "recorded", null, Map.of(), false);
+		EvalModel model = request -> new EvalModelResponse("", "recorded", null, Map.of(), false);
 		Judgment judgment = Rfc2119Parser.rollupFor(THREE,
-				model.generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
+				model.generate(io.github.markpollack.judge.ai.model.EvalModelRequest.user("parser fixture")));
 
 		assertThat(judgment.status()).isEqualTo(JudgmentStatus.ERROR);
 		assertThat(judgment.reasoning()).isEqualTo("The judging agent did not complete its run");
@@ -195,9 +195,9 @@ class Rfc2119JudgeTests {
 	}
 
 	private static Judgment judge(String answers) {
-		JudgeModel model = request -> new JudgeModelResponse(answers, "stub", null, Map.of());
+		EvalModel model = request -> new EvalModelResponse(answers, "stub", null, Map.of());
 		return Rfc2119Parser.rollupFor(THREE,
-				model.generate(io.github.markpollack.judge.ai.model.JudgeModelRequest.user("parser fixture")));
+				model.generate(io.github.markpollack.judge.ai.model.EvalModelRequest.user("parser fixture")));
 	}
 
 	private static Path context() {

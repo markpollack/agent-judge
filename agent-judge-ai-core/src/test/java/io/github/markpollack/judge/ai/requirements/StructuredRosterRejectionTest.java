@@ -36,7 +36,7 @@ class StructuredRosterRejectionTest {
 	void rfcCancellationEscapesStructuredRosterContainment() {
 		var a = Rfc2119Requirement.of("A", "1", "MUST", "retain", "audit", null);
 		var cancelled = new CancellationException("caller cancelled");
-		NativeRuntime<RequirementRequest<Rfc2119Specification, String>, Judgment> runtime = request -> {
+		EvalRuntime<RequirementRequest<Rfc2119Specification, String>, Judgment> runtime = request -> {
 			throw cancelled;
 		};
 		assertThatThrownBy(
@@ -48,7 +48,7 @@ class StructuredRosterRejectionTest {
 	void earsCancellationEscapesStructuredRosterContainment() {
 		var a = EarsRequirement.of("A", "1", "retain", "The system shall retain facts", null);
 		var cancelled = new CancellationException("caller cancelled");
-		NativeRuntime<RequirementRequest<EarsSpecification, String>, Judgment> runtime = request -> {
+		EvalRuntime<RequirementRequest<EarsSpecification, String>, Judgment> runtime = request -> {
 			throw cancelled;
 		};
 		assertThatThrownBy(
@@ -65,13 +65,13 @@ class StructuredRosterRejectionTest {
 	}
 
 	private <S> void verifyRejection(Requirement<S> a, Requirement<S> alien,
-			Function<NativeRuntime<RequirementRequest<S, String>, Judgment>, Jury> configure) {
+			Function<EvalRuntime<RequirementRequest<S, String>, Judgment>, Jury> configure) {
 		var calls = new AtomicInteger();
 		var lower = new Invocation("lower", "fixture:v1", true, "native", 2, Map.of("original", "retained"), List.of());
 		var returned = Judgment.fail("Apparent unbound violation").forRequirement(alien).withInvocation(lower);
 		var invocation = new Invocation("item", "fixture:v1", true, "native", 3, Map.of("rawAnswer", "ALIEN: FAIL"),
 				List.of());
-		NativeRuntime<RequirementRequest<S, String>, Judgment> runtime = request -> {
+		EvalRuntime<RequirementRequest<S, String>, Judgment> runtime = request -> {
 			calls.incrementAndGet();
 			assertThat(request.requirement()).isSameAs(a);
 			return new NativeExecution<>(returned, invocation);

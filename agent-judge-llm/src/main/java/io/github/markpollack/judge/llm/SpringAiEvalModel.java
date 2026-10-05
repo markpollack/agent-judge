@@ -12,15 +12,15 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.model.ChatResponse;
 
-import io.github.markpollack.judge.ai.model.JudgeMessage;
-import io.github.markpollack.judge.ai.model.JudgeMessageRole;
-import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelRequest;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalMessage;
+import io.github.markpollack.judge.ai.model.EvalMessageRole;
+import io.github.markpollack.judge.ai.model.EvalModel;
+import io.github.markpollack.judge.ai.model.EvalModelRequest;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import io.github.markpollack.judge.ai.model.Usage;
 
 /**
- * {@link JudgeModel} adapter that delegates to Spring AI {@link ChatClient}.
+ * {@link EvalModel} adapter that delegates to Spring AI {@link ChatClient}.
  *
  * <p>
  * This is the <strong>judging-side</strong> adapter — it uses Spring AI to invoke an LLM
@@ -30,7 +30,7 @@ import io.github.markpollack.judge.ai.model.Usage;
  * @author Mark Pollack
  * @since 0.10.0
  */
-public final class SpringAiJudgeModel implements JudgeModel {
+public final class SpringAiEvalModel implements EvalModel {
 
 	private final ChatClient chatClient;
 
@@ -40,7 +40,7 @@ public final class SpringAiJudgeModel implements JudgeModel {
 	 * Create an adapter from an existing chat client.
 	 * @param chatClient chat client
 	 */
-	public SpringAiJudgeModel(ChatClient chatClient) {
+	public SpringAiEvalModel(ChatClient chatClient) {
 		this(chatClient, io.github.markpollack.judge.ai.model.NativeCapture.json(1048576));
 	}
 
@@ -48,7 +48,7 @@ public final class SpringAiJudgeModel implements JudgeModel {
 	 * Create an adapter from a chat client builder.
 	 * @param chatClientBuilder chat client builder
 	 */
-	public SpringAiJudgeModel(ChatClient.Builder chatClientBuilder) {
+	public SpringAiEvalModel(ChatClient.Builder chatClientBuilder) {
 		this(chatClientBuilder.build());
 	}
 
@@ -57,22 +57,23 @@ public final class SpringAiJudgeModel implements JudgeModel {
 	 * @param client configured chat harness
 	 * @param capture original native response capture
 	 */
-	public SpringAiJudgeModel(ChatClient client,
+	public SpringAiEvalModel(ChatClient client,
 			io.github.markpollack.judge.ai.model.NativeCapture<ChatResponse> capture) {
 		this.chatClient = java.util.Objects.requireNonNull(client);
 		this.capture = java.util.Objects.requireNonNull(capture);
 	}
 
 	@Override
-	public void validateRequest(JudgeModelRequest request) {
+	public void validateRequest(EvalModelRequest request) {
 		java.util.Objects.requireNonNull(request);
+		if(!request.metadata().isEmpty()) throw new IllegalArgumentException("This configured adapter does not transmit request metadata");
 		if (request.options().timeout() != null || request.options().responseFormat() != null)
 			throw new IllegalArgumentException(
 					"Spring AI timeout/responseFormat must be configured on the native harness");
 	}
 
 	@Override
-	public JudgeModelResponse generate(JudgeModelRequest request) {
+	public EvalModelResponse generate(EvalModelRequest request) {
 		validateRequest(request);
 		java.util.List<org.springframework.ai.chat.messages.Message> messages = request.messages()
 			.stream().<org.springframework.ai.chat.messages.Message>map(message -> switch (message.role()) {
@@ -90,69 +91,45 @@ public final class SpringAiJudgeModel implements JudgeModel {
 				.maxTokens(options.maxTokens()));
 
 		ChatResponse chatResponse = spec.call().chatResponse();
+		if(chatResponse==null) return EvalModelResponse.noAnswer(new IllegalStateException("Spring AI returned no response"));
 
-		// Extract response text
-		String text = "";
-		if (chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null) {
-			text = chatResponse.getResult().getOutput().getText();
-		}
+        // Capture the complete native return before normalizing provider fields.
+        Map<String,Object> metadata = new HashMap<>();
+        java.util.List<io.github.markpollack.judge.provenance.ArtifactRef> artifacts = java.util.List.of();
+        Throwable responseFailure = null;
+        try {
+            var snapshot = capture.capture(chatResponse);
+            metadata.putAll(snapshot.facts()); artifacts = snapshot.artifacts();
+        } catch (java.util.concurrent.CancellationException cancelled) { throw cancelled; }
+        catch (RuntimeException failure) {
+            if (Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("Native capture interrupted");
+            responseFailure = failure;
+            metadata.put("captureFailure", failure.getClass().getName()+": "+java.util.Objects.toString(failure.getMessage(),""));
+        }
+        String text = "";
+        String model = null;
+        Usage usage = null;
+        boolean completed = false;
+        try {
+            var result = chatResponse.getResult();
+            if(result != null && result.getOutput() != null) text = result.getOutput().getText();
+            var responseMeta = chatResponse.getMetadata();
+            if(responseMeta != null) {
+                model = responseMeta.getModel();
+                if(responseMeta.getId()!=null) metadata.put("responseId",responseMeta.getId());
+            }
+            String finish = result==null || result.getMetadata()==null ? null : result.getMetadata().getFinishReason();
+            if(finish!=null) metadata.put("finishReason",finish);
+            if(responseMeta!=null) usage=tokenUsage(responseMeta.getUsage());
+            completed=result!=null && responseFailure==null && (finish==null || finish.isBlank() || java.util.Set.of("stop","STOP","SUCCESS","COMPLETE").contains(finish));
+        } catch (java.util.concurrent.CancellationException cancelled) { throw cancelled; }
+        catch(RuntimeException failure) {
+            if(Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("Native response mapping interrupted");
+            if(responseFailure==null) responseFailure=failure;
+            metadata.put("mappingFailure", failure.getClass().getName()+": "+java.util.Objects.toString(failure.getMessage(),""));
+        }
 
-		// Extract metadata
-		String model = null;
-		Usage usage = null;
-		Map<String, Object> metadata = new HashMap<>();
-
-		ChatResponseMetadata responseMeta = chatResponse.getMetadata();
-		if (responseMeta != null) {
-			model = responseMeta.getModel();
-			if (responseMeta.getId() != null) {
-				metadata.put("responseId", responseMeta.getId());
-			}
-		}
-
-		String finish = chatResponse.getResult() == null ? null
-				: chatResponse.getResult().getMetadata().getFinishReason();
-		if (finish != null)
-			metadata.put("finishReason", finish);
-		boolean completed = chatResponse.getResult() != null && (finish == null || finish.isBlank()
-				|| java.util.Set.of("stop", "STOP", "SUCCESS", "COMPLETE").contains(finish));
-		Throwable responseFailure = null;
-		java.util.List<io.github.markpollack.judge.provenance.ArtifactRef> artifacts = java.util.List.of();
-		try {
-			var snapshot = capture.capture(chatResponse);
-			metadata.putAll(snapshot.facts());
-			artifacts = snapshot.artifacts();
-		}
-		catch (java.util.concurrent.CancellationException cancelled) {
-			throw cancelled;
-		}
-		catch (RuntimeException failure) {
-			if (Thread.currentThread().isInterrupted())
-				throw new java.util.concurrent.CancellationException("Native capture interrupted");
-			responseFailure = failure;
-			metadata.put("captureFailure",
-					failure.getClass().getName() + ": " + java.util.Objects.toString(failure.getMessage(), ""));
-			completed = false;
-		}
-		// Normalize only after native capture. A malformed common quantity must not
-		// replace the returned SDK answer with an invocation-failure description.
-		try {
-			if (responseMeta != null)
-				usage = tokenUsage(responseMeta.getUsage());
-		}
-		catch (java.util.concurrent.CancellationException cancelled) {
-			throw cancelled;
-		}
-		catch (RuntimeException failure) {
-			if (Thread.currentThread().isInterrupted())
-				throw new java.util.concurrent.CancellationException("Native response mapping interrupted");
-			if (responseFailure == null)
-				responseFailure = failure;
-			metadata.put("mappingFailure",
-					failure.getClass().getName() + ": " + java.util.Objects.toString(failure.getMessage(), ""));
-			completed = false;
-		}
-		return new JudgeModelResponse(text == null ? "" : text, model, usage, metadata, completed, artifacts,
+		return new EvalModelResponse(text == null ? "" : text, model, usage, metadata, completed, artifacts,
 				responseFailure);
 	}
 

@@ -71,7 +71,7 @@ public final class Rfc2119Jury implements Jury {
 		 * @param runtime generated-answer harness
 		 * @return roster stage
 		 */
-		public GeneratedBuilder runtime(JudgeModel runtime) {
+		public GeneratedBuilder runtime(EvalModel runtime) {
 			return new GeneratedBuilder(Objects.requireNonNull(runtime));
 		}
 
@@ -82,7 +82,7 @@ public final class Rfc2119Jury implements Jury {
 		 * @return typed roster stage
 		 */
 		public <E> StructuredBuilder<E> runtime(
-				NativeRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime) {
+				EvalRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime) {
 			return new StructuredBuilder<>(runtime);
 		}
 
@@ -91,9 +91,9 @@ public final class Rfc2119Jury implements Jury {
 	/** Generated roster construction. */
 	public static final class GeneratedBuilder {
 
-		private final JudgeModel runtime;
+		private final EvalModel runtime;
 
-		private GeneratedBuilder(JudgeModel runtime) {
+		private GeneratedBuilder(EvalModel runtime) {
 			this.runtime = runtime;
 		}
 
@@ -111,11 +111,11 @@ public final class Rfc2119Jury implements Jury {
 	/** A roster fixed before execution. */
 	public static final class GeneratedRoster {
 
-		private final JudgeModel runtime;
+		private final EvalModel runtime;
 
 		private final List<Requirement<Rfc2119Specification>> requirements;
 
-		private GeneratedRoster(JudgeModel runtime, List<Requirement<Rfc2119Specification>> requirements) {
+		private GeneratedRoster(EvalModel runtime, List<Requirement<Rfc2119Specification>> requirements) {
 			this.runtime = runtime;
 			this.requirements = requirements;
 		}
@@ -161,9 +161,9 @@ public final class Rfc2119Jury implements Jury {
 	 */
 	public static final class StructuredBuilder<E> {
 
-		private final NativeRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime;
+		private final EvalRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime;
 
-		private StructuredBuilder(NativeRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime) {
+		private StructuredBuilder(EvalRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime) {
 			this.runtime = Objects.requireNonNull(runtime);
 		}
 
@@ -186,11 +186,11 @@ public final class Rfc2119Jury implements Jury {
 	public static final class StructuredRoster<E>
 			implements io.github.markpollack.judge.jury.JuryEvidenceStep<E> {
 
-		private final NativeRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime;
+		private final EvalRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime;
 
 		private final List<Requirement<Rfc2119Specification>> requirements;
 
-		private StructuredRoster(NativeRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime,
+		private StructuredRoster(EvalRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime,
 				List<Requirement<Rfc2119Specification>> requirements) {
 			this.runtime = runtime;
 			this.requirements = requirements;
@@ -313,7 +313,7 @@ public final class Rfc2119Jury implements Jury {
 		return Verdict.observed(req.id(), original, req.specification().applicability()).forRequirement(req);
 	}
 
-	private static Verdict generated(JudgeModel runtime, List<Requirement<Rfc2119Specification>> requirements,
+	private static Verdict generated(EvalModel runtime, List<Requirement<Rfc2119Specification>> requirements,
 			String input) {
 		List<Rfc2119Constraint> nativeRoster = requirements.stream()
 			.map(req -> new Rfc2119Constraint(req.id(), req.specification().keyword(),
@@ -321,7 +321,7 @@ public final class Rfc2119Jury implements Jury {
 					req.specification().applicability()))
 			.toList();
 		String prompt = Rfc2119Parser.templateFor("Rfc2119 roster", nativeRoster).render(Map.of("workspace", input));
-		var result = runtime.execute(JudgeModelRequest
+		var result = runtime.execute(EvalModelRequest
 			.user(requirements.stream().map(RequirementPrompts::header).collect(java.util.stream.Collectors.joining())
 					+ prompt));
 		Judgment parsed = Rfc2119Parser.rollupFor(nativeRoster, result.answer());

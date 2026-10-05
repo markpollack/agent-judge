@@ -8,8 +8,8 @@ package io.github.markpollack.judge.agentclient;
 import io.github.markpollack.agents.client.AgentClient;
 import io.github.markpollack.agents.client.AgentClientResponse;
 import io.github.markpollack.agents.model.AgentResponseMetadata;
-import io.github.markpollack.judge.ai.model.JudgeModelRequest;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModelRequest;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,10 +30,10 @@ class AgentClientJudgeModelTests {
 		given(clientResponse.getMetadata())
 			.willReturn(new AgentResponseMetadata("claude-sonnet-4-20250514", null, "session-abc", null));
 
-		AgentClientJudgeModel model = new AgentClientJudgeModel(agentClient,
+		AgentClientEvalModel model = new AgentClientEvalModel(agentClient,
 				response -> new io.github.markpollack.judge.ai.model.NativeSnapshot(
 						java.util.Map.of("fixture", "mock response"), java.util.List.of()));
-		JudgeModelResponse response = model.generate(JudgeModelRequest.user("Review this code for correctness"));
+		EvalModelResponse response = model.generate(EvalModelRequest.user("Review this code for correctness"));
 
 		assertThat(response.text()).isEqualTo("The code is correct.");
 		assertThat(response.model()).isEqualTo("claude-sonnet-4-20250514");
@@ -51,10 +51,10 @@ class AgentClientJudgeModelTests {
 		given(clientResponse.isSuccessful()).willReturn(false);
 		given(clientResponse.getMetadata()).willThrow(new RuntimeException("no metadata"));
 
-		AgentClientJudgeModel model = new AgentClientJudgeModel(agentClient,
+		AgentClientEvalModel model = new AgentClientEvalModel(agentClient,
 				response -> new io.github.markpollack.judge.ai.model.NativeSnapshot(
 						java.util.Map.of("fixture", "mock response"), java.util.List.of()));
-		JudgeModelResponse response = model.generate(JudgeModelRequest.user("test"));
+		EvalModelResponse response = model.generate(EvalModelRequest.user("test"));
 
 		assertThat(response.text()).isEqualTo("output");
 		assertThat(response.model()).isNull();
@@ -71,10 +71,10 @@ class AgentClientJudgeModelTests {
 		given(clientResponse.isSuccessful()).willReturn(false);
 		given(clientResponse.getMetadata()).willThrow(new RuntimeException("no metadata"));
 
-		AgentClientJudgeModel model = new AgentClientJudgeModel(agentClient,
+		AgentClientEvalModel model = new AgentClientEvalModel(agentClient,
 				response -> new io.github.markpollack.judge.ai.model.NativeSnapshot(
 						java.util.Map.of("fixture", "mock response"), java.util.List.of()));
-		JudgeModelResponse response = model.generate(JudgeModelRequest.user("test"));
+		EvalModelResponse response = model.generate(EvalModelRequest.user("test"));
 
 		assertThat(response.text()).isEmpty();
 	}

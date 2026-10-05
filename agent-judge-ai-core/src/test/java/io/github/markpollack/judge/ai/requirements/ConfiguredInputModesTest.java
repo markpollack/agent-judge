@@ -23,9 +23,9 @@ class ConfiguredInputModesTest {
 		var ears = EarsRequirement.of("E", "1", "Evidence", "The system shall retain evidence", null);
 		AtomicInteger calls = new AtomicInteger();
 		AtomicInteger acquired = new AtomicInteger();
-		JudgeModel nativeHarness = request -> {
+		EvalModel nativeHarness = request -> {
 			calls.incrementAndGet();
-			return new JudgeModelResponse("R: PASS - retained\nE: PASS - retained", "fixture", null, Map.of());
+			return new EvalModelResponse("R: PASS - retained\nE: PASS - retained", "fixture", null, Map.of());
 		};
 		var prepared = nativeHarness.withInputs(GeneratedInput.PREPARED_EVIDENCE);
 		var investigative = nativeHarness.withInputs(GeneratedInput.INTEGRATED_INVESTIGATION);
@@ -84,17 +84,17 @@ class ConfiguredInputModesTest {
 	void capabilityWrapperPreservesTheExactNativeExecution() {
 		var invocation = new Invocation("original", "native-fixture", true, "fixture", 7, Map.of("usage", 11),
 				List.of());
-		var original = new NativeExecution<>(new JudgeModelResponse("answer", "fixture", null, Map.of()), invocation);
-		JudgeModel delegate = new JudgeModel() {
-			public JudgeModelResponse generate(JudgeModelRequest request) {
+		var original = new NativeExecution<>(new EvalModelResponse("answer", "fixture", null, Map.of()), invocation);
+		EvalModel delegate = new EvalModel() {
+			public EvalModelResponse generate(EvalModelRequest request) {
 				throw new AssertionError("must use native execution");
 			}
 
-			public NativeExecution<JudgeModelResponse> execute(JudgeModelRequest request) {
+			public NativeExecution<EvalModelResponse> execute(EvalModelRequest request) {
 				return original;
 			}
 		};
-		assertThat(delegate.withInputs(GeneratedInput.PREPARED_EVIDENCE).execute(JudgeModelRequest.user("evidence")))
+		assertThat(delegate.withInputs(GeneratedInput.PREPARED_EVIDENCE).execute(EvalModelRequest.user("evidence")))
 			.isSameAs(original);
 	}
 

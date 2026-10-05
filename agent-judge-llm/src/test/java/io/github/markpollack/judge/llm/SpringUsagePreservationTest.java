@@ -45,8 +45,8 @@ class SpringUsagePreservationTest {
 			.id("original-id")
 			.usage(new DefaultUsage(-1, 7))
 			.build());
-		var runtime = new SpringAiJudgeModel(client);
-		var nativeResult = runtime.execute(JudgeModelRequest.user("local fixture"));
+		var runtime = new SpringAiEvalModel(client);
+		var nativeResult = runtime.execute(EvalModelRequest.user("local fixture"));
 		var response = nativeResult.answer();
 		assertThat(response.text()).isEqualTo("A: PASS - original answer");
 		assertThat(response.model()).isEqualTo("original-model");
@@ -74,8 +74,8 @@ class SpringUsagePreservationTest {
 	@Test
 	void defaultEmptyUsageStaysAbsentInCommonFacts() {
 		var client = client(ChatResponseMetadata.builder().model("original-model").id("original-id").build());
-		var runtime = new SpringAiJudgeModel(client);
-		var result = runtime.execute(JudgeModelRequest.user("local fixture"));
+		var runtime = new SpringAiEvalModel(client);
+		var result = runtime.execute(EvalModelRequest.user("local fixture"));
 		assertThat(result.answer().usage()).isNull();
 		assertThat(result.invocation().nativeFacts()).doesNotContainKey("usage");
 		assertThat(result.answer().completed()).isTrue();
@@ -91,9 +91,9 @@ class SpringUsagePreservationTest {
 
 	@Test
 	void explicitlyReportedZeroUsageRemainsPresent() {
-		var result = new SpringAiJudgeModel(
+		var result = new SpringAiEvalModel(
 				client(ChatResponseMetadata.builder().usage(new DefaultUsage(0, 0)).build()))
-			.execute(JudgeModelRequest.user("local fixture"));
+			.execute(EvalModelRequest.user("local fixture"));
 		assertThat(result.answer().usage().inputTokens()).isZero();
 		assertThat(result.answer().usage().outputTokens()).isZero();
 		assertThat(result.answer().usage().reportedTotalTokens()).isNull();
@@ -109,11 +109,11 @@ class SpringUsagePreservationTest {
 		var captured = new AtomicReference<ChatResponse>();
 		var artifact = io.github.markpollack.judge.provenance.ArtifactRef.ofBytes("protected-sdk-answer",
 				new byte[] { 1, 2 }, null);
-		var runtime = new SpringAiJudgeModel(client, response -> {
+		var runtime = new SpringAiEvalModel(client, response -> {
 			captured.set(response);
 			return new NativeSnapshot(Map.of("protected", true), List.of(artifact));
 		});
-		var result = runtime.execute(JudgeModelRequest.user("local fixture"));
+		var result = runtime.execute(EvalModelRequest.user("local fixture"));
 		assertThat(captured.get().getMetadata().getUsage().getPromptTokens()).isEqualTo(-1);
 		assertThat(captured.get().getResult().getOutput().getText()).isEqualTo(result.answer().text());
 		assertThat(result.invocation().artifacts()).containsExactly(artifact);
@@ -123,11 +123,11 @@ class SpringUsagePreservationTest {
 	@Test
 	void captureAndMappingFailuresRemainDistinct() {
 		var captureFailure = new IllegalStateException("capture failed");
-		var runtime = new SpringAiJudgeModel(
+		var runtime = new SpringAiEvalModel(
 				client(ChatResponseMetadata.builder().usage(new DefaultUsage(-1, 7)).build()), response -> {
 					throw captureFailure;
 				});
-		var result = runtime.execute(JudgeModelRequest.user("local fixture"));
+		var result = runtime.execute(EvalModelRequest.user("local fixture"));
 		assertThat(result.answer().text()).isEqualTo("A: PASS - original answer");
 		assertThat(result.invocation().nativeFacts()).containsKeys("captureFailure", "mappingFailure");
 		assertThat(result.invocation().cause()).isSameAs(captureFailure);
@@ -136,11 +136,11 @@ class SpringUsagePreservationTest {
 	@Test
 	void cancellationEscapesCaptureBeforeMalformedUsageMapping() {
 		var cancelled = new CancellationException("caller cancelled");
-		var runtime = new SpringAiJudgeModel(
+		var runtime = new SpringAiEvalModel(
 				client(ChatResponseMetadata.builder().usage(new DefaultUsage(-1, 7)).build()), response -> {
 					throw cancelled;
 				});
-		assertThatThrownBy(() -> runtime.execute(JudgeModelRequest.user("local fixture"))).isSameAs(cancelled);
+		assertThatThrownBy(() -> runtime.execute(EvalModelRequest.user("local fixture"))).isSameAs(cancelled);
 	}
 
 }

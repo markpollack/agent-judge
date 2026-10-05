@@ -51,7 +51,7 @@ public abstract class LLMJudge<E> implements JudgeWithMetadata {
 	private final java.util.function.Supplier<? extends E> evidence;
 
 	/** Chat client used by subclasses to evaluate prompts. */
-	protected final ChatClient chatClient;
+	private final io.github.markpollack.judge.ai.model.EvalModel runtime;
 
 	/**
 	 * Create an LLM judge with metadata and chat client.
@@ -68,8 +68,19 @@ public abstract class LLMJudge<E> implements JudgeWithMetadata {
 		// No exclusion capability: this judge always answers its question, or errors
 		// trying.
 		this.metadata = new JudgeMetadata(name, description, JudgeType.LLM_POWERED);
-		this.chatClient = chatClientBuilder != null ? chatClientBuilder.build() : null;
+		this.runtime = chatClientBuilder != null ? new SpringAiEvalModel(chatClientBuilder) : null;
 	}
+
+ /** Configure the portable generated protocol, with fresh evidence acquisition.
+  * @param runtime generated runtime
+  * @param evidence fresh evidence
+  * @param name producer name
+  * @param description producer description */
+ protected LLMJudge(io.github.markpollack.judge.ai.model.EvalModel runtime,
+   java.util.function.Supplier<? extends E> evidence,String name,String description) {
+  this.runtime=java.util.Objects.requireNonNull(runtime); this.evidence=java.util.Objects.requireNonNull(evidence);
+  this.metadata=new JudgeMetadata(name,description,JudgeType.LLM_POWERED);
+ }
 
 	/**
 	 * Build the prompt to send to the LLM.
@@ -116,12 +127,12 @@ public abstract class LLMJudge<E> implements JudgeWithMetadata {
 	 */
 	protected Judgment evaluate(E context) {
 		String prompt = buildPrompt(context);
-		var result = new SpringAiJudgeModel(this.chatClient)
-			.execute(io.github.markpollack.judge.ai.model.JudgeModelRequest.user(prompt));
+		var result = java.util.Objects.requireNonNull(runtime,"generated runtime")
+			.execute(io.github.markpollack.judge.ai.model.EvalModelRequest.user(prompt));
 		Judgment judgment;
 		try {
 			judgment = result.answer().completed() ? parseResponse(result.answer().text(), context)
-					: Judgment.error(result.answer().text());
+					: Judgment.error(result.answer().hasAnswer() ? result.answer().text() : "Native execution returned no answer");
 		}
 		catch (java.util.concurrent.CancellationException cancelled) {
 			throw cancelled;

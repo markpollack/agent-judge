@@ -5,7 +5,7 @@
 
 package io.github.markpollack.judge.ai;
 
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import io.github.markpollack.judge.ai.model.Usage;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
@@ -91,7 +91,7 @@ class LabelJudgmentClassifierTests {
 	void usageMetadataPreserved() {
 		var classifier = LabelJudgmentClassifier.passFail("yes", "no");
 		Usage usage = Usage.builder().inputTokens(10).outputTokens(5).reportedTotalTokens(15).build();
-		var resp = new JudgeModelResponse("yes", "gpt-4o", usage, null);
+		var resp = new EvalModelResponse("yes", "gpt-4o", usage, null);
 
 		Judgment judgment = classifier.classify(resp);
 
@@ -118,7 +118,7 @@ class LabelJudgmentClassifierTests {
 			.cacheCreationTokens(3)
 			.cacheReadTokens(2)
 			.build();
-		var resp = new JudgeModelResponse("yes", "gpt-4o", usage, null);
+		var resp = new EvalModelResponse("yes", "gpt-4o", usage, null);
 
 		Judgment judgment = classifier.classify(resp);
 
@@ -129,7 +129,7 @@ class LabelJudgmentClassifierTests {
 	@Test
 	void usageThatReportedNothingAddsNoKey() {
 		var classifier = LabelJudgmentClassifier.passFail("yes", "no");
-		var resp = new JudgeModelResponse("yes", "gpt-4o", Usage.builder().build(), null);
+		var resp = new EvalModelResponse("yes", "gpt-4o", Usage.builder().build(), null);
 
 		Judgment judgment = classifier.classify(resp);
 
@@ -140,7 +140,7 @@ class LabelJudgmentClassifierTests {
 	void absentUsageAddsNoKey() {
 		var classifier = LabelJudgmentClassifier.passFail("yes", "no");
 
-		Judgment judgment = classifier.classify(new JudgeModelResponse("yes", "gpt-4o", null, null));
+		Judgment judgment = classifier.classify(new EvalModelResponse("yes", "gpt-4o", null, null));
 
 		assertThat(judgment.metadata()).doesNotContainKey("usage");
 	}
@@ -209,8 +209,8 @@ class LabelJudgmentClassifierTests {
 		assertThat(classifier.categories()).containsExactlyInAnyOrder("yes", "no");
 	}
 
-	private JudgeModelResponse response(String text) {
-		return new JudgeModelResponse(text, null, null, null);
+	private EvalModelResponse response(String text) {
+		return new EvalModelResponse(text, null, null, null);
 	}
 
 	@Test
@@ -230,7 +230,7 @@ class LabelJudgmentClassifierTests {
 
 	@Test
 	void backendFailureCannotBeClassifiedAsASubjectPass() {
-		var response = new JudgeModelResponse("yes", "test-backend", null, java.util.Map.of(), false);
+		var response = new EvalModelResponse("yes", "test-backend", null, java.util.Map.of(), false);
 		assertThat(JudgmentClassifiers.passFail("yes", "no").classify(response).status())
 			.isEqualTo(JudgmentStatus.ERROR);
 	}

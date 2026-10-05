@@ -42,18 +42,18 @@ public class ConfiguredBasicsTest {
 		var compatibility = new Rfc2119Requirement("COMPATIBILITY", "2", "Preserve API",
 				new Rfc2119Specification("MUST", "Preserve API", "Support callers", null), source);
 		AtomicInteger nativeCalls = new AtomicInteger();
-		JudgeModel runtime = request -> {
+		EvalModel runtime = request -> {
 			nativeCalls.incrementAndGet();
 			String text = request.messages().get(0).content();
 			if (text.contains("SECURITY")) {
 				if (!text.contains("security evidence") || !text.contains("Protect state"))
 					throw new AssertionError("native spec/evidence lost");
-				return new JudgeModelResponse("SECURITY: PASS - Checked Security.java:1", "native-model",
+				return new EvalModelResponse("SECURITY: PASS - Checked Security.java:1", "native-model",
 						new Usage(10L, 5L, null, null, null, null), Map.of("sessionId", "native-session"));
 			}
 			if (!text.contains("compatibility evidence") || !text.contains("Preserve API"))
 				throw new AssertionError("second native spec/evidence lost");
-			return new JudgeModelResponse("COMPATIBILITY: PASS - Checked Api.java:1", "native-model", null, Map.of());
+			return new EvalModelResponse("COMPATIBILITY: PASS - Checked Api.java:1", "native-model", null, Map.of());
 		};
 		Judge securityJudge = Rfc2119Judge.builder()
 			.runtime(runtime)

@@ -26,7 +26,7 @@ class SingleAdmissionTest {
 	@CsvSource({ "rfc,PASS", "rfc,FAIL", "ears,PASS", "ears,FAIL" })
 	void generatedSingleRefusesAlienEnvelope(String kind, String status) {
 		String text = "A: " + status + " - apparent result\nALIEN: PASS - undeclared";
-		JudgeModel model = request -> new JudgeModelResponse(text, "fixture", null, Map.of());
+		EvalModel model = request -> new EvalModelResponse(text, "fixture", null, Map.of());
 		Judge judge;
 		Jury roster;
 		if (kind.equals("rfc")) {
@@ -56,9 +56,9 @@ class SingleAdmissionTest {
 	@CsvSource({ "rfc,PASS", "rfc,FAIL", "rfc,CANNOT_DETERMINE", "ears,PASS", "ears,FAIL", "ears,CANNOT_DETERMINE" })
 	void boundSingleRetainsNativeAndStatus(String kind, String status) {
 		var calls = new java.util.concurrent.atomic.AtomicInteger();
-		JudgeModel model = request -> {
+		EvalModel model = request -> {
 			calls.incrementAndGet();
-			return new JudgeModelResponse("A: " + status + " - observed", "fixture", null, Map.of());
+			return new EvalModelResponse("A: " + status + " - observed", "fixture", null, Map.of());
 		};
 		Judge judge = kind.equals("rfc")
 				? Rfc2119Judge.builder()
@@ -83,7 +83,7 @@ class SingleAdmissionTest {
 	@CsvSource({ "rfc", "ears" })
 	void generatedSinglePropagatesCancellationAndInterruption(String kind) {
 		var cancelled = new java.util.concurrent.CancellationException("cancelled");
-		JudgeModel model = request -> {
+		EvalModel model = request -> {
 			throw cancelled;
 		};
 		Judge judge = kind.equals("rfc")

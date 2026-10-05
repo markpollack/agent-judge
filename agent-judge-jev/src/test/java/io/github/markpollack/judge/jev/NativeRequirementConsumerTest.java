@@ -5,12 +5,12 @@
 
 package io.github.markpollack.judge.jev;
 
-import io.github.markpollack.judge.ai.model.JudgeMessage;
-import io.github.markpollack.judge.ai.model.JudgeMessageRole;
-import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelOptions;
-import io.github.markpollack.judge.ai.model.JudgeModelRequest;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalMessage;
+import io.github.markpollack.judge.ai.model.EvalMessageRole;
+import io.github.markpollack.judge.ai.model.EvalModel;
+import io.github.markpollack.judge.ai.model.EvalModelOptions;
+import io.github.markpollack.judge.ai.model.EvalModelRequest;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import io.github.markpollack.judge.ai.requirements.EarsCriterion;
 import io.github.markpollack.judge.ai.requirements.Rfc2119Constraint;
 import io.github.markpollack.judge.requirement.Requirement;
@@ -82,10 +82,10 @@ class NativeRequirementConsumerTest {
 			assertThat(actual.probabilityDistribution()).isNotNull();
 			assertThat(requestRequirement(artifacts)).isEqualTo(RFC.specification().asPrompt());
 			assertThat(transport.calls).hasValue(1);
-			JudgeModel model = request -> {
+			EvalModel model = request -> {
 				assertThat(request.messages().getFirst().content()).contains(RFC.id(), RFC.specification().asPrompt(),
 						SELECTED_EVIDENCE);
-				return new JudgeModelResponse("RULE-4: FAIL - Source.java:4 violates", "fixture-model", null, Map.of());
+				return new EvalModelResponse("RULE-4: FAIL - Source.java:4 violates", "fixture-model", null, Map.of());
 			};
 			var generated = Rfc2119Judge.builder()
 				.runtime(model)
@@ -114,7 +114,7 @@ class NativeRequirementConsumerTest {
 			assertThat(result.requirement()).isSameAs(EARS);
 			assertThat(requestRequirement(artifacts)).contains(EARS.specification().title(),
 					EARS.specification().requirement(), EARS.specification().applicability());
-			JudgeModel model = request -> new JudgeModelResponse("UC6-AC8: FAIL - Source.java:4 violates", null, null,
+			EvalModel model = request -> new EvalModelResponse("UC6-AC8: FAIL - Source.java:4 violates", null, null,
 					Map.of());
 			assertThat(EarsJudge.builder()
 				.runtime(model)
@@ -186,7 +186,7 @@ class NativeRequirementConsumerTest {
 					"CANNOT_DETERMINE - evidence insufficient", JudgmentStatus.ABSTAIN,
 					"FAIL - Source.java:4 permits cancellation", JudgmentStatus.FAIL)
 			.entrySet()) {
-			JudgeModel model = req -> new JudgeModelResponse(EARS.id() + ": " + value.getKey(), null, null, Map.of());
+			EvalModel model = req -> new EvalModelResponse(EARS.id() + ": " + value.getKey(), null, null, Map.of());
 			assertThat(EarsJudge.builder().runtime(model).requirement(EARS).build().judge().status())
 				.isEqualTo(value.getValue());
 		}
@@ -195,7 +195,7 @@ class NativeRequirementConsumerTest {
 	@Test
 	void unconditionalExclusionRetainsOriginalAndLocalRejection() {
 		var unconditional = Rfc2119Requirement.of("RULE-4", "7", "MUST", "lock", "why", null);
-		JudgeModel model = req -> new JudgeModelResponse("RULE-4: NOT_APPLICABLE - inconvenient", null, null, Map.of());
+		EvalModel model = req -> new EvalModelResponse("RULE-4: NOT_APPLICABLE - inconvenient", null, null, Map.of());
 		var result = Rfc2119Jury.builder().runtime(model).requirements(List.of(unconditional)).build().vote();
 		assertThat(result.conclusion()).isEqualTo(Verdict.Conclusion.INCONCLUSIVE);
 		assertThat(result.compositeAttempts().getFirst().verdict().individual().getFirst().status())
@@ -206,7 +206,7 @@ class NativeRequirementConsumerTest {
 	@Test
 	void malformedCompletionRemainsInstrumentFailureWithNativeAnswer() {
 		for (String answer : List.of("RULE-4: NOT_APPLICABLE", "RULE-4: PROBABLY - maybe", "RULE-4: PASS")) {
-			JudgeModel model = req -> new JudgeModelResponse(answer, "fixture", null, Map.of());
+			EvalModel model = req -> new EvalModelResponse(answer, "fixture", null, Map.of());
 			var result = Rfc2119Judge.builder().runtime(model).requirement(RFC).build().judge();
 			assertThat(result.status()).isEqualTo(JudgmentStatus.ERROR);
 			assertThat(result.invocations().getFirst().nativeFacts()).containsEntry("text", answer);
@@ -215,7 +215,7 @@ class NativeRequirementConsumerTest {
 
 	@Test
 	void failedCompletionRetainsAttemptAndConfiguredRequirement() {
-		JudgeModel model = req -> {
+		EvalModel model = req -> {
 			throw new IllegalStateException("transport unavailable");
 		};
 		var result = Rfc2119Judge.builder().runtime(model).requirement(RFC).build().judge();

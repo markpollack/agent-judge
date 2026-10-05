@@ -12,24 +12,24 @@ package io.github.markpollack.judge.ai.model;
  * <p>
  * Implementations bridge to specific AI runtimes:
  * <ul>
- * <li>{@code SpringAiJudgeModel} — wraps Spring AI ChatClient</li>
- * <li>{@code AgentClientJudgeModel} — wraps AgentClient for agentic judges</li>
- * <li>Lambda — any {@code JudgeModelRequest → JudgeModelResponse} function</li>
+ * <li>{@code SpringAiEvalModel} — wraps Spring AI ChatClient</li>
+ * <li>{@code AgentClientEvalModel} — wraps AgentClient for agentic judges</li>
+ * <li>Lambda — any {@code EvalModelRequest → EvalModelResponse} function</li>
  * </ul>
  *
  * @author Mark Pollack
  * @since 0.10.0
  */
 @FunctionalInterface
-public interface JudgeModel
-		extends io.github.markpollack.judge.execution.NativeRuntime<JudgeModelRequest, JudgeModelResponse> {
+public interface EvalModel
+		extends io.github.markpollack.judge.execution.EvalRuntime<EvalModelRequest, EvalModelResponse> {
 
 	/**
 	 * Generate a response from the model.
 	 * @param request the model request containing messages and options
 	 * @return the model response
 	 */
-	JudgeModelResponse generate(JudgeModelRequest request);
+	EvalModelResponse generate(EvalModelRequest request);
 
 	/**
 	 * Declares the input protocols of this configured harness. The general protocol
@@ -48,30 +48,30 @@ public interface JudgeModel
 	 * @param inputs supported input forms, at least one
 	 * @return immutable capability declaration around this harness
 	 */
-	default JudgeModel withInputs(GeneratedInput... inputs) {
+	default EvalModel withInputs(GeneratedInput... inputs) {
 		java.util.Set<GeneratedInput> modes = java.util.Set.copyOf(java.util.List.of(inputs));
 		if (modes.isEmpty() || !supportedInputs().containsAll(modes))
 			throw new IllegalArgumentException("Input modes must be a nonempty subset of the configured harness");
-		JudgeModel delegate = this;
-		return new JudgeModel() {
+		EvalModel delegate = this;
+		return new EvalModel() {
 			@Override
 			public java.util.Set<GeneratedInput> supportedInputs() {
 				return modes;
 			}
 
 			@Override
-			public JudgeModelResponse generate(JudgeModelRequest request) {
+			public EvalModelResponse generate(EvalModelRequest request) {
 				return delegate.generate(request);
 			}
 
 			@Override
-			public void validateRequest(JudgeModelRequest request) {
+			public void validateRequest(EvalModelRequest request) {
 				delegate.validateRequest(request);
 			}
 
 			@Override
-			public io.github.markpollack.judge.execution.NativeExecution<JudgeModelResponse> execute(
-					JudgeModelRequest request) {
+			public io.github.markpollack.judge.execution.NativeExecution<EvalModelResponse> execute(
+					EvalModelRequest request) {
 				return delegate.execute(request);
 			}
 		};
@@ -92,7 +92,7 @@ public interface JudgeModel
 	 * @return the response text
 	 */
 	default String generateText(String prompt) {
-		return generate(JudgeModelRequest.user(prompt)).text();
+		return generate(EvalModelRequest.user(prompt)).text();
 	}
 
 	/**
@@ -101,13 +101,13 @@ public interface JudgeModel
 	 * @return original answer and portable invocation observations
 	 */
 	@Override
-	default io.github.markpollack.judge.execution.NativeExecution<JudgeModelResponse> execute(
-			JudgeModelRequest request) {
+	default io.github.markpollack.judge.execution.NativeExecution<EvalModelResponse> execute(
+			EvalModelRequest request) {
 		validateRequest(request);
 		if (Thread.currentThread().isInterrupted())
 			throw new java.util.concurrent.CancellationException("Native execution interrupted before invocation");
 		long start = System.nanoTime();
-		JudgeModelResponse answer;
+		EvalModelResponse answer;
 		try {
 			answer = java.util.Objects.requireNonNull(generate(request), "Native runtime returned null");
 		}
@@ -117,14 +117,13 @@ public interface JudgeModel
 		catch (RuntimeException ex) {
 			if (Thread.currentThread().isInterrupted())
 				throw new java.util.concurrent.CancellationException("Native execution interrupted");
-			answer = new JudgeModelResponse(
-					"Native execution failed: " + ex.getClass().getName() + ": "
-							+ java.util.Objects.toString(ex.getMessage(), ""),
-					null, null, java.util.Map.of("failureType", ex.getClass().getName()), false, java.util.List.of(),
-					ex);
+			answer = EvalModelResponse.noAnswer(ex);
 		}
+		if(Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("Native execution interrupted after return");
 		java.util.Map<String, Object> facts = new java.util.LinkedHashMap<>(answer.metadata());
-		facts.put("text", answer.text());
+		if(answer.hasAnswer()) facts.put("text", answer.text());
+		facts.put("answerState",answer.answerState().name());
+		facts.put("options",request.options().toPortable());
 		facts.put("messages",
 				request.messages()
 					.stream()
@@ -134,7 +133,7 @@ public interface JudgeModel
 		if (answer.usage() != null)
 			facts.put("usage", answer.usage().toPortableMap());
 		var invocation = new io.github.markpollack.judge.provenance.Invocation(java.util.UUID.randomUUID().toString(),
-				"generated-answer:v1", answer.completed(), answer.model(),
+				"generated-answer:v2", answer.completed(), answer.model(),
 				java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start), facts,
 				answer.artifacts(), answer.failure());
 		return new io.github.markpollack.judge.execution.NativeExecution<>(answer, invocation);
@@ -145,7 +144,7 @@ public interface JudgeModel
 	 * declared roles/options; failures here are configuration errors.
 	 * @param request declared request
 	 */
-	default void validateRequest(JudgeModelRequest request) {
+	default void validateRequest(EvalModelRequest request) {
 		java.util.Objects.requireNonNull(request);
 	}
 

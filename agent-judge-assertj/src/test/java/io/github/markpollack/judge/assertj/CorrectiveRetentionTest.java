@@ -69,7 +69,7 @@ class CorrectiveRetentionTest {
 		if (ears) {
 			var a = EarsRequirement.of("A", "1", "retain", "The system shall retain facts", null);
 			var alien = EarsRequirement.of("ALIEN", "1", "alien", "The system shall retain alien facts", null);
-			NativeRuntime<RequirementRequest<EarsSpecification, String>, Judgment> runtime = request -> {
+			EvalRuntime<RequirementRequest<EarsSpecification, String>, Judgment> runtime = request -> {
 				calls.incrementAndGet();
 				return new NativeExecution<>(Judgment.fail("Unbound").forRequirement(alien), fact);
 			};
@@ -78,7 +78,7 @@ class CorrectiveRetentionTest {
 		else {
 			var a = Rfc2119Requirement.of("A", "1", "MUST", "retain", "audit", null);
 			var alien = Rfc2119Requirement.of("ALIEN", "1", "MUST", "alien", "audit", null);
-			NativeRuntime<RequirementRequest<Rfc2119Specification, String>, Judgment> runtime = request -> {
+			EvalRuntime<RequirementRequest<Rfc2119Specification, String>, Judgment> runtime = request -> {
 				calls.incrementAndGet();
 				return new NativeExecution<>(Judgment.fail("Unbound").forRequirement(alien), fact);
 			};

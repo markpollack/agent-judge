@@ -186,7 +186,7 @@ class PortableUsageContractTest {
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> projectedUsage(Usage usage) {
 		Judgment judgment = LabelJudgmentClassifier.passFail("yes", "no")
-			.classify(new JudgeModelResponse("yes", "gpt-4o", usage, null));
+			.classify(new EvalModelResponse("yes", "gpt-4o", usage, null));
 
 		Object projected = judgment.metadata().get("usage");
 		assertThat(projected).as("result metadata carries a portable usage object").isInstanceOf(Map.class);

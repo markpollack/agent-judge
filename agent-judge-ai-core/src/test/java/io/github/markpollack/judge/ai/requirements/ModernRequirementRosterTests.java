@@ -11,8 +11,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import io.github.markpollack.judge.ai.ModelBackedJudge;
-import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModel;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import java.nio.file.Path;
 import io.github.markpollack.judge.judgment.Check;
 import io.github.markpollack.judge.judgment.Judgment;
@@ -35,7 +35,7 @@ class ModernRequirementRosterTests {
 
 	private static final String COMPLETE = "R-1: PASS - verified\nR-2: PASS - verified\nR-3: PASS - verified";
 
-	private static io.github.markpollack.judge.jury.Jury configured(Kind kind, List<String> ids, JudgeModel model) {
+	private static io.github.markpollack.judge.jury.Jury configured(Kind kind, List<String> ids, EvalModel model) {
 		return kind == Kind.RFC
 				? Rfc2119Jury.builder()
 					.runtime(model)
@@ -55,7 +55,7 @@ class ModernRequirementRosterTests {
 
 	private static io.github.markpollack.judge.verdict.Verdict audit(Kind kind, String text) {
 		return configured(kind, List.of("R-1", "R-2", "R-3"),
-				request -> new JudgeModelResponse(text, "stub", null, Map.of()))
+				request -> new EvalModelResponse(text, "stub", null, Map.of()))
 			.vote();
 	}
 
@@ -89,8 +89,8 @@ class ModernRequirementRosterTests {
 	@ParameterizedTest
 	@EnumSource(Kind.class)
 	void emptyAndFailedBackendResponsesKeepTheWholeRoster(Kind kind) {
-		for (JudgeModelResponse response : List.of(new JudgeModelResponse("", null, null, Map.of()),
-				new JudgeModelResponse("backend unavailable", null, null, Map.of(), false))) {
+		for (EvalModelResponse response : List.of(new EvalModelResponse("", null, null, Map.of()),
+				new EvalModelResponse("backend unavailable", null, null, Map.of(), false))) {
 			io.github.markpollack.judge.verdict.Verdict result = configured(kind, List.of("R-1", "R-2", "R-3"),
 					request -> response)
 				.vote();
@@ -131,7 +131,7 @@ class ModernRequirementRosterTests {
 		AtomicInteger calls = new AtomicInteger();
 		assertThatThrownBy(() -> configured(kind, List.of("R-1", "R-1"), request -> {
 			calls.incrementAndGet();
-			return new JudgeModelResponse(COMPLETE, null, null, Map.of());
+			return new EvalModelResponse(COMPLETE, null, null, Map.of());
 		})).isInstanceOf(IllegalArgumentException.class);
 		assertThat(calls).hasValue(0);
 		assertThatThrownBy(() -> configured(kind, List.of(" "), request -> null))
@@ -145,7 +145,7 @@ class ModernRequirementRosterTests {
 		if (kind == Kind.RFC) {
 			var source = new ArrayList<>(List.of(Rfc2119Requirement.of("R-1", "test", "MUST", "one", "why", null)));
 			judge = Rfc2119Jury.builder()
-				.runtime((JudgeModel) request -> new JudgeModelResponse("R-1: PASS - verified", null, null, Map.of()))
+				.runtime((EvalModel) request -> new EvalModelResponse("R-1: PASS - verified", null, null, Map.of()))
 				.requirements(source)
 				.build();
 			source.add(Rfc2119Requirement.of("R-2", "test", "MUST", "two", "why", null));
@@ -153,7 +153,7 @@ class ModernRequirementRosterTests {
 		else {
 			var source = new ArrayList<>(List.of(EarsRequirement.of("R-1", "test", "one", "one", null)));
 			judge = EarsJury.builder()
-				.runtime((JudgeModel) request -> new JudgeModelResponse("R-1: PASS - verified", null, null, Map.of()))
+				.runtime((EvalModel) request -> new EvalModelResponse("R-1: PASS - verified", null, null, Map.of()))
 				.requirements(source)
 				.build();
 			source.add(EarsRequirement.of("R-2", "test", "two", "two", null));
@@ -168,7 +168,7 @@ class ModernRequirementRosterTests {
 	@ParameterizedTest
 	@EnumSource(Kind.class)
 	void thrownOrNullBackendResultsAreContainedWithErrorChecks(Kind kind) {
-		for (JudgeModel model : List.<JudgeModel>of(request -> null, request -> {
+		for (EvalModel model : List.<EvalModel>of(request -> null, request -> {
 			throw new IllegalStateException("transport unavailable");
 		})) {
 			io.github.markpollack.judge.verdict.Verdict result = configured(kind, List.of("R-1", "R-2", "R-3"), model)
@@ -197,7 +197,7 @@ class ModernRequirementRosterTests {
 		List<JudgmentStatus> outcomes = List.of("R`1", "**R1**", "OBSERVATION-R1")
 			.stream()
 			.map(id -> configured(kind, List.of(id),
-					request -> new JudgeModelResponse(id + ": PASS - verified", null, null, Map.of()))
+					request -> new EvalModelResponse(id + ": PASS - verified", null, null, Map.of()))
 				.vote()
 				.judgment()
 				.status())

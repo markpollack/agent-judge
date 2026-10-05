@@ -8,6 +8,6 @@ package io.github.markpollack.judge.ai.model;
  * @author Mark Pollack
  * @since 0.10.0
  */
-public record JudgeMessage(JudgeMessageRole role, String content) {
+public record EvalMessage(EvalMessageRole role, String content) {
 
 }

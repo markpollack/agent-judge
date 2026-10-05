@@ -12,9 +12,9 @@ import org.junit.jupiter.api.Test;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelRequest;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModel;
+import io.github.markpollack.judge.ai.model.EvalModelRequest;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
 import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.description.SeatDescription;
@@ -50,11 +50,11 @@ class ModelBackedJudgeCapabilityTests {
 
 	private static final String CONDITION = "criteria UC3-AC7 and UC3-AC9 are conditional";
 
-	private static JudgeModel model(String text) {
-		return new JudgeModel() {
+	private static EvalModel model(String text) {
+		return new EvalModel() {
 			@Override
-			public JudgeModelResponse generate(JudgeModelRequest request) {
-				return new JudgeModelResponse(text, "test-model", null, Map.of());
+			public EvalModelResponse generate(EvalModelRequest request) {
+				return new EvalModelResponse(text, "test-model", null, Map.of());
 			}
 		};
 	}

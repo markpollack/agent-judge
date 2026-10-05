@@ -8,7 +8,7 @@ package io.github.markpollack.judge.ai.requirements;
 import java.util.List;
 import java.util.Map;
 
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import io.github.markpollack.judge.judgment.Check;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentReasonCode;
@@ -177,8 +177,8 @@ class RosterErrorEvidenceTests {
 		return Rfc2119Parser.rollupFor(CONSTRAINTS, answer(answers));
 	}
 
-	private static JudgeModelResponse answer(String text) {
-		return new JudgeModelResponse(text, "stub", null, Map.of());
+	private static EvalModelResponse answer(String text) {
+		return new EvalModelResponse(text, "stub", null, Map.of());
 	}
 
 	@SuppressWarnings("unchecked")

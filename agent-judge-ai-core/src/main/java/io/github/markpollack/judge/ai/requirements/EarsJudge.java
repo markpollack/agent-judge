@@ -52,7 +52,7 @@ public final class EarsJudge implements Judge {
 		 * @param runtime configured native model or agent
 		 * @return requirement construction
 		 */
-		public GeneratedBuilder runtime(JudgeModel runtime) {
+		public GeneratedBuilder runtime(EvalModel runtime) {
 			return new GeneratedBuilder(Objects.requireNonNull(runtime));
 		}
 
@@ -63,7 +63,7 @@ public final class EarsJudge implements Judge {
 		 * @return requirement construction
 		 */
 		public <E> JudgeRecipe<EarsSpecification, E> runtime(
-				NativeRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime) {
+				EvalRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime) {
 			Objects.requireNonNull(runtime);
 			return requirement -> {
 				Requirement.validate(requirement);
@@ -90,9 +90,9 @@ public final class EarsJudge implements Judge {
 	/** Generated judging setup, reusable across independent requirements. */
 	public static final class GeneratedBuilder implements JudgeRecipe<EarsSpecification, String> {
 
-		private final JudgeModel runtime;
+		private final EvalModel runtime;
 
-		private GeneratedBuilder(JudgeModel runtime) {
+		private GeneratedBuilder(EvalModel runtime) {
 			this.runtime = runtime;
 		}
 
@@ -109,11 +109,11 @@ public final class EarsJudge implements Judge {
 	 */
 	public static final class GeneratedRequirement implements EvidenceStep<String>, ReadyJudge {
 
-		private final JudgeModel runtime;
+		private final EvalModel runtime;
 
 		private final Requirement<EarsSpecification> requirement;
 
-		private GeneratedRequirement(JudgeModel runtime, Requirement<EarsSpecification> requirement) {
+		private GeneratedRequirement(EvalModel runtime, Requirement<EarsSpecification> requirement) {
 			this.runtime = runtime;
 			this.requirement = requirement;
 		}
@@ -145,12 +145,12 @@ public final class EarsJudge implements Judge {
 
 	}
 
-	private static Judgment generated(JudgeModel runtime, Requirement<EarsSpecification> requirement, String input) {
+	private static Judgment generated(EvalModel runtime, Requirement<EarsSpecification> requirement, String input) {
 		EarsCriterion nativeSpec = new EarsCriterion(requirement.id(), requirement.specification().title(),
 				requirement.specification().requirement(), requirement.specification().applicability());
 		String prompt = EarsParser.templateFor("Ears", List.of(nativeSpec)).render(Map.of("workspace", input));
-		NativeExecution<JudgeModelResponse> result = runtime
-			.execute(JudgeModelRequest.user(RequirementPrompts.header(requirement) + prompt));
+		NativeExecution<EvalModelResponse> result = runtime
+			.execute(EvalModelRequest.user(RequirementPrompts.header(requirement) + prompt));
 		Judgment parsed = EarsParser.rollupFor(List.of(nativeSpec), result.answer());
 		if (!Boolean.TRUE.equals(parsed.metadata().get("protocolIdentityBound"))) {
 			// Preserve the full refused envelope and observed child; never promote

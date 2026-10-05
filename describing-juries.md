@@ -88,8 +88,8 @@ A seat's `position` is the key of `Verdict.weights()`. Its `verdictKey` is the k
 A description can show that a judge declared a model, or that it declared nothing. It cannot
 look inside a model client. `ModelBackedJudge` declares its prompt template name, a SHA-256 of
 the template text, its missing-variable policy and its classifier. It declares no model, because
-a `JudgeModel` does not say which model it will call. The model a call actually used is in
-`JudgeModelResponse.model()`.
+a `EvalModel` does not say which model it will call. The model a call actually used is in
+`EvalModelResponse.model()`.
 
 One valid declared seat/member is semantic identity, including a valid UNDECIDED child. It retains the complete original without adding a reduction evidence block. Derive exclusion permission and `routingOpinionBound` from the structured description; Judge-seat permissions are local declarations. Explicit RFC2119/EARS and AllOf audits declare KNOWN_NONE opinions.
 

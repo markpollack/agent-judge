@@ -49,7 +49,7 @@ class ConfiguredNativeProtocolTest {
 	@Test
 	void configuredNativeJudgingPreservesSdkAnswerUsageAndActualInput() {
 		var h = harness("R: PASS - Foo.java:7 retained");
-		var runtime = new SpringAiJudgeModel(h.client());
+		var runtime = new SpringAiEvalModel(h.client());
 		var actual = Rfc2119Requirement.of("R", "7", "MUST", "retain native evidence", "audit", null);
 		var ready = Rfc2119Judge.builder().runtime(runtime).requirement(actual).evidence("observed").build();
 		verifyNoInteractions(h.request(), h.call());
@@ -75,10 +75,10 @@ class ConfiguredNativeProtocolTest {
 	@Test
 	void supportedRolesAndOptionsReachNativeHarness() {
 		var h = harness("answer");
-		var runtime = new SpringAiJudgeModel(h.client());
-		var request = new JudgeModelRequest(List.of(new JudgeMessage(JudgeMessageRole.SYSTEM, "system"),
-				new JudgeMessage(JudgeMessageRole.USER, "user"), new JudgeMessage(JudgeMessageRole.ASSISTANT, "prior")),
-				new JudgeModelOptions("selected", 0.2, 123, null, null), Map.of("correlation", "local"));
+		var runtime = new SpringAiEvalModel(h.client());
+		var request = new EvalModelRequest(List.of(new EvalMessage(EvalMessageRole.SYSTEM, "system"),
+				new EvalMessage(EvalMessageRole.USER, "user"), new EvalMessage(EvalMessageRole.ASSISTANT, "prior")),
+				new EvalModelOptions("selected", 0.2, 123, null, null), Map.of());
 		var result = runtime.execute(request);
 		assertThat(result.invocation().nativeFacts()).containsEntry("requestMetadata", request.metadata());
 		var messages = org.mockito.ArgumentCaptor.forClass(List.class);
@@ -94,13 +94,14 @@ class ConfiguredNativeProtocolTest {
 	}
 
 	@Test
-	void unsupportedOptionsAreRefusedBeforeNativeCalls() {
+	void unsupportedOptionsAndMetadataAreRefusedBeforeNativeCalls() {
 		var client = mock(ChatClient.class);
-		var runtime = new SpringAiJudgeModel(client);
-		for (var options : List.of(new JudgeModelOptions(null, null, null, java.time.Duration.ofSeconds(1), null),
-				new JudgeModelOptions(null, null, null, null, "json"))) {
-			assertThatThrownBy(() -> runtime.execute(new JudgeModelRequest(
-					List.of(new JudgeMessage(JudgeMessageRole.USER, "request")), options, Map.of())))
+		var runtime = new SpringAiEvalModel(client);
+        assertThatThrownBy(() -> runtime.execute(new EvalModelRequest(List.of(new EvalMessage(EvalMessageRole.USER,"request")),EvalModelOptions.defaults(),Map.of("correlation","local")))).isInstanceOf(IllegalArgumentException.class);
+		for (var options : List.of(new EvalModelOptions(null, null, null, java.time.Duration.ofSeconds(1), null),
+				new EvalModelOptions(null, null, null, null, "json"))) {
+			assertThatThrownBy(() -> runtime.execute(new EvalModelRequest(
+					List.of(new EvalMessage(EvalMessageRole.USER, "request")), options, Map.of())))
 				.isInstanceOf(IllegalArgumentException.class);
 		}
 		verifyNoInteractions(client);
@@ -109,7 +110,7 @@ class ConfiguredNativeProtocolTest {
 	@Test
 	void captureFailurePreservesNativeTextAndUsage() {
 		var h = harness("R: PASS - Foo.java:7 retained");
-		var runtime = new SpringAiJudgeModel(h.client(), NativeCapture.json(1));
+		var runtime = new SpringAiEvalModel(h.client(), NativeCapture.json(1));
 		var actual = Rfc2119Requirement.of("R", "7", "MUST", "retain evidence", "audit", null);
 		var result = Rfc2119Judge.builder().runtime(runtime).requirement(actual).build().judge();
 		assertThat(result.requirement()).isSameAs(actual);
@@ -124,12 +125,12 @@ class ConfiguredNativeProtocolTest {
 	void cancellationEscapesNativeCaptureAndGeneration() {
 		var h = harness("R: PASS - evidence");
 		var cancelled = new CancellationException("caller cancelled");
-		var runtime = new SpringAiJudgeModel(h.client(), response -> {
+		var runtime = new SpringAiEvalModel(h.client(), response -> {
 			throw cancelled;
 		});
-		assertThatThrownBy(() -> runtime.execute(JudgeModelRequest.user("test"))).isSameAs(cancelled);
+		assertThatThrownBy(() -> runtime.execute(EvalModelRequest.user("test"))).isSameAs(cancelled);
 		when(h.call().chatResponse()).thenThrow(cancelled);
-		assertThatThrownBy(() -> new SpringAiJudgeModel(h.client()).execute(JudgeModelRequest.user("test")))
+		assertThatThrownBy(() -> new SpringAiEvalModel(h.client()).execute(EvalModelRequest.user("test")))
 			.isSameAs(cancelled);
 	}
 

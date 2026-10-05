@@ -61,7 +61,7 @@ public final class JevJudge implements Judge {
 		 * @return requirement construction
 		 */
 		public <S> JudgeRecipe<S, JevEvidence> runtime(
-				NativeRuntime<RequirementRequest<S, JevEvidence>, Judgment> runtime) {
+				EvalRuntime<RequirementRequest<S, JevEvidence>, Judgment> runtime) {
 			Objects.requireNonNull(runtime);
 			return requirement -> {
 				Requirement.validate(requirement);

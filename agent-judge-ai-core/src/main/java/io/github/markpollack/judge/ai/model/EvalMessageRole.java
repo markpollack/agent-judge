@@ -6,7 +6,7 @@ package io.github.markpollack.judge.ai.model;
  * @author Mark Pollack
  * @since 0.10.0
  */
-public enum JudgeMessageRole {
+public enum EvalMessageRole {
 
 	/** System instruction. */
 	SYSTEM,

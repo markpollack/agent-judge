@@ -8,7 +8,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalDouble;
 
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import io.github.markpollack.judge.ai.model.Usage;
 import io.github.markpollack.judge.judgment.Finding;
 import io.github.markpollack.judge.judgment.CategoryFinding;
@@ -74,7 +74,7 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 	}
 
 	@Override
-	public Judgment classify(JudgeModelResponse response) {
+	public Judgment classify(EvalModelResponse response) {
 		if (response == null || !response.completed()) {
 			return Judgment.error(response == null ? "No model response" : response.text());
 		}
@@ -104,7 +104,7 @@ public final class LabelJudgmentClassifier implements JudgmentClassifier {
 		return new Judgment(status, finding, null, null, null, raw, List.of(), null, metadata);
 	}
 
-	private static void addResponseMetadata(Map<String, Object> metadata, JudgeModelResponse response) {
+	private static void addResponseMetadata(Map<String, Object> metadata, EvalModelResponse response) {
 		if (response.model() != null) {
 			metadata.put("model", response.model());
 		}

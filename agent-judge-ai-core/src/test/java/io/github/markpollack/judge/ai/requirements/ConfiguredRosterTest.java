@@ -53,10 +53,10 @@ public class ConfiguredRosterTest {
 					Verdict.Conclusion.INCONCLUSIVE, "unparseable response", Verdict.Conclusion.INCONCLUSIVE)
 			.entrySet()) {
 			AtomicInteger calls = new AtomicInteger();
-			JudgeModel runtime = request -> {
+			EvalModel runtime = request -> {
 				calls.incrementAndGet();
 				assertThat(request.messages().getFirst().content()).contains("A", "B");
-				return new JudgeModelResponse(input.getKey(), "native-model",
+				return new EvalModelResponse(input.getKey(), "native-model",
 						Usage.builder().inputTokens(11).outputTokens(7).build(), Map.of("sessionId", "run-7"), true);
 			};
 			Jury ready = Rfc2119Jury.builder().runtime(runtime).requirements(requirements).build();
@@ -85,14 +85,14 @@ public class ConfiguredRosterTest {
 		}
 		var conditional = rfc("C", "the feature exists");
 		Verdict excluded = Rfc2119Jury.builder()
-			.runtime((JudgeModel) request -> new JudgeModelResponse("C: NOT_APPLICABLE - feature absent", null, null,
+			.runtime((EvalModel) request -> new EvalModelResponse("C: NOT_APPLICABLE - feature absent", null, null,
 					Map.of()))
 			.requirements(List.of(conditional))
 			.build()
 			.vote();
 		assertThat(excluded.conclusion()).isEqualTo(Verdict.Conclusion.NOT_APPLICABLE);
 		Verdict refused = Rfc2119Jury.builder()
-			.runtime((JudgeModel) request -> new JudgeModelResponse("A: NOT_APPLICABLE - feature absent", null, null,
+			.runtime((EvalModel) request -> new EvalModelResponse("A: NOT_APPLICABLE - feature absent", null, null,
 					Map.of()))
 			.requirements(List.of(a))
 			.build()
@@ -101,7 +101,7 @@ public class ConfiguredRosterTest {
 		assertThat(refused.compositeAttempts().getFirst().verdict().individual().getFirst().status())
 			.isEqualTo(JudgmentStatus.NOT_APPLICABLE);
 		assertThat(refused.compositeAttempts().getFirst().verdict().seats().getFirst().rejection()).isNotNull();
-		JudgeModel cancelled = request -> {
+		EvalModel cancelled = request -> {
 			throw new CancellationException("caller cancelled");
 		};
 		assertThatThrownBy(() -> Rfc2119Judge.builder().runtime(cancelled).requirement(a).build().judge())
@@ -118,7 +118,7 @@ public class ConfiguredRosterTest {
 
 	@Test
 	void rfcSingleCancellationPropagates() {
-		JudgeModel runtime = request -> {
+		EvalModel runtime = request -> {
 			throw new CancellationException("stop");
 		};
 		assertThatThrownBy(() -> Rfc2119Judge.builder().runtime(runtime).requirement(rfc("A", null)).build().judge())
@@ -127,7 +127,7 @@ public class ConfiguredRosterTest {
 
 	@Test
 	void rfcRosterCancellationPropagates() {
-		JudgeModel runtime = request -> {
+		EvalModel runtime = request -> {
 			throw new CancellationException("stop");
 		};
 		assertThatThrownBy(
@@ -137,7 +137,7 @@ public class ConfiguredRosterTest {
 
 	@Test
 	void earsSingleCancellationPropagates() {
-		JudgeModel runtime = request -> {
+		EvalModel runtime = request -> {
 			throw new CancellationException("stop");
 		};
 		var requirement = EarsRequirement.of("UC1-AC1", "rev1", "retain",
@@ -148,7 +148,7 @@ public class ConfiguredRosterTest {
 
 	@Test
 	void earsRosterCancellationPropagates() {
-		JudgeModel runtime = request -> {
+		EvalModel runtime = request -> {
 			throw new CancellationException("stop");
 		};
 		var requirement = EarsRequirement.of("UC1-AC1", "rev1", "retain",
@@ -160,9 +160,9 @@ public class ConfiguredRosterTest {
 	@Test
 	void oversizedRosterIsRejectedBeforeNativeExecution() {
 		var calls = new AtomicInteger();
-		JudgeModel runtime = request -> {
+		EvalModel runtime = request -> {
 			calls.incrementAndGet();
-			return new JudgeModelResponse("unused", null, null, Map.of());
+			return new EvalModelResponse("unused", null, null, Map.of());
 		};
 		var roster = java.util.stream.IntStream.range(0, 257).mapToObj(i -> rfc("R" + i, null)).toList();
 		assertThatThrownBy(() -> Rfc2119Jury.builder().runtime(runtime).requirements(roster))
@@ -184,9 +184,9 @@ public class ConfiguredRosterTest {
 		for (var scenario : Map.of("ears-six.txt", slice, "ears-all.txt", ears).entrySet()) {
 			var calls = new AtomicInteger();
 			String answer = Files.readString(base.resolve(scenario.getKey()));
-			var jury = EarsJury.builder().runtime((JudgeModel) request -> {
+			var jury = EarsJury.builder().runtime((EvalModel) request -> {
 				calls.incrementAndGet();
-				return new JudgeModelResponse(answer, "recorded", null, Map.of());
+				return new EvalModelResponse(answer, "recorded", null, Map.of());
 			}).requirements(scenario.getValue()).build();
 			Verdict result = jury.vote();
 			assertThat(calls).hasValue(1);
@@ -197,9 +197,9 @@ public class ConfiguredRosterTest {
 		}
 		var calls = new AtomicInteger();
 		String answer = Files.readString(base.resolve("rfc-all.txt"));
-		var result = Rfc2119Jury.builder().runtime((JudgeModel) request -> {
+		var result = Rfc2119Jury.builder().runtime((EvalModel) request -> {
 			calls.incrementAndGet();
-			return new JudgeModelResponse(answer, "recorded", null, Map.of());
+			return new EvalModelResponse(answer, "recorded", null, Map.of());
 		}).requirements(rfc).build().vote();
 		assertThat(calls).hasValue(1);
 		assertThat(result.roster()).hasSize(13);

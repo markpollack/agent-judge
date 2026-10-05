@@ -94,7 +94,7 @@ public final class JevRuntime {
 	 * @param render faithful native requirement rendering
 	 * @return typed request/answer execution
 	 */
-	public <S> NativeRuntime<RequirementRequest<S, JevEvidence>, Judgment> rendering(
+	public <S> EvalRuntime<RequirementRequest<S, JevEvidence>, Judgment> rendering(
 			java.util.function.Function<? super S, String> render) {
 		Objects.requireNonNull(render, "render");
 		return request -> {

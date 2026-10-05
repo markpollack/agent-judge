@@ -49,12 +49,12 @@ import io.github.markpollack.judge.voting.*;
 			  Requirement<String> requirement=Requirement.text("r","1","ready");
 			  Rfc2119Requirement nativeRequirement=Rfc2119Requirement.of("n","1","MUST","be ready","readiness",null);
 			  Requirement<AllOf> parent=new GeneralRequirement<>("p","1","both",new AllOf(List.of(requirement,nativeRequirement)),requirement.source());
-			  JudgeModel model=request->new JudgeModelResponse("satisfied", "fixture", null, Map.of());
+			  EvalModel model=request->new EvalModelResponse("satisfied", "fixture", null, Map.of());
 			  JudgeRecipe<String,String> judge=ModelBackedJudge.<String>builder().name("ready")
 			    .promptTemplate(JudgePromptTemplate.fromString("ready","{{requirement}} {{evidence}}"))
 			    .variables(value->Map.of("evidence",value))
 			    .judgmentClassifier(response->Judgment.pass("ready")).runtime(model);
-			  NativeRuntime<RequirementRequest<Rfc2119Specification,Integer>,Judgment> nativeRuntime=request->new NativeExecution<>(
+			  EvalRuntime<RequirementRequest<Rfc2119Specification,Integer>,Judgment> nativeRuntime=request->new NativeExecution<>(
 			    Judgment.pass("native"),new Invocation("native", "test:v1", true, null, 0, Map.of(), List.of()));
 			  JudgeRecipe<Rfc2119Specification,Integer> nativeJudge=Rfc2119Judge.builder().runtime(nativeRuntime);
 			  JuryRecipe<String,String> jury=actual->new JuryEvidenceStep<>() {
@@ -86,7 +86,7 @@ import io.github.markpollack.judge.voting.*;
 				else
 					body.append(line).append('\n');
 			}
-		String stub = "io.github.markpollack.judge.ai.model.JudgeModel judgeModel = request -> new io.github.markpollack.judge.ai.model.JudgeModelResponse(\"satisfied\",\"local\",null,java.util.Map.of());\n";
+		String stub = "io.github.markpollack.judge.ai.model.EvalModel judgeModel = request -> new io.github.markpollack.judge.ai.model.EvalModelResponse(\"satisfied\",\"local\",null,java.util.Map.of());\n";
 		var source = directory.resolve("Readme.java");
 		Files.writeString(source, imports + "class Readme { void run() {\n" + stub + body + "\n}}\n");
 		var diagnostics = new DiagnosticCollector<JavaFileObject>();

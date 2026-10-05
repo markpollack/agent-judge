@@ -17,8 +17,8 @@ import org.junit.jupiter.api.Test;
 
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModel;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate.MissingVariablePolicy;
 import io.github.markpollack.judge.ai.prompt.TextSources;
@@ -125,9 +125,9 @@ class ModelBackedJudgeDescriptionTests {
 	@Test
 	void describingNeverCallsTheModelAndIsRepeatable() throws Exception {
 		AtomicInteger calls = new AtomicInteger();
-		JudgeModel countingModel = request -> {
+		EvalModel countingModel = request -> {
 			calls.incrementAndGet();
-			return new JudgeModelResponse("yes", "counted-model", null, null);
+			return new EvalModelResponse("yes", "counted-model", null, null);
 		};
 		ModelBackedJudge first = judge(JudgePromptTemplate.fromString("t", "{{goal}}"),
 				JudgmentClassifiers.passFail("yes", "no"), countingModel);
@@ -146,7 +146,7 @@ class ModelBackedJudgeDescriptionTests {
 	}
 
 	private static ModelBackedJudge judge(JudgePromptTemplate template, JudgmentClassifier classifier,
-			JudgeModel model) {
+			EvalModel model) {
 		return ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
 			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
 			.name("relevance")
@@ -159,8 +159,8 @@ class ModelBackedJudgeDescriptionTests {
 			.build();
 	}
 
-	private static JudgeModel stubModel() {
-		return request -> new JudgeModelResponse("yes", "test-model", null, null);
+	private static EvalModel stubModel() {
+		return request -> new EvalModelResponse("yes", "test-model", null, null);
 	}
 
 	private static String sha256(String text) throws Exception {

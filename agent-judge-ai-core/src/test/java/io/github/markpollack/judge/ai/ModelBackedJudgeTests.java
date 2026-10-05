@@ -5,8 +5,8 @@
 
 package io.github.markpollack.judge.ai;
 
-import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModel;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
 import io.github.markpollack.judge.completion.CompletionStatus;
 import io.github.markpollack.judge.completion.CompletionEvidence;
@@ -21,7 +21,7 @@ class ModelBackedJudgeTests {
 
 	@Test
 	void passJudgment() {
-		JudgeModel model = stubModel("relevant");
+		EvalModel model = stubModel("relevant");
 
 		var judge = ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
 			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
@@ -44,7 +44,7 @@ class ModelBackedJudgeTests {
 
 	@Test
 	void failJudgment() {
-		JudgeModel model = stubModel("irrelevant");
+		EvalModel model = stubModel("irrelevant");
 
 		var judge = ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
 			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
@@ -66,7 +66,7 @@ class ModelBackedJudgeTests {
 
 	@Test
 	void abstainOnUnrecognizedLabel() {
-		JudgeModel model = stubModel("maybe");
+		EvalModel model = stubModel("maybe");
 
 		var judge = ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
 			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
@@ -89,7 +89,7 @@ class ModelBackedJudgeTests {
 
 	@Test
 	void classpathTemplate() {
-		JudgeModel model = stubModel("relevant");
+		EvalModel model = stubModel("relevant");
 
 		var judge = ModelBackedJudge.<io.github.markpollack.judge.completion.CompletionEvidence>builder()
 			.variables(io.github.markpollack.judge.ai.prompt.CompletionVariables::from)
@@ -137,8 +137,8 @@ class ModelBackedJudgeTests {
 			.build()).isInstanceOf(IllegalStateException.class).hasMessageContaining("name");
 	}
 
-	private JudgeModel stubModel(String response) {
-		return request -> new JudgeModelResponse(response, "test-model", null, null);
+	private EvalModel stubModel(String response) {
+		return request -> new EvalModelResponse(response, "test-model", null, null);
 	}
 
 }

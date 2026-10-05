@@ -68,7 +68,7 @@ class LLMJudgeTest {
 	void shouldAllowNullChatClientForTesting() {
 		TestLLMJudge judge = new TestLLMJudge("TestJudge", "Test", null);
 
-		assertThat(judge.chatClient).isNull();
+		assertThat(judge.metadata().name()).isEqualTo("TestJudge");
 	}
 
 	// ==================== Helper Methods ====================

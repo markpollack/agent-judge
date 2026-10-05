@@ -87,13 +87,13 @@ classDiagram
     Jury <|.. CascadedJury
     Jury <|.. Rfc2119Jury
     Jury <|.. EarsJury
-    NativeRuntime <|-- JudgeModel
-    NativeRuntime --> NativeExecution
+    EvalRuntime <|-- EvalModel
+    EvalRuntime --> NativeExecution
     NativeExecution --> Invocation
-    Rfc2119Judge --> NativeRuntime
-    EarsJudge --> NativeRuntime
+    Rfc2119Judge --> EvalRuntime
+    EarsJudge --> EvalRuntime
     JevJudge --> JevRuntime
-    JevRuntime --> NativeRuntime : typed rendering protocol
+    JevRuntime --> EvalRuntime : typed rendering protocol
     Assertions --> JudgeRecipe : actual requirement first
     Assertions --> Jury : ready composition
     Assertions --> EvaluationResult : cached once

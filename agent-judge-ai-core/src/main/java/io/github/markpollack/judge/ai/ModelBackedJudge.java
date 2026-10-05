@@ -15,9 +15,9 @@ import java.util.Map;
 import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.JudgeWithMetadata;
-import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelRequest;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModel;
+import io.github.markpollack.judge.ai.model.EvalModelRequest;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
 import java.util.function.Function;
 import java.util.Objects;
@@ -32,14 +32,14 @@ import io.github.markpollack.judge.judgment.Judgment;
  * Composes the full pipeline via builder — no subclassing needed:
  * <ol>
  * <li>{@link JudgePromptTemplate} renders the prompt from typed evidence</li>
- * <li>{@link JudgeModel} invokes the AI backend</li>
+ * <li>{@link EvalModel} invokes the AI backend</li>
  * <li>{@link JudgmentClassifier} maps the model response into a {@link Judgment}</li>
  * </ol>
  *
  * <p>
  * It is a {@link ConfiguredJudge}: {@link #configuration()} declares the prompt it
  * renders and the classifier that reads the answer. It declares no model, because a
- * {@link JudgeModel} does not state which model it will call.
+ * {@link EvalModel} does not state which model it will call.
  *
  * <p>
  * Its metadata carries the exclusion capability, if any. A judge whose rubric is partly
@@ -112,14 +112,14 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata, ConfiguredJ
 
 	private final JudgmentClassifier classifier;
 
-	private final JudgeModel model;
+	private final EvalModel model;
 
 	private final java.util.function.Supplier<? extends E> evidence;
 
 	private final io.github.markpollack.judge.requirement.Requirement<?> requirement;
 
 	private ModelBackedJudge(JudgeMetadata metadata, JudgePromptTemplate promptTemplate, JudgmentClassifier classifier,
-			JudgeModel model, Function<? super E, Map<String, Object>> variables,
+			EvalModel model, Function<? super E, Map<String, Object>> variables,
 			java.util.function.Supplier<? extends E> evidence,
 			io.github.markpollack.judge.requirement.Requirement<?> requirement) {
 		this.metadata = metadata;
@@ -135,7 +135,7 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata, ConfiguredJ
 	public Judgment judge() {
 		String prompt = promptTemplate
 			.render(variables.apply(java.util.Objects.requireNonNull(evidence.get(), "acquired evidence")));
-		var response = model.execute(JudgeModelRequest.user(prompt));
+		var response = model.execute(EvalModelRequest.user(prompt));
 		Judgment result;
 		try {
 			result = java.util.Objects.requireNonNull(classifier.classify(response.answer()),
@@ -168,10 +168,10 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata, ConfiguredJ
 	 * classifier's implementation ({@value #JUDGMENT_CLASSIFIER_KEY}).
 	 * </p>
 	 * <p>
-	 * There is no model key. A {@link JudgeModel} does not state which model it will
+	 * There is no model key. A {@link EvalModel} does not state which model it will
 	 * call, and an adapter such as a chat client may choose at call time, so any value
 	 * here would be a guess. The model a call actually used is reported afterwards, in
-	 * {@link JudgeModelResponse#model()}.
+	 * {@link EvalModelResponse#model()}.
 	 * </p>
 	 * @return the declared configuration, in declaration order
 	 *
@@ -226,7 +226,7 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata, ConfiguredJ
 
 		private JudgmentClassifier classifier;
 
-		private JudgeModel model;
+		private EvalModel model;
 
 		private String notApplicableWhen;
 
@@ -280,7 +280,7 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata, ConfiguredJ
 		 * @param runtime native harness
 		 * @return this builder
 		 */
-		public Builder<E> runtime(JudgeModel runtime) {
+		public Builder<E> runtime(EvalModel runtime) {
 			return model(runtime);
 		}
 
@@ -340,7 +340,7 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata, ConfiguredJ
 		 * @param model model adapter
 		 * @return this builder
 		 */
-		public Builder<E> model(JudgeModel model) {
+		public Builder<E> model(EvalModel model) {
 			this.model = model;
 			return this;
 		}

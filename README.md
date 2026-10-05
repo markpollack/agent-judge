@@ -19,7 +19,7 @@ Construction is inert. `Judge.judge()` returns a Judgment; `Jury.vote()` returns
 
 ## Configure an actual native requirement
 
-RFC2119 and EARS have pure native Requirement values. Their public Judges accept a generated-answer harness or a typed `NativeRuntime<RequirementRequest<S,E>,Judgment>`:
+RFC2119 and EARS have pure native Requirement values. Their public Judges accept a generated-answer harness or a typed `EvalRuntime<RequirementRequest<S,E>,Judgment>`:
 
 ```java
 import io.github.markpollack.judge.ai.requirements.Rfc2119Requirement;
@@ -27,7 +27,7 @@ import io.github.markpollack.judge.ai.requirements.Rfc2119Judge;
 
 var integrity = Rfc2119Requirement.of("integrity", "1", "MUST",
     "preserve all original judgments", "auditability", null);
-// judgeModel is a JudgeModel configured by the application.
+// judgeModel is a EvalModel configured by the application.
 var nativeRecipe = Rfc2119Judge.builder().runtime(judgeModel);
 Judge integrityJudge = nativeRecipe.requirement(integrity)
     .evidence("Recorded execution evidence").build();
@@ -111,7 +111,7 @@ An established constituent FAIL survives an incomplete sibling. PASS requires ev
 
 Prepared generated judging adds `.evidence(text)` or `.evidenceSupplier(source)` before `.build()`. Structured native rosters require real typed evidence: common `.evidence(e)` or an exact `.evidenceByRequirement(map)` snapshot. That mode invokes the structured runtime once per item and reports those invocations explicitly. It does not simulate a generated batch.
 
-Configure narrower generated capabilities with `judgeModel.withInputs(GeneratedInput.PREPARED_EVIDENCE)` or `INTEGRATED_INVESTIGATION`; both can be declared together. A prepared-only harness refuses an investigative build, and an investigation-only harness refuses supplied evidence before acquisition or native calls. The general JudgeModel contract accepts both forms. This declaration describes the configured harness: the application must provide native investigation tools, and capability is never inferred from provider brand.
+Configure narrower generated capabilities with `judgeModel.withInputs(GeneratedInput.PREPARED_EVIDENCE)` or `INTEGRATED_INVESTIGATION`; both can be declared together. A prepared-only harness refuses an investigative build, and an investigation-only harness refuses supplied evidence before acquisition or native calls. The general EvalModel contract accepts both forms. This declaration describes the configured harness: the application must provide native investigation tools, and capability is never inferred from provider brand.
 
 ## Route and decide reliance separately
 
@@ -178,3 +178,22 @@ required collections, composition meaning and invocation-reference closure. Doma
 objects carry no custom engine annotations. Raw POJO mapper binding is not the storage
 contract. Low-level Jackson users must explicitly register `ResultJson.module()`;
 the codec configures strict parsing and native specification registration.
+
+Generated evaluation uses `EvalModel`, a specialization of the typed `EvalRuntime<Q,A>` port.
+Every direct execution is fresh; one execution can contain several backend model/tool calls.
+Configured runtimes carry their own tools, advisors and permissions. Deterministic Judges
+need no runtime. When reusing a runtime across parallel seats, its implementation must be
+safe for concurrent calls. Construction acquires no evidence and invokes no backend.
+
+RAG helpers accept a portable generated runtime, for example
+`FaithfulnessJudge.builder().runtime(runtime).evidence(ragEvidence).build()`.
+The Spring AI builder convenience delegates to the same path. Evidence suppliers are
+acquired once for each direct operation. Native responses are captured before decoding;
+`EvalModelResponse.AnswerState.NO_ANSWER` distinguishes a failed invocation from a returned
+answer whose mapping failed. Unknown usage/options stay absent. Cancellation propagates.
+
+`SpringAiEvalModel` transmits supported roles and model/temperature/max-token options;
+configure timeout and response format on the native harness. `AgentClientEvalModel`
+accepts one USER goal and runtime-configured options. Both refuse untransmitted request
+metadata before invoking a backend. Protected capture callbacks own durable artifact bytes;
+the default SDK JSON snapshot does not claim to retain original HTTP bytes.

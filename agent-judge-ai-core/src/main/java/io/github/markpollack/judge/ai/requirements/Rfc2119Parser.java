@@ -21,8 +21,8 @@ import static java.util.stream.Collectors.joining;
 import io.github.markpollack.judge.ai.JudgmentClassifier;
 import io.github.markpollack.judge.ai.ModelBackedJudge;
 import java.nio.file.Path;
-import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModel;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
 import io.github.markpollack.judge.judgment.Check;
 import io.github.markpollack.judge.judgment.Judgment;
@@ -178,7 +178,7 @@ final class Rfc2119Parser {
 	 * @param response the audit to classify
 	 * @return the judgment the rollup produces
 	 */
-	static Judgment rollupFor(List<Rfc2119Constraint> constraints, JudgeModelResponse response) {
+	static Judgment rollupFor(List<Rfc2119Constraint> constraints, EvalModelResponse response) {
 		return classifier(constraints).classify(response);
 	}
 

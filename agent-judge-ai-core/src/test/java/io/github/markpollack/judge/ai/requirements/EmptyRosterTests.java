@@ -11,8 +11,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-import io.github.markpollack.judge.ai.model.JudgeModel;
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModel;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
@@ -50,7 +50,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("An empty requirement roster")
 class EmptyRosterTests {
 
-	private static final JudgeModel MODEL = request -> new JudgeModelResponse("", "stub", null, Map.of());
+	private static final EvalModel MODEL = request -> new EvalModelResponse("", "stub", null, Map.of());
 
 	@Test
 	void earsRefusesAnEmptyRosterAtConstruction() {
@@ -137,8 +137,8 @@ class EmptyRosterTests {
 			.isEqualTo(JudgmentStatus.ERROR);
 	}
 
-	private static JudgeModelResponse answer(String text) {
-		return new JudgeModelResponse(text, "stub", null, Map.of());
+	private static EvalModelResponse answer(String text) {
+		return new EvalModelResponse(text, "stub", null, Map.of());
 	}
 
 	@SuppressWarnings("unused")

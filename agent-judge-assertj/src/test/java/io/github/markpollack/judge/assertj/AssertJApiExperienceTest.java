@@ -122,15 +122,15 @@ class AssertJApiExperienceTest {
 	@Test
 	void modelBackedTextUsesActualRequirementAndLocalProtocolStub() {
 		var calls = new AtomicInteger();
-		io.github.markpollack.judge.ai.model.JudgeModel judgeModel = request -> {
+		io.github.markpollack.judge.ai.model.EvalModel judgeModel = request -> {
 			calls.incrementAndGet();
 			String rendered = request.messages()
 				.stream()
-				.map(io.github.markpollack.judge.ai.model.JudgeMessage::content)
+				.map(io.github.markpollack.judge.ai.model.EvalMessage::content)
 				.reduce("", String::concat);
 			assertThat(rendered).contains("The response communicates that 2 + 2 equals 4.",
 					"Two pairs make a group of four.");
-			return new io.github.markpollack.judge.ai.model.JudgeModelResponse("satisfied", "local-protocol-stub", null,
+			return new io.github.markpollack.judge.ai.model.EvalModelResponse("satisfied", "local-protocol-stub", null,
 					Map.of());
 		};
 		var meaning = io.github.markpollack.judge.ai.ModelBackedJudge.<String>builder()

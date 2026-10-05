@@ -15,13 +15,15 @@ import java.util.Map;
  * @author Mark Pollack
  * @since 0.10.0
  */
-public record JudgeModelRequest(List<JudgeMessage> messages, JudgeModelOptions options,
+public record EvalModelRequest(List<EvalMessage> messages, EvalModelOptions options,
 		Map<String, Object> metadata) {
 
 	/** Copy request collections into immutable values. */
-	public JudgeModelRequest {
+	public EvalModelRequest {
 		messages = List.copyOf(messages);
-		metadata = Map.copyOf(metadata);
+		metadata = io.github.markpollack.judge.portable.PortableValues.copy(metadata,"request.metadata");
+		java.util.Objects.requireNonNull(options);
+		if(messages.isEmpty()) throw new IllegalArgumentException("At least one message required");
 	}
 
 	/**
@@ -29,9 +31,9 @@ public record JudgeModelRequest(List<JudgeMessage> messages, JudgeModelOptions o
 	 * @param prompt the user prompt text
 	 * @return a new request
 	 */
-	public static JudgeModelRequest user(String prompt) {
-		return new JudgeModelRequest(List.of(new JudgeMessage(JudgeMessageRole.USER, prompt)),
-				JudgeModelOptions.defaults(), Map.of());
+	public static EvalModelRequest user(String prompt) {
+		return new EvalModelRequest(List.of(new EvalMessage(EvalMessageRole.USER, prompt)),
+				EvalModelOptions.defaults(), Map.of());
 	}
 
 }

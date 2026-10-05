@@ -1,6 +1,6 @@
 package io.github.markpollack.judge.ai;
 
-import io.github.markpollack.judge.ai.model.JudgeModelResponse;
+import io.github.markpollack.judge.ai.model.EvalModelResponse;
 import io.github.markpollack.judge.judgment.Judgment;
 
 /**
@@ -32,6 +32,6 @@ public interface JudgmentClassifier {
 	 * @param response the judge model response
 	 * @return the classified judgment
 	 */
-	Judgment classify(JudgeModelResponse response);
+	Judgment classify(EvalModelResponse response);
 
 }
