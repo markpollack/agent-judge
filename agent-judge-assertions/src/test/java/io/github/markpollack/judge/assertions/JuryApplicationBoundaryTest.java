@@ -57,10 +57,7 @@ class JuryApplicationBoundaryTest {
 
 	@Test
 	void individualRejectionAndCollectiveErrorBothReachPolicy() {
-		var rejected = SimpleJury.builder()
-			.judge("known", () -> Judgment.fail("violation"))
-			.judge("second", () -> Judgment.pass("present"))
-			.votingStrategy(new VotingStrategy() {
+		var failedRule = new VotingStrategy() {
 				public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
 					var values = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
 					throw new IllegalStateException("reduction broken");
@@ -69,7 +66,11 @@ class JuryApplicationBoundaryTest {
 				public String getName() {
 					return "broken";
 				}
-			})
+		};
+		var rejected = SimpleJury.builder()
+			.judge("known", () -> Judgment.fail("violation"))
+			.judge("second", () -> Judgment.pass("present"))
+			.votingStrategy(failedRule)
 			.build()
 			.vote();
 
@@ -87,7 +88,8 @@ class JuryApplicationBoundaryTest {
 			return new PolicyDecision(PolicyAction.RELY, "trust rejection");
 		});
 		assertThat(result.policyResult()).isInstanceOf(PolicyResult.Decided.class);
-		var restored = new VerdictCodec().read(new VerdictCodec().write(result.verdict()));
+		var codec = new VerdictCodec().withVotingRules(java.util.Map.of("broken", configuration -> failedRule));
+		var restored = codec.read(codec.write(result.verdict()));
 		assertThat(restored.conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
 	}
 
