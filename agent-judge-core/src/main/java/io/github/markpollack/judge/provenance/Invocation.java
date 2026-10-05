@@ -58,11 +58,11 @@ public record Invocation(String id, String protocol,
 
 	/** Validates and freezes observations. */
 	public Invocation {
-		io.github.markpollack.judge.requirement.Requirement.requireText(id);
-		io.github.markpollack.judge.requirement.Requirement.requireText(protocol);
+		io.github.markpollack.judge.portable.ValueRequirements.text(id, "id");
+		io.github.markpollack.judge.portable.ValueRequirements.text(protocol, "protocol");
 		if (durationMillis < 0)
 			throw new IllegalArgumentException("Negative duration");
-		nativeFacts = io.github.markpollack.judge.judgment.PortableValues.copy(nativeFacts, "invocation.nativeFacts");
+		nativeFacts = io.github.markpollack.judge.portable.PortableValues.copy(nativeFacts, "invocation.nativeFacts");
 		artifacts = List.copyOf(artifacts);
 	}
 }

@@ -8,14 +8,14 @@
  * vote.
  *
  * <p>
- * A {@link io.github.markpollack.judge.jury.Verdict} records what a jury did. This
+ * A {@link io.github.markpollack.judge.verdict.Verdict} records what a jury did. This
  * package records what a jury was configured to do, so the two can be compared: the seats
  * a {@link io.github.markpollack.judge.jury.SimpleJury} lists against the
  * {@code inputCount} its aggregation evidence reports, or the tiers a
  * {@link io.github.markpollack.judge.jury.CascadedJury} lists against the attempts it
  * made. Call {@link io.github.markpollack.judge.jury.Jury#describe()}; a single judge is
  * described by
- * {@link io.github.markpollack.judge.Judges#describe(io.github.markpollack.judge.Judge)}.
+ * {@link io.github.markpollack.judge.description.JudgeDescription#of(io.github.markpollack.judge.Judge)}.
  * </p>
  *
  * <h2>Each type describes itself</h2>

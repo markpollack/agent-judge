@@ -4,6 +4,10 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.AggregationEvidence;
+import io.github.markpollack.judge.voting.ErrorHandling;
+import io.github.markpollack.judge.voting.WeightedAverageStrategy;
 
 import io.github.markpollack.judge.completion.CompletionEvidence;
 

@@ -4,18 +4,19 @@
  */
 
 package io.github.markpollack.judge.description;
+import io.github.markpollack.judge.portable.PortableForm;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import io.github.markpollack.judge.jury.RoutingRule;
+import io.github.markpollack.judge.verdict.RoutingRule;
 
 /**
  * One tier of a {@link io.github.markpollack.judge.jury.CascadedJury}.
  *
  * <p>
- * The name is the same one a {@link io.github.markpollack.judge.jury.CompositeAttempt}
+ * The name is the same one a {@link io.github.markpollack.judge.verdict.CompositeAttempt}
  * carries, so a tier joins its attempt by name.
  * </p>
  *
@@ -42,7 +43,7 @@ public record TierDescription(String name, RoutingRule routingRule, JuryDescript
 		Map<String, Object> tree = new LinkedHashMap<>();
 		tree.put("name", name);
 		tree.put("policy", routingRule.wireName());
-		tree.put("jury", PortableForm.juryTree(jury));
+		tree.put("jury", DescriptionTrees.juryTree(jury));
 		return tree;
 	}
 

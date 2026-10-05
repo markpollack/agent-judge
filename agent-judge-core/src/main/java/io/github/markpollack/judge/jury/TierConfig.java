@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.verdict.RoutingRule;
 
 import java.util.Objects;
 

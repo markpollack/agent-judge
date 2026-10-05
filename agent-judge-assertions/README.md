@@ -4,7 +4,7 @@ Core executes configured producers and optionally applies an independent Policy.
 
 ```java
 import io.github.markpollack.judge.judgment.Judgment;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.evaluation.Evaluations;
 import io.github.markpollack.judge.assertions.RequirementAssertions;

@@ -4,6 +4,9 @@
  */
 
 package io.github.markpollack.judge.assertj;
+import io.github.markpollack.judge.jury.JuryEvidenceStep;
+import io.github.markpollack.judge.jury.JuryRecipe;
+import io.github.markpollack.judge.verdict.Verdict;
 
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -13,6 +16,8 @@ import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.construction.*;
 import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import io.github.markpollack.judge.evaluation.*;
 import io.github.markpollack.judge.policy.*;
 import io.github.markpollack.judge.assertions.*;

@@ -4,6 +4,19 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.verdict.CompositeAttempt;
+import io.github.markpollack.judge.verdict.CompositeFailure;
+import io.github.markpollack.judge.verdict.CompositeFailureCode;
+import io.github.markpollack.judge.verdict.CompositeLimitExceededException;
+import io.github.markpollack.judge.verdict.CompositeRelation;
+import io.github.markpollack.judge.verdict.DispositionReason;
+import io.github.markpollack.judge.verdict.Participation;
+import io.github.markpollack.judge.verdict.Seat;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.verdict.VerdictProvenance;
+import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
+import io.github.markpollack.judge.voting.ExclusionHandling;
+import io.github.markpollack.judge.voting.VotingStrategy;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -12,12 +25,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.lang.System.Logger;
+
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.description.JuryDescription;
-import io.github.markpollack.judge.description.KeySource;
+import io.github.markpollack.judge.verdict.KeySource;
 import io.github.markpollack.judge.description.MemberDescription;
 import io.github.markpollack.judge.description.MetaJuryDescription;
 import io.github.markpollack.judge.judgment.Judgment;
@@ -31,7 +44,7 @@ import io.github.markpollack.judge.judgment.JudgmentReasonCode;
  */
 class MetaJury implements VotingJury {
 
-	private static final Logger logger = LoggerFactory.getLogger(MetaJury.class);
+	private static final Logger logger = System.getLogger(MetaJury.class.getName());
 
 	private final List<NamedJury> members;
 
@@ -135,7 +148,7 @@ class MetaJury implements VotingJury {
 			}
 			catch (Exception ex) {
 				SimpleJury.preserveCancellation(ex);
-				logger.warn("Member '{}' did not produce a verdict ({}); recording a stage failure", member.name(),
+				logger.log(System.Logger.Level.WARNING, "Member {0} did not produce a verdict ({1}); recording a stage failure", member.name(),
 						ex.getClass().getName(), ex);
 				attempts.add(CompositeAttempt.executionFailed(member.name(), CompositeRelation.META_MEMBER, null,
 						new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED, ex)));
@@ -216,7 +229,7 @@ class MetaJury implements VotingJury {
 			.provenance(identity
 					? (attempts.get(0).verdict().provenance().kind() == VerdictProvenanceKind.UNDECIDED
 							? VerdictProvenance.undecided() : VerdictProvenance.own())
-					: AggregationBoundary.decisionFor(aggregate))
+					: VerdictProvenance.decisionFor(aggregate))
 			.compositeAttempts(attempts)
 			.build();
 	}

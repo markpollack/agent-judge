@@ -14,9 +14,9 @@ import org.springframework.ai.chat.model.Generation;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.jury.MajorityVotingStrategy;
+import io.github.markpollack.judge.voting.MajorityVotingStrategy;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.Test;

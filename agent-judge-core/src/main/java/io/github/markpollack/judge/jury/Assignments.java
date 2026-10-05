@@ -3,6 +3,16 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.verdict.CompositeAttempt;
+import io.github.markpollack.judge.verdict.CompositeFailure;
+import io.github.markpollack.judge.verdict.CompositeFailureCode;
+import io.github.markpollack.judge.verdict.CompositeLimitExceededException;
+import io.github.markpollack.judge.verdict.CompositeRelation;
+import io.github.markpollack.judge.verdict.DispositionReason;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.verdict.VerdictProvenance;
+import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
+
 
 import java.util.*;
 import java.util.function.Function;
@@ -74,8 +84,7 @@ public final class Assignments<E> {
 		EvidenceStep<C> step = judge.requirement(actual);
 		return add(actual, evidence -> {
 			C selected = Objects.requireNonNull(selectEvidence.apply(evidence), "selected evidence");
-			return io.github.markpollack.judge.evaluation.Evaluations.evaluate(step.evidence(selected).build())
-				.verdict()
+			return Juries.evaluate(step.evidence(selected).build())
 				.forRequirement(actual);
 		});
 	}
@@ -211,9 +220,11 @@ public final class Assignments<E> {
 								new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED, ex)));
 						continue;
 					}
-					VerdictSemantics.CheckedConstituent checked;
+					Verdict checked;
+					Verdict.Conclusion conclusion;
 					try {
-						checked = VerdictSemantics.associateConstituent(child, verdict);
+						checked = verdict.forRequirement(child);
+						conclusion = checked.conclusion();
 					}
 					catch (IllegalArgumentException rejected) {
 						incomplete = true;
@@ -221,8 +232,8 @@ public final class Assignments<E> {
 								DispositionReason.INVALID_TIER_RESULT, verdict));
 						continue;
 					}
-					verdict = checked.verdict();
-					Verdict.Conclusion conclusion = checked.conclusion();
+					verdict = checked;
+
 					failed |= conclusion == Verdict.Conclusion.FAIL;
 					incomplete |= conclusion != Verdict.Conclusion.PASS;
 					if (verdict.provenance().kind() == VerdictProvenanceKind.UNDECIDED)

@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.description;
+import io.github.markpollack.judge.portable.PortableForm;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -11,10 +12,10 @@ import java.util.Objects;
 
 /**
  * One named member of a meta-jury built by
- * {@link io.github.markpollack.judge.jury.Juries#meta(io.github.markpollack.judge.jury.VotingStrategy, io.github.markpollack.judge.jury.NamedJury...)}.
+ * {@link io.github.markpollack.judge.jury.Juries#meta(io.github.markpollack.judge.voting.VotingStrategy, io.github.markpollack.judge.jury.NamedJury...)}.
  *
  * <p>
- * The name is the one the member's {@link io.github.markpollack.judge.jury.CompositeAttempt}
+ * The name is the one the member's {@link io.github.markpollack.judge.verdict.CompositeAttempt}
  * carries.
  * </p>
  *
@@ -39,7 +40,7 @@ public record MemberDescription(String name, JuryDescription jury) {
 	Map<String, Object> portableTree() {
 		Map<String, Object> tree = new LinkedHashMap<>();
 		tree.put("name", name);
-		tree.put("jury", PortableForm.juryTree(jury));
+		tree.put("jury", DescriptionTrees.juryTree(jury));
 		return tree;
 	}
 

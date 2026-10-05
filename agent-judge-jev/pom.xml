@@ -10,6 +10,7 @@
     <name>Agent Judge Jev</name>
     <description>Bounded TypeSafe Jev evaluation adapter</description>
     <dependencies>
+        <dependency><groupId>io.github.markpollack</groupId><artifactId>agent-judge-json-jackson2</artifactId><version>${project.version}</version><scope>test</scope></dependency>
         <dependency>
             <groupId>io.github.markpollack</groupId>
             <artifactId>agent-judge-core</artifactId>

@@ -4,6 +4,16 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AverageVotingStrategy;
+import io.github.markpollack.judge.voting.ConjunctiveStrategy;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
+import io.github.markpollack.judge.voting.ErrorHandling;
+import io.github.markpollack.judge.voting.MajorityVotingStrategy;
+import io.github.markpollack.judge.voting.MedianVotingStrategy;
+import io.github.markpollack.judge.voting.TieBreakRule;
+import io.github.markpollack.judge.voting.VotingStrategy;
+import io.github.markpollack.judge.voting.WeightedAverageStrategy;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -17,7 +27,7 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
-import io.github.markpollack.judge.description.StrategyDescription;
+import io.github.markpollack.judge.voting.StrategyDescription;
 import io.github.markpollack.judge.judgment.Judgment;
 
 import static io.github.markpollack.judge.JudgeTestFixtures.passJudgment;

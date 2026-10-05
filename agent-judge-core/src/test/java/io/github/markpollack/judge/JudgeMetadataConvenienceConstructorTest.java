@@ -14,12 +14,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.jury.ConsensusStrategy;
-import io.github.markpollack.judge.jury.ErrorHandling;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
+import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.ExclusionHandling;
+import io.github.markpollack.judge.voting.ExclusionHandling;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
@@ -119,8 +119,8 @@ class JudgeMetadataConvenienceConstructorTest {
 		@Test
 		@DisplayName("the description publishes it as undeclared")
 		void theDescriptionSaysUndeclared() {
-			assertThat(Judges.describe(new NeverExcludes("plain", Judgment.pass("ok"))).notApplicableWhen()).isNull();
-			assertThat(Judges.describe(new NeverExcludes("plain", Judgment.pass("ok"))).toPortable())
+			assertThat(io.github.markpollack.judge.description.JudgeDescription.of(new NeverExcludes("plain", Judgment.pass("ok"))).notApplicableWhen()).isNull();
+			assertThat(io.github.markpollack.judge.description.JudgeDescription.of(new NeverExcludes("plain", Judgment.pass("ok"))).toPortable())
 				.containsEntry("notApplicableWhen", Map.of("declared", false));
 		}
 

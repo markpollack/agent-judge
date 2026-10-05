@@ -7,10 +7,10 @@ package io.github.markpollack.judge;
 
 import io.github.markpollack.judge.completion.CompletionStatus;
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.description.KeySource;
-import io.github.markpollack.judge.jury.VerdictProvenance;
-import io.github.markpollack.judge.jury.Seat;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.KeySource;
+import io.github.markpollack.judge.verdict.VerdictProvenance;
+import io.github.markpollack.judge.verdict.Seat;
+import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.judgment.Judgment;
 
 import java.nio.file.Path;

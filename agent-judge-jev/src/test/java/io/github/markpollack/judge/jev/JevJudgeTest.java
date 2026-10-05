@@ -20,9 +20,9 @@ import io.github.markpollack.judge.judgment.QualityDirection;
 import io.github.markpollack.judge.policy.PolicyAction;
 import io.github.markpollack.judge.policy.PolicyDecision;
 import io.github.markpollack.judge.provenance.ArtifactRef;
-import io.github.markpollack.judge.jury.ConsensusStrategy;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.serialization.diagnostics.ReadingSupport;
 import io.github.markpollack.judge.serialization.diagnostics.StoredVerdicts;
 import org.junit.jupiter.api.*;
@@ -40,6 +40,7 @@ import java.util.stream.*;
 import static org.assertj.core.api.Assertions.*;
 
 class JevJudgeTest {
+ private static final com.fasterxml.jackson.databind.ObjectMapper RESULTS = new com.fasterxml.jackson.databind.ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	static final String GOAL = "All three required clauses shall be met.";
 	static final String EVIDENCE = "Synthetic transport fixture; no real assessment was made.";
@@ -255,7 +256,7 @@ class JevJudgeTest {
 			.build()
 			.vote();
 		assertThat(verdict.judgment()).isEqualTo(j);
-		Verdict restored = Checks.JSON.readValue(Checks.JSON.writeValueAsBytes(verdict), Verdict.class);
+		Verdict restored = RESULTS.readValue(RESULTS.writeValueAsBytes(verdict), Verdict.class);
 		assertThat(restored).isEqualTo(verdict);
 		var interpreted = StoredVerdicts.interpret(restored);
 		assertThat(interpreted.readingSupport()).isEqualTo(ReadingSupport.SUPPORTED);
@@ -263,7 +264,7 @@ class JevJudgeTest {
 		assertThat(interpreted.root().judgment().provenance()).isEqualTo(j.provenance());
 		assertThat(interpreted.root().judgment().probabilityDistribution()).isEqualTo(j.probabilityDistribution());
 		assertThat(interpreted.root().judgment().confidence()).isEqualTo(j.confidence());
-		var wire = Checks.JSON.convertValue(verdict,
+		var wire = RESULTS.convertValue(verdict,
 				new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
 				});
 		assertThat(StoredVerdicts.interpret(wire)).isEqualTo(interpreted);
@@ -762,7 +763,7 @@ class JevJudgeTest {
 			.build()
 			.judge();
 		assertThat(j.status()).isEqualTo(JudgmentStatus.ERROR);
-		assertThat(Checks.JSON.valueToTree(j).toString()).doesNotContain("SECRET");
+		assertThat(RESULTS.valueToTree(j).toString()).doesNotContain("SECRET");
 	}
 
 	@Test
@@ -805,14 +806,14 @@ class JevJudgeTest {
 			.build()
 			.judge();
 		assertThat(j.status()).isEqualTo(JudgmentStatus.FAIL);
-		Judgment restored = Checks.JSON.readValue(Checks.JSON.writeValueAsBytes(j), Judgment.class);
+		Judgment restored = RESULTS.readValue(RESULTS.writeValueAsBytes(j), Judgment.class);
 		assertThat(restored).isEqualTo(j);
 		var verdict = SimpleJury.<JevSample<String, JevEvidence>>builder()
 			.judge(() -> j)
 			.votingStrategy(new ConsensusStrategy())
 			.build()
 			.vote();
-		var decoded = Checks.JSON.readValue(Checks.JSON.writeValueAsBytes(verdict), Verdict.class);
+		var decoded = RESULTS.readValue(RESULTS.writeValueAsBytes(verdict), Verdict.class);
 		assertThat(decoded).isEqualTo(verdict);
 		assertThat(StoredVerdicts.interpret(decoded).root().judgment().metadata()).isEqualTo(j.metadata());
 	}
@@ -860,7 +861,7 @@ class JevJudgeTest {
 		assertThat(j.provenance().revision())
 			.contains("requested=typesafe-ai/jev", "reported=typesafe-ai/jev", "underlyingModelVersion=unknown")
 			.doesNotContain("jev-1.13.0");
-		assertThat(Checks.JSON.readValue(Checks.json(j), Judgment.class)).isEqualTo(j);
+		assertThat(RESULTS.readValue(RESULTS.writeValueAsBytes(j), Judgment.class)).isEqualTo(j);
 		assertThat(calls).hasValue(1);
 	}
 
@@ -910,13 +911,13 @@ class JevJudgeTest {
 		assertThat(trace(j).at("/usage/costSource")).isEqualTo(usage.path("costSource"));
 		assertThat(j.checks()).isEmpty();
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
-		assertThat(Checks.JSON.readValue(Checks.json(j), Judgment.class)).isEqualTo(j);
+		assertThat(RESULTS.readValue(RESULTS.writeValueAsBytes(j), Judgment.class)).isEqualTo(j);
 		var verdict = SimpleJury.<JevSample<String, JevEvidence>>builder()
 			.judge(() -> j)
 			.votingStrategy(new ConsensusStrategy())
 			.build()
 			.vote();
-		var reopened = Checks.JSON.readValue(Checks.json(verdict), Verdict.class);
+		var reopened = RESULTS.readValue(RESULTS.writeValueAsBytes(verdict), Verdict.class);
 		assertThat(reopened).isEqualTo(verdict);
 		assertThat(StoredVerdicts.interpret(reopened).root().judgment().metadata()).isEqualTo(j.metadata());
 		assertThat(calls).hasValue(1);
@@ -1149,7 +1150,7 @@ class JevJudgeTest {
 		assertThat(j.probabilityDistribution().masses()).contains(new ProbabilityMass("violated", .9));
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
 		assertThat(calls).hasValue(1);
-		assertThat(Checks.JSON.readValue(Checks.json(j), Judgment.class)).isEqualTo(j);
+		assertThat(RESULTS.readValue(RESULTS.writeValueAsBytes(j), Judgment.class)).isEqualTo(j);
 		for (byte[] artifact : captured.values())
 			assertThat(artifact.length).isLessThanOrEqualTo(65536);
 		assertThat(artifact(j, "trace").length).isLessThan(4096);
@@ -1192,7 +1193,7 @@ class JevJudgeTest {
 		assertThat(captured.get(j.provenance().response().id())).isEqualTo(response.get());
 		assertThat(providerMetadata(j)).isEqualTo(body.path("provider_metadata"));
 		assertThat(artifact(j, "trace").length).isLessThan(4096);
-		assertThat(Checks.JSON.readValue(Checks.json(j), Judgment.class)).isEqualTo(j);
+		assertThat(RESULTS.readValue(RESULTS.writeValueAsBytes(j), Judgment.class)).isEqualTo(j);
 		assertThat(calls).hasValue(1);
 	}
 

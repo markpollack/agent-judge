@@ -4,6 +4,23 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.verdict.AttemptDisposition;
+import io.github.markpollack.judge.verdict.CompositeAttempt;
+import io.github.markpollack.judge.verdict.CompositeRelation;
+import io.github.markpollack.judge.verdict.DispositionReason;
+import io.github.markpollack.judge.verdict.RoutingDecision;
+import io.github.markpollack.judge.verdict.RoutingRule;
+import io.github.markpollack.judge.verdict.Seat;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.verdict.VerdictProvenance;
+import io.github.markpollack.judge.verdict.VerdictProvenanceBasis;
+import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
+import io.github.markpollack.judge.voting.AggregationEvidence;
+import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
+import io.github.markpollack.judge.voting.ErrorHandling;
+import io.github.markpollack.judge.voting.ExclusionHandling;
+import io.github.markpollack.judge.voting.VotingStrategy;
 
 import java.util.List;
 import java.util.Map;
@@ -20,7 +37,7 @@ import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.description.KeySource;
+import io.github.markpollack.judge.verdict.KeySource;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 import io.github.markpollack.judge.judgment.JudgmentStatus;

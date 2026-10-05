@@ -3,6 +3,12 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.assertj;
+import io.github.markpollack.judge.construction.NonEmptyJudge;
+import io.github.markpollack.judge.jury.JuryEvidenceStep;
+import io.github.markpollack.judge.jury.JuryRecipe;
+import io.github.markpollack.judge.jury.ReadyJury;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Files;
@@ -24,6 +30,8 @@ class CompileGrammarTest {
 			import static org.assertj.core.api.Assertions.assertThat;
 			import io.github.markpollack.judge.*;
 			import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 			import io.github.markpollack.judge.judgment.*;
 			import io.github.markpollack.judge.policy.*;
 			import io.github.markpollack.judge.requirement.*;

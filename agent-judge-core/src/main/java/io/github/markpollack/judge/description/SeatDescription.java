@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.description;
+import io.github.markpollack.judge.verdict.KeySource;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -15,9 +16,9 @@ import java.util.Objects;
  *
  * <p>
  * The position is the zero-based index used by
- * {@link io.github.markpollack.judge.jury.Verdict#individual()} and by the keys of
- * {@link io.github.markpollack.judge.jury.Verdict#weights()}. The verdict key is the key of
- * {@link io.github.markpollack.judge.jury.Verdict#individualByName()}. A seat is where the
+ * {@link io.github.markpollack.judge.verdict.Verdict#individual()} and by the keys of
+ * {@link io.github.markpollack.judge.verdict.Verdict#weights()}. The verdict key is the key of
+ * {@link io.github.markpollack.judge.verdict.Verdict#individualByName()}. A seat is where the
  * two join.
  * </p>
  *

@@ -3,11 +3,20 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.reporting;
+import io.github.markpollack.judge.verdict.CompositePathEntry;
+import io.github.markpollack.judge.verdict.CompositePaths;
+import io.github.markpollack.judge.verdict.InvocationRecords;
+import io.github.markpollack.judge.verdict.Seat;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.verdict.VerdictProvenanceBasis;
+import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
 
 import java.util.*;
 import io.github.markpollack.judge.requirement.Requirement;
 import org.jspecify.annotations.Nullable;
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import io.github.markpollack.judge.judgment.Judgment;
 
 /** Readable traversal over retained facts. Never invokes a producer or policy. */
@@ -89,7 +98,7 @@ public final class VerdictReport {
 	 * @return complete unique native invocation records in traversal order
 	 */
 	public List<io.github.markpollack.judge.provenance.Invocation> invocations() {
-		return io.github.markpollack.judge.jury.InvocationRecords.of(verdict);
+		return io.github.markpollack.judge.verdict.InvocationRecords.of(verdict);
 	}
 
 	private static String requirement(@Nullable Requirement<?> value) {

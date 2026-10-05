@@ -349,7 +349,7 @@ class JudgeFunctionalTest {
 		// The same two abstaining judges through the jury API: ABSTAIN, not FAIL, with
 		// the
 		// population published. This is why the combinators are left alone.
-		Judgment aggregate = new io.github.markpollack.judge.jury.AllMustPassStrategy().aggregate(
+		Judgment aggregate = new io.github.markpollack.judge.voting.AllMustPassStrategy().aggregate(
 				java.util.List.of(Judgment.abstain("not applicable"), Judgment.abstain("not applicable")),
 				java.util.Map.of());
 

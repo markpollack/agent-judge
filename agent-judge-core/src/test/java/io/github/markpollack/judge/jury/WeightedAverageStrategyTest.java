@@ -4,6 +4,9 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.voting.AggregationEvidence;
+import io.github.markpollack.judge.voting.AverageVotingStrategy;
+import io.github.markpollack.judge.voting.WeightedAverageStrategy;
 
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.judgment.Judgment;

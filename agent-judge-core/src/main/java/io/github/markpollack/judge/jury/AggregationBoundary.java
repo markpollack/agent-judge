@@ -4,13 +4,18 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.verdict.CompositeFailure;
+import io.github.markpollack.judge.verdict.CompositeFailureCode;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.verdict.VerdictProvenance;
+import io.github.markpollack.judge.voting.VotingStrategy;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
+import java.lang.System.Logger;
 
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentReasonCode;
@@ -132,7 +137,7 @@ final class AggregationBoundary {
 
 	private static Judgment contained(Logger logger, String strategyName, String what) {
 		String reasoning = "Strategy '" + strategyName + "' " + what + "; no aggregate was produced";
-		logger.warn("{}", reasoning);
+		logger.log(System.Logger.Level.WARNING, "{0}", reasoning);
 		return Judgment.error(JudgmentReasonCode.AGGREGATION_FAILED, reasoning);
 	}
 
@@ -157,11 +162,4 @@ final class AggregationBoundary {
 	 * @param judgment the aggregate
 	 * @return the provenance
 	 */
-	static VerdictProvenance decisionFor(Judgment judgment) {
-		JudgmentReasonCode code = judgment.reasonCode();
-		boolean undecided = judgment.status() == JudgmentStatus.ERROR && code != null
-				&& code.originFamily() == JudgmentReasonCode.OriginFamily.MACHINERY;
-		return undecided ? VerdictProvenance.undecided() : VerdictProvenance.own();
-	}
-
 }

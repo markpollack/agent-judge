@@ -53,7 +53,7 @@ import org.jspecify.annotations.Nullable;
  * <h2>Three origin families</h2>
  * <p>
  * {@link #originFamily()} says who failed, which decides whether an
- * {@link io.github.markpollack.judge.jury.ErrorHandling} may convert the error into a
+ * {@link io.github.markpollack.judge.voting.ErrorHandling} may convert the error into a
  * failing contribution:
  * </p>
  * <ul>

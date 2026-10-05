@@ -13,7 +13,7 @@ import java.util.function.Function;
 import dev.langchain4j.service.Result;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.judgment.Judgment;
 
 /**

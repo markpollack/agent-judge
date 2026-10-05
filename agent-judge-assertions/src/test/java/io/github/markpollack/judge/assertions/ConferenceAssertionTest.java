@@ -9,7 +9,7 @@ import io.github.markpollack.judge.requirement.Requirement;
 import com.sun.net.httpserver.HttpServer;
 import io.github.markpollack.judge.construction.JudgeRecipe;
 import io.github.markpollack.judge.evaluation.*;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.jev.JevEvidence;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
 import java.net.*;

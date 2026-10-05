@@ -4,6 +4,11 @@
  */
 
 package io.github.markpollack.judge.assertj;
+import io.github.markpollack.judge.jury.JuryEvidenceStep;
+import io.github.markpollack.judge.jury.JuryRecipe;
+import io.github.markpollack.judge.jury.ReadyJury;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.VotingStrategy;
 
 import java.util.*;
 import java.util.function.*;
@@ -11,6 +16,8 @@ import io.github.markpollack.judge.*;
 import io.github.markpollack.judge.construction.*;
 import io.github.markpollack.judge.requirement.*;
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import io.github.markpollack.judge.judgment.*;
 
 /**

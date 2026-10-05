@@ -19,13 +19,13 @@ import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
 import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.description.SeatDescription;
 import io.github.markpollack.judge.description.SimpleJuryDescription;
-import io.github.markpollack.judge.jury.ConsensusStrategy;
-import io.github.markpollack.judge.jury.ErrorHandling;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
+import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.jury.Juries;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.ExclusionHandling;
+import io.github.markpollack.judge.voting.ExclusionHandling;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
 
@@ -95,7 +95,7 @@ class ModelBackedJudgeCapabilityTests {
 		ModelBackedJudge conditional = judge("rubric", CONDITION, "excluded");
 
 		assertThat(Judges.notApplicableCapability(conditional)).contains(CONDITION);
-		assertThat(Judges.describe(conditional).notApplicableWhen()).isEqualTo(CONDITION);
+		assertThat(io.github.markpollack.judge.description.JudgeDescription.of(conditional).notApplicableWhen()).isEqualTo(CONDITION);
 
 		Jury jury = SimpleJury.builder()
 			.seat(io.github.markpollack.judge.jury.JudgeSeat.named("rubric", conditional).notApplicableWhen(CONDITION))
@@ -131,9 +131,9 @@ class ModelBackedJudgeCapabilityTests {
 	@Test
 	@DisplayName("the portable description says whether this seat may leave the denominator")
 	void thePortableDescriptionCarriesIt() {
-		assertThat(Judges.describe(judge("rubric", CONDITION, "excluded")).toPortable())
+		assertThat(io.github.markpollack.judge.description.JudgeDescription.of(judge("rubric", CONDITION, "excluded")).toPortable())
 			.containsEntry("notApplicableWhen", Map.of("declared", true, "value", CONDITION));
-		assertThat(Judges.describe(judge("correctness", null, "ok")).toPortable()).containsEntry("notApplicableWhen",
+		assertThat(io.github.markpollack.judge.description.JudgeDescription.of(judge("correctness", null, "ok")).toPortable()).containsEntry("notApplicableWhen",
 				Map.of("declared", false));
 	}
 

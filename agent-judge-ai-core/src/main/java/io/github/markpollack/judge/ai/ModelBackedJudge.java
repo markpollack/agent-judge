@@ -22,7 +22,7 @@ import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
 import java.util.function.Function;
 import java.util.Objects;
 import io.github.markpollack.judge.description.ConfiguredJudge;
-import io.github.markpollack.judge.description.ImplementationIdentity;
+import io.github.markpollack.judge.portable.ImplementationIdentity;
 import io.github.markpollack.judge.judgment.Judgment;
 
 /**

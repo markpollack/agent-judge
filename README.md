@@ -8,7 +8,7 @@ A deterministic check needs no invented Requirement:
 
 ```java
 import io.github.markpollack.judge.Judge;
-import io.github.markpollack.judge.NonEmptyJudge;
+import io.github.markpollack.judge.construction.NonEmptyJudge;
 import static io.github.markpollack.judge.assertj.Assertions.assertThat;
 
 Judge nonempty = NonEmptyJudge.builder().evidence("ready").build();
@@ -68,6 +68,8 @@ Ordinary voting accepts independently configured Judges, including mixed native 
 
 ```java
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import io.github.markpollack.judge.policy.*;
 import io.github.markpollack.judge.evaluation.*;
 
@@ -161,3 +163,18 @@ Core depends on no model provider or assertion framework. Public examples and co
 ## License
 
 The current source uses Business Source License 1.1 with project-specific terms in [LICENSE](LICENSE). Releases through 0.9.1 retain their former [Apache License 2.0](LICENSE-APACHE.txt) terms.
+
+
+### Result storage and package boundaries
+
+Opinion rules live in `io.github.markpollack.judge.voting`, retained records in
+`io.github.markpollack.judge.verdict`, and composition execution in
+`io.github.markpollack.judge.jury`. Core uses JDK facilities, JSpecify and Jackson
+annotations; JSON engines are outside core.
+
+For supported strict result storage, add `io.github.markpollack:agent-judge-json-jackson2`
+at the same version as core and use `VerdictCodec`. It validates the versioned document,
+required collections, composition meaning and invocation-reference closure. Domain
+objects carry no custom engine annotations. Raw POJO mapper binding is not the storage
+contract. Low-level Jackson users must explicitly register `ResultJson.module()`;
+the codec configures strict parsing and native specification registration.

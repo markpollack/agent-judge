@@ -53,13 +53,13 @@ class ModernRequirementRosterTests {
 					.build();
 	}
 
-	private static io.github.markpollack.judge.jury.Verdict audit(Kind kind, String text) {
+	private static io.github.markpollack.judge.verdict.Verdict audit(Kind kind, String text) {
 		return configured(kind, List.of("R-1", "R-2", "R-3"),
 				request -> new JudgeModelResponse(text, "stub", null, Map.of()))
 			.vote();
 	}
 
-	private static void roster(io.github.markpollack.judge.jury.Verdict result, JudgmentStatus... statuses) {
+	private static void roster(io.github.markpollack.judge.verdict.Verdict result, JudgmentStatus... statuses) {
 		assertThat(result.roster()).extracting(io.github.markpollack.judge.requirement.Requirement::id)
 			.containsExactly("R-1", "R-2", "R-3");
 		assertThat(result.compositeAttempts()).extracting(a -> a.verdict().individualByName().get(a.name()).status())
@@ -71,7 +71,7 @@ class ModernRequirementRosterTests {
 	@ParameterizedTest
 	@EnumSource(Kind.class)
 	void uncertainAndExcludedRequirementsRetainTheirOwnOutcomes(Kind kind) {
-		io.github.markpollack.judge.jury.Verdict result = audit(kind,
+		io.github.markpollack.judge.verdict.Verdict result = audit(kind,
 				"R-1: FAIL - violated\nR-2: CANNOT_DETERMINE - insufficient evidence\nR-3: NOT_APPLICABLE - no storage");
 		assertThat(result.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 		roster(result, JudgmentStatus.FAIL, JudgmentStatus.ABSTAIN, JudgmentStatus.NOT_APPLICABLE);
@@ -80,7 +80,7 @@ class ModernRequirementRosterTests {
 	@ParameterizedTest
 	@EnumSource(Kind.class)
 	void missingResponseRemainsAnErrorCheckAlongsideEstablishedFacts(Kind kind) {
-		io.github.markpollack.judge.jury.Verdict result = audit(kind,
+		io.github.markpollack.judge.verdict.Verdict result = audit(kind,
 				"R-1: FAIL - violated\nR-2: CANNOT_DETERMINE - insufficient evidence");
 		assertThat(result.judgment().status()).isEqualTo(JudgmentStatus.FAIL);
 		roster(result, JudgmentStatus.FAIL, JudgmentStatus.ABSTAIN, JudgmentStatus.ERROR);
@@ -91,7 +91,7 @@ class ModernRequirementRosterTests {
 	void emptyAndFailedBackendResponsesKeepTheWholeRoster(Kind kind) {
 		for (JudgeModelResponse response : List.of(new JudgeModelResponse("", null, null, Map.of()),
 				new JudgeModelResponse("backend unavailable", null, null, Map.of(), false))) {
-			io.github.markpollack.judge.jury.Verdict result = configured(kind, List.of("R-1", "R-2", "R-3"),
+			io.github.markpollack.judge.verdict.Verdict result = configured(kind, List.of("R-1", "R-2", "R-3"),
 					request -> response)
 				.vote();
 			assertThat(result.judgment().status()).isEqualTo(JudgmentStatus.ABSTAIN);
@@ -108,7 +108,7 @@ class ModernRequirementRosterTests {
 				COMPLETE.replace("R-1: PASS - verified", "R-1: PASS"),
 				COMPLETE.replace("R-1: PASS - verified", "R-1: PASS - "),
 				COMPLETE + "\nR-1 PASS - malformed duplicate")) {
-			io.github.markpollack.judge.jury.Verdict result = audit(kind, text);
+			io.github.markpollack.judge.verdict.Verdict result = audit(kind, text);
 			assertThat(result.judgment().status()).as(text).isEqualTo(JudgmentStatus.ABSTAIN);
 			roster(result, JudgmentStatus.ERROR, JudgmentStatus.PASS, JudgmentStatus.PASS);
 		}
@@ -117,7 +117,7 @@ class ModernRequirementRosterTests {
 	@ParameterizedTest
 	@EnumSource(Kind.class)
 	void unknownAnswerIdsAreErrorsButObservationsStayNonbinding(Kind kind) {
-		io.github.markpollack.judge.jury.Verdict extra = audit(kind, COMPLETE + "\nR-4: PASS - invented requirement");
+		io.github.markpollack.judge.verdict.Verdict extra = audit(kind, COMPLETE + "\nR-4: PASS - invented requirement");
 		assertThat(extra.judgment().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		roster(extra, JudgmentStatus.PASS, JudgmentStatus.PASS, JudgmentStatus.PASS);
 		assertThat(audit(kind, COMPLETE + "\nOBSERVATION R-4: PASS - irrelevant\nOBSERVATION R-1: PASSENGER: prose")
@@ -159,7 +159,7 @@ class ModernRequirementRosterTests {
 			source.add(EarsRequirement.of("R-2", "test", "two", "two", null));
 		}
 		var result = judge.vote();
-		assertThat(result.conclusion()).isEqualTo(io.github.markpollack.judge.jury.Verdict.Conclusion.PASS);
+		assertThat(result.conclusion()).isEqualTo(io.github.markpollack.judge.verdict.Verdict.Conclusion.PASS);
 		assertThat(result.roster()).extracting(io.github.markpollack.judge.requirement.Requirement::id)
 			.containsExactly("R-1");
 
@@ -171,7 +171,7 @@ class ModernRequirementRosterTests {
 		for (JudgeModel model : List.<JudgeModel>of(request -> null, request -> {
 			throw new IllegalStateException("transport unavailable");
 		})) {
-			io.github.markpollack.judge.jury.Verdict result = configured(kind, List.of("R-1", "R-2", "R-3"), model)
+			io.github.markpollack.judge.verdict.Verdict result = configured(kind, List.of("R-1", "R-2", "R-3"), model)
 				.vote();
 			assertThat(result.judgment().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 			roster(result, JudgmentStatus.ERROR, JudgmentStatus.ERROR, JudgmentStatus.ERROR);
@@ -181,11 +181,11 @@ class ModernRequirementRosterTests {
 	@ParameterizedTest
 	@EnumSource(Kind.class)
 	void illegalAndUnexplainedExclusionsAreErrorChecks(Kind kind) {
-		io.github.markpollack.judge.jury.Verdict illegal = audit(kind,
+		io.github.markpollack.judge.verdict.Verdict illegal = audit(kind,
 				COMPLETE.replace("R-1: PASS - verified", "R-1: NOT_APPLICABLE - inconvenient"));
 		assertThat(illegal.judgment().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		roster(illegal, JudgmentStatus.NOT_APPLICABLE, JudgmentStatus.PASS, JudgmentStatus.PASS);
-		io.github.markpollack.judge.jury.Verdict unexplained = audit(kind,
+		io.github.markpollack.judge.verdict.Verdict unexplained = audit(kind,
 				COMPLETE.replace("R-3: PASS - verified", "R-3: NOT_APPLICABLE"));
 		assertThat(unexplained.judgment().status()).isEqualTo(JudgmentStatus.ABSTAIN);
 		roster(unexplained, JudgmentStatus.PASS, JudgmentStatus.PASS, JudgmentStatus.ERROR);

@@ -18,6 +18,7 @@
     <description>RAG evaluation judges for Agent Judge - faithfulness, contextual relevance, and hallucination detection</description>
 
     <dependencies>
+        <dependency><groupId>io.github.markpollack</groupId><artifactId>agent-judge-json-jackson2</artifactId><version>${project.version}</version><scope>test</scope></dependency>
         <!-- Core Judge API -->
         <dependency>
             <groupId>io.github.markpollack</groupId>

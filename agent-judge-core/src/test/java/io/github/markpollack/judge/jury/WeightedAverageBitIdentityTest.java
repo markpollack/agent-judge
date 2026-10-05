@@ -4,6 +4,9 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.voting.AggregationEvidence;
+import io.github.markpollack.judge.voting.ErrorHandling;
+import io.github.markpollack.judge.voting.WeightedAverageStrategy;
 
 import java.util.ArrayList;
 import java.util.HashMap;

@@ -68,7 +68,7 @@ public final class NamedJudge implements JudgeWithMetadata {
 	 * The judge this wrapper delegates to.
 	 * <p>
 	 * A wrapper's metadata names the judge in a verdict, but it says nothing about what
-	 * actually judges. {@link Judges#describe(Judge)} reads through this accessor to
+	 * actually judges. {@link io.github.markpollack.judge.description.JudgeDescription#of(Judge)} reads through this accessor to
 	 * describe the wrapped judge as well.
 	 * </p>
 	 * @return the wrapped judge

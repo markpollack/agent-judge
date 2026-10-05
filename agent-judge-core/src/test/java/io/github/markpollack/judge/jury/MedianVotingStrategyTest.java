@@ -4,6 +4,8 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.voting.AggregationEvidence;
+import io.github.markpollack.judge.voting.MedianVotingStrategy;
 
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.judgment.Judgment;

@@ -4,7 +4,7 @@
  */
 package io.github.markpollack.judge.policy;
 
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 
 /**
  * Application-owned decision about reliance on a complete Verdict. No execution or

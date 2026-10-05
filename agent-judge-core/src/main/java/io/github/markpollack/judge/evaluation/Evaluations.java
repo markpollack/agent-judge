@@ -3,11 +3,18 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.evaluation;
+import io.github.markpollack.judge.verdict.InvocationRecords;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.ErrorHandling;
+import io.github.markpollack.judge.voting.ExclusionHandling;
 
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import io.github.markpollack.judge.*;
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import io.github.markpollack.judge.judgment.*;
 import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.policy.*;
@@ -35,7 +42,7 @@ public final class Evaluations {
 	 */
 	public static EvaluationResult apply(Verdict verdict, Policy policy) {
 		Objects.requireNonNull(verdict, "verdict").conclusion();
-		io.github.markpollack.judge.jury.InvocationRecords.of(verdict);
+		io.github.markpollack.judge.verdict.InvocationRecords.of(verdict);
 		Objects.requireNonNull(policy, "policy");
 		checkCancellation();
 		PolicyResult result;

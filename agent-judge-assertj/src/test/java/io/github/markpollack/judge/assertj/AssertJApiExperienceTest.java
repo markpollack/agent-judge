@@ -3,6 +3,8 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.assertj;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.MajorityVotingStrategy;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -11,6 +13,8 @@ import org.junit.jupiter.params.provider.*;
 import io.github.markpollack.judge.*;
 import io.github.markpollack.judge.judgment.*;
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import io.github.markpollack.judge.requirement.*;
 import io.github.markpollack.judge.policy.*;
 import io.github.markpollack.judge.evaluation.*;
@@ -56,7 +60,7 @@ class AssertJApiExperienceTest {
 		var readiness = new io.github.markpollack.judge.requirement.GeneralRequirement<AllOf>("readiness", "1",
 				"Ready to deploy", new AllOf(List.of(security, compatibility, observability)),
 				Requirement.text("source", "1", "security AND compatibility AND observability").source());
-		io.github.markpollack.judge.construction.JuryRecipe<String, String> opinions = TestRecipes.voting(
+		io.github.markpollack.judge.jury.JuryRecipe<String, String> opinions = TestRecipes.voting(
 				new MajorityVotingStrategy(),
 				List.of(TestRecipes.<String, String>judge((r, e) -> Judgment.pass("scanner A")),
 						TestRecipes.<String, String>judge((r, e) -> Judgment.pass("scanner B")),
@@ -96,7 +100,7 @@ class AssertJApiExperienceTest {
 			.judge((r, e) -> Judgment.pass(r.specification()));
 		// The nested evaluator prepares against the actual child supplied by the outer
 		// parent.
-		io.github.markpollack.judge.construction.JuryRecipe<AllOf, String> child = actual -> Assignments
+		io.github.markpollack.judge.jury.JuryRecipe<AllOf, String> child = actual -> Assignments
 			.<String>forRequirement(actual)
 			.judge(a, check)
 			.judge(b, check)

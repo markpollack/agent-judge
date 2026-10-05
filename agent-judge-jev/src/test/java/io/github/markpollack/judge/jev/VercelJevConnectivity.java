@@ -31,7 +31,7 @@ import java.util.Map;
 /** Explicit one-request SDK connectivity utility; never discovered as a JUnit test. */
 public final class VercelJevConnectivity {
 
-	private static final ObjectMapper JSON = new ObjectMapper();
+	private static final ObjectMapper JSON = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	private static final String MODEL = "typesafe-ai/jev";
 

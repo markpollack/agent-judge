@@ -7,7 +7,7 @@ package io.github.markpollack.judge.assertions;
 import java.util.Objects;
 import io.github.markpollack.judge.evaluation.*;
 import io.github.markpollack.judge.policy.PolicyAction;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 
 /**
  * Requirement assertions over retained results. These operations execute no judge or

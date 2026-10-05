@@ -4,6 +4,19 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.verdict.AttemptDisposition;
+import io.github.markpollack.judge.verdict.CompositeAttempt;
+import io.github.markpollack.judge.verdict.CompositeFailure;
+import io.github.markpollack.judge.verdict.CompositeFailureCode;
+import io.github.markpollack.judge.verdict.CompositeRelation;
+import io.github.markpollack.judge.verdict.DispositionReason;
+import io.github.markpollack.judge.verdict.Participation;
+import io.github.markpollack.judge.verdict.RoutingRule;
+import io.github.markpollack.judge.verdict.Seat;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.verdict.VerdictProvenance;
+import io.github.markpollack.judge.verdict.VerdictProvenanceBasis;
+import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -14,7 +27,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import io.github.markpollack.judge.description.KeySource;
+import io.github.markpollack.judge.verdict.KeySource;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 

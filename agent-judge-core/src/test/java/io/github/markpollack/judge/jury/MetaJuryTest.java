@@ -4,6 +4,12 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
+import io.github.markpollack.judge.voting.MajorityVotingStrategy;
+import io.github.markpollack.judge.voting.TieBreakRule;
+import io.github.markpollack.judge.voting.VotingStrategy;
+import io.github.markpollack.judge.voting.WeightedAverageStrategy;
 
 import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.completion.CompletionEvidence;

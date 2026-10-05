@@ -3,6 +3,9 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.ai.requirements;
+import io.github.markpollack.judge.verdict.InvocationRecords;
+import io.github.markpollack.judge.verdict.SeatExecution;
+import io.github.markpollack.judge.verdict.Verdict;
 
 import java.util.*;
 import java.util.concurrent.CancellationException;
@@ -14,6 +17,8 @@ import io.github.markpollack.judge.ai.model.*;
 import io.github.markpollack.judge.execution.*;
 import io.github.markpollack.judge.judgment.*;
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import io.github.markpollack.judge.provenance.*;
 import io.github.markpollack.judge.requirement.*;
 import io.github.markpollack.judge.serialization.*;
@@ -187,7 +192,7 @@ class ConfiguredStorageTest {
 	@Test
 	void currentCodecRefusesMissingOrContradictoryOwnershipAndHistoricalVersions() throws Exception {
 		var original = roster("A: FAIL - violated", new AtomicInteger());
-		var mapper = new ObjectMapper();
+		var mapper = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 		var tree = (ObjectNode) mapper.readTree(codec.write(original));
 		for (int version : List.of(2, 3, 4)) {
 			var historical = tree.deepCopy();

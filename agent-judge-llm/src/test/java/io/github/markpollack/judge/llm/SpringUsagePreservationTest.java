@@ -3,6 +3,8 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.llm;
+import io.github.markpollack.judge.verdict.InvocationRecords;
+import io.github.markpollack.judge.verdict.Verdict;
 
 import java.util.*;
 import java.util.concurrent.CancellationException;
@@ -16,6 +18,8 @@ import io.github.markpollack.judge.ai.model.*;
 import io.github.markpollack.judge.ai.requirements.*;
 import io.github.markpollack.judge.judgment.*;
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 

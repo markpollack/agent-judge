@@ -11,7 +11,7 @@ import java.util.Map;
 import io.github.markpollack.judge.ai.model.JudgeModel;
 import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import java.nio.file.Path;
-import io.github.markpollack.judge.jury.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AllMustPassStrategy;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
 import org.junit.jupiter.api.Test;

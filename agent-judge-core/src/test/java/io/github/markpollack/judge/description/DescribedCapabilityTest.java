@@ -4,6 +4,8 @@
  */
 
 package io.github.markpollack.judge.description;
+import io.github.markpollack.judge.verdict.KeySource;
+import io.github.markpollack.judge.voting.StrategyDescription;
 
 import java.util.List;
 import java.util.Map;
@@ -17,14 +19,14 @@ import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.JudgeType;
 import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.jury.AllMustPassStrategy;
-import io.github.markpollack.judge.jury.ErrorHandling;
+import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.ErrorHandling;
 import io.github.markpollack.judge.jury.Juries;
 import io.github.markpollack.judge.jury.Jury;
 import io.github.markpollack.judge.jury.NamedJury;
-import io.github.markpollack.judge.jury.ExclusionHandling;
+import io.github.markpollack.judge.voting.ExclusionHandling;
 import io.github.markpollack.judge.jury.SimpleJury;
-import io.github.markpollack.judge.jury.VotingStrategy;
+import io.github.markpollack.judge.voting.VotingStrategy;
 import io.github.markpollack.judge.judgment.Judgment;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -177,7 +179,7 @@ class DescribedCapabilityTest {
 		void applicabilityHasOneStructuredSource() {
 			var strategy = new AllMustPassStrategy(ErrorHandling.PROPAGATE, ExclusionHandling.EXCLUDE).describe();
 			var seats = List.of(new SeatDescription(0, "conditional", KeySource.DECLARED, 1.0,
-					Judges.describe(new Conditional("conditional"))));
+					io.github.markpollack.judge.description.JudgeDescription.of(new Conditional("conditional"))));
 			assertThat(new SimpleJuryDescription(strategy, seats).aggregateMayBeNotApplicable()).isTrue();
 			assertThat(new SimpleJuryDescription(strategy, List.of()).aggregateMayBeNotApplicable()).isFalse();
 		}

@@ -13,7 +13,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.judgment.Judgment;
 
 /**

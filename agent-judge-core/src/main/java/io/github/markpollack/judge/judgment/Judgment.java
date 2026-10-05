@@ -4,6 +4,8 @@
  */
 
 package io.github.markpollack.judge.judgment;
+import io.github.markpollack.judge.portable.ValueRequirements;
+import io.github.markpollack.judge.portable.PortableValues;
 
 import io.github.markpollack.judge.provenance.Provenance;
 
@@ -19,7 +21,6 @@ import java.util.OptionalDouble;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.jspecify.annotations.Nullable;
 import io.github.markpollack.judge.requirement.Requirement;
 
@@ -48,9 +49,8 @@ import io.github.markpollack.judge.requirement.Requirement;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({ "schemaVersion", "producerStatus", "finding", "confidence", "probabilityDistribution",
 		"reasonCode", "reasoning", "checks", "provenance", "metadata" })
-@com.fasterxml.jackson.databind.annotation.JsonSerialize(
-		using = io.github.markpollack.judge.serialization.ResultJson.JudgmentWriter.class)
-@JsonDeserialize(using = io.github.markpollack.judge.serialization.ResultJson.JudgmentReader.class)
+
+
 public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding, @Nullable Confidence confidence,
 		@Nullable ProbabilityDistribution probabilityDistribution, @Nullable JudgmentReasonCode reasonCode,
 		String reasoning, List<Check> checks, @Nullable Provenance provenance, Map<String, Object> metadata,
@@ -79,7 +79,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 	 * result value and is refused here.
 	 * </p>
 	 */
-	public static final String ELAPSED_MILLIS_KEY = "elapsedMillis";
+	public static final String ELAPSED_MILLIS_KEY = io.github.markpollack.judge.portable.PortableValues.ELAPSED_MILLIS_KEY;
 
 	/**
 	 * Aggregation-evidence key carrying the terminal reason codes an

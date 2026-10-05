@@ -5,7 +5,7 @@
 package io.github.markpollack.judge.evaluation;
 
 import java.util.Objects;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 
 /**
  * Complete reusable execution result; construction executes no judge or policy.
@@ -17,7 +17,7 @@ public record EvaluationResult(Verdict verdict, PolicyResult policyResult) {
 	/** Reject absent or unusable records. */
 	public EvaluationResult {
 		Objects.requireNonNull(verdict, "verdict").conclusion();
-		io.github.markpollack.judge.jury.InvocationRecords.of(verdict);
+		io.github.markpollack.judge.verdict.InvocationRecords.of(verdict);
 		Objects.requireNonNull(policyResult, "policyResult");
 	}
 }

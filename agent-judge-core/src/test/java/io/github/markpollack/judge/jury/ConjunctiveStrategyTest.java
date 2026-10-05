@@ -4,6 +4,10 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.voting.AggregationEvidence;
+import io.github.markpollack.judge.voting.AverageVotingStrategy;
+import io.github.markpollack.judge.voting.ConjunctiveStrategy;
+import io.github.markpollack.judge.voting.ErrorHandling;
 
 import java.util.List;
 import java.util.Map;

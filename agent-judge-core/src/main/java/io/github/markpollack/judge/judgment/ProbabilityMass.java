@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.judgment;
+import io.github.markpollack.judge.portable.ValueRequirements;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;

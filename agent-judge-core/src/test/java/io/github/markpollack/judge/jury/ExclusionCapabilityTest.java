@@ -4,6 +4,14 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.verdict.RoutingRule;
+import io.github.markpollack.judge.verdict.Seat;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
+import io.github.markpollack.judge.voting.ErrorHandling;
+import io.github.markpollack.judge.voting.ExclusionHandling;
+import io.github.markpollack.judge.voting.VotingStrategy;
 
 import java.util.List;
 import java.util.Map;
@@ -510,12 +518,12 @@ class ExclusionCapabilityTest {
 	@Test
 	@DisplayName("the description carries the effective capability, so a reader need not run the jury")
 	void theDescriptionCarriesTheCapability() {
-		JudgeDescription described = Judges.describe(Judges.named(new Conditional("inner", excluded()), "renamed"));
+		JudgeDescription described = io.github.markpollack.judge.description.JudgeDescription.of(Judges.named(new Conditional("inner", excluded()), "renamed"));
 
 		assertThat(described.notApplicableWhen()).isEqualTo(CONDITION);
 		assertThat(described.toPortable()).containsEntry("notApplicableWhen",
 				Map.of("declared", true, "value", CONDITION));
-		assertThat(Judges.describe(new Unconditional("plain", Judgment.pass("ok"))).toPortable())
+		assertThat(io.github.markpollack.judge.description.JudgeDescription.of(new Unconditional("plain", Judgment.pass("ok"))).toPortable())
 			.containsEntry("notApplicableWhen", Map.of("declared", false));
 	}
 

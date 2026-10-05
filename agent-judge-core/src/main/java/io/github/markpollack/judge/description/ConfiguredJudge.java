@@ -39,7 +39,7 @@ import io.github.markpollack.judge.JudgeWithMetadata;
  *
  * @author Mark Pollack
  * @since 0.17.0
- * @see io.github.markpollack.judge.Judges#describe(Judge)
+ * @see io.github.markpollack.judge.description.JudgeDescription#of(Judge)
  */
 public interface ConfiguredJudge extends Judge {
 

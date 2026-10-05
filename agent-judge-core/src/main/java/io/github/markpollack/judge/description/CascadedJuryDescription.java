@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.description;
+import io.github.markpollack.judge.portable.PortableForm;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -19,7 +20,7 @@ import java.util.Objects;
  * ⚠️ <b>Count a cascade per tier, never also by its aggregate.</b> A cascade's verdict
  * copies {@code judgment}, {@code individual} and {@code weights} from the tier that
  * stopped it. Compare each tier here with the
- * {@link io.github.markpollack.judge.jury.CompositeAttempt} of the same name in
+ * {@link io.github.markpollack.judge.verdict.CompositeAttempt} of the same name in
  * {@code Verdict.compositeAttempts()}. Counting the top-level verdict as well counts the
  * stopping tier twice. A tier that was never entered appears here and has no attempt,
  * which is how an early stop shows.

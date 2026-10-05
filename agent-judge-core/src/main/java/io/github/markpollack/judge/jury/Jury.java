@@ -4,6 +4,13 @@
  */
 
 package io.github.markpollack.judge.jury;
+import java.util.*;
+import io.github.markpollack.judge.voting.StrategyDescription;
+import io.github.markpollack.judge.description.*;
+import io.github.markpollack.judge.portable.ImplementationIdentity;
+import io.github.markpollack.judge.verdict.CompositeAttempt;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.VotingStrategy;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.description.JuryDescription;
@@ -46,7 +53,7 @@ public interface Jury {
 	/**
 	 * Describe this jury's configured structure, available before any vote.
 	 * <p>
-	 * The default describes the jury as {@linkplain JuryDescription#opaque(Jury) opaque}:
+	 * The default describes the jury as opaque:
 	 * its implementation and any declared voting structure, without claiming to know how
 	 * it seats, keys or weights them. The library's juries override it with a structural
 	 * description. A jury that composes other juries should override it as well, so that
@@ -59,7 +66,22 @@ public interface Jury {
 	 * @since 0.17.0
 	 */
 	default JuryDescription describe() {
-		return JuryDescription.opaque(this);
+
+		Objects.requireNonNull(this, "this must not be null");
+		VotingStrategy votingStrategy = this instanceof VotingJury voting ? voting.getVotingStrategy() : null;
+		StrategyDescription strategy = votingStrategy == null ? null : votingStrategy.describe();
+		List<? extends Judge> reported = Objects.requireNonNull(
+				this instanceof VotingJury voting ? voting.getJudges() : List.of(), "getJudges() must not return null");
+		List<JudgeDescription> judges = new ArrayList<>(reported.size());
+		for (int index = 0; index < reported.size(); index++) {
+			try {
+				judges.add(io.github.markpollack.judge.description.JudgeDescription.of(reported.get(index)));
+			}
+			catch (IllegalArgumentException ex) {
+				throw new IllegalArgumentException("judges[" + index + "]: " + ex.getMessage(), ex);
+			}
+		}
+		return new OpaqueJuryDescription(ImplementationIdentity.of(this.getClass()), strategy, judges);
 	}
 
 	/**

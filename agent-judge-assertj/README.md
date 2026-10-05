@@ -2,7 +2,7 @@
 
 ```java
 import static io.github.markpollack.judge.assertj.Assertions.assertThat;
-import io.github.markpollack.judge.NonEmptyJudge;
+import io.github.markpollack.judge.construction.NonEmptyJudge;
 import io.github.markpollack.judge.jury.SimpleJury;
 
 var judge = NonEmptyJudge.builder().evidence("READY").build();

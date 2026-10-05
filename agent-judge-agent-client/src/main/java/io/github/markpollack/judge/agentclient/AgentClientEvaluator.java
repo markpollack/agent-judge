@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 import io.github.markpollack.agents.client.AgentClientResponse;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 import io.github.markpollack.judge.judgment.Judgment;
 
 /**

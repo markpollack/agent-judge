@@ -37,6 +37,7 @@
 
     <modules>
         <module>agent-judge-core</module>
+        <module>agent-judge-json-jackson2</module>
         <module>agent-judge-jev</module>
         <module>agent-judge-assertions</module>
         <module>agent-judge-assertj</module>

@@ -4,6 +4,8 @@
  */
 
 package io.github.markpollack.judge.description;
+import io.github.markpollack.judge.portable.PortableForm;
+import io.github.markpollack.judge.voting.StrategyDescription;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -11,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import io.github.markpollack.judge.jury.ExclusionHandling;
+import io.github.markpollack.judge.voting.ExclusionHandling;
 
 /**
  * A meta-jury as configured: the strategy that aggregates its members' verdicts, and its
@@ -19,7 +21,7 @@ import io.github.markpollack.judge.jury.ExclusionHandling;
  *
  * <p>
  * Compare each member here with the
- * {@link io.github.markpollack.judge.jury.CompositeAttempt} of the same name. A member
+ * {@link io.github.markpollack.judge.verdict.CompositeAttempt} of the same name. A member
  * that failed to execute is recorded as an attempt with a failure and makes the
  * meta-jury's aggregate a bare error judgment that carries no aggregation evidence, so
  * the member count must come from this description, not from the evidence.

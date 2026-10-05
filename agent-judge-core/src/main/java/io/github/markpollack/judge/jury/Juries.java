@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.voting.VotingStrategy;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.JudgeType;
@@ -34,6 +35,13 @@ import java.util.Map;
  * @see MetaJury
  */
 public final class Juries {
+	/** Execute a single producer with honest local seat accounting.
+	 * @param judge configured producer
+	 * @return complete retained result */
+	public static io.github.markpollack.judge.verdict.Verdict evaluate(io.github.markpollack.judge.Judge judge) {
+		return SimpleJury.builder().judge(judge).parallel(false).votingStrategy(new io.github.markpollack.judge.voting.AllMustPassStrategy(io.github.markpollack.judge.voting.ErrorHandling.PROPAGATE, io.github.markpollack.judge.voting.ExclusionHandling.EXCLUDE)).build().vote();
+	}
+
 
 	private Juries() {
 		// Utility class - no instantiation

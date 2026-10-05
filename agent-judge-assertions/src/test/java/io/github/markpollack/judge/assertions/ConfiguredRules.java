@@ -11,6 +11,8 @@ import io.github.markpollack.judge.construction.*;
 import io.github.markpollack.judge.requirement.*;
 import io.github.markpollack.judge.judgment.*;
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import io.github.markpollack.judge.evaluation.*;
 import io.github.markpollack.judge.policy.*;
 

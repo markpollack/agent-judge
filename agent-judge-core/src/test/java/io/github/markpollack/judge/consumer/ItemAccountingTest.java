@@ -14,20 +14,20 @@ import org.junit.jupiter.api.Test;
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.completion.CompletionEvidence;
-import io.github.markpollack.judge.jury.AllMustPassStrategy;
-import io.github.markpollack.judge.jury.AttemptDisposition;
+import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.verdict.AttemptDisposition;
 import io.github.markpollack.judge.jury.CascadedJury;
-import io.github.markpollack.judge.jury.CompositeAttempt;
-import io.github.markpollack.judge.jury.CompositeRelation;
-import io.github.markpollack.judge.jury.ConsensusStrategy;
-import io.github.markpollack.judge.jury.VerdictProvenance;
-import io.github.markpollack.judge.jury.VerdictProvenanceBasis;
-import io.github.markpollack.judge.jury.VerdictProvenanceKind;
-import io.github.markpollack.judge.jury.DispositionReason;
+import io.github.markpollack.judge.verdict.CompositeAttempt;
+import io.github.markpollack.judge.verdict.CompositeRelation;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
+import io.github.markpollack.judge.verdict.VerdictProvenance;
+import io.github.markpollack.judge.verdict.VerdictProvenanceBasis;
+import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
+import io.github.markpollack.judge.verdict.DispositionReason;
 import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.RoutingRule;
-import io.github.markpollack.judge.jury.Verdict;
-import io.github.markpollack.judge.jury.VotingStrategy;
+import io.github.markpollack.judge.verdict.RoutingRule;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.VotingStrategy;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentReasonCode;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
@@ -275,8 +275,8 @@ class ItemAccountingTest {
 	private static Jury capableExcludingTier() {
 		return io.github.markpollack.judge.jury.SimpleJury.builder()
 			.seat(declared(new ConditionalJudge()))
-			.votingStrategy(new ConsensusStrategy(io.github.markpollack.judge.jury.ErrorHandling.PROPAGATE,
-					io.github.markpollack.judge.jury.ExclusionHandling.EXCLUDE))
+			.votingStrategy(new ConsensusStrategy(io.github.markpollack.judge.voting.ErrorHandling.PROPAGATE,
+					io.github.markpollack.judge.voting.ExclusionHandling.EXCLUDE))
 			.build();
 	}
 

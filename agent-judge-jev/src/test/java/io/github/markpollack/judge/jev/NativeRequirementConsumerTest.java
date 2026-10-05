@@ -20,7 +20,7 @@ import io.github.markpollack.judge.requirement.RequirementSource;
 import io.github.markpollack.judge.provenance.ArtifactRef;
 import io.github.markpollack.judge.judgment.Judgment;
 import io.github.markpollack.judge.judgment.JudgmentStatus;
-import io.github.markpollack.judge.jury.Verdict;
+import io.github.markpollack.judge.verdict.Verdict;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
@@ -241,7 +241,7 @@ class NativeRequirementConsumerTest {
 			var original = ready.vote();
 			assertThat(transport.calls).hasValue(2);
 			assertThat(original.conclusion()).isEqualTo(Verdict.Conclusion.FAIL);
-			assertThat(io.github.markpollack.judge.jury.InvocationRecords.of(original)).hasSize(2);
+			assertThat(io.github.markpollack.judge.verdict.InvocationRecords.of(original)).hasSize(2);
 			for (var item : original.compositeAttempts()) {
 				var answer = item.verdict().individual().getFirst();
 				assertThat(answer.probabilityDistribution()).isNotNull();

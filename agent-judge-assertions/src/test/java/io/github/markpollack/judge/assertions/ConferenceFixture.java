@@ -30,7 +30,7 @@ import java.util.*;
  */
 final class ConferenceFixture {
 
-	static final ObjectMapper JSON = new ObjectMapper();
+	static final ObjectMapper JSON = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 	static final String LOCK = "Repository locks are acquired in the required order";
 
 	final JsonNode bindings;

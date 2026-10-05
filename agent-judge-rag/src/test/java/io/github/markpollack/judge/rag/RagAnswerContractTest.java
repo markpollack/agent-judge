@@ -3,6 +3,7 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.rag;
+import io.github.markpollack.judge.verdict.InvocationRecords;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -11,6 +12,8 @@ import io.github.markpollack.judge.completion.CompletionEvidence;
 import io.github.markpollack.judge.judgment.*;
 import io.github.markpollack.judge.evaluation.Evaluations;
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;

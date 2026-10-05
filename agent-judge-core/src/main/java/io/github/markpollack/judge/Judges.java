@@ -9,9 +9,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-import io.github.markpollack.judge.description.ConfiguredJudge;
-import io.github.markpollack.judge.description.ImplementationIdentity;
-import io.github.markpollack.judge.description.JudgeDescription;
+
+import io.github.markpollack.judge.portable.ImplementationIdentity;
+
 import io.github.markpollack.judge.judgment.Judgment;
 
 /**
@@ -80,9 +80,9 @@ import io.github.markpollack.judge.judgment.Judgment;
  * them here.</b> These combinators bypass the seat guard as well: a judge reached through
  * a combinator returns {@code NOT_APPLICABLE} directly to the caller, with nothing
  * checking that it declared it may. Use a {@link io.github.markpollack.judge.jury.Jury}
- * with an explicit {@link io.github.markpollack.judge.jury.ErrorHandling}: a jury
+ * with an explicit {@link io.github.markpollack.judge.voting.ErrorHandling}: a jury
  * resolves the population by status, publishes what it actually reduced over in its
- * aggregation evidence, and {@link io.github.markpollack.judge.jury.AllMustPassStrategy}
+ * aggregation evidence, and {@link io.github.markpollack.judge.voting.AllMustPassStrategy}
  * expresses "every applicable judge must pass" without collapsing an abstention into a
  * negative finding.
  * </p>
@@ -235,72 +235,6 @@ public final class Judges {
 	}
 
 	/**
-	 * Describe a judge as configured, looking through {@link NamedJudge} wrappers.
-	 * <p>
-	 * The description carries the outer metadata, which names the judge in a verdict, and
-	 * the metadata of the judge the outer wrapper wraps directly, which can differ:
-	 * {@code Juries.fromJudges} re-wraps a judge whose name collides as
-	 * {@code DETERMINISTIC}, whatever its real type, and the wrapped judge's metadata
-	 * still states that type. The implementation is the innermost judge that is not a
-	 * {@code NamedJudge}, identified by {@link ImplementationIdentity#of(Class)}, so a
-	 * lambda, including every combinator in this class, is described as {@code HIDDEN}
-	 * with no class name. The configuration is that judge's
-	 * {@link ConfiguredJudge#configuration()}, or undeclared when it does not implement
-	 * {@link ConfiguredJudge}. The exclusion capability is the effective one from
-	 * {@link #notApplicableCapability(Judge)}, so the description says what a jury would
-	 * actually honour rather than what the outermost wrapper happens to hold.
-	 * </p>
-	 * @param judge the judge to describe
-	 * @return its description
-	 * @throws IllegalArgumentException if the judge declares a configuration that is not
-	 * portable, the message naming the judge and the path of the offending value; or if
-	 * the judge, or the judge a {@code NamedJudge} wraps directly, is a
-	 * {@link JudgeWithMetadata} whose {@code metadata()} returns null or throws, since
-	 * describing it as undeclared would misstate it
-	 *
-	 * @since 0.17.0
-	 */
-	public static JudgeDescription describe(Judge judge) {
-		Objects.requireNonNull(judge, "judge must not be null");
-		Judge innermost = judge;
-		while (innermost instanceof NamedJudge named) {
-			innermost = Objects.requireNonNull(named.delegate(), "a NamedJudge must wrap a judge");
-		}
-		ImplementationIdentity implementation = ImplementationIdentity.of(innermost.getClass());
-		JudgeMetadata outer = readableMetadataOf(judge, "Judge implemented by " + implementation.toPortable());
-		// The delegate metadata is what the directly wrapped judge declares. For the
-		// NamedJudge
-		// around a NamedJudge that Juries.fromJudges builds for a duplicate name, that is
-		// the
-		// caller's own label and type, not the innermost implementation's (usually none).
-		JudgeMetadata inner = null;
-		if (judge instanceof NamedJudge wrapper) {
-			String outerLabel = (outer != null && outer.name() != null) ? "'" + outer.name() + "'"
-					: "implemented by " + implementation.toPortable();
-			inner = readableMetadataOf(wrapper.delegate(), "The judge wrapped by judge " + outerLabel);
-		}
-		Map<String, Object> configuration = null;
-		if (innermost instanceof ConfiguredJudge configured) {
-			configuration = configured.configuration();
-			if (configuration == null) {
-				throw new NullPointerException("ConfiguredJudge " + implementation.toPortable()
-						+ " returned a null configuration; return an empty map to declare no values");
-			}
-		}
-		try {
-			return new JudgeDescription(outer == null ? null : outer.name(), outer == null ? null : outer.type(),
-					inner == null ? null : inner.name(), inner == null ? null : inner.type(),
-					notApplicableCapability(judge).orElse(null), implementation, configuration);
-		}
-		catch (IllegalArgumentException ex) {
-			String label = (outer != null && outer.name() != null) ? "'" + outer.name() + "'"
-					: "implemented by " + implementation.toPortable();
-			throw new IllegalArgumentException(
-					"Judge " + label + " declared a configuration that is not portable: " + ex.getMessage(), ex);
-		}
-	}
-
-	/**
 	 * Read a judge's metadata for a description.
 	 * @param judge the judge
 	 * @param subject how to name the judge if its metadata cannot be read
@@ -308,7 +242,7 @@ public final class Judges {
 	 * {@link JudgeWithMetadata}
 	 * @throws IllegalArgumentException if {@code metadata()} returns null or throws
 	 */
-	private static JudgeMetadata readableMetadataOf(Judge judge, String subject) {
+	public static JudgeMetadata readableMetadataOf(Judge judge, String subject) {
 		if (!(judge instanceof JudgeWithMetadata withMetadata)) {
 			return null;
 		}

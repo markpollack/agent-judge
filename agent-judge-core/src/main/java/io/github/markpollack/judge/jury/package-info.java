@@ -15,7 +15,7 @@
  *
  * <p>
  * Every strategy resolves what it reduces over through the same scan, and writes the
- * result into its {@link io.github.markpollack.judge.jury.AggregationEvidence} block: how
+ * result into its {@link io.github.markpollack.judge.voting.AggregationEvidence} block: how
  * many judgments arrived, how many were abstentions, how many were exclusions, how many
  * errored and with what causes, and what each policy actually did with them. Counts are
  * stored and rates are derived, because a stored rate cannot be recomputed when the
@@ -23,8 +23,8 @@
  *
  * <p>
  * Two policies decide what leaves that population.
- * {@link io.github.markpollack.judge.jury.ErrorHandling} governs a judge that could not
- * finish; {@link io.github.markpollack.judge.jury.ExclusionHandling} governs a criterion
+ * {@link io.github.markpollack.judge.voting.ErrorHandling} governs a judge that could not
+ * finish; {@link io.github.markpollack.judge.voting.ExclusionHandling} governs a criterion
  * that did not apply. Both default to refusing to guess — {@code PROPAGATE} and
  * {@code REFUSE} — because a jury assembled without deciding these questions has not
  * decided them.
@@ -49,7 +49,12 @@
  * actual verdict kept. Nothing is swallowed: every containment writes a code a reader can
  * count.
  *
- * @see io.github.markpollack.judge.jury.Verdict
- * @see io.github.markpollack.judge.jury.CompositeAttempt
+ * @see io.github.markpollack.judge.verdict.Verdict
+ * @see io.github.markpollack.judge.verdict.CompositeAttempt
  */
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.verdict.CompositeAttempt;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.AggregationEvidence;
+import io.github.markpollack.judge.voting.ErrorHandling;
+import io.github.markpollack.judge.voting.ExclusionHandling;

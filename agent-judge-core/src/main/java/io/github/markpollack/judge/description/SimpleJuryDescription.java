@@ -4,6 +4,8 @@
  */
 
 package io.github.markpollack.judge.description;
+import io.github.markpollack.judge.portable.PortableForm;
+import io.github.markpollack.judge.voting.StrategyDescription;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -11,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import io.github.markpollack.judge.jury.ExclusionHandling;
+import io.github.markpollack.judge.voting.ExclusionHandling;
 
 /**
  * A {@link io.github.markpollack.judge.jury.SimpleJury} as configured: its strategy and

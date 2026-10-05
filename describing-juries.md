@@ -53,7 +53,7 @@ For the jury above:
 {"descriptionVersion": 3,
  "kind": "SIMPLE",
  "strategy": {"name": "weightedAverage",
-              "implementation": {"form": "NAMED", "className": "io.github.markpollack.judge.jury.WeightedAverageStrategy"},
+              "implementation": {"form": "NAMED", "className": "io.github.markpollack.judge.voting.WeightedAverageStrategy"},
               "parameters": {"declared": true, "values": {"errorPolicy": "ignore", "threshold": 0.7}}},
  "seats": [
    {"position": 0, "verdictKey": "build", "keySource": "DECLARED", "weight": 2.0,

@@ -3,6 +3,7 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.voting.VotingStrategy;
 
 import java.util.List;
 import io.github.markpollack.judge.Judge;

@@ -15,10 +15,8 @@ import io.github.markpollack.judge.provenance.ArtifactRef;
  *
  * @param <S> native specification type
  */
-@com.fasterxml.jackson.databind.annotation.JsonSerialize(
-		using = io.github.markpollack.judge.serialization.ResultJson.RequirementWriter.class)
-@com.fasterxml.jackson.databind.annotation.JsonDeserialize(
-		using = io.github.markpollack.judge.serialization.ResultJson.RequirementReader.class)
+
+
 public interface Requirement<S> {
 
 	/**

@@ -22,7 +22,7 @@ import io.github.markpollack.judge.ai.model.JudgeModelResponse;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate;
 import io.github.markpollack.judge.ai.prompt.JudgePromptTemplate.MissingVariablePolicy;
 import io.github.markpollack.judge.ai.prompt.TextSources;
-import io.github.markpollack.judge.description.ImplementationIdentity;
+import io.github.markpollack.judge.portable.ImplementationIdentity;
 import io.github.markpollack.judge.description.JudgeDescription;
 import io.github.markpollack.judge.judgment.Judgment;
 
@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ModelBackedJudgeDescriptionTests {
 
-	private static final ObjectMapper JSON = new ObjectMapper();
+	private static final ObjectMapper JSON = new ObjectMapper().registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
 
 	@Test
 	void declaresPromptDigestPolicyAndClassifierButNoModel() throws Exception {
@@ -42,7 +42,7 @@ class ModelBackedJudgeDescriptionTests {
 		ModelBackedJudge judge = judge(JudgePromptTemplate.fromString("relevance-v2", text),
 				JudgmentClassifiers.passFail("relevant", "irrelevant"), stubModel());
 
-		JudgeDescription description = Judges.describe(judge);
+		JudgeDescription description = io.github.markpollack.judge.description.JudgeDescription.of(judge);
 
 		assertThat(description.name()).isEqualTo("relevance");
 		assertThat(description.type()).isEqualTo(JudgeType.LLM_POWERED);
@@ -90,7 +90,7 @@ class ModelBackedJudgeDescriptionTests {
 		ModelBackedJudge judge = judge(JudgePromptTemplate.fromString("t", "{{goal}}"),
 				response -> Judgment.pass(response.text()), stubModel());
 
-		JudgeDescription description = Judges.describe(judge);
+		JudgeDescription description = io.github.markpollack.judge.description.JudgeDescription.of(judge);
 
 		assertThat(description.configuration()).containsEntry(JUDGMENT_CLASSIFIER_KEY, Map.of("form", "HIDDEN"));
 		assertThat(JSON.writeValueAsString(description.toPortable())).doesNotContain("$$Lambda");
@@ -112,7 +112,7 @@ class ModelBackedJudgeDescriptionTests {
 		ModelBackedJudge judge = judge(JudgePromptTemplate.fromString("t", "{{goal}}"),
 				JudgmentClassifiers.passFail("yes", "no"), stubModel());
 
-		JudgeDescription description = Judges.describe(Judges.named(judge, "relevance-2"));
+		JudgeDescription description = io.github.markpollack.judge.description.JudgeDescription.of(Judges.named(judge, "relevance-2"));
 
 		assertThat(description.name()).isEqualTo("relevance-2");
 		assertThat(description.type()).isEqualTo(JudgeType.DETERMINISTIC);
@@ -134,8 +134,8 @@ class ModelBackedJudgeDescriptionTests {
 		ModelBackedJudge second = judge(JudgePromptTemplate.fromString("t", "{{goal}}"),
 				JudgmentClassifiers.passFail("yes", "no"), countingModel);
 
-		String firstJson = JSON.writeValueAsString(Judges.describe(first).toPortable());
-		String secondJson = JSON.writeValueAsString(Judges.describe(second).toPortable());
+		String firstJson = JSON.writeValueAsString(io.github.markpollack.judge.description.JudgeDescription.of(first).toPortable());
+		String secondJson = JSON.writeValueAsString(io.github.markpollack.judge.description.JudgeDescription.of(second).toPortable());
 
 		assertThat(calls).hasValue(0);
 		assertThat(firstJson).isEqualTo(secondJson).doesNotContain("counted-model");

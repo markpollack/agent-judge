@@ -4,16 +4,17 @@
  */
 
 package io.github.markpollack.judge.description;
+import io.github.markpollack.judge.portable.ImplementationIdentity;
+import io.github.markpollack.judge.verdict.KeySource;
 
 import java.util.Map;
 
-import io.github.markpollack.judge.jury.Jury;
 
 /**
  * A jury as configured, available before it votes.
  *
  * <p>
- * Obtained from {@link Jury#describe()}. The built-in variants mirror the library's
+ * Obtained from {@link io.github.markpollack.judge.jury.Jury#describe()}. The built-in variants mirror the library's
  * juries:
  * </p>
  * <ul>
@@ -128,14 +129,11 @@ public interface JuryDescription {
 	 * Describe a jury from its public view only: its implementation, its strategy and its
 	 * flattened judges.
 	 * <p>
-	 * This is the default of {@link Jury#describe()}. It is truthful but not structural:
+	 * This is the default of {@link io.github.markpollack.judge.jury.Jury#describe()}. It is truthful but not structural:
 	 * it does not know how the jury seats, weights, keys or orders those judges.
 	 * </p>
 	 * @param jury the jury
 	 * @return an opaque description
 	 */
-	static JuryDescription opaque(Jury jury) {
-		return OpaqueJuryDescription.of(jury);
-	}
 
 }

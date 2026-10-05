@@ -1,0 +1,171 @@
+/*
+ * Copyright (c) 2024-2026 Mark Pollack
+ * See LICENSE in the repository root for project-specific Business Source License terms.
+ */
+
+package io.github.markpollack.judge.voting;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+import io.github.markpollack.judge.judgment.Judgment;
+import io.github.markpollack.judge.judgment.JudgmentStatus;
+
+/**
+ * Majority voting strategy: the outcome held by most applicable judges wins.
+ *
+ * <p>
+ * A status-counting strategy. It reads {@link Judgment#status()}, the outcome of record,
+ * and does not consult scores — a judge that passed casts one pass vote regardless of how
+ * confidently it passed.
+ * </p>
+ *
+ * <p>
+ * Edge cases are governed by explicit policies rather than buried conditionals:
+ * </p>
+ * <ul>
+ * <li>Ties: resolved by {@link TieBreakRule} (default {@code FAIL}).</li>
+ * <li>Errors: resolved by {@link ErrorHandling} (default {@code PROPAGATE}).</li>
+ * <li>Abstentions: excluded — a judge that reached no provenance casts no vote.</li>
+ * <li>Exclusions: resolved by {@link ExclusionHandling} (default {@code REFUSE}).</li>
+ * <li>Nothing eligible: {@code ABSTAIN}, with evidence naming the cause.</li>
+ * </ul>
+ *
+ * <p>
+ * The aggregate carries no score. A majority verdict's meaning is its outcome; the vote
+ * counts are evidence and live in the {@link AggregationEvidence} block, not in a
+ * manufactured number a threshold could mistake for a quality finding.
+ * </p>
+ *
+ * <p>
+ * Example usage:
+ * </p>
+ * Executable examples are maintained in the Agent Judge Tutorial:
+ * https://github.com/markpollack/agent-judge-tutorial.
+ *
+ * @author Mark Pollack
+ * @since 0.1.0
+ */
+public class MajorityVotingStrategy implements VotingStrategy {
+
+	private final TieBreakRule tiePolicy;
+
+	private final ErrorHandling errorPolicy;
+
+	private final ExclusionHandling notApplicablePolicy;
+
+	/**
+	 * Create majority voting strategy with default policies.
+	 */
+	public MajorityVotingStrategy() {
+		this(TieBreakRule.FAIL, ErrorHandling.PROPAGATE);
+	}
+
+	/**
+	 * Create majority voting strategy with custom policies.
+	 * @param tiePolicy policy for handling ties
+	 * @param errorPolicy policy for handling errors
+	 * @throws IllegalArgumentException if {@code tiePolicy} or {@code errorPolicy} is
+	 * null; a null tie policy is refused here rather than at the first tie
+	 */
+	public MajorityVotingStrategy(TieBreakRule tiePolicy, ErrorHandling errorPolicy) {
+		this(tiePolicy, errorPolicy, ExclusionHandling.REFUSE);
+	}
+
+	/**
+	 * Create majority voting strategy with custom tie, error and not-applicable policies.
+	 * @param tiePolicy policy for handling ties
+	 * @param errorPolicy policy for handling errors
+	 * @param notApplicablePolicy policy for handling excluded judgments
+	 * @throws IllegalArgumentException if any policy is null; a null tie policy is
+	 * refused here rather than at the first tie
+	 * @since 0.17.0
+	 */
+	public MajorityVotingStrategy(TieBreakRule tiePolicy, ErrorHandling errorPolicy,
+			ExclusionHandling notApplicablePolicy) {
+		if (tiePolicy == null) {
+			throw new IllegalArgumentException("tiePolicy must not be null");
+		}
+		if (errorPolicy == null) {
+			throw new IllegalArgumentException("errorPolicy must not be null");
+		}
+		if (notApplicablePolicy == null) {
+			throw new IllegalArgumentException("notApplicablePolicy must not be null");
+		}
+		this.tiePolicy = tiePolicy;
+		this.errorPolicy = errorPolicy;
+		this.notApplicablePolicy = notApplicablePolicy;
+	}
+
+	@Override
+	public Judgment aggregate(List<Judgment> judgments, Map<String, Double> weights) {
+		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
+				this.notApplicablePolicy);
+
+		if (population.hasPolicyExit()) {
+			return population.policyExitAggregate(getName());
+		}
+		if (population.isEmpty()) {
+			return population.noResult(getName(), Map.of());
+		}
+
+		int passCount = (int) population.eligible().stream().filter(j -> j.status() == JudgmentStatus.PASS).count();
+		int failCount = (int) population.eligible().stream().filter(j -> j.status() == JudgmentStatus.FAIL).count();
+
+		JudgmentStatus status;
+		String reasoning;
+		if (passCount == failCount) {
+			status = switch (this.tiePolicy) {
+				case PASS -> JudgmentStatus.PASS;
+				case FAIL -> JudgmentStatus.FAIL;
+				case ABSTAIN -> JudgmentStatus.ABSTAIN;
+			};
+			reasoning = String.format("Tie vote: %d passed, %d failed (tie resolved as %s)", passCount, failCount,
+					this.tiePolicy.name().toLowerCase(Locale.ROOT));
+		}
+		else {
+			boolean majorityPass = passCount > failCount;
+			status = majorityPass ? JudgmentStatus.PASS : JudgmentStatus.FAIL;
+			reasoning = String.format("Majority vote: %d passed, %d failed (majority %s)", passCount, failCount,
+					majorityPass ? "pass" : "fail");
+		}
+
+		Judgment aggregate = switch (status) {
+			case PASS -> Judgment.builder().pass().reasoning(reasoning).build();
+			case FAIL -> Judgment.builder().fail().reasoning(reasoning).build();
+			case ABSTAIN -> Judgment.builder().abstain().reasoning(reasoning).build();
+			case NOT_APPLICABLE, ERROR ->
+				throw new IllegalStateException("Majority cannot produce " + status + " after population resolution");
+		};
+		return AggregationEvidence.attach(aggregate,
+				population.evidence(getName())
+					.put(AggregationEvidence.PASS_COUNT, passCount)
+					.put(AggregationEvidence.FAIL_COUNT, failCount)
+					.build());
+	}
+
+	@Override
+	public String getName() {
+		return "majority";
+	}
+
+	/**
+	 * Declares the error policy and, as the {@code tiePolicy} parameter, the tie policy's
+	 * constant name. This strategy has no threshold.
+	 * @return the declared description
+	 * @since 0.17.0
+	 */
+	@Override
+	public StrategyDescription describe() {
+		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, null,
+				Map.of("tiePolicy", this.tiePolicy.name()));
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public ExclusionHandling exclusionHandling() {
+		return this.notApplicablePolicy;
+	}
+
+}

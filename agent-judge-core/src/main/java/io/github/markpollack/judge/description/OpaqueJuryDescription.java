@@ -4,6 +4,9 @@
  */
 
 package io.github.markpollack.judge.description;
+import io.github.markpollack.judge.portable.ImplementationIdentity;
+import io.github.markpollack.judge.portable.PortableForm;
+import io.github.markpollack.judge.voting.StrategyDescription;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -15,18 +18,16 @@ import org.jspecify.annotations.Nullable;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.Judges;
-import io.github.markpollack.judge.jury.Jury;
-import io.github.markpollack.judge.jury.VotingJury;
-import io.github.markpollack.judge.jury.VotingStrategy;
+import io.github.markpollack.judge.voting.VotingStrategy;
 
 /**
  * A jury that does not describe its own structure: the default of
- * {@link Jury#describe()}.
+ * the default Jury description.
  *
  * <p>
  * What it knows comes from the jury's public view: the implementing class,
- * {@link VotingJury#getVotingStrategy()} and the flattened
- * {@link VotingJury#getJudges()}. It does not know how the jury seats, keys, weights or
+ * the reported voting strategy and the flattened
+ * the reported judges. It does not know how the jury seats, keys, weights or
  * orders those judges, and it does not claim to. A jury author who wants a structural
  * description overrides {@code describe()}, and may return one of the other
  * {@link JuryDescription} variants.
@@ -66,23 +67,6 @@ public record OpaqueJuryDescription(ImplementationIdentity implementation, @Null
 		return false;
 	}
 
-	static OpaqueJuryDescription of(Jury jury) {
-		Objects.requireNonNull(jury, "jury must not be null");
-		VotingStrategy votingStrategy = jury instanceof VotingJury voting ? voting.getVotingStrategy() : null;
-		StrategyDescription strategy = votingStrategy == null ? null : votingStrategy.describe();
-		List<? extends Judge> reported = Objects.requireNonNull(
-				jury instanceof VotingJury voting ? voting.getJudges() : List.of(), "getJudges() must not return null");
-		List<JudgeDescription> judges = new ArrayList<>(reported.size());
-		for (int index = 0; index < reported.size(); index++) {
-			try {
-				judges.add(Judges.describe(reported.get(index)));
-			}
-			catch (IllegalArgumentException ex) {
-				throw new IllegalArgumentException("judges[" + index + "]: " + ex.getMessage(), ex);
-			}
-		}
-		return new OpaqueJuryDescription(ImplementationIdentity.of(jury.getClass()), strategy, judges);
-	}
 
 	@Override
 	public Map<String, Object> toPortable() {

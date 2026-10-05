@@ -3,6 +3,10 @@
  * See LICENSE in the repository root for project-specific Business Source License terms.
  */
 package io.github.markpollack.judge.assertions;
+import io.github.markpollack.judge.verdict.RoutingRule;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.voting.MajorityVotingStrategy;
+import io.github.markpollack.judge.voting.VotingStrategy;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -12,6 +16,8 @@ import org.junit.jupiter.params.provider.*;
 import io.github.markpollack.judge.*;
 import io.github.markpollack.judge.judgment.*;
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import io.github.markpollack.judge.requirement.*;
 import io.github.markpollack.judge.policy.*;
 import io.github.markpollack.judge.evaluation.*;

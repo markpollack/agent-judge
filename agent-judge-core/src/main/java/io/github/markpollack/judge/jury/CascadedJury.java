@@ -4,14 +4,26 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.verdict.CompositeAttempt;
+import io.github.markpollack.judge.verdict.CompositeFailure;
+import io.github.markpollack.judge.verdict.CompositeFailureCode;
+import io.github.markpollack.judge.verdict.CompositeLimitExceededException;
+import io.github.markpollack.judge.verdict.CompositeRelation;
+import io.github.markpollack.judge.verdict.DispositionReason;
+import io.github.markpollack.judge.verdict.RoutingRule;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.verdict.VerdictProvenance;
+import io.github.markpollack.judge.verdict.VerdictProvenanceBasis;
+import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
+
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.lang.System.Logger;
+
 
 import io.github.markpollack.judge.description.CascadedJuryDescription;
 import io.github.markpollack.judge.description.JuryDescription;
@@ -32,7 +44,7 @@ import io.github.markpollack.judge.judgment.JudgmentStatus;
  */
 public class CascadedJury implements Jury {
 
-	private static final Logger logger = LoggerFactory.getLogger(CascadedJury.class);
+	private static final Logger logger = System.getLogger(CascadedJury.class.getName());
 
 	private final List<TierConfig> tiers;
 
@@ -134,7 +146,7 @@ public class CascadedJury implements Jury {
 			}
 			catch (Exception ex) {
 				SimpleJury.preserveCancellation(ex);
-				logger.warn("Tier '{}' did not produce a verdict ({}); continuing according to cascade policy",
+				logger.log(System.Logger.Level.WARNING, "Tier {0} did not produce a verdict ({1}); continuing according to cascade policy",
 						tier.name(), ex.getClass().getName(), ex);
 				attempts.add(CompositeAttempt.executionFailed(tier.name(), CompositeRelation.CASCADE_TIER,
 						tier.routingRule(), new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED, ex)));
@@ -190,11 +202,11 @@ public class CascadedJury implements Jury {
 	}
 
 	private boolean shouldStop(TierConfig tier, Verdict verdict) {
-		return VerdictSemantics.routingStops(tier.routingRule(), verdict, true);
+		return Verdict.routingStops(tier.routingRule(), verdict, true);
 	}
 
 	private boolean hasAnyFail(Verdict verdict) {
-		return VerdictSemantics.routingStops(RoutingRule.STOP_ON_ANY_OPINION_FAIL, verdict, true);
+		return Verdict.routingStops(RoutingRule.STOP_ON_ANY_OPINION_FAIL, verdict, true);
 	}
 
 	private Verdict tierOutcome(String name, Verdict stoppingVerdict, List<CompositeAttempt> attempts) {

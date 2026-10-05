@@ -4,6 +4,15 @@
  */
 
 package io.github.markpollack.judge.ai.requirements;
+import io.github.markpollack.judge.verdict.AttemptDisposition;
+import io.github.markpollack.judge.verdict.CompositeAttempt;
+import io.github.markpollack.judge.verdict.CompositeFailure;
+import io.github.markpollack.judge.verdict.CompositeFailureCode;
+import io.github.markpollack.judge.verdict.CompositeRelation;
+import io.github.markpollack.judge.verdict.DispositionReason;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.verdict.VerdictProvenance;
+import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
 
 import java.util.*;
 import java.util.function.Supplier;
@@ -11,6 +20,8 @@ import io.github.markpollack.judge.ai.model.*;
 import io.github.markpollack.judge.execution.*;
 import io.github.markpollack.judge.requirement.Requirement;
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import io.github.markpollack.judge.judgment.*;
 import io.github.markpollack.judge.description.*;
 
@@ -114,7 +125,7 @@ public final class EarsJury implements Jury {
 		 * @param evidence prepared evidence
 		 * @return ready Jury construction
 		 */
-		public io.github.markpollack.judge.construction.ReadyJury evidence(String evidence) {
+		public io.github.markpollack.judge.jury.ReadyJury evidence(String evidence) {
 			Objects.requireNonNull(evidence);
 			return evidenceSupplier(() -> evidence);
 		}
@@ -124,7 +135,7 @@ public final class EarsJury implements Jury {
 		 * @param evidence acquisition provider
 		 * @return ready Jury construction
 		 */
-		public io.github.markpollack.judge.construction.ReadyJury evidenceSupplier(Supplier<String> evidence) {
+		public io.github.markpollack.judge.jury.ReadyJury evidenceSupplier(Supplier<String> evidence) {
 			Objects.requireNonNull(evidence);
 			runtime.requireInput(GeneratedInput.PREPARED_EVIDENCE);
 			return () -> new EarsJury(requirements, () -> generated(runtime, requirements,
@@ -173,7 +184,7 @@ public final class EarsJury implements Jury {
 	 * @param <E> evidence type
 	 */
 	public static final class StructuredRoster<E>
-			implements io.github.markpollack.judge.construction.JuryEvidenceStep<E> {
+			implements io.github.markpollack.judge.jury.JuryEvidenceStep<E> {
 
 		private final NativeRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime;
 
@@ -186,13 +197,13 @@ public final class EarsJury implements Jury {
 		}
 
 		@Override
-		public io.github.markpollack.judge.construction.ReadyJury evidence(E evidence) {
+		public io.github.markpollack.judge.jury.ReadyJury evidence(E evidence) {
 			Objects.requireNonNull(evidence);
 			return evidenceSupplier(() -> evidence);
 		}
 
 		@Override
-		public io.github.markpollack.judge.construction.ReadyJury evidenceSupplier(Supplier<? extends E> evidence) {
+		public io.github.markpollack.judge.jury.ReadyJury evidenceSupplier(Supplier<? extends E> evidence) {
 			Objects.requireNonNull(evidence);
 			return () -> new EarsJury(requirements, () -> {
 				E value = Objects.requireNonNull(evidence.get(), "acquired evidence");
@@ -207,7 +218,7 @@ public final class EarsJury implements Jury {
 		 * @param evidence complete map keyed by actual requirement identity
 		 * @return ready Jury construction
 		 */
-		public io.github.markpollack.judge.construction.ReadyJury evidenceByRequirement(
+		public io.github.markpollack.judge.jury.ReadyJury evidenceByRequirement(
 				Map<String, ? extends E> evidence) {
 			Map<String, E> captured = checked(evidence);
 			return evidenceByRequirementSupplier(() -> captured);
@@ -218,7 +229,7 @@ public final class EarsJury implements Jury {
 		 * @param evidence complete requirement-specific acquisition
 		 * @return ready Jury construction
 		 */
-		public io.github.markpollack.judge.construction.ReadyJury evidenceByRequirementSupplier(
+		public io.github.markpollack.judge.jury.ReadyJury evidenceByRequirementSupplier(
 				Supplier<? extends Map<String, ? extends E>> evidence) {
 			Objects.requireNonNull(evidence);
 			return () -> new EarsJury(requirements, () -> structured(checked(evidence.get())));

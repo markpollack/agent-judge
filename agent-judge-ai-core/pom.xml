@@ -18,6 +18,8 @@
     <description>Framework-neutral AI-backed judge infrastructure - prompt templates, model abstraction, output classification</description>
 
     <dependencies>
+<dependency><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId></dependency>
+        <dependency><groupId>io.github.markpollack</groupId><artifactId>agent-judge-json-jackson2</artifactId><version>${project.version}</version></dependency>
         <!-- Core Judge API -->
         <dependency>
             <groupId>io.github.markpollack</groupId>

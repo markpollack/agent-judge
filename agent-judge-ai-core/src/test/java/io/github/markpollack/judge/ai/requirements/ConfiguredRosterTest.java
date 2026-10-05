@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.ai.requirements;
+import io.github.markpollack.judge.verdict.Verdict;
 
 import java.util.*;
 import java.nio.file.*;
@@ -11,6 +12,8 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicInteger;
 import io.github.markpollack.judge.ai.model.*;
 import io.github.markpollack.judge.jury.*;
+import io.github.markpollack.judge.verdict.*;
+import io.github.markpollack.judge.voting.*;
 import io.github.markpollack.judge.judgment.*;
 import io.github.markpollack.judge.requirement.*;
 import io.github.markpollack.judge.description.*;

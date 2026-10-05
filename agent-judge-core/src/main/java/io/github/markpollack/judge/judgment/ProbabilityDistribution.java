@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.judgment;
+import io.github.markpollack.judge.portable.ValueRequirements;
 
 import java.util.List;
 import java.util.Objects;

@@ -4,13 +4,22 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.verdict.Participation;
+import io.github.markpollack.judge.verdict.Seat;
+import io.github.markpollack.judge.verdict.SeatExecution;
+import io.github.markpollack.judge.verdict.Verdict;
+import io.github.markpollack.judge.verdict.VerdictProvenance;
+import io.github.markpollack.judge.voting.AggregationEvidence;
+import io.github.markpollack.judge.voting.ErrorHandling;
+import io.github.markpollack.judge.voting.ExclusionHandling;
+import io.github.markpollack.judge.voting.VotingStrategy;
 
 import io.github.markpollack.judge.Judge;
 import io.github.markpollack.judge.JudgeMetadata;
 import io.github.markpollack.judge.JudgeWithMetadata;
 import io.github.markpollack.judge.Judges;
 import io.github.markpollack.judge.description.JuryDescription;
-import io.github.markpollack.judge.description.KeySource;
+import io.github.markpollack.judge.verdict.KeySource;
 import io.github.markpollack.judge.description.SeatDescription;
 import io.github.markpollack.judge.description.SimpleJuryDescription;
 import io.github.markpollack.judge.judgment.Judgment;
@@ -29,8 +38,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.stream.IntStream;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.lang.System.Logger;
+
 
 /**
  * Simple jury implementation with parallel judge execution.
@@ -80,7 +89,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SimpleJury implements VotingJury {
 
-	private static final Logger logger = LoggerFactory.getLogger(SimpleJury.class);
+	private static final Logger logger = System.getLogger(SimpleJury.class.getName());
 
 	private final List<Judge> judges;
 
@@ -144,7 +153,7 @@ public class SimpleJury implements VotingJury {
 	}
 
 	private io.github.markpollack.judge.description.JudgeDescription seatDescription(int position, Judge judge) {
-		var original = Judges.describe(judge);
+		var original = io.github.markpollack.judge.description.JudgeDescription.of(judge);
 		return new io.github.markpollack.judge.description.JudgeDescription(original.name(), original.type(),
 				original.delegateName(), original.delegateType(), declaredCapabilities.get(position),
 				original.implementation(), original.configuration());
@@ -409,7 +418,7 @@ public class SimpleJury implements VotingJury {
 			.individualByName(judgmentByName)
 			.weights(weights)
 			.seats(seats)
-			.provenance(identity ? VerdictProvenance.own() : AggregationBoundary.decisionFor(judgment))
+			.provenance(identity ? VerdictProvenance.own() : VerdictProvenance.decisionFor(judgment))
 			.compositeAttempts(List.of())
 			.build();
 		return new CompositionVote(verdict, identity);
@@ -472,7 +481,7 @@ public class SimpleJury implements VotingJury {
 	private Invocation invokeJudge(int index, SeatKey key) {
 		if (key.metadataFailure() != null) {
 			String reasoning = key.unreadableMetadata();
-			logger.warn("{}; recording an ERROR for the error policy to resolve", reasoning, key.cause());
+			logger.log(System.Logger.Level.WARNING, "{0}; recording an ERROR for the error policy to resolve", reasoning, key.cause());
 			return new Invocation(Judgment.error(JudgmentReasonCode.JUDGE_METADATA_UNREADABLE, reasoning), false,
 					key.cause());
 		}
@@ -482,7 +491,7 @@ public class SimpleJury implements VotingJury {
 			Judgment raw = judge.judge();
 			Judgment judgment = guardExclusion(index, name, raw);
 			if (judgment == null) {
-				logger.warn("Judge '{}' returned no judgment; recording an ERROR for the error policy to resolve",
+				logger.log(System.Logger.Level.WARNING, "Judge {0} returned no judgment; recording an ERROR for the error policy to resolve",
 						name);
 				return new Invocation(
 						Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "Judge '" + name + "' returned no judgment"),
@@ -492,7 +501,7 @@ public class SimpleJury implements VotingJury {
 		}
 		catch (Exception ex) {
 			preserveCancellation(ex);
-			logger.warn("Judge '{}' threw {}; recording an ERROR for the error policy to resolve", name,
+			logger.log(System.Logger.Level.WARNING, "Judge {0} threw {1}; recording an ERROR for the error policy to resolve", name,
 					ex.getClass().getName(), ex);
 			return new Invocation(Judgment.error(JudgmentReasonCode.JUDGE_FAILED,
 					"Judge '" + name + "' threw " + ex.getClass().getName() + describeCause(ex)), false, ex);
@@ -530,7 +539,7 @@ public class SimpleJury implements VotingJury {
 		}
 		String reasoning = "Judge '" + name + "' returned NOT_APPLICABLE without declaring that it may exclude a "
 				+ "subject, so the exclusion is not honoured: " + judgment.reasoning();
-		logger.warn("{}; recording an ERROR for the error policy to resolve", reasoning);
+		logger.log(System.Logger.Level.WARNING, "{0}; recording an ERROR for the error policy to resolve", reasoning);
 		return Judgment.error(JudgmentReasonCode.UNDECLARED_NOT_APPLICABLE, reasoning);
 	}
 

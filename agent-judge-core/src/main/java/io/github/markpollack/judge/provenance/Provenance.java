@@ -4,6 +4,7 @@
  */
 
 package io.github.markpollack.judge.provenance;
+import io.github.markpollack.judge.portable.ValueRequirements;
 
 import java.util.List;
 import org.jspecify.annotations.Nullable;

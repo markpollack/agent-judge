@@ -4,6 +4,18 @@
  */
 
 package io.github.markpollack.judge.jury;
+import io.github.markpollack.judge.voting.AggregationEvidence;
+import io.github.markpollack.judge.voting.AllMustPassStrategy;
+import io.github.markpollack.judge.voting.AverageVotingStrategy;
+import io.github.markpollack.judge.voting.ConjunctiveStrategy;
+import io.github.markpollack.judge.voting.ConsensusStrategy;
+import io.github.markpollack.judge.voting.ErrorHandling;
+import io.github.markpollack.judge.voting.ExclusionHandling;
+import io.github.markpollack.judge.voting.MajorityVotingStrategy;
+import io.github.markpollack.judge.voting.MedianVotingStrategy;
+import io.github.markpollack.judge.voting.TieBreakRule;
+import io.github.markpollack.judge.voting.VotingStrategy;
+import io.github.markpollack.judge.voting.WeightedAverageStrategy;
 
 import java.util.ArrayList;
 import java.util.List;
