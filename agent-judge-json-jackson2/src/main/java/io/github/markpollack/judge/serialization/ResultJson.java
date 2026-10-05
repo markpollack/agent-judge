@@ -242,7 +242,8 @@ public final class ResultJson {
 			VerdictDocument v = context.readTreeAsValue(currentTree(parser, context), VerdictDocument.class);
 			version(v.schemaVersion());
 			try {
-				Verdict result = new Verdict(v.judgment(), v.individual(), v.individualByName(), v.seats(),
+				var aliases = retainedAliases(v);
+				Verdict result = new Verdict(aliases.judgment(), aliases.individual(), aliases.names(), aliases.seats(),
 						v.provenance(), v.compositeAttempts(), v.declaredCardinality(), v.requirement(),
 						v.reductionFailure(), v.roster(), v.invocations(),
 						v.rule() == null ? null : io.github.markpollack.judge.voting.VotingRules.reconstruct(
@@ -255,6 +256,64 @@ public final class ResultJson {
 			}
 		}
 
+	}
+
+	// V6 repeats complete values at declared joins. Restore only those joins, never
+	// intern equal independent opinions or Check nodes: those still count separately.
+	private record AliasInputs(Judgment judgment, List<Judgment> individual, Map<String, Judgment> names,
+			List<Seat> seats) {
+	}
+
+	private static AliasInputs retainedAliases(VerdictDocument v) {
+		var individual = new ArrayList<>(v.individual());
+		var seats = new ArrayList<>(v.seats());
+		Judgment aggregate = v.judgment();
+		for (int position = 0; position < v.compositeAttempts().size(); position++) {
+			var attempt = v.compositeAttempts().get(position);
+			Verdict child = attempt.verdict();
+			if (child == null || attempt.disposition() != AttemptDisposition.USED)
+				continue;
+			if (attempt.relation() == CompositeRelation.CASCADE_TIER
+					&& v.provenance().kind() == VerdictProvenanceKind.TIER
+					&& attempt.name().equals(v.provenance().tier())) {
+				if (aggregate.equals(child.judgment()))
+					aggregate = child.judgment();
+				if (individual.equals(child.individual()))
+					individual = new ArrayList<>(child.individual());
+				if (seats.equals(child.seats()))
+					seats = new ArrayList<>(child.seats());
+			}
+			if (attempt.relation() == CompositeRelation.META_MEMBER) {
+				for (int i = 0; i < seats.size() && i < individual.size(); i++)
+					if (seats.get(i).position() == position && individual.get(i).equals(child.judgment()))
+						individual.set(i, child.judgment());
+			}
+		}
+		if (v.provenance().kind() == VerdictProvenanceKind.OWN && v.declaredCardinality() == 1
+				&& individual.size() == 1 && aggregate.equals(individual.getFirst()))
+			aggregate = individual.getFirst();
+		for (int i = 0; i < seats.size() && i < individual.size(); i++) {
+			Seat seat = seats.get(i);
+			Judgment rejection = seat.rejection();
+			if (rejection == null || rejection.refusedReturn() == null)
+				continue;
+			RefusedReturn refusal = rejection.refusedReturn();
+			if (refusal.original() == individual.get(i) || !refusal.original().equals(individual.get(i)))
+				continue;
+			var joined = new Judgment(rejection.producerStatus(), rejection.finding(), rejection.confidence(),
+					rejection.probabilityDistribution(), rejection.reasonCode(), rejection.reasoning(), rejection.checks(),
+					rejection.provenance(), rejection.metadata(), rejection.requirement(), rejection.invocations(),
+					rejection.invocationIds(), new RefusedReturn(individual.get(i), refusal.expected(), refusal.reason()));
+			seats.set(i, new Seat(seat.position(), seat.verdictKey(), seat.keySource(), seat.execution(),
+					seat.participation(), seat.cause(), seat.notApplicableWhen(), joined, seat.declaredWeight()));
+		}
+		var names = new LinkedHashMap<>(v.individualByName());
+		for (int i = 0; i < seats.size() && i < individual.size(); i++) {
+			String key = seats.get(i).verdictKey();
+			if (individual.get(i).equals(names.get(key)))
+				names.put(key, individual.get(i));
+		}
+		return new AliasInputs(aggregate, individual, names, seats);
 	}
 
 	@SuppressWarnings("unchecked")

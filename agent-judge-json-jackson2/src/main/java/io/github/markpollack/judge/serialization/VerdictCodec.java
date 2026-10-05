@@ -134,7 +134,16 @@ public final class VerdictCodec {
 	 */
 	public String write(Verdict verdict) {
 		verdict.requireUsable();
-		return encode(verdict);
+		try {
+			String encoded = encode(verdict);
+			// Reconstruct with the same reader before publishing. Aliases without a V6
+			// relationship cannot be represented; refuse rather than emit unreadable bytes.
+			read(encoded);
+			return encoded;
+		}
+		catch (io.github.markpollack.judge.portable.PreservationLimitException limit) {
+			throw preservationOriginal(limit, verdict);
+		}
 	}
 
 	/**
@@ -143,9 +152,12 @@ public final class VerdictCodec {
 	 * @return complete validated verdict
 	 */
 	public Verdict read(String json) {
-		Verdict verdict = decode(json, Verdict.class);
-		verdict.requireUsable();
-		return verdict;
+		try {
+			return decode(json, Verdict.class).requireUsable();
+		}
+		catch (io.github.markpollack.judge.portable.PreservationLimitException limit) {
+			throw preservationOriginal(limit, json);
+		}
 	}
 
 	/**
@@ -169,7 +181,16 @@ public final class VerdictCodec {
 	 * @return current JSON
 	 */
 	public String write(EvaluationResult result) {
-		result.verdict().requireUsable();
+		try {
+			return writeEvaluation(result);
+		}
+		catch (io.github.markpollack.judge.portable.PreservationLimitException limit) {
+			throw preservationOriginal(limit, result);
+		}
+	}
+
+	private String writeEvaluation(EvaluationResult result) {
+		write(result.verdict());
 		var policy = new LinkedHashMap<String, Object>();
 		switch (result.policyResult()) {
 			case PolicyResult.NotRequested ignored -> policy.put("kind", "notRequested");
@@ -206,6 +227,15 @@ public final class VerdictCodec {
 	 * @return retained result with explicit stored failure data
 	 */
 	public EvaluationResult readEvaluation(String json) {
+		try {
+			return decodeEvaluation(json);
+		}
+		catch (io.github.markpollack.judge.portable.PreservationLimitException limit) {
+			throw preservationOriginal(limit, json);
+		}
+	}
+
+	private EvaluationResult decodeEvaluation(String json) {
 		JsonNode root = decode(json, JsonNode.class);
 		fields(root, Set.of("schemaVersion", "verdict", "policyResult"));
 		if (!root.path("schemaVersion").isIntegralNumber() || !root.path("schemaVersion").canConvertToInt()
@@ -241,6 +271,12 @@ public final class VerdictCodec {
 			default -> throw new IllegalArgumentException("Unsupported policy-result kind");
 		};
 		return new EvaluationResult(verdict, result);
+	}
+
+	private static io.github.markpollack.judge.portable.PreservationLimitException preservationOriginal(
+			io.github.markpollack.judge.portable.PreservationLimitException limit, Object original) {
+		return new io.github.markpollack.judge.portable.PreservationLimitException(
+				Objects.toString(limit.getMessage(), "Preservation bound exceeded"), original, limit);
 	}
 
 	private static void fields(JsonNode node, Set<String> fields) {

@@ -41,6 +41,10 @@ class RetainedRuleBoundaryTest {
 		assertThat(verdict.seats()).extracting(Seat::participation).containsExactly(Participation.INCLUDED, Participation.INCLUDED);
 		var codec = new VerdictCodec().withVotingRules(Map.of("input-participation:v1", q -> new InputParticipationRule()));
 		assertThat(codec.read(codec.write(verdict))).isEqualTo(verdict);
+		var meta = Juries.meta(new InputParticipationRule(),
+				new NamedJury("a", () -> Verdict.single("a", Judgment.pass("a"))),
+				new NamedJury("b", () -> Verdict.single("b", Judgment.pass("b")))).vote().requireUsable();
+		assertThat(codec.read(codec.write(meta))).isEqualTo(meta);
 		var guided = Verdict.builder().panel(new InputParticipationRule()).opinion("a", Judgment.pass("a"))
 				.opinion("b", Judgment.pass("b")).build().requireUsable();
 		assertThat(codec.read(codec.write(guided))).isEqualTo(guided);
@@ -80,6 +84,27 @@ class RetainedRuleBoundaryTest {
 		var reopened = codec.read(codec.write(verdict));
 		assertThat(reopened.requireUsable()).isEqualTo(verdict);
 		assertThat(calls).hasValue(1);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "name", "configuration", "aggregate" })
+	void preservationLimitAtRuleBoundaryEscapesWithTheSameOriginal(String phase) {
+		var original = new Object();
+		var limit = new io.github.markpollack.judge.portable.PreservationLimitException("rule bound", original);
+		var rule = new VotingStrategy() {
+			public String getName() {
+				if (phase.equals("name")) throw new java.util.concurrent.CompletionException(limit);
+				return "bounded-rule:v1";
+			}
+			public Map<String, Object> configuration() {
+				if (phase.equals("configuration")) throw new java.util.concurrent.CompletionException(limit);
+				return Map.of();
+			}
+			public Judgment aggregate(List<Ballot> ballots) { throw new java.util.concurrent.CompletionException(limit); }
+		};
+		assertThatThrownBy(() -> SimpleJury.builder().parallel(false).judge(() -> Judgment.pass("a"))
+				.judge(() -> Judgment.pass("b")).votingStrategy(rule).build().vote()).isSameAs(limit);
+		assertThat(limit.original()).isSameAs(original);
 	}
 
 	@Test
