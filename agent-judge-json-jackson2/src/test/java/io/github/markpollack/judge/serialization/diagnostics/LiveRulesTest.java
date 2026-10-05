@@ -59,7 +59,7 @@ class LiveRulesTest {
 			.vote();
 
 		for (StoredReading interpretation : List.of(StoredVerdicts.interpret(verdict),
-				StoredVerdicts.interpret(asMap(verdict)))) {
+				StoredVerdicts.interpret(Fixtures.readCurrent(asMap(verdict))))) {
 			assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.NOT_ASSESSED);
 			assertThat(interpretation.root().status()).isEqualTo("error");
 			assertThat(interpretation.root().reasonCode()).isEqualTo("errors_propagated");
@@ -105,7 +105,7 @@ class LiveRulesTest {
 			.vote();
 
 		for (StoredReading interpretation : List.of(StoredVerdicts.interpret(verdict),
-				StoredVerdicts.interpret(asMap(verdict)))) {
+				StoredVerdicts.interpret(Fixtures.readCurrent(asMap(verdict))))) {
 			assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.NOT_APPLICABLE);
 			assertThat(interpretation.root().status()).isEqualTo("not_applicable");
 			assertThat(interpretation.root().judges())
@@ -148,7 +148,7 @@ class LiveRulesTest {
 			.vote();
 
 		for (StoredReading interpretation : List.of(StoredVerdicts.interpret(verdict),
-				StoredVerdicts.interpret(asMap(verdict)))) {
+				StoredVerdicts.interpret(Fixtures.readCurrent(asMap(verdict))))) {
 			assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
 			assertThat(interpretation.decidedBy())
 				.isEqualTo(new DecidedBy("gate", List.of("gate"), "individual_rejection"));
@@ -167,7 +167,7 @@ class LiveRulesTest {
 		Verdict verdict = boundaryRejectingCascade().vote();
 
 		for (StoredReading interpretation : List.of(StoredVerdicts.interpret(verdict),
-				StoredVerdicts.interpret(asMap(verdict)))) {
+				StoredVerdicts.interpret(Fixtures.readCurrent(asMap(verdict))))) {
 			assertThat(interpretation.outcome()).isEqualTo(RequirementOutcome.VIOLATED);
 			assertThat(interpretation.decidedBy())
 				.isEqualTo(new DecidedBy("rubric", List.of("rubric"), "individual_rejection"));

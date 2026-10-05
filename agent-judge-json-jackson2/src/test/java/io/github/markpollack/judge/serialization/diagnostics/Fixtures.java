@@ -34,8 +34,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Stored fixtures, live juries and small helpers shared by the interpretation tests. */
 final class Fixtures {
 
+	// Explicit test-owned reconstruction vocabulary, including the failed rule below.
+	static final Map<String, io.github.markpollack.judge.voting.VotingRuleFactory> RULES;
+	static {
+		var rules = new LinkedHashMap<>(io.github.markpollack.judge.voting.VotingRules.builtIns());
+		rules.put("broken", configuration -> brokenRule());
+		RULES = Map.copyOf(rules);
+	}
+
 	static final ObjectMapper MAPPER = new ObjectMapper()
-		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module());
+		.registerModule(io.github.markpollack.judge.serialization.ResultJson.module())
+		.setDefaultAttributes(com.fasterxml.jackson.databind.cfg.ContextAttributes.getEmpty()
+				.withSharedAttribute(io.github.markpollack.judge.serialization.ResultJson.RULES, RULES));
+
+	static Verdict readCurrent(Map<String, Object> document) {
+		return new io.github.markpollack.judge.serialization.VerdictCodec()
+				.withVotingRules(Map.of("broken", configuration -> brokenRule())).read(document);
+	}
 
 	static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {
 	};
@@ -195,7 +210,16 @@ final class Fixtures {
 
 	/** A leaf jury whose reduction throws, so the tier returns an undecided verdict. */
 	static Jury undecidedTier(Judgment... judgments) {
-		SimpleJury.Builder builder = SimpleJury.builder().votingStrategy(new VotingStrategy() {
+		SimpleJury.Builder builder = SimpleJury.builder().votingStrategy(brokenRule());
+		for (int index = 0; index < judgments.length; index++) {
+			Judgment judgment = judgments[index];
+			builder.judge(Judges.named(() -> judgment, "judge-" + (index + 1)));
+		}
+		return builder.build();
+	}
+
+	private static VotingStrategy brokenRule() {
+		return new VotingStrategy() {
 			@Override
 			public Judgment aggregate(List<io.github.markpollack.judge.voting.Ballot> ballots) {
 				var input = io.github.markpollack.judge.voting.Ballots.judgments(ballots);
@@ -206,12 +230,7 @@ final class Fixtures {
 			public String getName() {
 				return "broken";
 			}
-		});
-		for (int index = 0; index < judgments.length; index++) {
-			Judgment judgment = judgments[index];
-			builder.judge(Judges.named(() -> judgment, "judge-" + (index + 1)));
-		}
-		return builder.build();
+		};
 	}
 
 	/**

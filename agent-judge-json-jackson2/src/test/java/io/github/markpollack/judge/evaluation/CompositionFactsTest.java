@@ -122,7 +122,7 @@ class CompositionFactsTest {
 		assertThat(verdict.individual()).extracting(Judgment::status)
 			.containsExactly(JudgmentStatus.PASS, JudgmentStatus.FAIL);
 		assertThat(verdict.conclusion()).isEqualTo(Verdict.Conclusion.INCONCLUSIVE);
-		var codec = new VerdictCodec();
+		var codec = new VerdictCodec().withVotingRules(Map.of("failed-reduction", configuration -> strategy));
 		var restored = codec.read(codec.write(verdict));
 		assertThat(restored).isEqualTo(verdict);
 		assertThat(restored.reductionFailure().cause()).isNull();

@@ -81,7 +81,9 @@ class RetainedRuleBoundaryTest {
 		assertThat(verdict.rule()).isNotNull();
 		assertThat(verdict.rule().configuration()).containsEntry("mode", mode).containsEntry("threshold", 0.7);
 		var codec = new VerdictCodec().withVotingRules(Map.of("failed-rule:v1", q -> new FailedRule((String) q.get("mode"), calls)));
-		var reopened = codec.read(codec.write(verdict));
+		var encoded = codec.write(verdict);
+		assertThatThrownBy(() -> new VerdictCodec().read(encoded)).hasMessageContaining("Unknown voting rule token");
+		var reopened = codec.read(encoded);
 		assertThat(reopened.requireUsable()).isEqualTo(verdict);
 		assertThat(calls).hasValue(1);
 	}

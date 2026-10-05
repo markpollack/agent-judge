@@ -265,8 +265,12 @@ public final class ResultJson {
 	}
 
 	private static AliasInputs retainedAliases(VerdictDocument v) {
-		var individual = new ArrayList<>(v.individual());
-		var seats = new ArrayList<>(v.seats());
+		Objects.requireNonNull(v.individualByName(), "individualByName must be explicit");
+		Objects.requireNonNull(v.compositeAttempts(), "compositeAttempts must be explicit");
+		Objects.requireNonNull(v.provenance(), "provenance must be explicit");
+		Objects.requireNonNull(v.judgment(), "judgment must be explicit");
+		var individual = new ArrayList<>(Objects.requireNonNull(v.individual(), "individual must be explicit"));
+		var seats = new ArrayList<>(Objects.requireNonNull(v.seats(), "seats must be explicit"));
 		Judgment aggregate = v.judgment();
 		for (int position = 0; position < v.compositeAttempts().size(); position++) {
 			var attempt = v.compositeAttempts().get(position);
