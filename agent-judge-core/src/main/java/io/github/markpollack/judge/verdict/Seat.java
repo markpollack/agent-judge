@@ -86,13 +86,15 @@ public record Seat(@JsonProperty(required = true) int position, String verdictKe
 	}
 
 	/**
-	 * Project one retained seat with the complete original into typed reduction input.
+	 * Project one retained seat with the complete original into pre-reduction input.
+	 * Recorded participation is an output of reduction; replay receives NOT_RECORDED,
+	 * just as live execution does.
 	 * @param original original opinion
 	 * @return complete ballot
 	 */
 	public io.github.markpollack.judge.voting.Ballot ballot(Judgment original) {
 		return new io.github.markpollack.judge.voting.Ballot(position, verdictKey, original,
-				rejection == null ? original : rejection, participation, declaredWeight);
+				rejection == null ? original : rejection, Participation.NOT_RECORDED, declaredWeight);
 	}
 
 	/**

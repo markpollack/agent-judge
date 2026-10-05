@@ -91,7 +91,7 @@ final class AggregationBoundary {
 		// the diagnostic that reports it.
 		String name = safeName(strategy);
 		Judgment aggregate;
-		RetainedRule retained;
+		@Nullable RetainedRule retained = null;
 		try {
 			retained = RetainedRule.of(strategy);
 			aggregate = retained.aggregate(ballots);
@@ -104,12 +104,12 @@ final class AggregationBoundary {
 					contained(logger, name,
 							"threw " + ex.getClass().getName()
 									+ ((cause == null || cause.isBlank()) ? "" : ": " + cause)),
-					new CompositeFailure(CompositeFailureCode.AGGREGATION_FAILED, ex));
+					new CompositeFailure(CompositeFailureCode.AGGREGATION_FAILED, ex), retained);
 		}
 		String rejection = allowListRejection(aggregate, mayBeNotApplicable);
 		return rejection == null ? new Reduction(aggregate, null, retained) : new Reduction(
 				contained(logger, name, rejection),
-				new CompositeFailure(CompositeFailureCode.AGGREGATION_FAILED, new IllegalStateException(rejection)));
+				new CompositeFailure(CompositeFailureCode.AGGREGATION_FAILED, new IllegalStateException(rejection)), retained);
 	}
 
 	record Reduction(Judgment judgment, @Nullable CompositeFailure failure, @Nullable RetainedRule rule) {

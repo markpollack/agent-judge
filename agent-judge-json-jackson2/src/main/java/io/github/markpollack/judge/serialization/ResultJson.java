@@ -150,8 +150,8 @@ public final class ResultJson {
 	 * @param roster complete ordered independent requirements, empty for ordinary
 	 * composition
 	 * @param invocations owned immutable native execution observations
-	 * @param rule complete stable rule identity/configuration, or null when no reduction
-	 * happened
+	 * @param rule complete stable rule identity/configuration for a captured reduction
+	 * attempt, including a failed attempt; null when no declaration was captured
 	 */
 	@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
 	public record VerdictDocument(
