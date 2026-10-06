@@ -145,6 +145,7 @@ Current retained results use [schema V6](portable-results-v6.md) and description
 
 ## Build and modules
 
+The source inventory is **14 JAR modules plus agent-judge-parent** (POM packaging).
 Run `./mvnw clean verify` with Java 21. Dependencies use matching `0.18.0-SNAPSHOT` versions. Add `agent-judge-assertj` for fluent assertions, `agent-judge-ai-core` for generated/native requirements, and `agent-judge-jev` for Jev structured protocols.
 
 | Module | Responsibility |
@@ -164,7 +165,9 @@ Core depends on no model provider or assertion framework. Public examples and co
 ## Documentation
 
 - [Documentation](https://lab.pollack.ai/docs/agent-judge)
-- [Executable tutorial](https://github.com/markpollack/agent-judge-tutorial)
+- [Configured PetClinic tutorial](https://github.com/markpollack/agent-judge-tutorial/tree/861231ccf96d650c14fa62a14ddb5bc1181ced19/case-studies/spec-driven-petclinic)
+- [Executable fundamentals tutorial](https://github.com/markpollack/agent-judge-tutorial)
+- [Draft 0.18 release notes](RELEASE_NOTES_0.18.0.md) and [0.17 → 0.18 migration](MIGRATION_0.18.md)
 - [Releases](https://github.com/markpollack/agent-judge/releases)
 - API Javadoc ships with each release. [AGENTS.md](AGENTS.md) lists build profiles and project rules.
 

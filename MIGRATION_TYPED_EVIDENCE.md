@@ -1,6 +1,7 @@
 # Configured execution migration
 
-API compatibility is not required for the 0.18 source line. Configure real inputs before obtaining a ready producer.
+This guide covers intermediate 0.18 development APIs. For migration from released 0.17,
+use [MIGRATION_0.18.md](MIGRATION_0.18.md). Configure real inputs before obtaining a ready producer.
 
 | Previous API | Current construction/execution |
 |---|---|
@@ -19,4 +20,4 @@ A ready ordinary Jury accepts mixed independent requirements/evidence without in
 
 Generated native rosters retain one investigative call for the whole roster. Typed structured rosters require real common or per-requirement evidence and report one execution per item. Names identify seats; requirement ids identify inputs. Neither is reconstructed from naming conventions.
 
-Retained results use [V5](portable-results-v5.md), with description V3. Current codecs refuse V2/V3/V4. Use `NativeRequirementCodecs.codec()` for exact RFC2119/EARS reconstruction, or register a pure `SpecificationCodec` factory. Frozen artifacts remain unchanged; archival reading uses the baseline code and original semantics.
+Retained results use [V6](portable-results-v6.md), with description V3. Current codecs refuse V2/V3/V4/V5. Use `NativeRequirementCodecs.codec()` for exact RFC2119/EARS reconstruction, or register a pure `SpecificationCodec` factory. Frozen artifacts remain unchanged; archival reading uses the baseline code and original semantics.
