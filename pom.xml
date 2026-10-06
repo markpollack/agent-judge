@@ -77,8 +77,8 @@
         <maven-model.version>3.9.16</maven-model.version>
 
         <!-- JSON processing -->
-        <jackson.version>2.22.2</jackson.version>
-        <jackson3.version>3.2.2</jackson3.version>
+        <jackson.version>2.22.3</jackson.version>
+        <jackson3.version>3.2.3</jackson3.version>
 
         <!-- Nullness contract (declarations) and its enforcing checker -->
         <jspecify.version>1.0.1</jspecify.version>
@@ -111,12 +111,10 @@
             </dependency>
 
             <!--
-                Jackson 3 BOM (tools.jackson). Spring AI 2.0.0 drags in jackson-core 3.0.3
-                (CVE-2026-29062) and jackson-databind 3.1.4; this import converges the reactor on
-                the accepted 3.1.6 floor. Dependency management alone does not reach standalone
-                consumers, because the released flattened child POMs carry no dependencyManagement:
-                agent-judge-llm and agent-judge-rag additionally declare tools.jackson.core:jackson-databind
-                directly so the floor is exported.
+                Import Jackson 3 after Jackson 2, so the Jackson 2 BOM owns shared
+                jackson-annotations management. Both engine lines use patched maintenance
+                releases. Flattened child POMs carry no dependencyManagement, so llm and rag
+                declare tools.jackson.core:jackson-databind directly to export that version.
             -->
             <dependency>
                 <groupId>tools.jackson</groupId>
@@ -485,6 +483,26 @@
                 <artifactId>maven-resources-plugin</artifactId>
                 <version>${maven-resources-plugin.version}</version>
                 <executions>
+                    <!-- Preserve module test-resource lists while licensing attached test JARs. -->
+                    <execution>
+                        <id>stage-test-license</id>
+                        <phase>process-test-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.testOutputDirectory}/META-INF</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${maven.multiModuleProjectDirectory}</directory>
+                                    <includes>
+                                        <include>LICENSE</include>
+                                    </includes>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
                     <execution>
                         <id>stage-javadoc-license</id>
                         <phase>generate-resources</phase>

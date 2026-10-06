@@ -81,6 +81,10 @@ The separate fundamentals and judge-junit path stays on released 0.17.0.
 
 ## License and availability
 
+Jackson 2 uses BOM 2.22.3 and Jackson 3 uses BOM 3.2.3. The Jackson 2 BOM manages
+the shared `jackson-annotations:2.22` dependency. Main, sources, Javadoc and attached
+test JARs include the current root LICENSE through the build configuration.
+
 Project-specific [Business Source License terms](LICENSE) remain in force. Earlier releases
 retain the terms shipped with them. Final dependency/license/security checks, certification,
 signing and publication remain prerequisites to a release. These notes supply no certification
