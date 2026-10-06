@@ -1,4 +1,5 @@
 # Agent Judge Claude Code Bridge
 
-Read and follow `AGENTS.md`. It is the canonical repository instruction file for all coding agents.
-Do not duplicate project guidance or private steward state here.
+`AGENTS.md` is the canonical instruction file for all coding agents and is imported below.
+
+@AGENTS.md

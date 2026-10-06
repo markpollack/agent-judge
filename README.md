@@ -27,7 +27,7 @@ import io.github.markpollack.judge.ai.requirements.Rfc2119Judge;
 
 var integrity = Rfc2119Requirement.of("integrity", "1", "MUST",
     "preserve all original judgments", "auditability", null);
-// judgeModel is a EvalModel configured by the application.
+// judgeModel is an EvalModel configured by the application.
 var nativeRecipe = Rfc2119Judge.builder().runtime(judgeModel);
 Judge integrityJudge = nativeRecipe.requirement(integrity)
     .evidence("Recorded execution evidence").build();
@@ -160,6 +160,13 @@ Run `./mvnw clean verify` with Java 21. Dependencies use matching `0.18.0-SNAPSH
 | `agent-judge-spring-ai` / `agent-judge-langchain4j` / `agent-judge-koog` | Evaluated response bridges |
 
 Core depends on no model provider or assertion framework. Public examples and compiler regressions use local fixtures; no live inference is required. See the [AssertJ guide](agent-judge-assertj/README.md) and [Jev guide](agent-judge-jev/README.md).
+
+## Documentation
+
+- [Documentation](https://lab.pollack.ai/docs/agent-judge)
+- [Executable tutorial](https://github.com/markpollack/agent-judge-tutorial)
+- [Releases](https://github.com/markpollack/agent-judge/releases)
+- API Javadoc ships with each release. [AGENTS.md](AGENTS.md) lists build profiles and project rules.
 
 ## License
 
