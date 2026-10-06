@@ -96,16 +96,20 @@ One valid declared seat/member is semantic identity, including a valid UNDECIDED
 
 ## What to count
 
-- **Simple jury:** compare `seats.size()` with the aggregate's `aggregation.inputCount`.
-- **Cascade:** ⚠️ **count per tier, and never also count the top-level aggregate.** A cascade's
-  top-level `judgment`, `individual` and `weights` are copied from the tier that stopped it.
-  Compare each `tiers[i]` with the `compositeAttempts` entry of the same name, and count that
-  tier's verdict once. Counting the top-level verdict as well counts the stopping tier twice. A
-  tier with no attempt was never entered, which means the cascade stopped early.
-- **Meta-jury:** compare `members` with `compositeAttempts`. `VotingJury.getJudges()` is a voting-only view; a meta-jury
-  retains its own member description. A member that failed to execute makes the
-  aggregate a bare `ERROR` judgment with no aggregation block. Take the member count from the
-  description, not from the evidence.
+- **Simple jury:** compare the declared `seats.size()` with `Verdict.declaredCardinality()` and
+  the retained seats, then inspect their execution and participation facts. One valid returned
+  seat is identity and adds no aggregation block. For a reduction, inspect `aggregation.inputCount`
+  and eligibility separately; abstention and exclusion are not missing executions.
+- **Cascade:** count per tier and do not also count the top-level projection. A normal tier outcome
+  retains the stopping tier's judgment, individuals and seats (including declared weights).
+  An individual-rejection stop has its own provenance and root judgment. Join each described
+  tier to the `compositeAttempts` entry of the same name and inspect its disposition and retained
+  verdict or failure. A tier with no attempt was never entered.
+- **Meta-jury:** compare described `members` with `compositeAttempts`; `VotingJury.getJudges()`
+  is a voting-only view. A failed member leaves a failed attempt; successful members' originals
+  remain retained, while the parent records `ERROR` with undecided provenance and no reduction.
+  Take the declared member count from the description or `Verdict.declaredCardinality()`, not
+  from the successful seats alone. One valid member is identity, including an undecided child.
 
 ## Declaring a judge's configuration
 

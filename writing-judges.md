@@ -673,10 +673,10 @@ a `goldRecall` that had *passed* at 0.6 was thrown away because a sibling judge 
 your tier holds independent questions, `PROPAGATE` is the wrong default *for that tier* — and the
 right fix is usually to put independent questions in separate juries rather than to weaken the policy.
 
-### 6.2 Give the judge an identity — and know where identity is missing
+### 6.2 Give the judge an identity and retain the complete verdict
 
-A `Judgment` carries `status`, `score`, `label`, `reasoning`, `checks`, `metadata` — and **no judge
-identity**. This has three consequences you must design around. `[OURS]`
+A `Judgment` carries an outcome and optional findings, support, checks and provenance. Judge
+identity belongs to the enclosing `Verdict` seats, rather than to the subject observation. `[OURS]`
 
 **Always name your judges.** `SimpleJury` resolves a name from the judge's `JudgeMetadata` and falls
 back to `"Judge#" + (index + 1)` for anonymous lambdas. A named judge appears in
@@ -689,11 +689,9 @@ tier.judge(Judges.named(new DddReviewQualityJudge(), "dddQuality"));   // do thi
 tier.judge(() -> { ... });                                            // becomes "Judge#3"
 ```
 
-**Know what identity does *not* reach.** `VotingStrategy.aggregate(List<Judgment>, Map<String,Double>)`
-receives an ordered bag of anonymous verdicts. Position is the only handle it has, so
-`WeightedAverageStrategy` keys weights by position (`"0"`, `"1"`, …) — documented behaviour, and the
-best the method can do with the contract it was given. **The defect is in the contract, not the
-method.**
+**Voting receives typed ballots.** `VotingStrategy.aggregate(List<Ballot>)` receives each seat's
+position, label, complete original judgment, separate treatment and declared weight. Reduction
+does not require reconstructing identities or weights from an anonymous list.
 
 In practice:
 
@@ -703,20 +701,21 @@ In practice:
   `Seat.declaredWeight()` is the single retained weight owner. An absent declaration has effective
   weight 1.0; explicit weights must be finite and positive. Unweighted rules retain and ignore them.
   Duplicate labels do not identify seats; seating the same producer twice executes it twice.
-- **Persist the judge name yourself** into whatever run record you keep. Do not rely on ordinal
-  position surviving a configuration change.
+- **Retain the complete Verdict**, including its seats and original judgments. Name judges for
+  readable labels; do not treat labels or ordinal positions as stable identity across configurations.
 
 **Do not let identity loss be silent.** ⭐ A jury must never return a verdict computed from fewer
 judges than it lists. `[OURS]` Two mechanisms previously allowed exactly that — a prompt template
 resolved lazily through the thread-context classloader vanished on the pool worker that rendered it,
 and a throwing judge escaped `SimpleJury` and collapsed its whole cascade tier. Both are fixed in the
-library; the *discipline* they imply is yours: assert `eligibleCount == inputCount` wherever you
-expect a full roster.
+library; the *discipline* they imply is yours: compare the declared roster with retained seats and execution facts, then inspect
+aggregation input and eligibility counts separately. Exclusion and abstention can legitimately
+reduce eligibility; one valid seat is identity and adds no reduction evidence block.
 
 ### 6.3 The combinators are boolean-era; read them before using them
 
 `Judges.and`, `Judges.or`, `Judges.allOf`, and `Judges.anyOf` branch on `Judgment.pass()`, which is
-`status == PASS`. They predate the four-status model, and their treatment of the other two statuses
+`status == PASS`. They predate the current five-outcome model, and their treatment of non-PASS outcomes
 is a hazard rather than a policy:
 
 - `allOf` / `and` — an `ABSTAIN` or `ERROR` is "not pass", so it short-circuits and is returned as
