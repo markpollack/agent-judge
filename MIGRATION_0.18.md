@@ -7,7 +7,7 @@ and package prefixes, but recompile all adopting callers against matching module
 | 0.17 caller surface | 0.18 replacement |
 |---|---|
 | `Judge.judge(JudgmentContext)` / `Jury.vote(JudgmentContext)` | Configure evidence/workspace collaborators first; call `Judge.judge()` / `Jury.vote()` |
-| Model plumbing using JudgeModel/Request/Response | EvalModel/Request/Response/Options and EvalMessage/EvalRole; native adapters are SpringAiEvalModel and AgentClientEvalModel |
+| Model plumbing using JudgeModel/Request/Response | EvalModel/Request/Response/Options and EvalMessage/EvalMessageRole; native adapters are SpringAiEvalModel and AgentClientEvalModel |
 | Result imports in `result` and voting/attempt types in `jury` | `judgment` owns Judgment/Finding/Check; `verdict` owns Verdict/Seat/CompositeAttempt; `voting` owns Ballot and rules; `jury` owns composition |
 | Binary Check assumptions and score/label-only copying | Preserve child Judgment statuses and complete optional finding/support/native facts |
 | Requirement-roster Judge returning one rollup Judgment | EarsJury/Rfc2119Jury returns complete selected coverage; EarsJudge/Rfc2119Judge judges one actual requirement |

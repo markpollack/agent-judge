@@ -165,7 +165,7 @@ Core depends on no model provider or assertion framework. Public examples and co
 ## Documentation
 
 - [Documentation](https://lab.pollack.ai/docs/agent-judge)
-- [Configured PetClinic tutorial](https://github.com/markpollack/agent-judge-tutorial/tree/861231ccf96d650c14fa62a14ddb5bc1181ced19/case-studies/spec-driven-petclinic)
+- [Configured PetClinic tutorial](https://github.com/markpollack/agent-judge-tutorial/tree/main/case-studies/spec-driven-petclinic)
 - [Executable fundamentals tutorial](https://github.com/markpollack/agent-judge-tutorial)
 - [Draft 0.18 release notes](RELEASE_NOTES_0.18.0.md) and [0.17 → 0.18 migration](MIGRATION_0.18.md)
 - [Releases](https://github.com/markpollack/agent-judge/releases)
