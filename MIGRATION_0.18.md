@@ -1,7 +1,7 @@
 # Migrating from Agent Judge 0.17 to Agent Eval 0.18
 
-This is an intentional source/API/wire break on the Java 21 source line. Current artifacts
-are `0.18.0-SNAPSHOT`; 0.18.0 is not announced as published. Keep repository, coordinate
+This is an intentional source/API/wire break on the Java 21 source line. Released
+artifacts are `0.18.0` on Maven Central. Keep repository, coordinate
 and package prefixes, but recompile all adopting callers against matching module versions.
 
 | 0.17 caller surface | 0.18 replacement |

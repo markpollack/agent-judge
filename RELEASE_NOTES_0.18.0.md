@@ -1,4 +1,4 @@
-# Agent Eval 0.18.0 — unreleased
+# Agent Eval 0.18.0
 
 Configure requirements and evidence before running a Judge or Jury, retain the complete
 assessment, and let application policy decide whether to rely on it.
@@ -13,7 +13,6 @@ new result packages. V6 readers refuse older typed results; preserve historical 
 See [migration details](MIGRATION_0.18.md).
 
 Java 21. Maven coordinates remain `io.github.markpollack:agent-judge-*`.
-The current source is `0.18.0-SNAPSHOT`; 0.18.0 has not been published.
 
 Try the [PetClinic walkthrough](https://github.com/markpollack/agent-judge-tutorial/tree/main/case-studies/spec-driven-petclinic),
 which demonstrates the APIs using archived responses and offline replay.

@@ -1,6 +1,6 @@
 # Portable retained results V6
 
-`Judgment`, `Verdict` and `EvaluationResult` use integer `schemaVersion: 6`. Descriptions retain `descriptionVersion: 3`. The domain stores neither a writable format version nor a duplicate conclusion. Use matching `io.github.markpollack:agent-judge-json-jackson2:0.18.0-SNAPSHOT` for storage; core contains no Jackson engine API. Jackson 2 is the supported engine.
+`Judgment`, `Verdict` and `EvaluationResult` use integer `schemaVersion: 6`. Descriptions retain `descriptionVersion: 3`. The domain stores neither a writable format version nor a duplicate conclusion. Use matching `io.github.markpollack:agent-judge-json-jackson2:0.18.0` for storage; core contains no Jackson engine API. Jackson 2 is the supported engine.
 
 ```java
 var codec = NativeRequirementCodecs.codec(); // RFC2119/EARS plus text/AllOf

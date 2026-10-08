@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.github.markpollack</groupId>
         <artifactId>agent-judge-parent</artifactId>
-        <version>0.18.0-SNAPSHOT</version>
+        <version>0.18.0</version>
     </parent>
     <artifactId>agent-judge-jev</artifactId>
     <name>Agent Judge Jev</name>

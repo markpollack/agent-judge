@@ -1,6 +1,6 @@
 # Agent Eval
 
-Configure typed requirements and evidence, execute a ready Judge or Jury, and retain the complete result. Java 21; source line **0.18.0-SNAPSHOT**.
+Configure typed requirements and evidence, execute a ready Judge or Jury, and retain the complete result. Java 21; current release **0.18.0**.
 
 A familiar assertion such as `org.assertj.core.api.Assertions.assertThat("4").isEqualTo("4")` compares exact values. A semantic assertion evaluates an actual requirement over selected evidence and retains the support and execution facts.
 
@@ -146,7 +146,7 @@ Current retained results use [schema V6](portable-results-v6.md) and description
 ## Build and modules
 
 The source inventory is **14 JAR modules plus agent-judge-parent** (POM packaging).
-Run `./mvnw clean verify` with Java 21. Dependencies use matching `0.18.0-SNAPSHOT` versions. Add `agent-judge-assertj` for fluent assertions, `agent-judge-ai-core` for generated/native requirements, and `agent-judge-jev` for Jev structured protocols.
+Run `./mvnw clean verify` with Java 21. Use matching `0.18.0` versions for every module. Add `agent-judge-assertj` for fluent assertions, `agent-judge-ai-core` for generated/native requirements, and `agent-judge-jev` for Jev structured protocols.
 
 | Module | Responsibility |
 |---|---|
