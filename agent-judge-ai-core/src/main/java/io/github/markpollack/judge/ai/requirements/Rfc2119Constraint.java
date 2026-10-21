@@ -50,13 +50,17 @@ import org.slf4j.LoggerFactory;
  * <h2>Document layout</h2>
  *
  * <p>
- * A rule is a {@code ### RULE-n} (or {@code ### UCn-RULEm}) heading on its own line, followed
- * within the same entry by one bold keyword statement, {@code **MUST** …}, and one
- * {@code **Reason:** …} line. The entry ends at the next heading of any level or at the end
- * of the document. Two further lines are recognised inside an entry and everything else is
- * prose: {@code **Covers:** …} is traceability and {@code **Applies when:** condition}
- * (also accepted without the bold) declares the optional applicability. Lines inside fenced
- * code blocks are never read.
+ * The document is read as CommonMark. A rule is a {@code ### RULE-n} (or {@code ### UCn-RULEm})
+ * heading with nothing else on its line, followed within the same entry by one bold keyword
+ * statement, {@code **MUST** …}, and one {@code **Reason:** …} line, each on its own line of
+ * a paragraph. The entry ends at the next heading of any level or at the end of the
+ * document. Two further lines are recognised inside an entry and everything else is prose:
+ * {@code **Covers:** …} is traceability and {@code **Applies when:** condition} (also
+ * accepted without the bold) declares the optional applicability. Fenced and indented code
+ * blocks, HTML blocks and thematic breaks are never read, so an example rule inside a fence
+ * of any length or character is documentation; paragraphs inside lists and block quotes are
+ * read like any other. The text of a rule is always the document's own line, never a
+ * rendering of it.
  *
  * <p>
  * {@link #from(Path)} is permissive: an entry missing its keyword or reason is left out, and
@@ -176,16 +180,14 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 
 		for (Line line : MarkdownRequirementDocument.lines(snapshot)) {
 			String text = line.text();
-			Matcher heading = HEADING.matcher(text);
-			if (heading.matches()) {
-				finish(entry, constraints, problems, seen, sourceName);
-				entry = new Entry(heading.group(1), line.number());
-				continue;
-			}
-			if (MarkdownRequirementDocument.isHeading(text)) {
+			if (line.heading()) {
 				finish(entry, constraints, problems, seen, sourceName);
 				entry = null;
-				if (RULE_LIKE.matcher(text).matches()) {
+				Matcher heading = HEADING.matcher(text);
+				if (heading.matches()) {
+					entry = new Entry(heading.group(1), line.number());
+				}
+				else if (RULE_LIKE.matcher(text).matches()) {
 					problems.add(new RequirementDocumentProblem(sourceName,
 							MarkdownRequirementDocument.headingToken(text), line.number(),
 							"heading resembles a rule but is not exactly `### RULE-n` or `### UCn-RULEm` on its own line"));

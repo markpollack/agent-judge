@@ -272,6 +272,52 @@ class StrictRequirementLoadingTests {
 	}
 
 	@Test
+	void aMetadataOnlyEarsEntryHasNoStatementAndIsReportedRatherThanLoaded() {
+		// The labelled lines a criteria document carries beside its sentence are metadata;
+		// they can neither stand in for the sentence nor vanish without a word.
+		Path criteria = write("criteria.md", """
+				### UC1-AC1: Preserve timestamps
+				Rule: RULE-1. Tests: none yet. Status: not implemented.
+
+				### UC1-AC2: Record the version
+
+				When a run starts, the capture shall record the CLI version.
+				Rule: RULE-2. Tests: `VersionTest`. Status: demonstrated.
+				""");
+
+		assertThat(EarsCriterion.from(criteria)).singleElement().satisfies(criterion -> {
+			assertThat(criterion.id()).isEqualTo("UC1-AC2");
+			assertThat(criterion.requirement()).isEqualTo("When a run starts, the capture shall record the CLI version.");
+		});
+		assertThat(EarsCriterion.problems(criteria)).singleElement().satisfies(problem -> {
+			assertThat(problem.id()).isEqualTo("UC1-AC1");
+			assertThat(problem.line()).isEqualTo(1);
+			assertThat(problem.reason()).contains("no requirement sentence");
+		});
+		assertThatThrownBy(() -> EarsCriterion.fromStrict(criteria)).isInstanceOf(RequirementDocumentException.class)
+			.hasMessageContaining("criteria.md:1 UC1-AC1:");
+		assertThatThrownBy(() -> EarsRequirement.fromStrict(criteria, "v"))
+			.isInstanceOf(RequirementDocumentException.class);
+	}
+
+	@Test
+	void eachRecognisedEarsMetadataLabelIsNeverTheStatement() {
+		for (String label : List.of("Rule:", "Rules:", "Tests:", "Status:", "Covers:", "**Covers:**", "**Rule:**",
+				"Applies when:")) {
+			Path criteria = write("criteria.md", """
+					### UC1-AC1: Labelled first
+					%s something
+					When read, the system shall return the sentence, not the label.
+					""".formatted(label));
+
+			List<EarsCriterion> parsed = EarsCriterion.from(criteria);
+
+			assertThat(parsed).as(label).singleElement().extracting(EarsCriterion::requirement)
+				.isEqualTo("When read, the system shall return the sentence, not the label.");
+		}
+	}
+
+	@Test
 	void headingsThatResembleCriteriaAreReportedAndOrdinaryHeadingsAreNot() {
 		Path criteria = write("criteria.md", """
 				# Acceptance Criteria: UC1

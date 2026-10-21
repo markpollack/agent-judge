@@ -50,14 +50,20 @@ import org.slf4j.LoggerFactory;
  * <h2>Document layout</h2>
  *
  * <p>
- * A criterion is a {@code ### UCn-ACm: Title} heading, followed within the same entry by
- * its requirement sentence: the first line that is not blank, not {@code **Covers:** …}
- * and not an {@code Applies when:} entry. The entry ends at the next heading of any level
- * or at the end of the document; later lines in the entry are prose and are not read.
- * {@code Applies when: condition} (also accepted as {@code **Applies when:** condition})
- * declares the optional applicability anywhere inside the entry, preferably after the
- * sentence. An EARS trigger such as {@code When}, {@code While} or {@code If} inside the
- * sentence never declares applicability. Lines inside fenced code blocks are never read.
+ * The document is read as CommonMark. A criterion is a {@code ### UCn-ACm: Title} heading,
+ * followed within the same entry by its requirement sentence: the first paragraph line that
+ * is not a metadata line. Metadata lines begin with one of the labels {@code Covers:},
+ * {@code Rule:}, {@code Rules:}, {@code Tests:} or {@code Status:} (bold or plain) or are an
+ * {@code Applies when:} entry; they can neither stand in for the sentence nor hide its
+ * absence. The entry ends at the next heading of any level or at the end of the document;
+ * later lines in the entry are prose and are not read. {@code Applies when: condition} (also
+ * accepted as {@code **Applies when:** condition}) declares the optional applicability
+ * anywhere inside the entry, preferably after the sentence. An EARS trigger such as
+ * {@code When}, {@code While} or {@code If} inside the sentence never declares
+ * applicability. Fenced and indented code blocks, HTML blocks and thematic breaks are never
+ * read, so an example criterion inside a fence of any length or character is documentation;
+ * paragraphs inside lists and block quotes are read like any other. The sentence is always
+ * the document's own line, never a rendering of it.
  *
  * <p>
  * {@link #from(Path)} is permissive: a heading without a sentence is left out, and every
@@ -116,6 +122,13 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 	/** {@code ### UC6-AC5: Permit adjacent future appointments} */
 	private static final Pattern HEADING = Pattern.compile("^### (UC\\d+-AC\\d+): (.+)$");
 
+	/**
+	 * The labelled lines a criteria document carries beside its sentence: traceability and
+	 * status, never the requirement. {@code Applies when:} is recognised separately.
+	 */
+	private static final Pattern METADATA = Pattern.compile(
+			"^(?:\\*\\*)?(?:Covers|Rules?|Tests|Status):(?:\\*\\*)?(?:\\s|$)", Pattern.CASE_INSENSITIVE);
+
 	/** A heading that looks like a criterion but is not written exactly as {@link #HEADING}. */
 	private static final Pattern CRITERION_LIKE = Pattern.compile("^#{1,6}\\s+UC\\d+-AC\\d+\\b.*$",
 			Pattern.CASE_INSENSITIVE);
@@ -168,23 +181,21 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 
 		for (Line line : MarkdownRequirementDocument.lines(snapshot)) {
 			String text = line.text();
-			Matcher heading = HEADING.matcher(text);
-			if (heading.matches()) {
-				finish(entry, criteria, problems, seen, sourceName);
-				entry = new Entry(heading.group(1), heading.group(2).strip(), line.number());
-				continue;
-			}
-			if (MarkdownRequirementDocument.isHeading(text)) {
+			if (line.heading()) {
 				finish(entry, criteria, problems, seen, sourceName);
 				entry = null;
-				if (CRITERION_LIKE.matcher(text).matches()) {
+				Matcher heading = HEADING.matcher(text);
+				if (heading.matches()) {
+					entry = new Entry(heading.group(1), heading.group(2).strip(), line.number());
+				}
+				else if (CRITERION_LIKE.matcher(text).matches()) {
 					problems.add(new RequirementDocumentProblem(sourceName,
 							MarkdownRequirementDocument.headingToken(text), line.number(),
 							"heading resembles a criterion but is not exactly `### UCn-ACm: Title`"));
 				}
 				continue;
 			}
-			if (entry == null || text.isEmpty() || text.startsWith("**Covers:**")) {
+			if (entry == null || text.isEmpty() || METADATA.matcher(text).find()) {
 				continue;
 			}
 			String applies = MarkdownRequirementDocument.appliesWhen(text);
