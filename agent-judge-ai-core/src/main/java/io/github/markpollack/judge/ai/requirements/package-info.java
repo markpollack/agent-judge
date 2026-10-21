@@ -27,6 +27,18 @@
  * Requirement or root voting opinions are created. Roster descriptions declare KNOWN_NONE
  * routing opinions; callers can route on the derived conclusion.
  *
+ * <h2>Document loading</h2>
+ *
+ * <p>
+ * {@link io.github.markpollack.judge.ai.requirements.Rfc2119Constraint} and
+ * {@link io.github.markpollack.judge.ai.requirements.EarsCriterion} read the Markdown
+ * documents and document their accepted layout, including the optional
+ * {@code Applies when:} entry that declares applicability. Each reader has a permissive
+ * {@code from} that logs problems and a strict {@code fromStrict} that refuses the document
+ * with a {@link io.github.markpollack.judge.ai.requirements.RequirementDocumentException}
+ * naming every {@link io.github.markpollack.judge.ai.requirements.RequirementDocumentProblem};
+ * the native requirements offer the same pair.
+ *
  * <h2>Original answers and applicability</h2>
  *
  * <p>

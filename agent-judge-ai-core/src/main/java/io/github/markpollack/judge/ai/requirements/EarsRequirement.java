@@ -47,20 +47,39 @@ public record EarsRequirement(String id, String revision, String text, EarsSpeci
 	}
 
 	/**
-	 * Reads pure native requirements from an explicitly selected source document.
+	 * Reads pure native requirements from an explicitly selected source document. Malformed
+	 * entries are left out and logged; see {@link EarsCriterion#from(java.nio.file.Path)}.
 	 * @param path source document, never loaded during judge()/vote()
 	 * @param revision caller-selected immutable revision
 	 * @return immutable declared roster
 	 */
 	public static java.util.List<EarsRequirement> from(java.nio.file.Path path, String revision) {
+		return load(path, revision, false);
+	}
+
+	/**
+	 * Reads pure native requirements from an explicitly selected source document, refusing
+	 * the document if any recognisable criterion is malformed; see
+	 * {@link EarsCriterion#fromStrict(java.nio.file.Path)}.
+	 * @param path source document, never loaded during judge()/vote()
+	 * @param revision caller-selected immutable revision
+	 * @return immutable declared roster
+	 * @throws RequirementDocumentException naming every problem with its line
+	 * @since 0.19.0
+	 */
+	public static java.util.List<EarsRequirement> fromStrict(java.nio.file.Path path, String revision) {
+		return load(path, revision, true);
+	}
+
+	private static java.util.List<EarsRequirement> load(java.nio.file.Path path, String revision, boolean strict) {
 		Requirement.requireText(revision);
 		try {
 			byte[] bytes = java.nio.file.Files.readAllBytes(path);
 			var artifact = io.github.markpollack.judge.provenance.ArtifactRef.ofBytes(path.toString(), bytes, null);
-			return EarsCriterion
-				.parseSnapshot(new String(bytes, java.nio.charset.StandardCharsets.UTF_8),
-						path.getFileName().toString())
-				.stream()
+			var parsed = EarsCriterion.parse(new String(bytes, java.nio.charset.StandardCharsets.UTF_8),
+					path.getFileName().toString());
+			var items = strict ? parsed.strict() : parsed.permissive(EarsCriterion.logger());
+			return items.stream()
 				.map(item -> new EarsRequirement(item.id(), revision, item.requirement(),
 						new EarsSpecification(item.title(), item.requirement(), item.applicability()),
 						new RequirementSource(artifact, item.id())))

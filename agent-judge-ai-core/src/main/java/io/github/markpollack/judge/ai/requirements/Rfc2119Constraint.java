@@ -10,10 +10,14 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import io.github.markpollack.judge.ai.requirements.MarkdownRequirementDocument.Line;
+import io.github.markpollack.judge.ai.requirements.MarkdownRequirementDocument.Parsed;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +46,24 @@ import org.slf4j.LoggerFactory;
  * protocol error rather than a finding, because excluding a constraint removes it from
  * the denominator and the condition for that belongs in the design rather than in an
  * answer written after the code was read.
+ *
+ * <h2>Document layout</h2>
+ *
+ * <p>
+ * A rule is a {@code ### RULE-n} (or {@code ### UCn-RULEm}) heading on its own line, followed
+ * within the same entry by one bold keyword statement, {@code **MUST** …}, and one
+ * {@code **Reason:** …} line. The entry ends at the next heading of any level or at the end
+ * of the document. Two further lines are recognised inside an entry and everything else is
+ * prose: {@code **Covers:** …} is traceability and {@code **Applies when:** condition}
+ * (also accepted without the bold) declares the optional applicability. Lines inside fenced
+ * code blocks are never read.
+ *
+ * <p>
+ * {@link #from(Path)} is permissive: an entry missing its keyword or reason is left out, and
+ * every such problem is logged at WARN. {@link #fromStrict(Path)} refuses the document
+ * instead, naming each problem by identifier and line, and {@link #problems(Path)} returns
+ * the same list without loading. An apparently complete strict load therefore has every
+ * recognisable rule in it.
  *
  * @param id the document's own identifier, such as {@code RULE-4}
  * @param keyword MUST, MUST NOT, SHOULD, SHOULD NOT or MAY
@@ -90,12 +112,20 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 	 */
 	private static final Logger logger = LoggerFactory.getLogger(Rfc2119Constraint.class);
 
+	static Logger logger() {
+		return logger;
+	}
+
 	/** {@code ### RULE-4} or {@code ### UC6-RULE1} */
 	private static final Pattern HEADING = Pattern.compile("^### ((?:UC\\d+-)?RULE-?\\d+)$");
 
 	/** {@code **MUST** protect reservation-changing transactions ...} */
 	private static final Pattern KEYWORD = Pattern
 		.compile("^\\*\\*(MUST NOT|MUST|SHOULD NOT|SHOULD|MAY)\\*\\*\\s*(.*)$");
+
+	/** A heading that looks like a rule but is not written exactly as {@link #HEADING}. */
+	private static final Pattern RULE_LIKE = Pattern.compile("^#{1,6}\\s+(?:UC\\d+-)?RULE[-_ ]?\\d+\\b.*$",
+			Pattern.CASE_INSENSITIVE);
 
 	/**
 	 * Read every constraint out of a design's {@code rules.md}.
@@ -108,42 +138,169 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 		return parseSnapshot(read(rulesFile), rulesFile.getFileName().toString());
 	}
 
-	static List<Rfc2119Constraint> parseSnapshot(String snapshot, String sourceName) {
-		List<Rfc2119Constraint> constraints = new ArrayList<>();
-		String id = null;
-		String keyword = null;
-		String requirement = null;
+	/**
+	 * Read every constraint out of a design's {@code rules.md}, refusing the document if any
+	 * recognisable rule is malformed.
+	 * @param rulesFile the design document to read
+	 * @return every constraint, in the document's order
+	 * @throws RequirementDocumentException naming each malformed heading, missing statement
+	 * or reason, duplicate identifier and invalid applicability entry, with its line
+	 * @throws java.io.UncheckedIOException if the document cannot be read
+	 * @since 0.19.0
+	 */
+	public static List<Rfc2119Constraint> fromStrict(Path rulesFile) {
+		return parse(read(rulesFile), rulesFile.getFileName().toString()).strict();
+	}
 
-		for (String line : snapshot.lines().toList()) {
-			String text = line.strip();
+	/**
+	 * Every problem a strict read of the document would report, without loading it.
+	 * @param rulesFile the design document to check
+	 * @return the problems in document order; empty when {@link #fromStrict(Path)} would
+	 * succeed
+	 * @throws java.io.UncheckedIOException if the document cannot be read
+	 * @since 0.19.0
+	 */
+	public static List<RequirementDocumentProblem> problems(Path rulesFile) {
+		return parse(read(rulesFile), rulesFile.getFileName().toString()).problems();
+	}
+
+	static List<Rfc2119Constraint> parseSnapshot(String snapshot, String sourceName) {
+		return parse(snapshot, sourceName).permissive(logger);
+	}
+
+	static Parsed<Rfc2119Constraint> parse(String snapshot, String sourceName) {
+		List<Rfc2119Constraint> constraints = new ArrayList<>();
+		List<RequirementDocumentProblem> problems = new ArrayList<>();
+		Set<String> seen = new HashSet<>();
+		Entry entry = null;
+
+		for (Line line : MarkdownRequirementDocument.lines(snapshot)) {
+			String text = line.text();
 			Matcher heading = HEADING.matcher(text);
 			if (heading.matches()) {
-				id = heading.group(1);
-				keyword = null;
-				requirement = null;
+				finish(entry, constraints, problems, seen, sourceName);
+				entry = new Entry(heading.group(1), line.number());
 				continue;
 			}
-			if (id == null) {
+			if (MarkdownRequirementDocument.isHeading(text)) {
+				finish(entry, constraints, problems, seen, sourceName);
+				entry = null;
+				if (RULE_LIKE.matcher(text).matches()) {
+					problems.add(new RequirementDocumentProblem(sourceName,
+							MarkdownRequirementDocument.headingToken(text), line.number(),
+							"heading resembles a rule but is not exactly `### RULE-n` or `### UCn-RULEm` on its own line"));
+				}
+				continue;
+			}
+			if (entry == null) {
 				continue;
 			}
 			Matcher must = KEYWORD.matcher(text);
 			if (must.matches()) {
-				keyword = must.group(1);
-				requirement = must.group(2).strip();
+				String statement = must.group(2).strip();
+				if (statement.isEmpty()) {
+					entry.problems.add(new RequirementDocumentProblem(sourceName, entry.id, line.number(),
+							"keyword `" + must.group(1) + "` without a statement after it"));
+				}
+				else if (entry.keyword != null) {
+					entry.problems.add(new RequirementDocumentProblem(sourceName, entry.id, line.number(),
+							"a second keyword statement; one obligation per heading"));
+					if (entry.reason == null) {
+						entry.keyword = must.group(1);
+						entry.requirement = statement;
+					}
+				}
+				else {
+					entry.keyword = must.group(1);
+					entry.requirement = statement;
+				}
+				continue;
 			}
-			else if (text.startsWith("**Reason:**") && requirement != null) {
-				constraints.add(new Rfc2119Constraint(id, keyword, requirement,
-						text.substring("**Reason:**".length()).strip()));
-				id = null;
-				keyword = null;
-				requirement = null;
+			if (text.startsWith("**Reason:**")) {
+				String reason = text.substring("**Reason:**".length()).strip();
+				if (reason.isEmpty()) {
+					entry.problems.add(new RequirementDocumentProblem(sourceName, entry.id, line.number(),
+							"`**Reason:**` without a reason after it"));
+				}
+				else if (entry.reason != null) {
+					entry.problems.add(new RequirementDocumentProblem(sourceName, entry.id, line.number(),
+							"a second `**Reason:**` line; one reason per rule"));
+				}
+				else {
+					entry.reason = reason;
+				}
+				continue;
+			}
+			String applies = MarkdownRequirementDocument.appliesWhen(text);
+			if (applies != null) {
+				if (applies.isEmpty()) {
+					entry.problems.add(new RequirementDocumentProblem(sourceName, entry.id, line.number(),
+							"blank `Applies when:` entry; state the condition or omit the entry"));
+				}
+				else if (entry.applicability != null) {
+					entry.problems.add(new RequirementDocumentProblem(sourceName, entry.id, line.number(),
+							"a second `Applies when:` entry; one condition per rule"));
+				}
+				else {
+					entry.applicability = applies;
+				}
 			}
 		}
+		finish(entry, constraints, problems, seen, sourceName);
 		// The denominator comes from the parser, not from the model. Logged before any
 		// answer exists, because that is what makes the roster guard meaningful.
 		logger.info("{} constraints parsed from {}", constraints.size(), sourceName);
 
-		return List.copyOf(constraints);
+		return new Parsed<>(sourceName, List.copyOf(constraints), List.copyOf(problems));
+	}
+
+	private static void finish(@Nullable Entry entry, List<Rfc2119Constraint> constraints,
+			List<RequirementDocumentProblem> problems, Set<String> seen, String sourceName) {
+		if (entry == null) {
+			return;
+		}
+		if (!seen.add(entry.id)) {
+			problems.add(new RequirementDocumentProblem(sourceName, entry.id, entry.line,
+					"duplicate identifier; an earlier heading already declared it"));
+		}
+		String keyword = entry.keyword;
+		String requirement = entry.requirement;
+		String reason = entry.reason;
+		if (keyword == null || requirement == null) {
+			problems.add(new RequirementDocumentProblem(sourceName, entry.id, entry.line,
+					"no bold RFC2119 keyword statement (`**MUST** …`) before the next heading or the end of the document"));
+		}
+		if (reason == null) {
+			problems.add(new RequirementDocumentProblem(sourceName, entry.id, entry.line,
+					"no `**Reason:**` line before the next heading or the end of the document"));
+		}
+		problems.addAll(entry.problems);
+		if (keyword != null && requirement != null && reason != null) {
+			constraints.add(new Rfc2119Constraint(entry.id, keyword, requirement, reason, entry.applicability));
+		}
+	}
+
+	/** One rule entry while its lines are being read. */
+	private static final class Entry {
+
+		private final String id;
+
+		private final int line;
+
+		private @Nullable String keyword;
+
+		private @Nullable String requirement;
+
+		private @Nullable String reason;
+
+		private @Nullable String applicability;
+
+		private final List<RequirementDocumentProblem> problems = new ArrayList<>();
+
+		private Entry(String id, int line) {
+			this.id = id;
+			this.line = line;
+		}
 	}
 
 	/**

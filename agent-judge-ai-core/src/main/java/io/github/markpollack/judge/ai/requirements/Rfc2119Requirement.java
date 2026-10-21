@@ -49,22 +49,44 @@ public record Rfc2119Requirement(String id, String revision, String text, Rfc211
 	}
 
 	/**
-	 * Reads pure native requirements from an explicitly selected source document.
+	 * Reads pure native requirements from an explicitly selected source document. Malformed
+	 * entries are left out and logged; see {@link Rfc2119Constraint#from(java.nio.file.Path)}.
 	 * @param path source document, never loaded during judge()/vote()
 	 * @param revision caller-selected immutable revision
 	 * @return immutable declared roster
 	 */
 	public static java.util.List<Rfc2119Requirement> from(java.nio.file.Path path, String revision) {
+		return load(path, revision, false);
+	}
+
+	/**
+	 * Reads pure native requirements from an explicitly selected source document, refusing
+	 * the document if any recognisable rule is malformed; see
+	 * {@link Rfc2119Constraint#fromStrict(java.nio.file.Path)}.
+	 * @param path source document, never loaded during judge()/vote()
+	 * @param revision caller-selected immutable revision
+	 * @return immutable declared roster
+	 * @throws RequirementDocumentException naming every problem with its line
+	 * @since 0.19.0
+	 */
+	public static java.util.List<Rfc2119Requirement> fromStrict(java.nio.file.Path path, String revision) {
+		return load(path, revision, true);
+	}
+
+	private static java.util.List<Rfc2119Requirement> load(java.nio.file.Path path, String revision, boolean strict) {
 		Requirement.requireText(revision);
 		try {
 			byte[] bytes = java.nio.file.Files.readAllBytes(path);
 			var artifact = io.github.markpollack.judge.provenance.ArtifactRef.ofBytes(path.toString(), bytes, null);
-			return Rfc2119Constraint
-				.parseSnapshot(new String(bytes, java.nio.charset.StandardCharsets.UTF_8),
-						path.getFileName().toString())
-				.stream()
+			var parsed = Rfc2119Constraint.parse(new String(bytes, java.nio.charset.StandardCharsets.UTF_8),
+					path.getFileName().toString());
+			var items = strict ? parsed.strict() : parsed.permissive(Rfc2119Constraint.logger());
+			// The native specification carries the complete obligation; title() is a display
+			// label and must never stand in for it.
+			return items.stream()
 				.map(item -> new Rfc2119Requirement(item.id(), revision, item.asPrompt(),
-						new Rfc2119Specification(item.keyword(), item.title(), item.reason(), item.applicability()),
+						new Rfc2119Specification(item.keyword(), item.requirement(), item.reason(),
+								item.applicability()),
 						new RequirementSource(artifact, item.id())))
 				.toList();
 		}
