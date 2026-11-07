@@ -160,6 +160,9 @@ public final class Assertions {
 
 		private @Nullable Error fatal;
 
+		/** Private, so caller code that synchronizes on a stage cannot block it. */
+		private final Object lock = new Object();
+
 		private LiveStage(Supplier<EvaluationResult> execution, @Nullable Policy policy) {
 			this(execution, policy, null);
 		}
@@ -177,7 +180,7 @@ public final class Assertions {
 		 * @return configured branch
 		 * @throws IllegalStateException after execution
 		 */
-		public synchronized LiveStage withPolicy(Policy policy) {
+		public LiveStage withPolicy(Policy policy) {
 			requireUnexecuted();
 			return new LiveStage(execution, Objects.requireNonNull(policy));
 		}
@@ -188,42 +191,47 @@ public final class Assertions {
 		 * @param attribution immutable complete caller attribution
 		 * @return attributed live branch
 		 */
-		public synchronized LiveStage withPolicy(Policy policy, PolicyAttribution attribution) {
+		public LiveStage withPolicy(Policy policy, PolicyAttribution attribution) {
 			requireUnexecuted();
 			return new LiveStage(execution, Objects.requireNonNull(policy), Objects.requireNonNull(attribution));
 		}
 
 		final void requireUnexecuted() {
-			if (attempted)
-				throw new IllegalStateException(
-						"Evaluation already completed; apply policy explicitly to its retained Verdict");
+			synchronized (lock) {
+				if (attempted)
+					throw new IllegalStateException(
+							"Evaluation already completed; apply policy explicitly to its retained Verdict");
+			}
 		}
 
 		/**
 		 * Executes once, then returns the original cached evaluation.
 		 * @return retained original evaluation
 		 */
-		public synchronized EvaluationResult evaluate() {
-			if (!attempted) {
-				attempted = true;
-				try {
-					EvaluationResult completed = Objects.requireNonNull(execution.get());
-					result = policy == null ? completed : Evaluations.apply(completed.verdict(), policy, attribution);
+		public EvaluationResult evaluate() {
+			synchronized (lock) {
+				if (!attempted) {
+					attempted = true;
+					try {
+						EvaluationResult completed = Objects.requireNonNull(execution.get());
+						result = policy == null ? completed
+								: Evaluations.apply(completed.verdict(), policy, attribution);
+					}
+					catch (RuntimeException problem) {
+						failure = problem;
+						throw problem;
+					}
+					catch (Error problem) {
+						fatal = problem;
+						throw problem;
+					}
 				}
-				catch (RuntimeException problem) {
-					failure = problem;
-					throw problem;
-				}
-				catch (Error problem) {
-					fatal = problem;
-					throw problem;
-				}
+				if (failure != null)
+					throw failure;
+				if (fatal != null)
+					throw fatal;
+				return Objects.requireNonNull(result);
 			}
-			if (failure != null)
-				throw failure;
-			if (fatal != null)
-				throw fatal;
-			return Objects.requireNonNull(result);
 		}
 
 		/** Requires PASS and successful RELY when a policy was selected. */
@@ -253,14 +261,14 @@ public final class Assertions {
 		}
 
 		@Override
-		public synchronized SatisfactionStage withPolicy(Policy policy, PolicyAttribution attribution) {
+		public SatisfactionStage withPolicy(Policy policy, PolicyAttribution attribution) {
 			requireUnexecuted();
 			return new SatisfactionStage(execution, Objects.requireNonNull(policy),
 					Objects.requireNonNull(attribution));
 		}
 
 		@Override
-		public synchronized SatisfactionStage withPolicy(Policy policy) {
+		public SatisfactionStage withPolicy(Policy policy) {
 			requireUnexecuted();
 			return new SatisfactionStage(execution, Objects.requireNonNull(policy));
 		}
