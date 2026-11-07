@@ -302,7 +302,7 @@ public final class ResultJson {
 			if (rejection == null || rejection.refusedReturn() == null)
 				continue;
 			RefusedReturn refusal = rejection.refusedReturn();
-			if (refusal.original() == individual.get(i) || !refusal.original().equals(individual.get(i)))
+			if (!refusal.original().equals(individual.get(i)))
 				continue;
 			var joined = new Judgment(rejection.producerStatus(), rejection.finding(), rejection.confidence(),
 					rejection.probabilityDistribution(), rejection.reasonCode(), rejection.reasoning(), rejection.checks(),

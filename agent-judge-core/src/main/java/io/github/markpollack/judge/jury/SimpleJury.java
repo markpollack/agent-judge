@@ -512,15 +512,16 @@ public class SimpleJury implements VotingJury {
 				io.github.markpollack.judge.judgment.JudgmentBounds.validate(raw, 0, raw);
 			if (raw != null && raw.refusedReturn() != null)
 				return new Invocation(raw, false, null, raw.refusedReturn().original());
-			Judgment judgment = guardExclusion(index, name, raw);
-			if (judgment == null) {
+			if (raw == null) {
 				logger.log(System.Logger.Level.WARNING,
 						"Judge {0} returned no judgment; recording an ERROR for the error policy to resolve", name);
 				return new Invocation(
 						Judgment.error(JudgmentReasonCode.JUDGE_FAILED, "Judge '" + name + "' returned no judgment"),
 						false);
 			}
-			return new Invocation(judgment, judgment == raw, null, judgment == raw ? null : raw);
+			Judgment rejection = undeclaredExclusion(index, name, raw);
+			return rejection == null ? new Invocation(raw, true, null, null)
+					: new Invocation(rejection, false, null, raw);
 		}
 		catch (Exception ex) {
 			io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
@@ -554,13 +555,14 @@ public class SimpleJury implements VotingJury {
 	 * </p>
 	 * @param index the seat's position
 	 * @param name the seat's verdict key
-	 * @param judgment the judge's result, possibly null
-	 * @return the judgment, or the error that replaces an undeclared exclusion
+	 * @param judgment the judge's returned result
+	 * @return the error that replaces an undeclared exclusion, or {@code null} when the
+	 * judgment stands
 	 */
-	private Judgment guardExclusion(int index, String name, Judgment judgment) {
-		if (judgment == null || judgment.status() != JudgmentStatus.NOT_APPLICABLE
-				|| declaredCapabilities.get(index) != null) {
-			return judgment;
+	private @org.jspecify.annotations.Nullable Judgment undeclaredExclusion(int index, String name,
+			Judgment judgment) {
+		if (judgment.status() != JudgmentStatus.NOT_APPLICABLE || declaredCapabilities.get(index) != null) {
+			return null;
 		}
 		String reasoning = "Judge '" + name + "' returned NOT_APPLICABLE without declaring that it may exclude a "
 				+ "subject, so the exclusion is not honoured: " + judgment.reasoning();
