@@ -190,7 +190,8 @@ objects carry no custom engine annotations. Raw POJO mapper binding is not the s
 contract. Low-level Jackson users must explicitly register `ResultJson.module()`;
 the codec configures strict parsing and native specification registration.
 
-Generated evaluation uses `EvalModel`, a specialization of the typed `EvalRuntime<Q,A>` port.
+Generated evaluation uses `EvalModel`, a generated-answer harness whose `execute` returns the same
+`NativeExecution` shape as the typed `EvalRuntime<Q,A>` port; it is not itself an `EvalRuntime`.
 Every direct execution is fresh; one execution can contain several backend model/tool calls.
 Configured runtimes carry their own tools, advisors and permissions. Deterministic Judges
 need no runtime. When reusing a runtime across parallel seats, its implementation must be

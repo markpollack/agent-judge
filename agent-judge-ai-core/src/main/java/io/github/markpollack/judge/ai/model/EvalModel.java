@@ -21,8 +21,7 @@ package io.github.markpollack.judge.ai.model;
  * @since 0.10.0
  */
 @FunctionalInterface
-public interface EvalModel
-		extends io.github.markpollack.judge.execution.EvalRuntime<EvalModelRequest, EvalModelResponse> {
+public interface EvalModel {
 
 	/**
 	 * Generate a response from the model.
@@ -104,7 +103,6 @@ public interface EvalModel
 	 * @param request exact supported request
 	 * @return original answer and portable invocation observations
 	 */
-	@Override
 	default io.github.markpollack.judge.execution.NativeExecution<EvalModelResponse> execute(EvalModelRequest request) {
 		validateRequest(request);
 		if (Thread.currentThread().isInterrupted())

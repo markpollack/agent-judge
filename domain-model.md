@@ -87,7 +87,7 @@ classDiagram
     Jury <|.. CascadedJury
     Jury <|.. Rfc2119Jury
     Jury <|.. EarsJury
-    EvalRuntime <|-- EvalModel
+    EvalModel --> NativeExecution
     EvalRuntime --> NativeExecution
     NativeExecution --> Invocation
     Rfc2119Judge --> EvalRuntime
