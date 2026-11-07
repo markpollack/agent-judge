@@ -73,8 +73,8 @@ public class TextFileJudge extends DeterministicJudge<FileComparison> {
 	}
 
 	private String generateDiff(String expected, String actual) {
-		String[] expectedLines = expected.split("\n");
-		String[] actualLines = actual.split("\n");
+		String[] expectedLines = expected.lines().toArray(String[]::new);
+		String[] actualLines = actual.lines().toArray(String[]::new);
 
 		StringBuilder diff = new StringBuilder();
 		int maxLines = Math.max(expectedLines.length, actualLines.length);
