@@ -59,7 +59,7 @@ public class FileContentJudge extends DeterministicJudge<Path> {
 	public FileContentJudge(java.util.function.Supplier<? extends Path> source, String filePath, String expectedContent,
 			MatchMode matchMode) {
 		super(source, "FileContentJudge",
-				String.format("Verifies file content at %s (%s match)", filePath, matchMode.name().toLowerCase()));
+				String.format("Verifies file content at %s (%s match)", filePath, matchMode.name().toLowerCase(java.util.Locale.ROOT)));
 		this.filePath = filePath;
 		this.expectedContent = expectedContent;
 		this.matchMode = matchMode;
@@ -126,8 +126,8 @@ public class FileContentJudge extends DeterministicJudge<Path> {
 		};
 
 		return (matches ? Judgment.builder().pass() : Judgment.builder().fail())
-			.reasoning(matches ? String.format("Content %s matches in %s", matchMode.name().toLowerCase(), filePath)
-					: String.format("Content does not %s match in %s", matchMode.name().toLowerCase(), filePath))
+			.reasoning(matches ? String.format("Content %s matches in %s", matchMode.name().toLowerCase(java.util.Locale.ROOT), filePath)
+					: String.format("Content does not %s match in %s", matchMode.name().toLowerCase(java.util.Locale.ROOT), filePath))
 			.check(Check.pass("file_exists", "File found"))
 			.check(Check.pass("file_readable", "File readable"))
 			.check(matches ? Check.pass("content_match", String.format("%s match successful", matchMode))

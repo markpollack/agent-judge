@@ -195,7 +195,7 @@ public final class SpringAiCompletionEvidenceBuilder {
 		if (reason == null) {
 			return CompletionStatus.UNKNOWN;
 		}
-		return switch (reason.toLowerCase()) {
+		return switch (reason.toLowerCase(java.util.Locale.ROOT)) {
 			case "stop" -> CompletionStatus.SUCCESS;
 			case "tool_calls" -> CompletionStatus.SUCCESS;
 			case "length" -> CompletionStatus.SUCCESS;

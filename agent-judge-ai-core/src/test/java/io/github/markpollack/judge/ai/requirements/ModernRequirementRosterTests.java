@@ -127,6 +127,26 @@ class ModernRequirementRosterTests {
 
 	@ParameterizedTest
 	@EnumSource(Kind.class)
+	void observationsAreReadTheSameUnderEveryDefaultLocale(Kind kind) {
+		String text = COMPLETE + "\nObservation R-1: an aside at Foo.java:10";
+		java.util.Locale original = java.util.Locale.getDefault();
+		try {
+			for (java.util.Locale locale : List.of(java.util.Locale.ROOT, java.util.Locale.forLanguageTag("tr"))) {
+				java.util.Locale.setDefault(locale);
+				io.github.markpollack.judge.verdict.Verdict result = audit(kind, text);
+				assertThat(java.util.stream.Stream.concat(java.util.stream.Stream.of(result.judgment()),
+						result.individual().stream())
+					.flatMap(judgment -> Observation.of(judgment).stream())
+					.map(Observation::requirementId)).as(locale.toString()).contains("R-1");
+			}
+		}
+		finally {
+			java.util.Locale.setDefault(original);
+		}
+	}
+
+	@ParameterizedTest
+	@EnumSource(Kind.class)
 	void duplicateConfigurationIsRejectedBeforeCallingTheBackend(Kind kind) {
 		AtomicInteger calls = new AtomicInteger();
 		assertThatThrownBy(() -> configured(kind, List.of("R-1", "R-1"), request -> {

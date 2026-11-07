@@ -382,7 +382,7 @@ final class Rfc2119Parser {
 	private static List<Observation> observations(String text, Set<String> roster) {
 		List<Observation> found = new ArrayList<>();
 		for (String line : text.lines().map(String::strip).toList()) {
-			if (!line.toUpperCase().startsWith("OBSERVATION")) {
+			if (!line.toUpperCase(java.util.Locale.ROOT).startsWith("OBSERVATION")) {
 				continue;
 			}
 			int colon = line.indexOf(':');
