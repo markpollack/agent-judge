@@ -79,15 +79,15 @@ final class ObservedHttpClient extends HttpClient {
 
 		private final boolean cancelled;
 
-		Snapshot(byte[] request, byte @Nullable [] response, @Nullable String requestId, int attempts, int status,
-				long elapsedNanos, boolean cancelled) {
-			this.request = request.clone();
-			this.response = response == null ? null : response.clone();
-			this.requestId = requestId;
-			this.attempts = attempts;
-			this.status = status;
-			this.elapsedNanos = elapsedNanos;
-			this.cancelled = cancelled;
+		/** Copies the client's state; the caller holds the client's lock. */
+		Snapshot(ObservedHttpClient client) {
+			this.request = client.requestBytes.toByteArray();
+			this.response = client.responseBytes == null ? null : client.responseBytes.clone();
+			this.requestId = client.requestId;
+			this.attempts = client.attempts;
+			this.status = client.status;
+			this.elapsedNanos = client.elapsed;
+			this.cancelled = client.cancelled;
 		}
 
 		byte[] request() {
@@ -122,8 +122,7 @@ final class ObservedHttpClient extends HttpClient {
 
 	Snapshot snapshot() {
 		synchronized (lock) {
-			return new Snapshot(requestBytes.toByteArray(), responseBytes == null ? null : responseBytes.clone(),
-					requestId, attempts, status, elapsed, cancelled);
+			return new Snapshot(this);
 		}
 	}
 
@@ -192,64 +191,66 @@ final class ObservedHttpClient extends HttpClient {
 				return super.cancel(mayInterrupt);
 			}
 		};
-		// The callback completes the exposed future on every outcome, fatal errors included, so
-		// the callback's own future carries nothing a caller needs.
-		var unused = source.whenComplete((response, failure) -> {
-			try {
-				if (failure != null) {
-					finish(false);
-					try {
-						io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
-					}
-					catch (io.github.markpollack.judge.portable.PreservationLimitException limitFailure) {
-						result.completeExceptionally(limitFailure);
-						return;
-					}
-					result.completeExceptionally(new IOException("HTTP transport failed"));
-					return;
-				}
-				try {
-					synchronized (lock) {
-						if (ended)
-							return;
-						if (!(response.body() instanceof byte[] body) || body.length > limit)
-							throw new IllegalArgumentException("Bounded byte response required");
-						responseBytes = body.clone();
-						status = response.statusCode();
-						requestId = response.headers().firstValue("x-typesafe-request-id").orElse(null);
-						// Publish validated facts atomically before completion or
-						// cancellation can
-						// expose a snapshot. Never apply SDK defaults to an unchecked
-						// original.
-						if (response.statusCode() >= 200 && response.statusCode() < 300)
-							validate.accept(body);
-						finish(false);
-					}
-					result.complete(response);
-				}
-				catch (RuntimeException e) {
-					finish(false);
-					try {
-						io.github.markpollack.judge.portable.PreservationLimitException.propagate(e);
-					}
-					catch (io.github.markpollack.judge.portable.PreservationLimitException limitFailure) {
-						result.completeExceptionally(limitFailure);
-						return;
-					}
-					result.completeExceptionally(new IOException("Invalid provider response"));
-				}
-			}
-			catch (Error fatal) {
-				// The callback's own future is not exposed, so a fatal error thrown here
-				// reaches the caller only through the exposed future.
-				finish(false);
-				result.completeExceptionally(fatal);
-			}
-			finally {
-				observed.complete(null);
-			}
-		});
+		// complete(...) settles the exposed future on every outcome, fatal errors included,
+		// so the callback's own future carries nothing a caller needs.
+		var unused = source.whenComplete((response, failure) -> complete(result, response, failure));
 		return result;
+	}
+
+	private <T> void complete(CompletableFuture<HttpResponse<T>> result, @Nullable HttpResponse<T> response,
+			@Nullable Throwable failure) {
+		try {
+			if (failure != null) {
+				finish(false);
+				result.completeExceptionally(refusal(failure, "HTTP transport failed"));
+				return;
+			}
+			accept(result, java.util.Objects.requireNonNull(response));
+		}
+		catch (Error fatal) {
+			// The callback's own future is not exposed, so a fatal error thrown here
+			// reaches the caller only through the exposed future.
+			finish(false);
+			result.completeExceptionally(fatal);
+		}
+		finally {
+			observed.complete(null);
+		}
+	}
+
+	private <T> void accept(CompletableFuture<HttpResponse<T>> result, HttpResponse<T> response) {
+		try {
+			synchronized (lock) {
+				if (ended)
+					return;
+				if (!(response.body() instanceof byte[] body) || body.length > limit)
+					throw new IllegalArgumentException("Bounded byte response required");
+				responseBytes = body.clone();
+				status = response.statusCode();
+				requestId = response.headers().firstValue("x-typesafe-request-id").orElse(null);
+				// Publish validated facts atomically before completion or cancellation can
+				// expose a snapshot. Never apply SDK defaults to an unchecked original.
+				if (response.statusCode() >= 200 && response.statusCode() < 300)
+					validate.accept(body);
+				finish(false);
+			}
+			result.complete(response);
+		}
+		catch (RuntimeException e) {
+			finish(false);
+			result.completeExceptionally(refusal(e, "Invalid provider response"));
+		}
+	}
+
+	/** A preservation refusal keeps its original; any other failure is reported without detail. */
+	private static Throwable refusal(Throwable failure, String message) {
+		try {
+			io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
+		}
+		catch (io.github.markpollack.judge.portable.PreservationLimitException limitFailure) {
+			return limitFailure;
+		}
+		return new IOException(message);
 	}
 
 	private byte[] requestBody(HttpRequest.BodyPublisher publisher) {
