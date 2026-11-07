@@ -205,12 +205,8 @@ public final class EarsJury implements Jury {
 		@Override
 		public io.github.markpollack.judge.jury.ReadyJury evidenceSupplier(Supplier<? extends E> evidence) {
 			Objects.requireNonNull(evidence);
-			return () -> new EarsJury(requirements, () -> {
-				E value = Objects.requireNonNull(evidence.get(), "acquired evidence");
-				Map<String, E> values = new LinkedHashMap<>();
-				requirements.forEach(req -> values.put(req.id(), value));
-				return structured(values);
-			});
+			return () -> new EarsJury(requirements, () -> structured(
+					RosterJuries.common(requirements, Objects.requireNonNull(evidence.get(), "acquired evidence"))));
 		}
 
 		/**
@@ -235,139 +231,28 @@ public final class EarsJury implements Jury {
 		}
 
 		private Map<String, E> checked(Map<String, ? extends E> values) {
-			Objects.requireNonNull(values, "evidence map");
-			Set<String> ids = new LinkedHashSet<>();
-			requirements.forEach(req -> ids.add(req.id()));
-			if (!ids.equals(values.keySet()))
-				throw new IllegalArgumentException("Evidence must cover exactly the declared roster");
-			Map<String, E> copy = new LinkedHashMap<>();
-			requirements
-				.forEach(req -> copy.put(req.id(), Objects.requireNonNull(values.get(req.id()), "item evidence")));
-			return Collections.unmodifiableMap(copy);
+			return RosterJuries.checked(requirements, values);
 		}
 
 		private Verdict structured(Map<String, E> evidence) {
-			List<CompositeAttempt> attempts = new ArrayList<>();
-			List<io.github.markpollack.judge.provenance.Invocation> invocations = new ArrayList<>();
-			Set<String> nativeIds = new HashSet<>();
-			for (var req : requirements) {
-				try {
-					var result = Objects.requireNonNull(
-							runtime.execute(new RequirementRequest<>(req, evidence.get(req.id()))), "native result");
-					if (!nativeIds.add(result.invocation().id()))
-						throw new IllegalArgumentException(
-								"Native execution reused invocation identity: " + result.invocation().id());
-					invocations.add(result.invocation());
-					Judgment associated = result.answer();
-					invocations.addAll(associated.invocations());
-					var references = new LinkedHashSet<>(associated.invocationIds());
-					associated.invocations().forEach(nativeFact -> references.add(nativeFact.id()));
-					references.add(result.invocation().id());
-					Judgment original = associated.withInvocationIds(new ArrayList<>(references));
-					try {
-						attempts.add(CompositeAttempt.used(req.id(), CompositeRelation.ROSTER_ITEM, null,
-								child(req, original.forRequirement(req))));
-					}
-					catch (IllegalArgumentException rejected) {
-						io.github.markpollack.judge.portable.PreservationLimitException.propagate(rejected);
-						// The native call returned. Preserve its actual association and
-						// observations without claiming an invocation failure or
-						// violation.
-						Verdict unbound = Verdict.observed(req.id(), original, req.specification().applicability());
-						if (original.requirement() != null)
-							unbound = unbound.forRequirement(original.requirement());
-						attempts.add(CompositeAttempt.stageFailed(req.id(), CompositeRelation.ROSTER_ITEM, null,
-								DispositionReason.PROTOCOL_UNBOUND, unbound));
-					}
-				}
-				catch (java.util.concurrent.CancellationException cancellation) {
-					throw cancellation;
-				}
-				catch (RuntimeException failure) {
-					io.github.markpollack.judge.portable.PreservationLimitException.propagate(failure);
-					if (Thread.currentThread().isInterrupted())
-						throw new java.util.concurrent.CancellationException("Roster interrupted");
-					attempts.add(CompositeAttempt.executionFailed(req.id(), CompositeRelation.ROSTER_ITEM, null,
-							new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED, failure)));
-				}
-			}
-			Map<String, io.github.markpollack.judge.provenance.Invocation> unique = new LinkedHashMap<>();
-			for (var observed : invocations) {
-				var previous = unique.putIfAbsent(observed.id(), observed);
-				if (previous != null && !previous.equals(observed))
-					throw new IllegalArgumentException("Conflicting native invocation identity: " + observed.id());
-			}
-			return complete(requirements, attempts, List.copyOf(unique.values()), Map.of());
+			return RosterJuries.structured(requirements, runtime, evidence, EarsSpecification::applicability);
 		}
 
 	}
 
-	private static List<Requirement<EarsSpecification>> snapshot(
-			List<? extends Requirement<EarsSpecification>> source) {
-		List<Requirement<EarsSpecification>> roster = List.copyOf(source);
-		new AuditJuryDescription("Ears", new ArrayList<Requirement<?>>(roster), false);
-		roster.forEach(q -> NamedJury.requireValidName(q.id()));
-		return roster;
+	private static List<Requirement<EarsSpecification>> snapshot(List<? extends Requirement<EarsSpecification>> source) {
+		return RosterJuries.snapshot("Ears", source);
 	}
 
-	private static Verdict child(Requirement<EarsSpecification> req, Judgment original) {
-		return Verdict.observed(req.id(), original, req.specification().applicability()).forRequirement(req);
-	}
-
-	private static Verdict generated(EvalModel runtime, List<Requirement<EarsSpecification>> requirements,
-			String input) {
+	private static Verdict generated(EvalModel runtime, List<Requirement<EarsSpecification>> requirements, String input) {
 		List<EarsCriterion> nativeRoster = requirements.stream()
 			.map(req -> new EarsCriterion(req.id(), req.specification().title(), req.specification().requirement(),
 					req.specification().applicability()))
 			.toList();
 		String prompt = EarsParser.templateFor("Ears roster", nativeRoster).render(Map.of("workspace", input));
-		var result = runtime.execute(EvalModelRequest
-			.user(requirements.stream().map(RequirementPrompts::header).collect(java.util.stream.Collectors.joining())
-					+ prompt));
-		Judgment parsed = EarsParser.rollupFor(nativeRoster, result.answer());
-		boolean bound = Boolean.TRUE.equals(parsed.metadata().get("protocolIdentityBound"));
-		List<CompositeAttempt> attempts = new ArrayList<>();
-		for (int i = 0; i < requirements.size(); i++) {
-			var req = requirements.get(i);
-			Judgment original = parsed.checks()
-				.get(i)
-				.judgment()
-				.forRequirement(req)
-				.withInvocationIds(List.of(result.invocation().id()));
-			Verdict child = child(req, original);
-			attempts.add(bound ? CompositeAttempt.used(req.id(), CompositeRelation.ROSTER_ITEM, null, child)
-					: CompositeAttempt.stageFailed(req.id(), CompositeRelation.ROSTER_ITEM, null,
-							DispositionReason.PROTOCOL_UNBOUND, child));
-		}
-		return complete(requirements, attempts, List.of(result.invocation()), parsed.metadata());
-	}
-
-	private static Verdict complete(List<Requirement<EarsSpecification>> roster, List<CompositeAttempt> attempts,
-			List<io.github.markpollack.judge.provenance.Invocation> invocations, Map<String, Object> facts) {
-		boolean failed = false, incomplete = false, applicable = false;
-		for (var attempt : attempts) {
-			if (attempt.disposition() != AttemptDisposition.USED) {
-				incomplete = true;
-				continue;
-			}
-			var c = Objects.requireNonNull(attempt.verdict()).conclusion();
-			failed |= c == Verdict.Conclusion.FAIL;
-			applicable |= c != Verdict.Conclusion.NOT_APPLICABLE;
-			incomplete |= c != Verdict.Conclusion.PASS && c != Verdict.Conclusion.NOT_APPLICABLE;
-		}
-		Judgment collective = failed ? Judgment.fail("An established roster requirement was violated")
-				: incomplete ? Judgment.abstain("Not every applicable declared requirement was established")
-						: applicable ? Judgment.pass("Every applicable declared requirement passed")
-								: Judgment.notApplicable("Every declared requirement was justifiably excluded");
-		collective = collective.toBuilder().metadata(facts).build();
-		return Verdict.advancedBuilder()
-			.judgment(collective)
-			.roster(roster)
-			.declaredCardinality(roster.size())
-			.invocations(invocations)
-			.compositeAttempts(attempts)
-			.provenance(new VerdictProvenance(VerdictProvenanceKind.ROSTER, null, null))
-			.build();
+		var result = runtime.execute(RosterJuries.request(requirements, prompt));
+		return RosterJuries.generated(requirements, EarsParser.rollupFor(nativeRoster, result.answer()), result,
+				EarsSpecification::applicability);
 	}
 
 }
