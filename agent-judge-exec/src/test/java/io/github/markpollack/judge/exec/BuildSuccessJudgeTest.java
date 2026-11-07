@@ -22,6 +22,43 @@ class BuildSuccessJudgeTest {
 	@TempDir
 	Path tempDir;
 
+	/**
+	 * Every public static factory reachable through {@code BuildSuccessJudge} must produce
+	 * a build judge with the 10-minute build timeout. A factory inherited from another
+	 * class would compile at {@code BuildSuccessJudge.builder(...)} and silently return a
+	 * plain command judge with a 2-minute timeout.
+	 */
+	@Test
+	void everyReachableFactoryBuildsABuildJudgeWithTheBuildTimeout() throws Exception {
+		var factories = java.util.Arrays.stream(BuildSuccessJudge.class.getMethods())
+			.filter(m -> java.lang.reflect.Modifier.isStatic(m.getModifiers()))
+			.filter(m -> io.github.markpollack.judge.construction.EvidenceStep.class.isAssignableFrom(m.getReturnType()))
+			.toList();
+		assertThat(factories).extracting(java.lang.reflect.Method::getName)
+			.containsExactlyInAnyOrder("builder", "maven", "gradle");
+		for (var factory : factories) {
+			Object[] args = java.util.Arrays.stream(factory.getParameterTypes()).map(type -> {
+				if (type == String.class)
+					return "true";
+				if (type == String[].class)
+					return new String[] { "--version" };
+				if (type == int.class)
+					return 0;
+				if (type == java.time.Duration.class)
+					return java.time.Duration.ofMinutes(10);
+				if (type == java.util.function.Function.class)
+					return (java.util.function.Function<Path, io.github.markpollack.sandbox.Sandbox>) io.github.markpollack.sandbox.LocalSandbox::new;
+				throw new AssertionError("Unhandled parameter type " + type + " in " + factory);
+			}).toArray();
+			var step = (io.github.markpollack.judge.construction.EvidenceStep<?>) factory.invoke(null, args);
+			@SuppressWarnings("unchecked")
+			var judge = ((io.github.markpollack.judge.construction.EvidenceStep<Path>) step).evidence(tempDir).build();
+			assertThat(judge).as(factory.toString()).isInstanceOf(BuildSuccessJudge.class);
+			assertThat(((BuildSuccessJudge) judge).getTimeout()).as(factory.toString())
+				.isEqualTo(java.time.Duration.ofMinutes(10));
+		}
+	}
+
 	@Test
 	void customBuildCommandExecutes() {
 		io.github.markpollack.judge.construction.EvidenceStep<Path> judge = BuildSuccessJudge

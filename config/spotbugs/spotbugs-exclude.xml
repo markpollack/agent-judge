@@ -46,18 +46,4 @@
         <Bug pattern="BC_IMPOSSIBLE_INSTANCEOF"/>
     </Match>
 
-    <!--
-      HSM_HIDING_METHOD (rank 7), 2026-11-07. BuildSuccessJudge.builder(String) deliberately hides
-      CommandJudge.builder(String): it configures the 10-minute build timeout and expected exit 0,
-      where the hidden method gives a plain CommandJudge with a 2-minute timeout. Removing or renaming
-      it would make BuildSuccessJudge.builder(String) silently resolve to the hidden method. The
-      remaining hazard, CommandJudge's inherited multi-argument builders reachable through
-      BuildSuccessJudge, is not this pattern and is filed as an API change for the Owner.
-    -->
-    <Match>
-        <Class name="io.github.markpollack.judge.exec.BuildSuccessJudge"/>
-        <Method name="builder" params="java.lang.String"/>
-        <Bug pattern="HSM_HIDING_METHOD"/>
-    </Match>
-
 </FindBugsFilter>
