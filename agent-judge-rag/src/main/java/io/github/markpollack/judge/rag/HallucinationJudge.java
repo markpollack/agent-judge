@@ -5,7 +5,6 @@
 
 package io.github.markpollack.judge.rag;
 
-import java.util.Optional;
 
 import io.github.markpollack.judge.llm.LLMJudge;
 import io.github.markpollack.judge.judgment.Judgment;
@@ -63,13 +62,9 @@ public class HallucinationJudge extends LLMJudge<RagEvidence> {
 
 	@Override
 	protected Judgment evaluate(RagEvidence context) {
-		Optional<String> ctx = java.util.Optional.of(context.retrievedContext()).filter(value -> !value.isBlank());
-		Optional<String> ans = java.util.Optional.of(context.answer()).filter(value -> !value.isBlank());
-		if (ctx.isEmpty()) {
-			return Judgment.abstain("No context provided — cannot detect hallucinations");
-		}
-		if (ans.isEmpty()) {
-			return Judgment.abstain("No answer provided — cannot detect hallucinations");
+		Judgment missing = RagInputs.missing(context, "detect hallucinations");
+		if (missing != null) {
+			return missing;
 		}
 		return super.evaluate(context);
 	}
@@ -77,10 +72,8 @@ public class HallucinationJudge extends LLMJudge<RagEvidence> {
 	@Override
 	protected String buildPrompt(RagEvidence context) {
 		String question = context.question();
-		String retrievedContext = java.util.Optional.of(context.retrievedContext())
-			.filter(value -> !value.isBlank())
-			.orElse("");
-		String answer = java.util.Optional.of(context.answer()).filter(value -> !value.isBlank()).orElse("");
+		String retrievedContext = RagInputs.shown(context.retrievedContext());
+		String answer = RagInputs.shown(context.answer());
 
 		return String.format("""
 				Begin your response with the line "Answer: YES" or "Answer: NO".
