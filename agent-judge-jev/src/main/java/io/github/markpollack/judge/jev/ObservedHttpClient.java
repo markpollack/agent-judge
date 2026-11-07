@@ -59,8 +59,65 @@ final class ObservedHttpClient extends HttpClient {
 		this.validate = validate;
 	}
 
-	record Snapshot(byte[] request, byte @Nullable [] response, @Nullable String requestId, int attempts, int status,
-			long elapsedNanos, boolean cancelled) {
+	/**
+	 * What one observed exchange recorded. A class, not a record: it holds byte arrays,
+	 * which a record would compare by reference. Each accessor returns a copy.
+	 */
+	static final class Snapshot {
+
+		private final byte[] request;
+
+		private final byte @Nullable [] response;
+
+		private final @Nullable String requestId;
+
+		private final int attempts;
+
+		private final int status;
+
+		private final long elapsedNanos;
+
+		private final boolean cancelled;
+
+		Snapshot(byte[] request, byte @Nullable [] response, @Nullable String requestId, int attempts, int status,
+				long elapsedNanos, boolean cancelled) {
+			this.request = request.clone();
+			this.response = response == null ? null : response.clone();
+			this.requestId = requestId;
+			this.attempts = attempts;
+			this.status = status;
+			this.elapsedNanos = elapsedNanos;
+			this.cancelled = cancelled;
+		}
+
+		byte[] request() {
+			return request.clone();
+		}
+
+		byte @Nullable [] response() {
+			return response == null ? null : response.clone();
+		}
+
+		@Nullable String requestId() {
+			return requestId;
+		}
+
+		int attempts() {
+			return attempts;
+		}
+
+		int status() {
+			return status;
+		}
+
+		long elapsedNanos() {
+			return elapsedNanos;
+		}
+
+		boolean cancelled() {
+			return cancelled;
+		}
+
 	}
 
 	Snapshot snapshot() {
