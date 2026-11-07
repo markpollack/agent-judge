@@ -8,15 +8,11 @@ package io.github.markpollack.judge.exec.util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.github.markpollack.sandbox.ExecResult;
-import io.github.markpollack.sandbox.ExecSpec;
 import io.github.markpollack.sandbox.LocalSandbox;
 import io.github.markpollack.sandbox.Sandbox;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Utility for running Maven builds with automatic wrapper detection.
@@ -58,22 +54,8 @@ public class MavenBuildRunner {
 	 */
 	public static BuildResult runBuild(Path workspace, long timeoutMinutes, String... goals) {
 		try (Sandbox sandbox = new LocalSandbox(workspace)) {
-			// Detect Maven command
-			String mavenCmd = detectMavenCommand(workspace);
 			logger.info("Running Maven build in: {}", workspace);
-			logger.debug("Maven command: {} {}", mavenCmd, String.join(" ", goals));
-
-			// Build command
-			List<String> command = new ArrayList<>();
-			command.add(mavenCmd);
-			for (String goal : goals) {
-				command.add(goal);
-			}
-
-			// Execute
-			ExecSpec spec = ExecSpec.builder().command(command).timeout(Duration.ofMinutes(timeoutMinutes)).build();
-
-			ExecResult result = sandbox.exec(spec);
+			ExecResult result = MavenCommand.execute(sandbox, workspace, timeoutMinutes, goals);
 
 			int exitCode = result.exitCode();
 			String output = result.mergedLog();
@@ -89,21 +71,6 @@ public class MavenBuildRunner {
 			logger.error("Failed to execute Maven build", e);
 			return new BuildResult(-1, "Error executing Maven: " + e.getMessage(), Duration.ZERO, false);
 		}
-	}
-
-	/**
-	 * Detect Maven wrapper or fallback to mvn.
-	 * @param workspace the Maven project root
-	 * @return Maven command to use
-	 */
-	private static String detectMavenCommand(Path workspace) {
-		Path mvnw = workspace.resolve("mvnw");
-		if (Files.exists(mvnw) && Files.isExecutable(mvnw)) {
-			logger.debug("Found Maven wrapper: {}", mvnw);
-			return "./mvnw";
-		}
-		logger.debug("Maven wrapper not found, using 'mvn' from PATH");
-		return "mvn";
 	}
 
 	/**
