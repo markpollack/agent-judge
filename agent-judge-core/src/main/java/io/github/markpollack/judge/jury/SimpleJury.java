@@ -413,11 +413,11 @@ public class SimpleJury implements VotingJury {
 	}
 
 	/**
-	 * Call the strategy inside the shared boundary, so a broken reduction becomes a
-	 * contained, countable error instead of an exception that discards every judge that
-	 * succeeded.
-	 * @param individualJudgments the judgments to reduce
-	 * @return the strategy's aggregate, or the contained error that replaces it
+	 * The strategy's input: one ballot per seat, pairing each seat with its original
+	 * judgment, in seat order.
+	 * @param seats the seats, in order
+	 * @param original each seat's original judgment, in the same order
+	 * @return immutable ballots
 	 */
 	private static List<io.github.markpollack.judge.voting.Ballot> ballots(List<Seat> seats, List<Judgment> original) {
 		var result = new ArrayList<io.github.markpollack.judge.voting.Ballot>();
@@ -437,7 +437,6 @@ public class SimpleJury implements VotingJury {
 	 * </p>
 	 * @param index the judge's position in the configured list
 	 * @param key the seat's key, read before any judge ran
-	 * @param context the judgment context
 	 * @return the result and whether it was returned validly rather than contained
 	 */
 	private Invocation invokeJudge(int index, SeatKey key) {

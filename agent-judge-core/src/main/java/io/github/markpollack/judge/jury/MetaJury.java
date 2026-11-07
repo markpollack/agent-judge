@@ -240,9 +240,11 @@ class MetaJury implements VotingJury {
 	}
 
 	/**
-	 * Call the meta-strategy inside the same boundary a SimpleJury uses.
-	 * @param successful the aggregates of the members that were used
-	 * @return the strategy's aggregate, or the contained error that replaces it
+	 * The meta-strategy's input: one ballot per member seat, pairing each seat with its
+	 * original aggregate, in seat order.
+	 * @param seats the member seats, in order
+	 * @param originals each member's original aggregate, in the same order
+	 * @return immutable ballots
 	 */
 	private static List<io.github.markpollack.judge.voting.Ballot> ballots(List<Seat> seats, List<Judgment> originals) {
 		var result = new ArrayList<io.github.markpollack.judge.voting.Ballot>();
