@@ -397,21 +397,11 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 			throw new IllegalArgumentException("INDIVIDUAL_REJECTION requires a genuine FAIL among tier '" + name
 					+ "' individuals; a broken stage on its own justifies nothing");
 		}
-		if (acceptedUndecided || reason == DispositionReason.CHILD_UNDECIDED) {
-			if (!judgment.equals(tierVerdict.judgment())) {
-				throw new IllegalArgumentException("a CHILD_UNDECIDED rejection keeps the child's own machinery error "
-						+ "as the root aggregate, but tier '" + name + "' differs");
-			}
-			return;
-		}
-		// UNDECLARED_NOT_APPLICABLE: the child's aggregate is an exclusion the cascade
-		// refused,
-		// so the root cannot be a copy of it. The parent authors a machinery error
-		// instead, and
-		// the child's verdict stays unchanged on its attempt.
-		if (judgment.reasonCode() != JudgmentReasonCode.STAGE_FAILED) {
-			throw new IllegalArgumentException("a rejection on a boundary-refused exclusion builds a parent-authored "
-					+ "ERROR stage_failed root, but tier '" + name + "' produced " + judgment.reasonCode());
+		// Only an accepted UNDECIDED tier reaches here (checked above), so the root keeps
+		// the tier's own aggregate.
+		if (!judgment.equals(tierVerdict.judgment())) {
+			throw new IllegalArgumentException("a CHILD_UNDECIDED rejection keeps the child's own machinery error "
+					+ "as the root aggregate, but tier '" + name + "' differs");
 		}
 	}
 
