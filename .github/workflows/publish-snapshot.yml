@@ -1,6 +1,12 @@
 name: Publish Snapshot
 
+# Every push to main that changes more than docs publishes the development snapshot, so consumers
+# take each fix as it lands. A dispatch publishes the branch head on demand.
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '*.md'
   workflow_dispatch:
 
 concurrency:
