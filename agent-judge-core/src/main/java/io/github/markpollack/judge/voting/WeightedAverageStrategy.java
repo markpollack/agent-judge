@@ -84,7 +84,7 @@ import io.github.markpollack.judge.judgment.Judgment;
  * @author Mark Pollack
  * @since 0.1.0
  */
-public class WeightedAverageStrategy implements VotingStrategy {
+public class WeightedAverageStrategy extends ThresholdStrategy {
 
 	/**
 	 * The acceptance bar applied when the caller does not state one.
@@ -100,11 +100,8 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	 */
 	public static final double DEFAULT_THRESHOLD = 0.5;
 
-	private final double threshold;
 
-	private final ErrorHandling errorPolicy;
 
-	private final ExclusionHandling notApplicablePolicy;
 
 	/**
 	 * Create a weighted average strategy with the default error policy.
@@ -160,37 +157,13 @@ public class WeightedAverageStrategy implements VotingStrategy {
 	 * @since 0.17.0
 	 */
 	public WeightedAverageStrategy(double threshold, ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
-		if (notApplicablePolicy == null) {
-			throw new IllegalArgumentException("notApplicablePolicy must not be null");
-		}
-		this.notApplicablePolicy = notApplicablePolicy;
-		if (!Double.isFinite(threshold)) {
-			throw new IllegalArgumentException("threshold must be finite, but was " + threshold);
-		}
-		if (threshold < 0.0 || threshold > 1.0) {
-			throw new IllegalArgumentException("threshold must be between 0.0 and 1.0, but was " + threshold);
-		}
-		if (errorPolicy == null) {
-			throw new IllegalArgumentException("errorPolicy must not be null");
-		}
-		this.threshold = threshold;
-		this.errorPolicy = errorPolicy;
+		super(threshold, errorPolicy, notApplicablePolicy);
 	}
 
-	/**
-	 * The acceptance bar this strategy applies.
-	 * @return the normalized threshold
-	 * @since 0.16.0
-	 */
-	public double getThreshold() {
-		return this.threshold;
-	}
 
 	@Override
 	public Judgment aggregate(List<Ballot> ballots) {
-		List<Judgment> judgments = Ballots.judgments(ballots);
-		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
-				this.notApplicablePolicy);
+		AggregationPopulation population = population(ballots);
 
 		double[] resolved = resolveWeights(ballots);
 		double inputWeight = 0.0;
@@ -234,16 +207,16 @@ public class WeightedAverageStrategy implements VotingStrategy {
 		double weightedAverage = Double.isInfinite(eligibleWeight) ? rescaledWeightedAverage(population, resolved)
 				: weightedSum / eligibleWeight;
 
-		Judgment aggregate = (weightedAverage >= this.threshold ? Judgment.builder().pass() : Judgment.builder().fail())
+		Judgment aggregate = (weightedAverage >= getThreshold() ? Judgment.builder().pass() : Judgment.builder().fail())
 			.score(weightedAverage)
 			.reasoning(
 					String.format("Weighted average: %.2f across %d applicable judge(s) (threshold: %.2f, result: %s)",
-							weightedAverage, population.eligible().size(), this.threshold,
-							weightedAverage >= this.threshold ? "pass" : "fail"))
+							weightedAverage, population.eligible().size(), getThreshold(),
+							weightedAverage >= getThreshold() ? "pass" : "fail"))
 			.build();
 		return AggregationEvidence.attach(aggregate,
 				population.evidence(getName())
-					.put(AggregationEvidence.THRESHOLD, this.threshold)
+					.put(AggregationEvidence.THRESHOLD, getThreshold())
 					.put(AggregationEvidence.INPUT_WEIGHT, portableTotal(inputWeight))
 					.put(AggregationEvidence.ELIGIBLE_WEIGHT, portableTotal(eligibleWeight))
 					.build());
@@ -296,21 +269,6 @@ public class WeightedAverageStrategy implements VotingStrategy {
 		return "weightedAverage";
 	}
 
-	/**
-	 * Declares the error policy and the threshold. Weights are the jury's configuration,
-	 * not this strategy's, and appear on the jury's seats.
-	 * @return the declared description
-	 * @since 0.17.0
-	 */
-	@Override
-	public StrategyDescription describe() {
-		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, this.threshold, Map.of());
-	}
 
-	/** {@inheritDoc} */
-	@Override
-	public ExclusionHandling exclusionHandling() {
-		return this.notApplicablePolicy;
-	}
 
 }

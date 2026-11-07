@@ -77,13 +77,10 @@ import io.github.markpollack.judge.judgment.Judgment;
  * @see AverageVotingStrategy
  * @see AggregationEvidence#BINDING_ELIGIBLE_INDEX
  */
-public class ConjunctiveStrategy implements VotingStrategy {
+public class ConjunctiveStrategy extends ThresholdStrategy {
 
-	private final double threshold;
 
-	private final ErrorHandling errorPolicy;
 
-	private final ExclusionHandling notApplicablePolicy;
 
 	/**
 	 * Create a conjunctive strategy with the default error policy.
@@ -119,44 +116,18 @@ public class ConjunctiveStrategy implements VotingStrategy {
 	 * @since 0.17.0
 	 */
 	public ConjunctiveStrategy(double threshold, ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
-		if (notApplicablePolicy == null) {
-			throw new IllegalArgumentException("notApplicablePolicy must not be null");
-		}
-		this.notApplicablePolicy = notApplicablePolicy;
-		if (!Double.isFinite(threshold)) {
-			throw new IllegalArgumentException("threshold must be finite, but was " + threshold);
-		}
-		if (threshold < 0.0 || threshold > 1.0) {
-			throw new IllegalArgumentException("threshold must be between 0.0 and 1.0, but was " + threshold);
-		}
-		if (errorPolicy == null) {
-			throw new IllegalArgumentException("errorPolicy must not be null");
-		}
-		this.threshold = threshold;
-		this.errorPolicy = errorPolicy;
+		super(threshold, errorPolicy, notApplicablePolicy);
 	}
 
-	/**
-	 * The bar every applicable judgment must reach.
-	 * @return the normalized threshold
-	 */
-	public double getThreshold() {
-		return this.threshold;
-	}
 
 	@Override
 	public Judgment aggregate(List<Ballot> ballots) {
-		List<Judgment> judgments = Ballots.judgments(ballots);
-		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
-				this.notApplicablePolicy);
-
-		if (population.hasPolicyExit()) {
-			return population.policyExitAggregate(getName());
-		}
-		if (population.isEmpty()) {
-			// An empty conjunction is vacuously true. Reporting that as PASS is the
-			// "a check that passed on nothing" defect, so it stays a no-result ABSTAIN.
-			return population.noResult(getName(), Map.of());
+		AggregationPopulation population = population(ballots);
+		// An empty conjunction is vacuously true. Reporting that as PASS is the
+		// "a check that passed on nothing" defect, so it stays a no-result ABSTAIN.
+		Judgment exit = Populations.exit(population, getName());
+		if (exit != null) {
+			return exit;
 		}
 
 		// Every eligible judgment is PASS or FAIL, so effectiveScore is always present.
@@ -174,16 +145,16 @@ public class ConjunctiveStrategy implements VotingStrategy {
 		// the survivors: the caller indexes its judges by the former.
 		int bindingIndex = population.eligibleIndices().get(bindingPosition);
 
-		boolean passed = minimum >= this.threshold;
+		boolean passed = minimum >= getThreshold();
 		Judgment aggregate = (passed ? Judgment.builder().pass() : Judgment.builder().fail()).score(minimum)
 			.reasoning(String.format(
 					"Minimum score: %.2f across %d applicable judge(s) (threshold: %.2f, result: %s); "
 							+ "binding judgment at index %d",
-					minimum, eligible.size(), this.threshold, passed ? "pass" : "fail", bindingIndex))
+					minimum, eligible.size(), getThreshold(), passed ? "pass" : "fail", bindingIndex))
 			.build();
 
 		AggregationEvidence.Builder evidence = population.evidence(getName())
-			.put(AggregationEvidence.THRESHOLD, this.threshold)
+			.put(AggregationEvidence.THRESHOLD, getThreshold())
 			.put(AggregationEvidence.BINDING_ELIGIBLE_INDEX, bindingIndex);
 		return AggregationEvidence.attach(aggregate, evidence.build());
 	}
@@ -193,20 +164,6 @@ public class ConjunctiveStrategy implements VotingStrategy {
 		return "conjunctive";
 	}
 
-	/**
-	 * Declares the error policy and the threshold.
-	 * @return the declared description
-	 * @since 0.17.0
-	 */
-	@Override
-	public StrategyDescription describe() {
-		return StrategyDescription.declared(this, this.errorPolicy, this.notApplicablePolicy, this.threshold, Map.of());
-	}
 
-	/** {@inheritDoc} */
-	@Override
-	public ExclusionHandling exclusionHandling() {
-		return this.notApplicablePolicy;
-	}
 
 }

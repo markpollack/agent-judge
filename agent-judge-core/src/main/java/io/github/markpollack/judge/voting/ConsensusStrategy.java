@@ -134,32 +134,22 @@ public class ConsensusStrategy implements VotingStrategy {
 	 * @since 0.17.0
 	 */
 	public ConsensusStrategy(ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
-		if (errorPolicy == null) {
-			throw new IllegalArgumentException("errorPolicy must not be null");
-		}
-		if (notApplicablePolicy == null) {
-			throw new IllegalArgumentException("notApplicablePolicy must not be null");
-		}
+		Populations.requirePolicies(errorPolicy, notApplicablePolicy);
 		this.errorPolicy = errorPolicy;
 		this.notApplicablePolicy = notApplicablePolicy;
 	}
 
 	@Override
 	public Judgment aggregate(List<Ballot> ballots) {
-		List<Judgment> judgments = Ballots.judgments(ballots);
-		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
-				this.notApplicablePolicy);
-
-		if (population.hasPolicyExit()) {
-			return population.policyExitAggregate(getName());
-		}
-		if (population.isEmpty()) {
-			return population.noResult(getName(), Map.of());
+		AggregationPopulation population = Populations.of(ballots, this.errorPolicy, this.notApplicablePolicy);
+		Judgment exit = Populations.exit(population, getName());
+		if (exit != null) {
+			return exit;
 		}
 
 		int eligibleCount = population.eligible().size();
-		int passCount = (int) population.eligible().stream().filter(j -> j.status() == JudgmentStatus.PASS).count();
-		int failCount = (int) population.eligible().stream().filter(j -> j.status() == JudgmentStatus.FAIL).count();
+		int passCount = Populations.count(population, JudgmentStatus.PASS);
+		int failCount = Populations.count(population, JudgmentStatus.FAIL);
 
 		JudgmentStatus status;
 		String reasoning;
@@ -187,11 +177,7 @@ public class ConsensusStrategy implements VotingStrategy {
 			case NOT_APPLICABLE, ERROR ->
 				throw new IllegalStateException("Consensus produced an unexpected status: " + status);
 		};
-		return AggregationEvidence.attach(aggregate,
-				population.evidence(getName())
-					.put(AggregationEvidence.PASS_COUNT, passCount)
-					.put(AggregationEvidence.FAIL_COUNT, failCount)
-					.build());
+		return Populations.withCounts(population, getName(), aggregate);
 	}
 
 	@Override

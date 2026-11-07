@@ -48,54 +48,31 @@ public class AllEligiblePassStrategy implements VotingStrategy {
 	 * @since 0.17.0
 	 */
 	public AllEligiblePassStrategy(ErrorHandling errorPolicy, ExclusionHandling notApplicablePolicy) {
-		if (errorPolicy == null) {
-			throw new IllegalArgumentException("errorPolicy must not be null");
-		}
-		if (notApplicablePolicy == null) {
-			throw new IllegalArgumentException("notApplicablePolicy must not be null");
-		}
+		Populations.requirePolicies(errorPolicy, notApplicablePolicy);
 		this.errorPolicy = errorPolicy;
 		this.notApplicablePolicy = notApplicablePolicy;
 	}
 
 	@Override
 	public Judgment aggregate(List<Ballot> ballots) {
-		List<Judgment> judgments = Ballots.judgments(ballots);
-		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
-				this.notApplicablePolicy);
-
-		if (population.hasPolicyExit()) {
-			return population.policyExitAggregate(getName());
-		}
-		if (population.isEmpty()) {
-			// Never PASS. An empty conjunction is vacuously true, and a gate that passes
-			// because it lost its requirements is the failure this class exists to
-			// prevent.
-			return population.noResult(getName(), Map.of());
+		AggregationPopulation population = Populations.of(ballots, this.errorPolicy, this.notApplicablePolicy);
+		// Never PASS. An empty conjunction is vacuously true, and a gate that passes
+		// because it lost its requirements is the failure this class exists to
+		// prevent.
+		Judgment exit = Populations.exit(population, getName());
+		if (exit != null) {
+			return exit;
 		}
 
-		int passCount = 0;
-		int failCount = 0;
-		for (Judgment judgment : population.eligible()) {
-			if (judgment.status() == JudgmentStatus.PASS) {
-				passCount++;
-			}
-			else {
-				failCount++;
-			}
-		}
-
+		// Every eligible judgment is PASS or FAIL.
+		int failCount = Populations.count(population, JudgmentStatus.FAIL);
 		boolean passed = failCount == 0;
 		int eligibleCount = population.eligible().size();
 		Judgment aggregate = (passed ? Judgment.builder().pass() : Judgment.builder().fail())
 			.reasoning(passed ? String.format("All %d applicable requirement(s) passed", eligibleCount)
 					: String.format("%d of %d applicable requirement(s) failed", failCount, eligibleCount))
 			.build();
-
-		AggregationEvidence.Builder evidence = population.evidence(getName())
-			.put(AggregationEvidence.PASS_COUNT, passCount)
-			.put(AggregationEvidence.FAIL_COUNT, failCount);
-		return AggregationEvidence.attach(aggregate, evidence.build());
+		return Populations.withCounts(population, getName(), aggregate);
 	}
 
 	@Override

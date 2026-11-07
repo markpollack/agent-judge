@@ -100,19 +100,14 @@ public class MajorityVotingStrategy implements VotingStrategy {
 
 	@Override
 	public Judgment aggregate(List<Ballot> ballots) {
-		List<Judgment> judgments = Ballots.judgments(ballots);
-		AggregationPopulation population = AggregationPopulation.resolve(judgments, this.errorPolicy,
-				this.notApplicablePolicy);
-
-		if (population.hasPolicyExit()) {
-			return population.policyExitAggregate(getName());
-		}
-		if (population.isEmpty()) {
-			return population.noResult(getName(), Map.of());
+		AggregationPopulation population = Populations.of(ballots, this.errorPolicy, this.notApplicablePolicy);
+		Judgment exit = Populations.exit(population, getName());
+		if (exit != null) {
+			return exit;
 		}
 
-		int passCount = (int) population.eligible().stream().filter(j -> j.status() == JudgmentStatus.PASS).count();
-		int failCount = (int) population.eligible().stream().filter(j -> j.status() == JudgmentStatus.FAIL).count();
+		int passCount = Populations.count(population, JudgmentStatus.PASS);
+		int failCount = Populations.count(population, JudgmentStatus.FAIL);
 
 		JudgmentStatus status;
 		String reasoning;
@@ -139,11 +134,7 @@ public class MajorityVotingStrategy implements VotingStrategy {
 			case NOT_APPLICABLE, ERROR ->
 				throw new IllegalStateException("Majority cannot produce " + status + " after population resolution");
 		};
-		return AggregationEvidence.attach(aggregate,
-				population.evidence(getName())
-					.put(AggregationEvidence.PASS_COUNT, passCount)
-					.put(AggregationEvidence.FAIL_COUNT, failCount)
-					.build());
+		return Populations.withCounts(population, getName(), aggregate);
 	}
 
 	@Override
