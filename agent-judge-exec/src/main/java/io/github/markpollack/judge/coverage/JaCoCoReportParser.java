@@ -96,18 +96,21 @@ public class JaCoCoReportParser {
 				int total = covered + missed;
 
 				switch (type) {
-					case "LINE":
+					case "LINE" -> {
 						linesCovered = covered;
 						linesTotal = total;
-						break;
-					case "BRANCH":
+					}
+					case "BRANCH" -> {
 						branchesCovered = covered;
 						branchesTotal = total;
-						break;
-					case "METHOD":
+					}
+					case "METHOD" -> {
 						methodsCovered = covered;
 						methodsTotal = total;
-						break;
+					}
+					default -> {
+						// INSTRUCTION, COMPLEXITY and CLASS counters are not reported.
+					}
 				}
 			}
 
