@@ -44,7 +44,7 @@ public final class VerdictCodec {
 	 * @param specifications additional unique names and concrete native types
 	 */
 	public VerdictCodec(Map<String, Class<?>> specifications) {
-		this(generalTypes(specifications), true);
+		this(generalTypes(specifications), Map.of());
 	}
 
 	private static Map<String, SpecificationCodec<?>> generalTypes(Map<String, Class<?>> specifications) {
@@ -59,11 +59,7 @@ public final class VerdictCodec {
 	 * @return current-format codec
 	 */
 	public static VerdictCodec withSpecifications(Map<String, SpecificationCodec<?>> specifications) {
-		return new VerdictCodec(specifications, true);
-	}
-
-	private VerdictCodec(Map<String, SpecificationCodec<?>> specifications, boolean registered) {
-		this(specifications, registered, Map.of());
+		return new VerdictCodec(specifications, Map.of());
 	}
 
 	/**
@@ -78,10 +74,10 @@ public final class VerdictCodec {
 			if (combined.putIfAbsent(token, Objects.requireNonNull(factory)) != null)
 				throw new IllegalArgumentException("Ambiguous voting rule token: " + token);
 		});
-		return new VerdictCodec(specificationRegistrations, true, combined);
+		return new VerdictCodec(specificationRegistrations, combined);
 	}
 
-	private VerdictCodec(Map<String, SpecificationCodec<?>> specifications, boolean registered,
+	private VerdictCodec(Map<String, SpecificationCodec<?>> specifications,
 			Map<String, io.github.markpollack.judge.voting.VotingRuleFactory> rules) {
 		specificationRegistrations = Map.copyOf(specifications);
 		ruleRegistrations = Map.copyOf(rules);

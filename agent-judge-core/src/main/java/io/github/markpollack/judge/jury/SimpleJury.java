@@ -140,7 +140,7 @@ public class SimpleJury implements VotingJury {
 		for (int i = 0; i < judges.size(); i++)
 			capabilities.add(declarations.containsKey(i) ? declarations.get(i).notApplicableWhen() : null);
 		this.declaredCapabilities = Collections.unmodifiableList(capabilities);
-		requireCoherentExclusionPolicy(this.judges, this.declaredCapabilities, votingStrategy);
+		requireCoherentExclusionPolicy(this.declaredCapabilities, votingStrategy);
 		if (requireDeclaredNames) {
 			requireDeclaredNames(this.judges, this.deduplicatedPositions);
 		}
@@ -160,34 +160,6 @@ public class SimpleJury implements VotingJury {
 	}
 
 	/**
-	 * Read every seat's declared exclusion capability.
-	 * <p>
-	 * A judge whose metadata cannot be read has declared nothing, and is recorded as
-	 * declaring nothing rather than failing construction. It never gets to exercise the
-	 * absent capability either: the jury cannot tell what it is called, so it does not
-	 * run it, and the seat is an {@code ERROR judge_metadata_unreadable}. Describing such
-	 * a jury still fails loudly, which is where an unreadable judge is actually reported.
-	 * </p>
-	 * @param judges the configured judges
-	 * @return the declaration per position, with null for a seat that declares none
-	 */
-	private static List<String> readCapabilities(List<Judge> judges) {
-		List<String> capabilities = new ArrayList<>(judges.size());
-		for (Judge judge : judges) {
-			String declared;
-			try {
-				declared = Judges.notApplicableCapability(judge).orElse(null);
-			}
-			catch (IllegalArgumentException ex) {
-				io.github.markpollack.judge.portable.PreservationLimitException.propagate(ex);
-				declared = null;
-			}
-			capabilities.add(declared);
-		}
-		return Collections.unmodifiableList(capabilities);
-	}
-
-	/**
 	 * Refuse a jury whose strategy would not honour an exclusion one of its seats
 	 * declares.
 	 * <p>
@@ -195,12 +167,10 @@ public class SimpleJury implements VotingJury {
 	 * the contradiction is visible in the jury as assembled, and every run of it would
 	 * waste a judge's work to reach the same error.
 	 * </p>
-	 * @param judges the configured judges
 	 * @param capabilities each seat's declaration
 	 * @param strategy the configured strategy
 	 */
-	private static void requireCoherentExclusionPolicy(List<Judge> judges, List<String> capabilities,
-			VotingStrategy strategy) {
+	private static void requireCoherentExclusionPolicy(List<String> capabilities, VotingStrategy strategy) {
 		if (strategy.exclusionHandling() != ExclusionHandling.REFUSE) {
 			return;
 		}
@@ -323,30 +293,6 @@ public class SimpleJury implements VotingJury {
 		// derivation
 		// would then publish a confident false about a jury that can exclude.
 		return new SimpleJuryDescription(votingStrategy.describe(), seats);
-	}
-
-	/**
-	 * Refuse to describe a seat whose declaration has changed since the jury was built.
-	 * <p>
-	 * The description and the guard must agree, or the description is a claim about a
-	 * jury that does not exist. A judge whose {@code metadata()} answers differently on
-	 * each call would otherwise be described as capable while being guarded as incapable,
-	 * or the reverse.
-	 * </p>
-	 * @param position the seat's position
-	 * @param described what the judge declares now
-	 */
-	private void requireStableCapability(int position, String described) {
-		String built = declaredCapabilities.get(position);
-		if (!java.util.Objects.equals(built, described)) {
-			throw new IllegalArgumentException("its exclusion capability changed after the jury was built: "
-					+ "it declared " + describeCapability(built) + " at construction and "
-					+ describeCapability(described) + " now");
-		}
-	}
-
-	private static String describeCapability(String declared) {
-		return declared == null ? "none" : "'" + declared + "'";
 	}
 
 	@Override

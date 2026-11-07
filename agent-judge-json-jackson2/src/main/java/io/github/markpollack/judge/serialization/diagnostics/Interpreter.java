@@ -117,7 +117,7 @@ final class Interpreter {
 
 		Walk walk = walk(verdict);
 		@Nullable RequirementOutcome reading = reading(walk, rootNode.status());
-		checkSupport(walk, verdict, rootNode);
+		checkSupport(walk, rootNode);
 
 		boolean contradicted = this.defects.stream().anyMatch(defect -> defect.kind() == DefectKind.INCONSISTENT);
 		ReadingSupport support = contradicted ? ReadingSupport.CONTRADICTED
@@ -952,7 +952,7 @@ final class Interpreter {
 
 	// ==================== Reading support ====================
 
-	private void checkSupport(Walk walk, Map<String, Object> root, Node rootNode) {
+	private void checkSupport(Walk walk, Node rootNode) {
 		if (walk.rejection()) {
 			checkRejection(walk);
 		}

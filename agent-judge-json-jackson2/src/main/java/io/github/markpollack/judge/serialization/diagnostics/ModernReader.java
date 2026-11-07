@@ -15,7 +15,6 @@ import io.github.markpollack.judge.verdict.VerdictProvenanceKind;
 import java.util.*;
 import org.jspecify.annotations.Nullable;
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.github.markpollack.judge.jury.*;
 import io.github.markpollack.judge.verdict.*;
 import io.github.markpollack.judge.voting.*;
@@ -28,14 +27,6 @@ final class ModernReader {
 
 	private ModernReader() {
 	}
-
-	private static final ObjectMapper MAPPER = JsonMapper.builder()
-		.addModule(io.github.markpollack.judge.serialization.ResultJson.module())
-		.disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
-		.disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
-		.enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
-		.enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
-		.build();
 
 	static Verdict read(Map<String, Object> stored) {
 		return new io.github.markpollack.judge.serialization.VerdictCodec().read(stored);

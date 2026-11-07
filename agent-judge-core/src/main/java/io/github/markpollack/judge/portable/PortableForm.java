@@ -33,8 +33,6 @@ public final class PortableForm {
 	/** Root description version key. */
 	public static final String DESCRIPTION_VERSION = "descriptionVersion";
 
-	private static final String CARRIER_PATH_PREFIX = "metadata.";
-
 	private PortableForm() {
 	}
 
@@ -121,10 +119,6 @@ public final class PortableForm {
 		return node;
 	}
 
-
-	private static String relocate(String message) {
-		return message.startsWith(CARRIER_PATH_PREFIX) ? message.substring(CARRIER_PATH_PREFIX.length()) : message;
-	}
 
 	private static Object order(Object value) {
 		if (value instanceof Map<?, ?> object) {
