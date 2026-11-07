@@ -96,7 +96,11 @@ public interface EvalModel
 	}
 
 	/**
-	 * Executes and retains the native response before classification.
+	 * Executes and retains the native response before classification. The invocation
+	 * ({@code generated-answer:v3}) records each request message as {@code messageDigests}
+	 * (role, {@code utf8Bytes}, {@code sha256}), never its content: a caller that must keep
+	 * the exact request bytes retains them in its own store and returns an
+	 * {@link io.github.markpollack.judge.provenance.ArtifactRef} with the same digest.
 	 * @param request exact supported request
 	 * @return original answer and portable invocation observations
 	 */
@@ -126,19 +130,28 @@ public interface EvalModel
 			facts.put("text", answer.text());
 		facts.put("answerState", answer.answerState().name());
 		facts.put("options", request.options().toPortable());
-		facts.put("messages",
-				request.messages()
-					.stream()
-					.map(m -> java.util.Map.of("role", m.role().name(), "content", m.content()))
-					.toList());
+		facts.put("messageDigests", messageDigests(request));
 		facts.put("requestMetadata", request.metadata());
 		if (answer.usage() != null)
 			facts.put("usage", answer.usage().toPortableMap());
 		var invocation = new io.github.markpollack.judge.provenance.Invocation(java.util.UUID.randomUUID().toString(),
-				"generated-answer:v2", answer.completed(), answer.model(),
+				"generated-answer:v3", answer.completed(), answer.model(),
 				java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start), facts,
 				answer.artifacts(), answer.failure());
 		return new io.github.markpollack.judge.execution.NativeExecution<>(answer, invocation);
+	}
+
+	/**
+	 * Identifies each request message by role, UTF-8 length and SHA-256 of its exact
+	 * content. Requests are generated from requirement and evidence, so a stored
+	 * invocation records their digest rather than a second copy of the evidence.
+	 */
+	private static java.util.List<java.util.Map<String, Object>> messageDigests(EvalModelRequest request) {
+		return request.messages().stream().map(m -> {
+			byte[] bytes = m.content().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+			return java.util.Map.<String, Object>of("role", m.role().name(), "utf8Bytes", bytes.length, "sha256",
+					io.github.markpollack.judge.provenance.ArtifactRef.ofBytes("request", bytes, null).sha256());
+		}).toList();
 	}
 
 	/**
