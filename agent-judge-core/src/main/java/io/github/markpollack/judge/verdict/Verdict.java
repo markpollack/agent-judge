@@ -687,6 +687,7 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 			this.rule = rule;
 		}
 
+		@Override
 		public PanelStage opinion(String name, Judgment original) {
 			return add(name, original, null);
 		}
@@ -698,10 +699,12 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 			return this;
 		}
 
+		@Override
 		public PanelStage opinion(String name, Judgment original, double weight) {
 			return add(name, original, weight);
 		}
 
+		@Override
 		public Verdict build() {
 			if (ballots.size() == 1) {
 				var ballot = ballots.getFirst();

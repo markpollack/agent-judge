@@ -252,11 +252,13 @@ public final class ModelBackedJudge<E> implements JudgeWithMetadata, ConfiguredJ
 			io.github.markpollack.judge.requirement.Requirement.validate(actual);
 			Builder<E> captured = snapshot();
 			return new io.github.markpollack.judge.construction.EvidenceStep<>() {
+				@Override
 				public Ready<E> evidence(E value) {
 					Objects.requireNonNull(value);
 					return evidenceSupplier(() -> value);
 				}
 
+				@Override
 				public Ready<E> evidenceSupplier(java.util.function.Supplier<? extends E> provider) {
 					Objects.requireNonNull(provider);
 					return () -> captured.build(provider, actual);

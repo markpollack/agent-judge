@@ -66,11 +66,13 @@ public final class JevJudge implements Judge {
 			return requirement -> {
 				Requirement.validate(requirement);
 				return new EvidenceStep<>() {
+					@Override
 					public ReadyJudge evidence(JevEvidence value) {
 						Objects.requireNonNull(value);
 						return evidenceSupplier(() -> value);
 					}
 
+					@Override
 					public ReadyJudge evidenceSupplier(Supplier<? extends JevEvidence> evidence) {
 						Objects.requireNonNull(evidence);
 						return () -> new JevJudge(() -> {

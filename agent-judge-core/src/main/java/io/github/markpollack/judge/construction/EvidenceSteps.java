@@ -25,11 +25,13 @@ public final class EvidenceSteps {
 	public static <E> EvidenceStep<E> of(Function<Supplier<? extends E>, ? extends Judge> factory) {
 		Objects.requireNonNull(factory);
 		return new EvidenceStep<>() {
+			@Override
 			public ReadyJudge evidence(E evidence) {
 				Objects.requireNonNull(evidence);
 				return evidenceSupplier(() -> evidence);
 			}
 
+			@Override
 			public ReadyJudge evidenceSupplier(Supplier<? extends E> evidence) {
 				Objects.requireNonNull(evidence);
 				return () -> Objects.requireNonNull(factory.apply(evidence));

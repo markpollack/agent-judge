@@ -68,11 +68,13 @@ public final class Rfc2119Judge implements Judge {
 			return requirement -> {
 				Requirement.validate(requirement);
 				return new EvidenceStep<E>() {
+					@Override
 					public ReadyJudge evidence(E evidence) {
 						Objects.requireNonNull(evidence);
 						return evidenceSupplier(() -> evidence);
 					}
 
+					@Override
 					public ReadyJudge evidenceSupplier(Supplier<? extends E> evidence) {
 						Objects.requireNonNull(evidence);
 						return () -> new Rfc2119Judge(() -> {

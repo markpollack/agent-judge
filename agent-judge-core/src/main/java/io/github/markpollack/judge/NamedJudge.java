@@ -60,6 +60,7 @@ public final class NamedJudge implements JudgeWithMetadata {
 	 * Get the metadata for this judge.
 	 * @return the judge metadata
 	 */
+	@Override
 	public JudgeMetadata metadata() {
 		return this.metadata;
 	}

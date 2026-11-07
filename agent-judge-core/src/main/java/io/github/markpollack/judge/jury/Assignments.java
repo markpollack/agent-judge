@@ -186,10 +186,12 @@ public final class Assignments<E> {
 		public ReadyJury evidenceSupplier(Supplier<? extends E> provider) {
 			Objects.requireNonNull(provider, "provider");
 			return () -> new Jury() {
+				@Override
 				public Verdict vote() {
 					return Prepared.this.vote(Objects.requireNonNull(provider.get(), "acquired evidence"));
 				}
 
+				@Override
 				public io.github.markpollack.judge.description.JuryDescription describe() {
 					return new io.github.markpollack.judge.description.AuditJuryDescription("allOf",
 							parent.specification().constituents(), !parent.specification().applicable());

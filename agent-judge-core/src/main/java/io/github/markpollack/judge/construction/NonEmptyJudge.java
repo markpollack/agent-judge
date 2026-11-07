@@ -27,11 +27,13 @@ public final class NonEmptyJudge implements Judge {
 	 */
 	public static io.github.markpollack.judge.construction.EvidenceStep<String> builder() {
 		return new io.github.markpollack.judge.construction.EvidenceStep<>() {
+			@Override
 			public io.github.markpollack.judge.construction.ReadyJudge evidence(String value) {
 				Objects.requireNonNull(value, "evidence");
 				return () -> new NonEmptyJudge(() -> value);
 			}
 
+			@Override
 			public io.github.markpollack.judge.construction.ReadyJudge evidenceSupplier(
 					Supplier<? extends String> provider) {
 				Objects.requireNonNull(provider, "evidence provider");

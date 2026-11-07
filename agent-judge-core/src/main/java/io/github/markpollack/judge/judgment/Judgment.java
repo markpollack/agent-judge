@@ -1181,6 +1181,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		 * @param reasonCode the code; its family must match the selected outcome
 		 * @return this builder
 		 */
+		@Override
 		public Builder reasonCode(JudgmentReasonCode reasonCode) {
 			this.reasonCode = Objects.requireNonNull(reasonCode, "reasonCode must not be null");
 			return this;
@@ -1191,6 +1192,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		 * @param reasoning human-readable explanation
 		 * @return this builder
 		 */
+		@Override
 		public Builder reasoning(String reasoning) {
 			Objects.requireNonNull(reasoning, "reasoning must not be null");
 			if (status != null && requiresReasoning(status) && reasoning.isBlank()) {
@@ -1205,6 +1207,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		 * @param score normalized score in [0.0, 1.0]
 		 * @return this builder
 		 */
+		@Override
 		public Builder score(double score) {
 			if (!Double.isFinite(score)) {
 				throw new IllegalArgumentException("score must be finite, but was " + score);
@@ -1224,6 +1227,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		 * @param label the non-blank classification
 		 * @return this builder
 		 */
+		@Override
 		public Builder label(String label) {
 			Objects.requireNonNull(label, "label must not be null");
 			if (label.isBlank()) {
@@ -1240,6 +1244,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		 * @param check the check
 		 * @return this builder
 		 */
+		@Override
 		public Builder check(Check check) {
 			this.checks.add(Objects.requireNonNull(check, "check must not be null"));
 			return this;
@@ -1250,6 +1255,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		 * @param checks the checks
 		 * @return this builder
 		 */
+		@Override
 		public Builder checks(Collection<Check> checks) {
 			this.checks.addAll(List.copyOf(Objects.requireNonNull(checks, "checks must not be null")));
 			return this;
@@ -1263,6 +1269,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		 * constructor enforces
 		 * @return this builder
 		 */
+		@Override
 		public Builder metadata(String key, Object value) {
 			Objects.requireNonNull(key, "metadata key must not be null");
 			Objects.requireNonNull(value, "metadata value must not be null");
@@ -1278,6 +1285,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 		 * {@value Judgment#AGGREGATION_KEY} key
 		 * @return this builder
 		 */
+		@Override
 		public Builder metadata(Map<String, Object> metadata) {
 			Objects.requireNonNull(metadata, "metadata must not be null");
 			metadata.keySet().forEach(Builder::requireNotReserved);
@@ -1293,6 +1301,7 @@ public record Judgment(JudgmentStatus producerStatus, @Nullable Finding finding,
 			}
 		}
 
+		@Override
 		public Judgment build() {
 			// The staged interfaces make build() unreachable before an outcome is
 			// selected,
