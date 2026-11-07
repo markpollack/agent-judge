@@ -6,24 +6,11 @@
 package io.github.markpollack.judge.file;
 
 import io.github.markpollack.judge.file.comparator.XmlSemanticComparator;
-import io.github.markpollack.judge.file.comparator.XmlSemanticComparator.ComparisonResult;
-import io.github.markpollack.judge.DeterministicJudge;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import io.github.markpollack.judge.judgment.Check;
-import io.github.markpollack.judge.judgment.Judgment;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 /**
  * Judge that compares non-POM XML files using DOM-based semantic comparison.
  */
-public class XmlSemanticJudge extends DeterministicJudge<FileComparison> {
-
-	private static final Logger logger = LoggerFactory.getLogger(XmlSemanticJudge.class);
+public class XmlSemanticJudge extends SemanticFileJudge {
 
 	private final XmlSemanticComparator comparator = new XmlSemanticComparator();
 
@@ -33,45 +20,13 @@ public class XmlSemanticJudge extends DeterministicJudge<FileComparison> {
 	 * execution
 	 */
 	public XmlSemanticJudge(java.util.function.Supplier<? extends FileComparison> source) {
-		super(source, "XmlSemanticJudge", "Compares XML files using DOM-based semantic comparison");
+		super(source, "XmlSemanticJudge", "Compares XML files using DOM-based semantic comparison", "XML");
 	}
 
 	@Override
-	protected Judgment evaluate(FileComparison evidence) {
-		String filePath = evidence.relativePath();
-		Path expectedFile = evidence.expectedFile();
-		Path actualFile = evidence.actualFile();
-
-		try {
-			String expected = Files.readString(expectedFile);
-
-			if (!Files.exists(actualFile)) {
-				return Judgment.fail("File missing: " + filePath);
-			}
-
-			String actual = Files.readString(actualFile);
-			ComparisonResult result = comparator.compare(expected, actual);
-
-			if (result.equivalent()) {
-				return Judgment.builder()
-					.pass()
-					.reasoning("XML semantically matches")
-					.check(Check.pass(filePath))
-					.build();
-			}
-
-			String diff = String.join("\n", result.differences());
-			return Judgment.builder()
-				.fail()
-				.reasoning("XML semantic differences: " + diff)
-				.check(Check.fail(filePath, diff))
-				.build();
-
-		}
-		catch (IOException e) {
-			logger.error("File comparison failed", e);
-			return Judgment.error("Failed to read files: " + e.getMessage());
-		}
+	Comparison compare(String expected, String actual) {
+		XmlSemanticComparator.ComparisonResult result = comparator.compare(expected, actual);
+		return new Comparison(result.equivalent(), result.differences());
 	}
 
 	/**
