@@ -17,7 +17,6 @@ import java.util.Objects;
  */
 public record FileComparison(String relativePath, Path expectedFile, Path actualFile) {
 	/** Require every comparison input. */
-	/** Validate the required evidence values. */
 	public FileComparison {
 		Objects.requireNonNull(relativePath, "relativePath");
 		Objects.requireNonNull(expectedFile, "expectedFile");

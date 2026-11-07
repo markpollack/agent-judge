@@ -755,11 +755,6 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 		private @Nullable RetainedRule rule;
 
 		/**
-		 * Retain the actual immutable reduction rule, absent when no reduction happened.
-		 * @param rule bound rule or null
-		 * @return this advanced builder
-		 */
-		/**
 		 * Retain the exact rule that performed this reduction.
 		 * @param rule immutable declaration, or null for identity/failed reduction
 		 * @return this advanced builder

@@ -161,15 +161,4 @@ final class AggregationBoundary {
 		return (name == null || name.isBlank()) ? strategy.getClass().getName() : name;
 	}
 
-	/**
-	 * What produced a verdict's aggregate.
-	 * <p>
-	 * A machinery error means nothing determined an outcome; anything else — including a
-	 * propagated error, which is the jury's own policy outcome — is the jury's own
-	 * provenance.
-	 * </p>
-	 * @param judgment the aggregate
-	 * @return the provenance
-	 */
-
 }

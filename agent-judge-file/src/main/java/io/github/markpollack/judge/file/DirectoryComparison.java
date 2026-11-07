@@ -16,7 +16,6 @@ import java.util.Objects;
  */
 public record DirectoryComparison(Path expectedDirectory, Path actualDirectory) {
 	/** Require every comparison input. */
-	/** Validate the required evidence values. */
 	public DirectoryComparison {
 		Objects.requireNonNull(expectedDirectory, "expectedDirectory");
 		Objects.requireNonNull(actualDirectory, "actualDirectory");

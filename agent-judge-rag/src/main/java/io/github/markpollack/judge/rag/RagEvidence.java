@@ -17,7 +17,6 @@ import java.util.Objects;
  */
 public record RagEvidence(String question, String retrievedContext, String answer) {
 	/** Require explicit fields; empty values represent unavailable evidence. */
-	/** Validate the required evidence values. */
 	public RagEvidence {
 		Objects.requireNonNull(question, "question");
 		Objects.requireNonNull(retrievedContext, "retrievedContext");

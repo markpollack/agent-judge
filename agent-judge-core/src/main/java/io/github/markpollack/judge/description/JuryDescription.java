@@ -125,15 +125,4 @@ public interface JuryDescription {
 	 */
 	boolean aggregateMayBeNotApplicable();
 
-	/**
-	 * Describe a jury from its public view only: its implementation, its strategy and its
-	 * flattened judges.
-	 * <p>
-	 * This is the default of {@link io.github.markpollack.judge.jury.Jury#describe()}. It is truthful but not structural:
-	 * it does not know how the jury seats, weights, keys or orders those judges.
-	 * </p>
-	 * @param jury the jury
-	 * @return an opaque description
-	 */
-
 }

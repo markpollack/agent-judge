@@ -25,7 +25,6 @@ public final class PortableForm {
 	public static final String DECLARED = "declared";
 
 	/** Declared parameter map key. */
-	/** Declared single value key. */
 	public static final String VALUES = "values";
 
 	/** Declared single value key. */
