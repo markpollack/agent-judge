@@ -44,6 +44,29 @@ class KoogCompletionEvidenceBuilderTest {
 				"Created HelloWorld.java");
 	}
 
+	/**
+	 * Koog's blocking {@code run} is Kotlin and can throw {@link InterruptedException}
+	 * without declaring it, so the interrupt branch is reachable even though Java sees only
+	 * unchecked exceptions. The interrupt status must survive the failed evidence.
+	 */
+	@Test
+	void undeclaredInterruptionRestoresInterruptStatus() {
+		AIAgent<String, String> agent = mockAgent();
+		when(agent.run("Interrupted")).thenAnswer(invocation -> {
+			throw new InterruptedException("cancelled");
+		});
+		try {
+			CompletionEvidence context = KoogCompletionEvidenceBuilder.from(agent, "Interrupted");
+
+			assertThat(context.status()).isEqualTo(CompletionStatus.FAILED);
+			assertThat(context.error()).isInstanceOf(InterruptedException.class);
+			assertThat(Thread.currentThread().isInterrupted()).isTrue();
+		}
+		finally {
+			Thread.interrupted();
+		}
+	}
+
 	@Test
 	void shouldExposeConfiguredProviderAndModelIdentity() {
 		AIAgent<String, String> agent = mockAgent();
