@@ -10,3 +10,4 @@ PMD_MECHANISM: ratchet (2026-11-07; per module at its measured count, lowered as
 THRESHOLD_FIT_CYCLO: accept (2026-11-07; the failing methods are the hotspots cognitive complexity also flags)
 THRESHOLD_FIT_LAMBDA: accept (2026-11-07; the two failures are the twin EARS/RFC2119 classifier lambdas)
 GUARDRAILS_MODE: control (2026-11-07)
+ERRORPRONE_DISABLED: none (2026-11-07, the kit default: every finding fixed in the code)

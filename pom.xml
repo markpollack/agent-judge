@@ -85,6 +85,9 @@
         <commonmark.version>0.30.0</commonmark.version>
         <errorprone.version>2.50.0</errorprone.version>
         <nullaway.version>0.13.8</nullaway.version>
+        <!-- the errorprone profile fails on any finding; measure overrides both for report mode -->
+        <errorprone.failOnWarning>true</errorprone.failOnWarning>
+        <errorprone.extraArgs>-XepDisableWarningsInGeneratedCode</errorprone.extraArgs>
 
         <!-- Test dependency versions -->
         <junit-jupiter.version>5.14.4</junit-jupiter.version>
@@ -302,6 +305,64 @@
     </distributionManagement>
 
     <profiles>
+        <!-- Error Prone gate (java-guardrails): Error Prone's default-enabled checks and NullAway, at
+             ERROR, on main sources. Judge targets Java 21, so the profile is active on every build
+             (activation by JDK 21+). The javac internals Error Prone needs are opened in .mvn/jvm.config.
+             - failOnWarning (javac -Werror): a check whose default severity is WARNING fails the build
+               like an ERROR one, and so do javac's own default warnings (removal, for one). A new Error
+               Prone version brings its new checks in at ERROR: triage them on upgrade.
+             - SystemOut at ERROR: a library does not print.
+             - NullAway only in @NullMarked packages (OnlyNullMarked), in JSpecify mode; this replaces
+               the per-module NullAway-only configurations (-XepDisableAllChecks) of earlier releases.
+             - only the main compile execution (default-compile): test sources are not checked;
+             - never fork the compiler (compiler-plugin then hides every diagnostic). -->
+        <profile>
+            <id>errorprone</id>
+            <activation>
+                <jdk>[21,)</jdk>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>default-compile</id>
+                                <configuration>
+                                    <!-- errorprone.failOnWarning and errorprone.extraArgs are properties so that
+                                         `measure` can run the same profile in report mode:
+                                         -Derrorprone.failOnWarning=false -Derrorprone.extraArgs=-XepAllErrorsAsWarnings -->
+                                    <failOnWarning>${errorprone.failOnWarning}</failOnWarning>
+                                    <compilerArgs>
+                                        <arg>-XDcompilePolicy=simple</arg>
+                                        <arg>-Xmaxerrs</arg>
+                                        <arg>10000</arg>
+                                        <arg>-Xmaxwarns</arg>
+                                        <arg>10000</arg>
+                                        <arg>--should-stop=ifError=FLOW</arg>
+                                        <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
+                                        <arg>-Xplugin:ErrorProne -Xep:SystemOut:ERROR -Xep:NullAway:ERROR -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:OnlyNullMarked=true ${errorprone.extraArgs}</arg>
+                                    </compilerArgs>
+                                    <annotationProcessorPaths>
+                                        <path>
+                                            <groupId>com.google.errorprone</groupId>
+                                            <artifactId>error_prone_core</artifactId>
+                                            <version>${errorprone.version}</version>
+                                        </path>
+                                        <path>
+                                            <groupId>com.uber.nullaway</groupId>
+                                            <artifactId>nullaway</artifactId>
+                                            <version>${nullaway.version}</version>
+                                        </path>
+                                    </annotationProcessorPaths>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <!-- OWASP dependency-check: build-time CVE gate (fails on HIGH+). Run: ./mvnw -Powasp verify -->
         <profile>
             <id>owasp</id>
