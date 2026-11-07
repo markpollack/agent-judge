@@ -101,6 +101,12 @@
         <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
         <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
+        <!-- PMD size, complexity and duplication gate (java-guardrails) -->
+        <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
+        <pmd.version>7.28.0</pmd.version>
+        <cpd.minimumTokens>100</cpd.minimumTokens>
+        <!-- PMD-only ratchet, overridden per module; CPD always allows zero duplications. -->
+        <pmd.maxAllowedViolations>0</pmd.maxAllowedViolations>
         <!-- SpotBugs gate (java-guardrails). spotbugs-maven-plugin 4.10.x requires Maven 3.8.9+; with the
              3.8.6 wrapper the 4.9.8.x plugin runs the current SpotBugs engine below. -->
         <spotbugs-maven-plugin.version>4.9.8.5</spotbugs-maven-plugin.version>
@@ -658,6 +664,65 @@
                         <goals>
                             <goal>check</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+
+            <!-- PMD size, complexity and duplication gate: pmd:check and pmd:cpd-check fail
+                 verify above the PMD allowance or on any CPD violation. Rules and thresholds are in
+                 config/pmd/ruleset.xml; CPD's token threshold is cpd.minimumTokens above. Main
+                 sources only. Fix a violation in the code: there is no baseline. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <version>${maven-pmd-plugin.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>net.sourceforge.pmd</groupId>
+                        <artifactId>pmd-core</artifactId>
+                        <version>${pmd.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>net.sourceforge.pmd</groupId>
+                        <artifactId>pmd-java</artifactId>
+                        <version>${pmd.version}</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <rulesets>
+                        <ruleset>${maven.multiModuleProjectDirectory}/config/pmd/ruleset.xml</ruleset>
+                    </rulesets>
+                    <targetJdk>${java.version}</targetJdk>
+                    <includeTests>false</includeTests>
+                    <minimumTokens>${cpd.minimumTokens}</minimumTokens>
+                    <printFailingErrors>true</printFailingErrors>
+                    <failOnViolation>true</failOnViolation>
+                    <!-- Direct goals stay strict, including when pmd.maxAllowedViolations is set.
+                         The PMD allowance belongs only to the pmd-gate execution below. -->
+                    <maxAllowedViolations>0</maxAllowedViolations>
+                    <linkXRef>false</linkXRef>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>pmd-gate</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <maxAllowedViolations>${pmd.maxAllowedViolations}</maxAllowedViolations>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>cpd-gate</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>cpd-check</goal>
+                        </goals>
+                        <configuration>
+                            <maxAllowedViolations>0</maxAllowedViolations>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

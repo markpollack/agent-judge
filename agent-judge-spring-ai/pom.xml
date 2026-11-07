@@ -11,6 +11,11 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
+    <properties>
+        <!-- PMD ratchet (java-guardrails): today's count, lowered as fixes land, never raised -->
+        <pmd.maxAllowedViolations>4</pmd.maxAllowedViolations>
+    </properties>
+
     <artifactId>agent-judge-spring-ai</artifactId>
     <packaging>jar</packaging>
 

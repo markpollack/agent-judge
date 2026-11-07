@@ -6,6 +6,11 @@
         <artifactId>agent-judge-parent</artifactId>
         <version>0.19.0-SNAPSHOT</version>
     </parent>
+
+    <properties>
+        <!-- PMD ratchet (java-guardrails): today's count, lowered as fixes land, never raised -->
+        <pmd.maxAllowedViolations>10</pmd.maxAllowedViolations>
+    </properties>
     <artifactId>agent-judge-jev</artifactId>
     <name>Agent Judge Jev</name>
     <description>Bounded TypeSafe Jev evaluation adapter</description>

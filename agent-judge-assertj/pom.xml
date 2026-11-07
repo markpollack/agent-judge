@@ -6,6 +6,11 @@
         <artifactId>agent-judge-parent</artifactId>
         <version>0.19.0-SNAPSHOT</version>
     </parent>
+
+    <properties>
+        <!-- PMD ratchet (java-guardrails): today's count, lowered as fixes land, never raised -->
+        <pmd.maxAllowedViolations>1</pmd.maxAllowedViolations>
+    </properties>
     <artifactId>agent-judge-assertj</artifactId>
     <name>Agent Judge AssertJ</name>
     <description>Staged requirement assertions for AssertJ</description>
