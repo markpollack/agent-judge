@@ -31,8 +31,8 @@ public final class RequirementAssertions {
 					"Satisfaction requires an associated Requirement; inspect the neutral conclusion for evidence-only checks");
 		var conclusion = result.verdict().conclusion();
 		if (conclusion == Verdict.Conclusion.PASS && (result.policyResult() instanceof PolicyResult.NotRequested
-				|| result.policyResult() instanceof PolicyResult.Decided d
-						&& d.decision().action() == PolicyAction.RELY))
+				|| (result.policyResult() instanceof PolicyResult.Decided d
+						&& d.decision().action() == PolicyAction.RELY)))
 			return;
 		throw new RequirementAssertionError(result);
 	}

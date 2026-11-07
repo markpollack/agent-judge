@@ -283,8 +283,8 @@ public final class Assertions {
 	private static void requirePassed(EvaluationResult result) {
 		if (result.verdict().conclusion() != Verdict.Conclusion.PASS
 				|| result.policyResult() instanceof PolicyResult.Failed
-				|| result.policyResult() instanceof PolicyResult.Decided decision
-						&& decision.decision().action() != PolicyAction.RELY)
+				|| (result.policyResult() instanceof PolicyResult.Decided decision
+						&& decision.decision().action() != PolicyAction.RELY))
 			throw new RequirementAssertionError(result);
 	}
 

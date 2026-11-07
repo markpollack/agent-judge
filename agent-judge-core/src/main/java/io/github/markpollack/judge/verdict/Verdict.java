@@ -463,7 +463,7 @@ public record Verdict(Judgment judgment, List<Judgment> individual, Map<String, 
 		boolean complete = original.refusedReturn() != null;
 		if (complete)
 			original = original.refusedReturn().original();
-		boolean rejected = complete || original.notApplicable() && notApplicableWhen == null;
+		boolean rejected = complete || (original.notApplicable() && notApplicableWhen == null);
 		Judgment treatment = complete ? returned
 				: rejected ? Judgment.error(
 						io.github.markpollack.judge.judgment.JudgmentReasonCode.UNDECLARED_NOT_APPLICABLE,

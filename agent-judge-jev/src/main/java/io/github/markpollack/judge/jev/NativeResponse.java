@@ -40,7 +40,7 @@ record NativeResponse(String model, long inputTokens, long outputTokens, Judgmen
 	static Envelope envelope(byte[] bytes, boolean gateway) {
 		JsonNode root = Checks.parse(bytes);
 		String model = text(root.path("model"));
-		if (!(model.matches("jev-[0-9]+\\.[0-9]+\\.[0-9]+") || gateway && model.equals("typesafe-ai/jev")))
+		if (!(model.matches("jev-[0-9]+\\.[0-9]+\\.[0-9]+") || (gateway && model.equals("typesafe-ai/jev"))))
 			throw invalid();
 		JsonNode usage = root.path("usage");
 		return new Envelope(model, tokens(usage.path("input_tokens")), tokens(usage.path("output_tokens")),
@@ -60,7 +60,7 @@ record NativeResponse(String model, long inputTokens, long outputTokens, Judgmen
 				return null;
 			BigDecimal decimal = new BigDecimal(node.asText());
 			double amount = decimal.doubleValue();
-			return decimal.signum() < 0 || !Double.isFinite(amount) || amount == 0 && decimal.signum() != 0 ? null
+			return decimal.signum() < 0 || !Double.isFinite(amount) || (amount == 0 && decimal.signum() != 0) ? null
 					: amount;
 		}
 		catch (IOException | NumberFormatException e) {
