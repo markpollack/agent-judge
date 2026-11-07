@@ -213,6 +213,50 @@ final class RosterJuries {
 		return complete(requirements, attempts, List.of(result.invocation()), parsed.metadata());
 	}
 
+	/**
+	 * The judgment of one generated single-requirement audit.
+	 * @param requirement the judged requirement
+	 * @param parsed the parser's rollup over that one requirement
+	 * @param result the generated execution
+	 * @return the requirement's judgment, carrying the parser's facts and the invocation
+	 */
+	static Judgment single(Requirement<?> requirement, Judgment parsed, NativeExecution<EvalModelResponse> result) {
+		if (!Boolean.TRUE.equals(parsed.metadata().get("protocolIdentityBound"))) {
+			// Preserve the full refused envelope and observed child; never promote its
+			// apparent determination when parser identity admission failed.
+			return parsed.forRequirement(requirement).withInvocation(result.invocation());
+		}
+		Judgment answer = parsed.checks().get(0).judgment();
+		// Single operation retains parser diagnostics, the actual input and the original
+		// native response facts.
+		return answer.toBuilder()
+			.metadata(parsed.metadata())
+			.build()
+			.forRequirement(requirement)
+			.withInvocation(result.invocation());
+	}
+
+	/**
+	 * One typed structured judging of a single requirement, refusing a returned answer
+	 * that does not fit the requirement.
+	 * @param <S> specification type
+	 * @param <E> evidence type
+	 * @param runtime typed native protocol
+	 * @param requirement the judged requirement
+	 * @param evidence acquisition, invoked once
+	 * @return the requirement's judgment
+	 */
+	static <S, E> Judgment typed(EvalRuntime<RequirementRequest<S, E>, Judgment> runtime, Requirement<S> requirement,
+			java.util.function.Supplier<? extends E> evidence) {
+		if (Thread.currentThread().isInterrupted())
+			throw new java.util.concurrent.CancellationException("Judging interrupted before invocation");
+		NativeExecution<Judgment> result = runtime.execute(
+				new RequirementRequest<>(requirement, Objects.requireNonNull(evidence.get(), "acquired evidence")));
+		if (Thread.currentThread().isInterrupted())
+			throw new java.util.concurrent.CancellationException("Judging interrupted after return");
+		return Judgment.refuse(result.answer(), requirement, result.invocation());
+	}
+
 	private static <S> Verdict child(Requirement<S> req, Judgment original,
 			Function<S, @Nullable String> applicability) {
 		return Verdict.observed(req.id(), original, applicability.apply(req.specification())).forRequirement(req);

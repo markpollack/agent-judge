@@ -184,58 +184,16 @@ public final class EarsJury implements Jury {
 	 *
 	 * @param <E> evidence type
 	 */
-	public static final class StructuredRoster<E> implements io.github.markpollack.judge.jury.JuryEvidenceStep<E> {
-
-		private final EvalRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime;
-
-		private final List<Requirement<EarsSpecification>> requirements;
+	public static final class StructuredRoster<E> extends StructuredRosterStage<EarsSpecification, E> {
 
 		private StructuredRoster(EvalRuntime<RequirementRequest<EarsSpecification, E>, Judgment> runtime,
 				List<Requirement<EarsSpecification>> requirements) {
-			this.runtime = runtime;
-			this.requirements = requirements;
+			super(runtime, requirements, EarsSpecification::applicability);
 		}
 
 		@Override
-		public io.github.markpollack.judge.jury.ReadyJury evidence(E evidence) {
-			Objects.requireNonNull(evidence);
-			return evidenceSupplier(() -> evidence);
-		}
-
-		@Override
-		public io.github.markpollack.judge.jury.ReadyJury evidenceSupplier(Supplier<? extends E> evidence) {
-			Objects.requireNonNull(evidence);
-			return () -> new EarsJury(requirements, () -> structured(
-					RosterJuries.common(requirements, Objects.requireNonNull(evidence.get(), "acquired evidence"))));
-		}
-
-		/**
-		 * Selects a separate actual evidence bundle for each declared requirement.
-		 * @param evidence complete map keyed by actual requirement identity
-		 * @return ready Jury construction
-		 */
-		public io.github.markpollack.judge.jury.ReadyJury evidenceByRequirement(Map<String, ? extends E> evidence) {
-			Map<String, E> captured = checked(evidence);
-			return evidenceByRequirementSupplier(() -> captured);
-		}
-
-		/**
-		 * Acquires one coherent collection snapshot before any native item executes.
-		 * @param evidence complete requirement-specific acquisition
-		 * @return ready Jury construction
-		 */
-		public io.github.markpollack.judge.jury.ReadyJury evidenceByRequirementSupplier(
-				Supplier<? extends Map<String, ? extends E>> evidence) {
-			Objects.requireNonNull(evidence);
-			return () -> new EarsJury(requirements, () -> structured(checked(evidence.get())));
-		}
-
-		private Map<String, E> checked(Map<String, ? extends E> values) {
-			return RosterJuries.checked(requirements, values);
-		}
-
-		private Verdict structured(Map<String, E> evidence) {
-			return RosterJuries.structured(requirements, runtime, evidence, EarsSpecification::applicability);
+		EarsJury jury(List<Requirement<EarsSpecification>> requirements, Supplier<Verdict> operation) {
+			return new EarsJury(requirements, operation);
 		}
 
 	}

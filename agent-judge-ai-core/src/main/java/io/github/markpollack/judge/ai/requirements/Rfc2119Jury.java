@@ -184,58 +184,16 @@ public final class Rfc2119Jury implements Jury {
 	 *
 	 * @param <E> evidence type
 	 */
-	public static final class StructuredRoster<E> implements io.github.markpollack.judge.jury.JuryEvidenceStep<E> {
-
-		private final EvalRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime;
-
-		private final List<Requirement<Rfc2119Specification>> requirements;
+	public static final class StructuredRoster<E> extends StructuredRosterStage<Rfc2119Specification, E> {
 
 		private StructuredRoster(EvalRuntime<RequirementRequest<Rfc2119Specification, E>, Judgment> runtime,
 				List<Requirement<Rfc2119Specification>> requirements) {
-			this.runtime = runtime;
-			this.requirements = requirements;
+			super(runtime, requirements, Rfc2119Specification::applicability);
 		}
 
 		@Override
-		public io.github.markpollack.judge.jury.ReadyJury evidence(E evidence) {
-			Objects.requireNonNull(evidence);
-			return evidenceSupplier(() -> evidence);
-		}
-
-		@Override
-		public io.github.markpollack.judge.jury.ReadyJury evidenceSupplier(Supplier<? extends E> evidence) {
-			Objects.requireNonNull(evidence);
-			return () -> new Rfc2119Jury(requirements, () -> structured(
-					RosterJuries.common(requirements, Objects.requireNonNull(evidence.get(), "acquired evidence"))));
-		}
-
-		/**
-		 * Selects a separate actual evidence bundle for each declared requirement.
-		 * @param evidence complete map keyed by actual requirement identity
-		 * @return ready Jury construction
-		 */
-		public io.github.markpollack.judge.jury.ReadyJury evidenceByRequirement(Map<String, ? extends E> evidence) {
-			Map<String, E> captured = checked(evidence);
-			return evidenceByRequirementSupplier(() -> captured);
-		}
-
-		/**
-		 * Acquires one coherent collection snapshot before any native item executes.
-		 * @param evidence complete requirement-specific acquisition
-		 * @return ready Jury construction
-		 */
-		public io.github.markpollack.judge.jury.ReadyJury evidenceByRequirementSupplier(
-				Supplier<? extends Map<String, ? extends E>> evidence) {
-			Objects.requireNonNull(evidence);
-			return () -> new Rfc2119Jury(requirements, () -> structured(checked(evidence.get())));
-		}
-
-		private Map<String, E> checked(Map<String, ? extends E> values) {
-			return RosterJuries.checked(requirements, values);
-		}
-
-		private Verdict structured(Map<String, E> evidence) {
-			return RosterJuries.structured(requirements, runtime, evidence, Rfc2119Specification::applicability);
+		Rfc2119Jury jury(List<Requirement<Rfc2119Specification>> requirements, Supplier<Verdict> operation) {
+			return new Rfc2119Jury(requirements, operation);
 		}
 
 	}

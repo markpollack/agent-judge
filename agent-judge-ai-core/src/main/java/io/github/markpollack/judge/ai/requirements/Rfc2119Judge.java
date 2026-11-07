@@ -77,17 +77,7 @@ public final class Rfc2119Judge implements Judge {
 					@Override
 					public ReadyJudge evidenceSupplier(Supplier<? extends E> evidence) {
 						Objects.requireNonNull(evidence);
-						return () -> new Rfc2119Judge(() -> {
-							if (Thread.currentThread().isInterrupted())
-								throw new java.util.concurrent.CancellationException(
-										"Judging interrupted before invocation");
-							NativeExecution<Judgment> result = runtime.execute(new RequirementRequest<>(requirement,
-									Objects.requireNonNull(evidence.get(), "acquired evidence")));
-							if (Thread.currentThread().isInterrupted())
-								throw new java.util.concurrent.CancellationException(
-										"Judging interrupted after return");
-							return Judgment.refuse(result.answer(), requirement, result.invocation());
-						});
+						return () -> new Rfc2119Judge(() -> RosterJuries.typed(runtime, requirement, evidence));
 					}
 				};
 			};
@@ -96,18 +86,15 @@ public final class Rfc2119Judge implements Judge {
 	}
 
 	/** Generated judging setup, reusable across independent requirements. */
-	public static final class GeneratedBuilder implements JudgeRecipe<Rfc2119Specification, String> {
-
-		private final EvalModel runtime;
+	public static final class GeneratedBuilder extends GeneratedRecipeStage<Rfc2119Specification, GeneratedRequirement> {
 
 		private GeneratedBuilder(EvalModel runtime) {
-			this.runtime = runtime;
+			super(runtime);
 		}
 
 		@Override
-		public GeneratedRequirement requirement(Requirement<Rfc2119Specification> requirement) {
-			Requirement.validate(requirement);
-			return new GeneratedRequirement(runtime, requirement);
+		GeneratedRequirement stage(EvalModel model, Requirement<Rfc2119Specification> requirement) {
+			return new GeneratedRequirement(model, requirement);
 		}
 
 	}
@@ -115,40 +102,23 @@ public final class Rfc2119Judge implements Judge {
 	/**
 	 * A requirement is fixed; prepared evidence or investigation can be selected once.
 	 */
-	public static final class GeneratedRequirement implements EvidenceStep<String>, ReadyJudge {
-
-		private final EvalModel runtime;
+	public static final class GeneratedRequirement extends GeneratedRequirementStage<Rfc2119Judge> {
 
 		private final Requirement<Rfc2119Specification> requirement;
 
 		private GeneratedRequirement(EvalModel runtime, Requirement<Rfc2119Specification> requirement) {
-			this.runtime = runtime;
+			super(runtime);
 			this.requirement = requirement;
 		}
 
 		@Override
-		public ReadyJudge evidence(String evidence) {
-			Objects.requireNonNull(evidence);
-			return evidenceSupplier(() -> evidence);
+		Rfc2119Judge judge(Supplier<Judgment> execution) {
+			return new Rfc2119Judge(execution);
 		}
 
 		@Override
-		public ReadyJudge evidenceSupplier(Supplier<? extends String> evidence) {
-			Objects.requireNonNull(evidence);
-			runtime.requireInput(GeneratedInput.PREPARED_EVIDENCE);
-			return () -> new Rfc2119Judge(() -> generated(runtime, requirement,
-					"Prepared evidence:\n" + Objects.requireNonNull(evidence.get(), "acquired evidence")));
-		}
-
-		/**
-		 * Builds an integrated investigation; native workspace/tools stay on the harness.
-		 * @return ready investigative Judge
-		 */
-		@Override
-		public Rfc2119Judge build() {
-			runtime.requireInput(GeneratedInput.INTEGRATED_INVESTIGATION);
-			return new Rfc2119Judge(() -> generated(runtime, requirement,
-					"Investigate with the configured native workspace and tools."));
+		Judgment generated(EvalModel model, String input) {
+			return Rfc2119Judge.generated(model, requirement, input);
 		}
 
 	}
@@ -158,22 +128,8 @@ public final class Rfc2119Judge implements Judge {
 				requirement.specification().requirement(), requirement.specification().reason(),
 				requirement.specification().applicability());
 		String prompt = Rfc2119Parser.templateFor("Rfc2119", List.of(nativeSpec)).render(Map.of("workspace", input));
-		NativeExecution<EvalModelResponse> result = runtime
-			.execute(EvalModelRequest.user(RequirementPrompts.header(requirement) + prompt));
-		Judgment parsed = Rfc2119Parser.rollupFor(List.of(nativeSpec), result.answer());
-		if (!Boolean.TRUE.equals(parsed.metadata().get("protocolIdentityBound"))) {
-			// Preserve the full refused envelope and observed child; never promote
-			// its apparent determination when parser identity admission failed.
-			return parsed.forRequirement(requirement).withInvocation(result.invocation());
-		}
-		Judgment answer = parsed.checks().get(0).judgment();
-		// Single operation retains parser diagnostics, the actual input and the original
-		// native response facts.
-		return answer.toBuilder()
-			.metadata(parsed.metadata())
-			.build()
-			.forRequirement(requirement)
-			.withInvocation(result.invocation());
+		NativeExecution<EvalModelResponse> result = runtime.execute(RosterJuries.request(List.of(requirement), prompt));
+		return RosterJuries.single(requirement, Rfc2119Parser.rollupFor(List.of(nativeSpec), result.answer()), result);
 	}
 
 }

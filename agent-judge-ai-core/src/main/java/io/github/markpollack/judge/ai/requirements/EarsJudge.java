@@ -77,17 +77,7 @@ public final class EarsJudge implements Judge {
 					@Override
 					public ReadyJudge evidenceSupplier(Supplier<? extends E> evidence) {
 						Objects.requireNonNull(evidence);
-						return () -> new EarsJudge(() -> {
-							if (Thread.currentThread().isInterrupted())
-								throw new java.util.concurrent.CancellationException(
-										"Judging interrupted before invocation");
-							NativeExecution<Judgment> result = runtime.execute(new RequirementRequest<>(requirement,
-									Objects.requireNonNull(evidence.get(), "acquired evidence")));
-							if (Thread.currentThread().isInterrupted())
-								throw new java.util.concurrent.CancellationException(
-										"Judging interrupted after return");
-							return Judgment.refuse(result.answer(), requirement, result.invocation());
-						});
+						return () -> new EarsJudge(() -> RosterJuries.typed(runtime, requirement, evidence));
 					}
 				};
 			};
@@ -96,18 +86,15 @@ public final class EarsJudge implements Judge {
 	}
 
 	/** Generated judging setup, reusable across independent requirements. */
-	public static final class GeneratedBuilder implements JudgeRecipe<EarsSpecification, String> {
-
-		private final EvalModel runtime;
+	public static final class GeneratedBuilder extends GeneratedRecipeStage<EarsSpecification, GeneratedRequirement> {
 
 		private GeneratedBuilder(EvalModel runtime) {
-			this.runtime = runtime;
+			super(runtime);
 		}
 
 		@Override
-		public GeneratedRequirement requirement(Requirement<EarsSpecification> requirement) {
-			Requirement.validate(requirement);
-			return new GeneratedRequirement(runtime, requirement);
+		GeneratedRequirement stage(EvalModel model, Requirement<EarsSpecification> requirement) {
+			return new GeneratedRequirement(model, requirement);
 		}
 
 	}
@@ -115,40 +102,23 @@ public final class EarsJudge implements Judge {
 	/**
 	 * A requirement is fixed; prepared evidence or investigation can be selected once.
 	 */
-	public static final class GeneratedRequirement implements EvidenceStep<String>, ReadyJudge {
-
-		private final EvalModel runtime;
+	public static final class GeneratedRequirement extends GeneratedRequirementStage<EarsJudge> {
 
 		private final Requirement<EarsSpecification> requirement;
 
 		private GeneratedRequirement(EvalModel runtime, Requirement<EarsSpecification> requirement) {
-			this.runtime = runtime;
+			super(runtime);
 			this.requirement = requirement;
 		}
 
 		@Override
-		public ReadyJudge evidence(String evidence) {
-			Objects.requireNonNull(evidence);
-			return evidenceSupplier(() -> evidence);
+		EarsJudge judge(Supplier<Judgment> execution) {
+			return new EarsJudge(execution);
 		}
 
 		@Override
-		public ReadyJudge evidenceSupplier(Supplier<? extends String> evidence) {
-			Objects.requireNonNull(evidence);
-			runtime.requireInput(GeneratedInput.PREPARED_EVIDENCE);
-			return () -> new EarsJudge(() -> generated(runtime, requirement,
-					"Prepared evidence:\n" + Objects.requireNonNull(evidence.get(), "acquired evidence")));
-		}
-
-		/**
-		 * Builds an integrated investigation; native workspace/tools stay on the harness.
-		 * @return ready investigative Judge
-		 */
-		@Override
-		public EarsJudge build() {
-			runtime.requireInput(GeneratedInput.INTEGRATED_INVESTIGATION);
-			return new EarsJudge(() -> generated(runtime, requirement,
-					"Investigate with the configured native workspace and tools."));
+		Judgment generated(EvalModel model, String input) {
+			return EarsJudge.generated(model, requirement, input);
 		}
 
 	}
@@ -157,22 +127,8 @@ public final class EarsJudge implements Judge {
 		EarsCriterion nativeSpec = new EarsCriterion(requirement.id(), requirement.specification().title(),
 				requirement.specification().requirement(), requirement.specification().applicability());
 		String prompt = EarsParser.templateFor("Ears", List.of(nativeSpec)).render(Map.of("workspace", input));
-		NativeExecution<EvalModelResponse> result = runtime
-			.execute(EvalModelRequest.user(RequirementPrompts.header(requirement) + prompt));
-		Judgment parsed = EarsParser.rollupFor(List.of(nativeSpec), result.answer());
-		if (!Boolean.TRUE.equals(parsed.metadata().get("protocolIdentityBound"))) {
-			// Preserve the full refused envelope and observed child; never promote
-			// its apparent determination when parser identity admission failed.
-			return parsed.forRequirement(requirement).withInvocation(result.invocation());
-		}
-		Judgment answer = parsed.checks().get(0).judgment();
-		// Single operation retains parser diagnostics, the actual input and the original
-		// native response facts.
-		return answer.toBuilder()
-			.metadata(parsed.metadata())
-			.build()
-			.forRequirement(requirement)
-			.withInvocation(result.invocation());
+		NativeExecution<EvalModelResponse> result = runtime.execute(RosterJuries.request(List.of(requirement), prompt));
+		return RosterJuries.single(requirement, EarsParser.rollupFor(List.of(nativeSpec), result.answer()), result);
 	}
 
 }
