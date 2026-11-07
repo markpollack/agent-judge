@@ -1169,47 +1169,53 @@ final class Interpreter {
 		}
 		@Nullable Integer passes = e.passCount();
 		@Nullable Integer fails = e.failCount();
-		switch (e.strategy()) {
-			case "consensus" -> {
-				if (passes == null) {
-					return Expectation.missing(AggregationEvidence.PASS_COUNT);
-				}
-				if (fails == null) {
-					return Expectation.missing(AggregationEvidence.FAIL_COUNT);
-				}
-				return Expectation.of(passes.equals(eligible) ? PASS : fails.equals(eligible) ? FAIL : ABSTAIN);
-			}
-			case "majority" -> {
-				if (passes == null) {
-					return Expectation.missing(AggregationEvidence.PASS_COUNT);
-				}
-				if (fails == null) {
-					return Expectation.missing(AggregationEvidence.FAIL_COUNT);
-				}
-				if (passes.equals(fails)) {
-					return new Expectation(null, null, true, null);
-				}
-				return Expectation.of(passes > fails ? PASS : FAIL);
-			}
-			case "allMustPass" -> {
-				if (fails == null) {
-					return Expectation.missing(AggregationEvidence.FAIL_COUNT);
-				}
-				return Expectation.of(fails == 0 ? PASS : FAIL);
-			}
-			case "average", "weightedAverage", "median", "conjunctive" -> {
-				if (e.threshold() == null) {
-					return Expectation.missing(AggregationEvidence.THRESHOLD);
-				}
-				if (!(aggregated.get("score") instanceof Number score)) {
-					return Expectation.open();
-				}
-				return Expectation.of(score.doubleValue() >= e.threshold() ? PASS : FAIL);
-			}
-			default -> {
-				return Expectation.open();
-			}
+		return switch (e.strategy()) {
+			case "consensus" -> consensus(passes, fails, eligible);
+			case "majority" -> majority(passes, fails);
+			case "allMustPass" -> allMustPass(fails);
+			case "average", "weightedAverage", "median", "conjunctive" -> threshold(e, aggregated);
+			default -> Expectation.open();
+		};
+	}
+
+	private static Expectation consensus(@Nullable Integer passes, @Nullable Integer fails, int eligible) {
+		if (passes == null) {
+			return Expectation.missing(AggregationEvidence.PASS_COUNT);
 		}
+		if (fails == null) {
+			return Expectation.missing(AggregationEvidence.FAIL_COUNT);
+		}
+		return Expectation.of(passes.equals(eligible) ? PASS : fails.equals(eligible) ? FAIL : ABSTAIN);
+	}
+
+	private static Expectation majority(@Nullable Integer passes, @Nullable Integer fails) {
+		if (passes == null) {
+			return Expectation.missing(AggregationEvidence.PASS_COUNT);
+		}
+		if (fails == null) {
+			return Expectation.missing(AggregationEvidence.FAIL_COUNT);
+		}
+		if (passes.equals(fails)) {
+			return new Expectation(null, null, true, null);
+		}
+		return Expectation.of(passes > fails ? PASS : FAIL);
+	}
+
+	private static Expectation allMustPass(@Nullable Integer fails) {
+		if (fails == null) {
+			return Expectation.missing(AggregationEvidence.FAIL_COUNT);
+		}
+		return Expectation.of(fails == 0 ? PASS : FAIL);
+	}
+
+	private static Expectation threshold(Evidence e, Map<String, Object> aggregated) {
+		if (e.threshold() == null) {
+			return Expectation.missing(AggregationEvidence.THRESHOLD);
+		}
+		if (!(aggregated.get("score") instanceof Number score)) {
+			return Expectation.open();
+		}
+		return Expectation.of(score.doubleValue() >= e.threshold() ? PASS : FAIL);
 	}
 
 	private static boolean hasMachineryOrigin(Map<String, Long> origin) {
