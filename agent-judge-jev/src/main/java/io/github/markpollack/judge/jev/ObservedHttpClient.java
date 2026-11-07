@@ -135,7 +135,9 @@ final class ObservedHttpClient extends HttpClient {
 				return super.cancel(mayInterrupt);
 			}
 		};
-		source.whenComplete((response, failure) -> {
+		// The callback completes the exposed future on every outcome, fatal errors included, so
+		// the callback's own future carries nothing a caller needs.
+		var unused = source.whenComplete((response, failure) -> {
 			try {
 				if (failure != null) {
 					finish(false);
@@ -179,6 +181,12 @@ final class ObservedHttpClient extends HttpClient {
 					}
 					result.completeExceptionally(new IOException("Invalid provider response"));
 				}
+			}
+			catch (Error fatal) {
+				// The callback's own future is not exposed, so a fatal error thrown here
+				// reaches the caller only through the exposed future.
+				finish(false);
+				result.completeExceptionally(fatal);
 			}
 			finally {
 				observed.complete(null);
