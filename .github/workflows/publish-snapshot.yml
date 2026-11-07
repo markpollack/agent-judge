@@ -1,7 +1,9 @@
 name: Publish Snapshot
 
-# Every push to main that changes more than docs publishes the development snapshot, so consumers
-# take each fix as it lands. A dispatch publishes the branch head on demand.
+# A push to main that changes anything other than top-level Markdown publishes the development
+# snapshot, so consumers take each fix as it lands. A dispatch publishes the selected ref on demand.
+# Runs queue per ref and are never cancelled mid-deploy: a running publication completes, and while
+# it runs only the newest waiting push is kept, so an intermediate push can be superseded.
 on:
   push:
     branches: [main]
@@ -11,7 +13,7 @@ on:
 
 concurrency:
   group: publish-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   publish:
