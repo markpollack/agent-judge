@@ -134,6 +134,9 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 	private static final Pattern METADATA = Pattern.compile(
 			"^(?:\\*\\*)?(?:Covers|Rules?|Tests|Status):(?:\\*\\*)?(?:\\s|$)", Pattern.CASE_INSENSITIVE);
 
+	/** The EARS modal verb every requirement sentence states. */
+	private static final Pattern SHALL = Pattern.compile("\\bshall\\b", Pattern.CASE_INSENSITIVE);
+
 	/** A heading that looks like a criterion but is not written exactly as {@link #HEADING}. */
 	private static final Pattern CRITERION_LIKE = Pattern.compile("^#{1,6}\\s+UC\\d+-AC\\d+\\b.*$",
 			Pattern.CASE_INSENSITIVE);
@@ -225,6 +228,7 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 			}
 			if (entry.requirement == null) {
 				entry.requirement = text;
+				entry.requirementLine = line.number();
 				entry.open = true;
 			}
 			else if (entry.open && line.continuation() && !labelled(line.content())) {
@@ -271,6 +275,19 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 			problems.add(new RequirementDocumentProblem(sourceName, entry.id, entry.line,
 					"no requirement sentence before the next heading or the end of the document"));
 		}
+		if (requirement != null) {
+			// Completeness: a sentence that never says what the system shall do, or that
+			// stops mid-clause, is most likely truncated, and a judge would be asked to
+			// assess half a requirement.
+			if (!SHALL.matcher(requirement).find()) {
+				problems.add(new RequirementDocumentProblem(sourceName, entry.id, entry.requirementLine,
+						"requirement sentence has no `shall`; an EARS requirement states what the system shall do"));
+			}
+			if (!MarkdownRequirementDocument.endsSentence(requirement)) {
+				problems.add(new RequirementDocumentProblem(sourceName, entry.id, entry.requirementLine,
+						"requirement sentence does not end in terminal punctuation (. ! ?); it may be truncated"));
+			}
+		}
 		problems.addAll(entry.problems);
 		if (requirement != null) {
 			criteria.add(new EarsCriterion(entry.id, entry.title, requirement, entry.applicability));
@@ -292,6 +309,9 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 
 		/** Whether the requirement paragraph is still being read. */
 		private boolean open;
+
+		/** The line the requirement sentence starts on. */
+		private int requirementLine;
 
 		private final List<RequirementDocumentProblem> problems = new ArrayList<>();
 

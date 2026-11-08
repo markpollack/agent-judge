@@ -146,6 +146,22 @@ final class MarkdownRequirementDocument {
 	}
 
 	/**
+	 * Whether a requirement sentence visibly ends: its last character, after any closing
+	 * brackets, quotes or inline-markup characters, is {@code .}, {@code !} or
+	 * {@code ?}. A sentence that stops mid-clause, such as one truncated at a line break,
+	 * does not.
+	 * @param sentence a requirement sentence
+	 * @return true when the sentence ends in terminal punctuation
+	 */
+	static boolean endsSentence(String sentence) {
+		String text = sentence.strip();
+		int end = text.length();
+		while (end > 0 && ")]}\"'`*_".indexOf(text.charAt(end - 1)) >= 0)
+			end--;
+		return end > 0 && ".!?".indexOf(text.charAt(end - 1)) >= 0;
+	}
+
+	/**
 	 * The applicability condition declared on the line.
 	 * @param text a stripped line
 	 * @return the condition, the empty string when the entry is present but blank, or null

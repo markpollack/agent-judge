@@ -210,11 +210,13 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 					if (entry.reason == null) {
 						entry.keyword = must.group(1);
 						entry.requirement = statement;
+						entry.requirementLine = line.number();
 					}
 				}
 				else {
 					entry.keyword = must.group(1);
 					entry.requirement = statement;
+					entry.requirementLine = line.number();
 				}
 				continue;
 			}
@@ -256,6 +258,17 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 		return new Parsed<>(sourceName, List.copyOf(constraints), List.copyOf(problems));
 	}
 
+	/**
+	 * Completeness: a keyword statement that stops mid-clause is most likely truncated.
+	 */
+	private static java.util.Optional<RequirementDocumentProblem> incomplete(Entry entry, String sourceName) {
+		String requirement = entry.requirement;
+		if (requirement == null || MarkdownRequirementDocument.endsSentence(requirement))
+			return java.util.Optional.empty();
+		return java.util.Optional.of(new RequirementDocumentProblem(sourceName, entry.id, entry.requirementLine,
+				"keyword statement does not end in terminal punctuation (. ! ?); it may be truncated"));
+	}
+
 	private static void finish(@Nullable Entry entry, List<Rfc2119Constraint> constraints,
 			List<RequirementDocumentProblem> problems, Set<String> seen, String sourceName) {
 		if (entry == null) {
@@ -276,6 +289,7 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 			problems.add(new RequirementDocumentProblem(sourceName, entry.id, entry.line,
 					"no `**Reason:**` line before the next heading or the end of the document"));
 		}
+		incomplete(entry, sourceName).ifPresent(problems::add);
 		problems.addAll(entry.problems);
 		if (keyword != null && requirement != null && reason != null) {
 			constraints.add(new Rfc2119Constraint(entry.id, keyword, requirement, reason, entry.applicability));
@@ -296,6 +310,9 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 		private @Nullable String reason;
 
 		private @Nullable String applicability;
+
+		/** The line of the keyword statement in use. */
+		private int requirementLine;
 
 		private final List<RequirementDocumentProblem> problems = new ArrayList<>();
 
