@@ -146,6 +146,19 @@ final class MarkdownRequirementDocument {
 	}
 
 	/**
+	 * A sentence continued by the next line of its paragraph. A soft wrap reads as one
+	 * space, and so does a hard break, whose trailing backslash is markup rather than
+	 * wording (trailing spaces are already stripped).
+	 * @param sentence the sentence so far
+	 * @param next the continuation line's own text
+	 * @return the joined sentence
+	 */
+	static String joined(String sentence, String next) {
+		String head = sentence.endsWith("\\") ? sentence.substring(0, sentence.length() - 1).strip() : sentence;
+		return next.isEmpty() ? head : head + " " + next;
+	}
+
+	/**
 	 * Whether a requirement sentence visibly ends: its last character, after any closing
 	 * brackets, quotes or inline-markup characters, is {@code .}, {@code !} or
 	 * {@code ?}. A sentence that stops mid-clause, such as one truncated at a line break,

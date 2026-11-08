@@ -232,7 +232,7 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 				entry.open = true;
 			}
 			else if (entry.open && line.continuation() && !labelled(line.content())) {
-				entry.requirement = joined(entry.requirement, line.content());
+				entry.requirement = MarkdownRequirementDocument.joined(entry.requirement, line.content());
 			}
 			else {
 				entry.open = false;
@@ -249,16 +249,6 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 	/** A metadata or {@code Applies when:} label, which ends the requirement paragraph. */
 	private static boolean labelled(String content) {
 		return METADATA.matcher(content).find() || MarkdownRequirementDocument.appliesWhen(content) != null;
-	}
-
-	/**
-	 * The sentence so far, continued by the next line of its paragraph. A soft wrap reads
-	 * as one space, and so does a hard break, whose trailing backslash is markup rather
-	 * than wording (trailing spaces are already stripped).
-	 */
-	private static String joined(String sentence, String next) {
-		String head = sentence.endsWith("\\") ? sentence.substring(0, sentence.length() - 1).strip() : sentence;
-		return next.isEmpty() ? head : head + " " + next;
 	}
 
 	private static void finish(@Nullable Entry entry, List<EarsCriterion> criteria,

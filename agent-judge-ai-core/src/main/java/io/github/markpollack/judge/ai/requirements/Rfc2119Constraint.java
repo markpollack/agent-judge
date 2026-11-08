@@ -52,8 +52,11 @@ import org.slf4j.LoggerFactory;
  * <p>
  * The document is read as CommonMark. A rule is a {@code ### RULE-n} (or {@code ### UCn-RULEm})
  * heading with nothing else on its line, followed within the same entry by one bold keyword
- * statement, {@code **MUST** …}, and one {@code **Reason:** …} line, each on its own line of
- * a paragraph. The entry ends at the next heading of any level or at the end of the
+ * statement, {@code **MUST** …}, and one {@code **Reason:** …} line, each starting its own
+ * line of a paragraph. A statement wrapped across lines is read in full: later lines of its
+ * paragraph are joined with single spaces, as Markdown renders a soft wrap (a hard break
+ * joins the same way, without its backslash), up to the next keyword, {@code **Reason:**},
+ * {@code **Covers:**} or {@code Applies when:} line or the end of the paragraph. The entry ends at the next heading of any level or at the end of the
  * document. Two further lines are recognised inside an entry and everything else is prose:
  * {@code **Covers:** …} is traceability and {@code **Applies when:** condition} (also
  * accepted without the bold) declares the optional applicability. Fenced and indented code
@@ -127,6 +130,9 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 	private static final Pattern KEYWORD = Pattern
 		.compile("^\\*\\*(MUST NOT|MUST|SHOULD NOT|SHOULD|MAY)\\*\\*\\s*(.*)$");
 
+	/** {@code **Covers:** …}, the traceability line, bold or plain. */
+	private static final Pattern COVERS = Pattern.compile("^(?:\\*\\*)?Covers:", Pattern.CASE_INSENSITIVE);
+
 	/** A heading that looks like a rule but is not written exactly as {@link #HEADING}. */
 	private static final Pattern RULE_LIKE = Pattern.compile("^#{1,6}\\s+(?:UC\\d+-)?RULE[-_ ]?\\d+\\b.*$",
 			Pattern.CASE_INSENSITIVE);
@@ -199,6 +205,7 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 			}
 			Matcher must = KEYWORD.matcher(text);
 			if (must.matches()) {
+				entry.open = false;
 				String statement = must.group(2).strip();
 				if (statement.isEmpty()) {
 					entry.problems.add(new RequirementDocumentProblem(sourceName, entry.id, line.number(),
@@ -211,15 +218,22 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 						entry.keyword = must.group(1);
 						entry.requirement = statement;
 						entry.requirementLine = line.number();
+						entry.open = true;
 					}
 				}
 				else {
 					entry.keyword = must.group(1);
 					entry.requirement = statement;
 					entry.requirementLine = line.number();
+					entry.open = true;
 				}
 				continue;
 			}
+			if (continues(entry, line)) {
+				entry.requirement = MarkdownRequirementDocument.joined(entry.requirement, line.content());
+				continue;
+			}
+			entry.open = false;
 			if (text.startsWith("**Reason:**")) {
 				String reason = text.substring("**Reason:**".length()).strip();
 				if (reason.isEmpty()) {
@@ -256,6 +270,19 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 		logger.info("{} constraints parsed from {}", constraints.size(), sourceName);
 
 		return new Parsed<>(sourceName, List.copyOf(constraints), List.copyOf(problems));
+	}
+
+	/**
+	 * Whether the line continues the open keyword statement: a later line of the same
+	 * paragraph that is not itself a keyword, {@code **Reason:**}, {@code **Covers:**} or
+	 * {@code Applies when:} line.
+	 */
+	private static boolean continues(Entry entry, Line line) {
+		if (!entry.open || entry.requirement == null || !line.continuation())
+			return false;
+		String content = line.content();
+		return !KEYWORD.matcher(content).matches() && !content.startsWith("**Reason:**")
+				&& !COVERS.matcher(content).find() && MarkdownRequirementDocument.appliesWhen(content) == null;
 	}
 
 	/**
@@ -313,6 +340,9 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 
 		/** The line of the keyword statement in use. */
 		private int requirementLine;
+
+		/** Whether the keyword statement's paragraph is still being read. */
+		private boolean open;
 
 		private final List<RequirementDocumentProblem> problems = new ArrayList<>();
 
