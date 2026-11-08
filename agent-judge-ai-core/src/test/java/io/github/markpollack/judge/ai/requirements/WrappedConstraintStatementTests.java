@@ -95,4 +95,30 @@ class WrappedConstraintStatementTests {
 		assertThat(List.of(parsed.items().getFirst().requirement())).containsExactly("send confirmations.");
 	}
 
+	@Test
+	void keywordStatementsInsideListItemsAndBlockQuotesAreRecognised() {
+		Rfc2119Constraint listed = only("""
+				### RULE-1
+
+				- **MUST** record the booking
+				  and send exactly five confirmations.
+				- **Reason:** audit
+				""");
+		Rfc2119Constraint quoted = only("""
+				### RULE-1
+
+				> **MUST** record the booking
+				> and send exactly five confirmations.
+				>
+				> **Reason:** audit
+				> Applies when: the clinic sends confirmations
+				""");
+
+		assertThat(listed.requirement()).isEqualTo(STATEMENT);
+		assertThat(listed.reason()).isEqualTo("audit");
+		assertThat(quoted.requirement()).isEqualTo(STATEMENT);
+		assertThat(quoted.reason()).isEqualTo("audit");
+		assertThat(quoted.applicability()).isEqualTo("the clinic sends confirmations");
+	}
+
 }

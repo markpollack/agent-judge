@@ -53,7 +53,8 @@ import org.slf4j.LoggerFactory;
  * The document is read as CommonMark. A rule is a {@code ### RULE-n} (or {@code ### UCn-RULEm})
  * heading with nothing else on its line, followed within the same entry by one bold keyword
  * statement, {@code **MUST** …}, and one {@code **Reason:** …} line, each starting its own
- * line of a paragraph. A statement wrapped across lines is read in full: later lines of its
+ * line of a paragraph, also inside a list item or a block quote, whose markers are not part
+ * of the line. A statement wrapped across lines is read in full: later lines of its
  * paragraph are joined with single spaces, as Markdown renders a soft wrap (a hard break
  * joins the same way, without its backslash), up to the next keyword, {@code **Reason:**},
  * {@code **Covers:**} or {@code Applies when:} line or the end of the paragraph. The entry ends at the next heading of any level or at the end of the
@@ -203,6 +204,9 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 			if (entry == null) {
 				continue;
 			}
+			// Entry lines are read without list or block-quote markers, so a keyword,
+			// Reason or Applies when line inside a list item or a quote is recognised.
+			text = line.content();
 			Matcher must = KEYWORD.matcher(text);
 			if (must.matches()) {
 				entry.open = false;
