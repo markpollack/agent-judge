@@ -45,8 +45,11 @@ final class MarkdownRequirementDocument {
 	 * @param number 1-based line number
 	 * @param text the document's own line, stripped
 	 * @param heading whether CommonMark read the line as a heading of any level
+	 * @param continuation whether the line continues the paragraph of the line before it
+	 * @param content the paragraph's own text on this line, stripped: the line without any
+	 * list or block-quote markers
 	 */
-	record Line(int number, String text, boolean heading) {
+	record Line(int number, String text, boolean heading, boolean continuation, String content) {
 	}
 
 	/**
@@ -99,12 +102,14 @@ final class MarkdownRequirementDocument {
 			if (node instanceof Heading) {
 				List<SourceSpan> spans = node.getSourceSpans();
 				if (!spans.isEmpty()) {
-					lines.add(line(spans.get(0), source, true));
+					lines.add(line(spans.get(0), source, true, false));
 				}
 			}
 			else if (node instanceof Paragraph) {
+				boolean continuation = false;
 				for (SourceSpan span : node.getSourceSpans()) {
-					lines.add(line(span, source, false));
+					lines.add(line(span, source, false, continuation));
+					continuation = true;
 				}
 			}
 			else if (node instanceof BlockQuote || node instanceof ListBlock || node instanceof ListItem) {
@@ -116,9 +121,12 @@ final class MarkdownRequirementDocument {
 		}
 	}
 
-	private static Line line(SourceSpan span, List<String> source, boolean heading) {
+	private static Line line(SourceSpan span, List<String> source, boolean heading, boolean continuation) {
 		int index = span.getLineIndex();
-		return new Line(index + 1, source.get(index).strip(), heading);
+		String whole = source.get(index);
+		int start = Math.min(span.getColumnIndex(), whole.length());
+		int end = Math.min(start + span.getLength(), whole.length());
+		return new Line(index + 1, whole.strip(), heading, continuation, whole.substring(start, end).strip());
 	}
 
 	/**

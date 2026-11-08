@@ -51,19 +51,24 @@ import org.slf4j.LoggerFactory;
  *
  * <p>
  * The document is read as CommonMark. A criterion is a {@code ### UCn-ACm: Title} heading,
- * followed within the same entry by its requirement sentence: the first paragraph line that
- * is not a metadata line. Metadata lines begin with one of the labels {@code Covers:},
- * {@code Rule:}, {@code Rules:}, {@code Tests:} or {@code Status:} (bold or plain) or are an
- * {@code Applies when:} entry; they can neither stand in for the sentence nor hide its
- * absence. The entry ends at the next heading of any level or at the end of the document;
- * later lines in the entry are prose and are not read. {@code Applies when: condition} (also
+ * followed within the same entry by its requirement sentence: the first paragraph that is
+ * not a metadata line, read in full. A sentence wrapped across lines is joined with single
+ * spaces, as Markdown renders a soft wrap; a hard break (two trailing spaces or a trailing
+ * backslash) joins the same way, without its backslash. The sentence starts at its first
+ * line, which is kept as the document's own line, and ends at a blank line, a metadata or
+ * {@code Applies when:} line, a heading or the end of the entry. List and block-quote
+ * markers are not part of a continuation line. Metadata lines begin with one of the labels
+ * {@code Covers:}, {@code Rule:}, {@code Rules:}, {@code Tests:} or {@code Status:} (bold
+ * or plain) or are an {@code Applies when:} entry; they can neither stand in for the
+ * sentence nor hide its absence. The entry ends at the next heading of any level or at the
+ * end of the document; later paragraphs in the entry are prose and are not read. {@code Applies when: condition} (also
  * accepted as {@code **Applies when:** condition}) declares the optional applicability
  * anywhere inside the entry, preferably after the sentence. An EARS trigger such as
  * {@code When}, {@code While} or {@code If} inside the sentence never declares
  * applicability. Fenced and indented code blocks, HTML blocks and thematic breaks are never
  * read, so an example criterion inside a fence of any length or character is documentation;
  * paragraphs inside lists and block quotes are read like any other. The sentence is always
- * the document's own line, never a rendering of it.
+ * the document's own text, never a rendering of it.
  *
  * <p>
  * {@link #from(Path)} is permissive: a heading without a sentence is left out, and every
@@ -195,11 +200,16 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 				}
 				continue;
 			}
-			if (entry == null || text.isEmpty() || METADATA.matcher(text).find()) {
+			if (entry == null) {
+				continue;
+			}
+			if (text.isEmpty() || METADATA.matcher(text).find()) {
+				entry.open = false;
 				continue;
 			}
 			String applies = MarkdownRequirementDocument.appliesWhen(text);
 			if (applies != null) {
+				entry.open = false;
 				if (applies.isEmpty()) {
 					entry.problems.add(new RequirementDocumentProblem(sourceName, entry.id, line.number(),
 							"blank `Applies when:` entry; state the condition or omit the entry"));
@@ -215,6 +225,13 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 			}
 			if (entry.requirement == null) {
 				entry.requirement = text;
+				entry.open = true;
+			}
+			else if (entry.open && line.continuation() && !labelled(line.content())) {
+				entry.requirement = joined(entry.requirement, line.content());
+			}
+			else {
+				entry.open = false;
 			}
 		}
 		finish(entry, criteria, problems, seen, sourceName);
@@ -223,6 +240,21 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 		logger.info("{} criteria parsed from {}", criteria.size(), sourceName);
 
 		return new Parsed<>(sourceName, List.copyOf(criteria), List.copyOf(problems));
+	}
+
+	/** A metadata or {@code Applies when:} label, which ends the requirement paragraph. */
+	private static boolean labelled(String content) {
+		return METADATA.matcher(content).find() || MarkdownRequirementDocument.appliesWhen(content) != null;
+	}
+
+	/**
+	 * The sentence so far, continued by the next line of its paragraph. A soft wrap reads
+	 * as one space, and so does a hard break, whose trailing backslash is markup rather
+	 * than wording (trailing spaces are already stripped).
+	 */
+	private static String joined(String sentence, String next) {
+		String head = sentence.endsWith("\\") ? sentence.substring(0, sentence.length() - 1).strip() : sentence;
+		return next.isEmpty() ? head : head + " " + next;
 	}
 
 	private static void finish(@Nullable Entry entry, List<EarsCriterion> criteria,
@@ -257,6 +289,9 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 		private @Nullable String requirement;
 
 		private @Nullable String applicability;
+
+		/** Whether the requirement paragraph is still being read. */
+		private boolean open;
 
 		private final List<RequirementDocumentProblem> problems = new ArrayList<>();
 
