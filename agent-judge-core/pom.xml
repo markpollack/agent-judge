@@ -81,21 +81,13 @@
         <plugins>
 <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><executions><execution><goals><goal>test-jar</goal></goals></execution></executions></plugin>
             <!--
-                NullAway enforces the @NullMarked declarations in
-                the judgment, policy, evaluation, reporting, requirement, serialization and provenance packages, io.github.markpollack.judge.description and
-                io.github.markpollack.judge.serialization.diagnostics.
-                JSpecify ships annotations only, so without a checker the contract would be
-                prose the build never verifies.
-
-                - default-compile only: test sources sit in the same package names and inherit
-                  @NullMarked, where the checker reports assertion-shaped noise rather than defects.
-                - XepDisableAllChecks: this act enforces nullness, not lint. Stock Error Prone
-                  checks scope to the module, not to @NullMarked packages.
-                - OnlyNullMarked + JSpecifyMode: adoption is per package; result, description
-                  and stored diagnostics have opted in.
-                - No <fork>: compiler-plugin 3.14.0 swallows Error Prone diagnostics when forking.
-
-                Error Prone needs javac internals opened; see .mvn/jvm.config.
+                NullAway enforces the @NullMarked declarations in the judgment, policy, evaluation,
+                reporting, requirement, serialization and provenance packages,
+                io.github.markpollack.judge.description and
+                io.github.markpollack.judge.serialization.diagnostics. It runs in the root pom's
+                errorprone profile with Error Prone's default checks: default-compile only,
+                OnlyNullMarked and JSpecify mode. Error Prone needs javac internals opened; see
+                .mvn/jvm.config.
             -->
             <!-- JaCoCo Code Coverage Plugin -->
             <plugin>
