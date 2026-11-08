@@ -211,8 +211,24 @@ final class VerdictSemantics {
 			case NOT_APPLICABLE -> JudgmentStatus.NOT_APPLICABLE;
 			case INCONCLUSIVE -> JudgmentStatus.ABSTAIN;
 		};
-		if (v.judgment().status() != expected)
+		if (v.judgment().status() != expected && !refusedBeforeExecution(v))
 			defect(path, "judgment", "Roster rollup contradicts retained accepted constituents");
+	}
+
+	/**
+	 * A roster refused before anything ran, such as a generated audit whose prompt exceeds
+	 * its limit: an ERROR root, every item an execution failure with no returned verdict,
+	 * and no invocation at all. Its constituents roll up to an abstention, but nothing was
+	 * established or contradicted, so the root's ERROR is the honest record. Any roster with
+	 * a returned item or a retained invocation must still match its rollup.
+	 */
+	private static boolean refusedBeforeExecution(Verdict v) {
+		return v.judgment().status() == JudgmentStatus.ERROR && v.invocations().isEmpty()
+				&& v.judgment().invocationIds().isEmpty()
+				&& v.compositeAttempts()
+					.stream()
+					.allMatch(attempt -> attempt.verdict() == null
+							&& attempt.dispositionReason() == DispositionReason.EXECUTION_FAILED);
 	}
 
 	private static void defect(String path, String field, String explanation) {
