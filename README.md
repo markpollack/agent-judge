@@ -113,6 +113,21 @@ Prepared generated judging adds `.evidence(text)` or `.evidenceSupplier(source)`
 
 Configure narrower generated capabilities with `judgeModel.withInputs(GeneratedInput.PREPARED_EVIDENCE)` or `INTEGRATED_INVESTIGATION`; both can be declared together. A prepared-only harness refuses an investigative build, and an investigation-only harness refuses supplied evidence before acquisition or native calls. The general EvalModel contract accepts both forms. This declaration describes the configured harness: the application must provide native investigation tools, and capability is never inferred from provider brand.
 
+A generated audit is one call, and its workspace slot is meant for a path the judge reads with its tools, not pasted source. Before calling, every generated EARS and RFC 2119 judge and roster jury measures the whole request. Above `PromptLimits.DEFAULT_MAX_PROMPT_CHARACTERS` (100,000 characters) it makes no call and returns ERROR, stating the size, the limit and how much is requirement headers, workspace slot, and template and criteria. Set another limit with `.maxPromptCharacters(n)` right after `.runtime(judgeModel)`.
+
+## Lint a specification while you write it
+
+`RequirementDocuments.lint(Path.of("spec"))` reads every Markdown file below a directory with the strict EARS and RFC 2119 readers and reports every problem with its file, requirement identifier and line. One line in one test keeps a specification repository valid; it fails listing every problem:
+
+```java
+import java.nio.file.Path;
+import io.github.markpollack.judge.ai.requirements.RequirementDocuments;
+
+RequirementDocuments.assertValid(Path.of("spec"));
+```
+
+From the command line, `java -cp <agent-judge-ai-core and its dependencies> io.github.markpollack.judge.ai.requirements.RequirementDocuments spec` prints the report and exits with status 1 when there is a problem.
+
 ## Route and decide reliance separately
 
 A one-declared-member MetaJury preserves the child's whole semantic identity, including UNDECIDED results and routing opinions. Multiple members remain a reduction over member aggregates. All five non-final cascade rules require an accepted, valid tier. Whole-tier refusal supplies no routing evidence; a refused final tier terminates INCONCLUSIVE while retaining the original.
