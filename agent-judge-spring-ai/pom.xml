@@ -23,6 +23,11 @@
     <description>Spring AI ChatResponse evaluation bridge for Agent Judge - evaluated-side bridge, not judging-side LLM dependency</description>
 
     <dependencies>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Core Judge API -->
         <dependency>
             <groupId>io.github.markpollack</groupId>

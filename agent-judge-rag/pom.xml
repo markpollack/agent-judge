@@ -18,6 +18,11 @@
     <description>RAG evaluation judges for Agent Judge - faithfulness, contextual relevance, and hallucination detection</description>
 
     <dependencies>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency><groupId>io.github.markpollack</groupId><artifactId>agent-judge-json-jackson2</artifactId><version>${project.version}</version><scope>test</scope></dependency>
         <!-- Core Judge API -->
         <dependency>

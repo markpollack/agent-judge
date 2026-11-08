@@ -18,6 +18,11 @@
     <description>JetBrains Koog agent integration for Agent Judge - bridge from Koog agent execution to CompletionEvidence</description>
 
     <dependencies>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Core Judge API -->
         <dependency>
             <groupId>io.github.markpollack</groupId>

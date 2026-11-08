@@ -23,6 +23,11 @@
     <description>AgentClient CLI-agent integration for Agent Judge - bridge from CLI-delegated agent execution to AgentExecutionEvidence</description>
 
     <dependencies>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Core Judge API -->
         <dependency>
             <groupId>io.github.markpollack</groupId>

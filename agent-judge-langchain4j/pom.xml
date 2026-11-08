@@ -23,6 +23,11 @@
     <description>LangChain4j integration for Agent Judge - bridge from LangChain4j Result to CompletionEvidence</description>
 
     <dependencies>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Core Judge API -->
         <dependency>
             <groupId>io.github.markpollack</groupId>

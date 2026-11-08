@@ -23,6 +23,11 @@
     <description>LLM-powered judges for Agent Judge - correctness, quality, and semantic evaluation</description>
 
     <dependencies>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency><groupId>io.github.markpollack</groupId><artifactId>agent-judge-json-jackson2</artifactId><version>${project.version}</version><scope>test</scope></dependency>
         <!-- Core Judge API -->
         <dependency>

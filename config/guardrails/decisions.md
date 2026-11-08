@@ -11,3 +11,4 @@ THRESHOLD_FIT_CYCLO: accept (2026-11-07; the failing methods are the hotspots co
 THRESHOLD_FIT_LAMBDA: accept (2026-11-07; the two failures are the twin EARS/RFC2119 classifier lambdas)
 GUARDRAILS_MODE: control (2026-11-07)
 ERRORPRONE_DISABLED: none (2026-11-07, the kit default: every finding fixed in the code)
+ARCHUNIT_CYCLES: scope agent-judge-agent-client, agent-judge-ai-core, agent-judge-assertions, agent-judge-assertj, agent-judge-exec, agent-judge-file, agent-judge-jev, agent-judge-koog, agent-judge-langchain4j, agent-judge-llm, agent-judge-rag, agent-judge-spring-ai (2026-11-07, Owner: "No need to pursue this: Breaking those would change public value types for no real gain." The class cycles in agent-judge-core and agent-judge-json-jackson2 are the recursive value model and stay; package-level no-cycles is enforced in all 14 modules)
