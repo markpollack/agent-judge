@@ -1,34 +1,36 @@
 <?xml version="1.0"?>
 <!--
-  ACP Java SDK size, complexity and duplication gate (maven-pmd-plugin, `verify`, main sources).
+  Agent Judge size, complexity and duplication gate (maven-pmd-plugin, `verify`, main sources).
+  Rules and thresholds are the java-guardrails kit's reference values (kit ab75812), with the
+  reason for each beside it. They were measured on Agent Judge on 2026-11-07 (PMD 7.28.0, 14
+  modules, 1,301 methods); the counts below are from that measurement.
 
-  Purpose: keep methods short enough to read and classes layered enough to follow. Each threshold
-  below was set from a measurement of the code base (PMD 7, October 2026): strict enough that the
-  long, dense methods and the 1,000-line transport that existed then fail, loose enough that
-  ordinary code passes. A violation is fixed in the code, never grandfathered: there is no
-  baseline or exclusion file. The one exemption is structural and stated next to its rule.
+  Policy (Owner, 2026-11-07; config/guardrails/decisions.md): PMD_MECHANISM ratchet. Each module
+  allows its violation count of that day (pmd.maxAllowedViolations in its own pom, 155 in total);
+  the allowance is lowered as fixes land and never raised. A new violation cannot enter: it
+  exceeds the allowance. A violation is fixed in the code, never suppressed there, and there is
+  no baseline file. The structural exemptions below are stated next to their rules.
 
-  Duplication is checked by CPD (pmd:cpd-check), configured in the parent pom: 100 tokens
-  (cpd.minimumTokens), about 15 to 20 lines of real code. Measured: the five blocks at 100 or more
-  were copied logic (the two sessions' request plumbing and error class, the stdio and WebSocket
-  reply pump, the client builders' build()); below 100, CPD mostly reports parallel declarations
-  (record headers, interface signatures). CPD runs per module, so the two Jackson
-  modules, which implement one SPI against two incompatible Jackson APIs, are not compared.
+  Duplication is checked by CPD (pmd:cpd-check, the cpd-gate execution in the parent pom) at 100
+  tokens (cpd.minimumTokens) with zero allowance in every module, independent of the PMD
+  ratchet. Measured before the gate: 22 duplicated blocks, almost all the twin EARS and RFC 2119
+  parsers, juries and judges, plus the voting strategies; all were removed before the gate.
+  CPD runs per module.
 -->
-<ruleset name="acp-java-sdk-size-and-complexity"
+<ruleset name="agent-judge-size-and-complexity"
          xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
 
-    <description>Method and class size, complexity and parameter count for the ACP Java SDK.</description>
+    <description>Method and class size, complexity and parameter count for Agent Judge.</description>
 
     <!--
       Cognitive complexity, method, reported at 15 or more (the SonarSource default).
       The main readability rule: it charges for nesting, so a loop inside a try inside an if
-      costs more than three flat ifs, and it looks inside lambdas, where reactive code keeps
-      its logic. Measured before the gate: the hotspots scored 34 (agent start(), handler
-      discovery), 24 (client session dispatch), 19 and 18; the stdio and SSE read/write loops
-      16 to 22. Ordinary methods scored 10 or less.
+      costs more than three flat ifs, and it looks inside lambdas. Measured: 44 of 1,301 methods
+      (3.4%) at 15 or more, so the reference fits. The worst were the twin roster classifiers
+      (81 each, removed before the gate), then JevRuntime.evaluate and VerdictSemantics.validate
+      (58 each).
     -->
     <rule ref="category/java/design.xml/CognitiveComplexity">
         <properties>
@@ -39,9 +41,11 @@
     <!--
       Cyclomatic complexity, method, reported at 10 or more (McCabe's limit and PMD's
       default): the number of paths a test has to cover. Catches wide, flat methods that
-      cognitive complexity forgives, such as the 11-path servlet doPost and the 13- to 15-path
-      routing resolvers. Class total reported at 80 or more (PMD's default): the 1,000-line
-      HTTP client transport measured 114; the next class 72.
+      cognitive complexity forgives. Measured: 91 of 1,301 methods (7.0%) at 10 or more, above
+      the kit's 5% fit line; the Owner accepted the reference (THRESHOLD_FIT_CYCLO: accept), so
+      the excess is carried by the ratchet rather than by a higher threshold. Class total
+      reported at 80 or more (PMD's default): 7 of 308 classes, the largest the diagnostics
+      Interpreter at 332.
     -->
     <rule ref="category/java/design.xml/CyclomaticComplexity">
         <properties>
@@ -52,23 +56,17 @@
 
     <!--
       Non-commenting source statements (NCSS). Method: reported at 30 or more, roughly a screen
-      of code; the long methods measured 35 to 53, every other method 29 or less. Class:
-      reported at 300 or more, counting nested classes, so a class cannot hide its size in inner
-      classes; the HTTP client transport measured 392, the next 253. NCSS ignores comments and
-      Javadoc, so a well-documented API interface (AcpAgent, AcpClient: about 1,000 physical
-      lines, 220 to 250 statements of handler interfaces and builder setters) is measured by
-      its code, not its documentation.
+      of code: 28 of 1,301 methods (2.2%). Class: reported at 300 or more, counting nested
+      classes, so a class cannot hide its size in inner classes: 3 of 308 classes (1.0%). NCSS
+      ignores comments and Javadoc, so a well-documented API type is measured by its code.
 
-      Exemptions, class level only, each a shape rather than a name:
+      Exemptions, class level only, each a shape rather than a name (kit constants):
       - A wire record container: a final class with no instance fields whose nested types are
         records, interfaces, enums, and classes holding nothing but static fields (constants).
-        Its size is the protocol's size, not code to be followed; its methods are still
-        measured like any other. AcpSchema and McpSchema (2026-10-08, which carries a nested
-        ErrorCodes constants class) are the cases.
+        Its size is the schema's size, not code to be followed; its methods are still measured.
       - An interface: its own logic is default methods, which the method rules measure; its
-        size is API surface, including nested builder types that are public API and cannot
-        move without breaking callers (McpServer and its four specification builders,
-        2026-10-08). Each nested class is still measured on its own.
+        size is API surface, including nested builder types that are public API. Each nested
+        class is still measured on its own.
     -->
     <rule ref="category/java/design.xml/NcssCount">
         <properties>
@@ -82,11 +80,10 @@
     <!--
       Long lambda, reported at 30 or more statements in one lambda body (nested lambdas count
       toward the outer one): the method threshold above, applied where NcssCount does not look.
-      PMD's NCSS does not count the statements inside a lambda body (verified: a method that
-      returns a 40-statement lambda is not reported), and reactive code keeps its logic in
-      lambdas. Measured before the gate: two lambdas had 30 or more, the agent's start() (the
-      150-line handler registration) and the Streamable HTTP listener's start() (Jetty setup);
-      every other lambda had fewer than 25.
+      PMD's NCSS does not count the statements inside a lambda body. Measured: of 31 lambdas,
+      the two twin roster classifiers had 57 statements each (6.5%, above the fit line because
+      the population is small); the Owner accepted the reference (THRESHOLD_FIT_LAMBDA: accept),
+      and both were removed before the gate.
     -->
     <rule name="LongLambda"
           language="java"
@@ -108,21 +105,17 @@
     </rule>
 
     <!--
-      Parameter list, reported at 7 or more. Six parameters is the most any method or
-      constructor needed except the agent's 19-argument constructor (one per handler);
-      beyond six, the arguments are a type of their own.
+      Parameter list, reported at 7 or more: beyond six, the arguments are a type of their own.
+      Measured: 4 of 1,255 methods and constructors (0.3%).
     -->
     <rule ref="category/java/design.xml/ExcessiveParameterList">
         <properties>
             <property name="minimum" value="7"/>
             <!--
-              Exemption: a record's constructors and its @JsonCreator factories. A record's
-              components are its contract; every constructor and the deserialization factory
-              restate them, so a protocol schema with nine-component messages is not a long
-              parameter list to fix. Class constructors and ordinary methods stay measured.
-              Decided on the MCP Java SDK (2026-10-08): six feature-record canonical
-              constructors, four schema convenience constructors and two fromJson factories
-              failed only here.
+              Exemption (kit constant): a record's constructors and its @JsonCreator factories.
+              A record's components are its contract; every constructor and the
+              deserialization factory restate them. Class constructors and ordinary methods
+              stay measured, which is why turning a record into a class can surface a finding.
             -->
             <property name="violationSuppressXPath"
                       value="./ancestor::ConstructorDeclaration[1][parent::RecordBody] | ./ancestor::MethodDeclaration[1][parent::RecordBody][ModifierList/Annotation[@SimpleName = 'JsonCreator']]"/>
@@ -130,14 +123,10 @@
     </rule>
 
     <!--
-      Considered and left out, from the same measurement:
-      - GodClass: flagged three classes; the HTTP client transport, which class NCSS and class
-        cyclomatic complexity already catch; the server connection, and NegotiatedCapabilities,
-        a value object with one flag, one query and one require method per capability, whose
-        low cohesion is its design. No case the rules above miss.
-      - TooManyMethods and ExcessivePublicCount: flagged builders, API interfaces
-        (PromptContext), the capability value object and the schema; counting methods measures
-        API breadth, not tangled code.
+      Considered and left out (kit decision): GodClass, TooManyMethods and ExcessivePublicCount.
+      Counting methods or cohesion measures API breadth and value-object design rather than
+      tangled code, and the size and complexity rules above already catch the classes they
+      would flag.
     -->
 
 </ruleset>
