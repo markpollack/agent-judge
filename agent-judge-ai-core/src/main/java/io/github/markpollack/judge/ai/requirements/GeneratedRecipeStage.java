@@ -20,22 +20,30 @@ abstract class GeneratedRecipeStage<S, R extends GeneratedRequirementStage<?>> i
 
 	private final EvalModel runtime;
 
-	GeneratedRecipeStage(EvalModel runtime) {
+	private final int maxPromptCharacters;
+
+	GeneratedRecipeStage(EvalModel runtime, int maxPromptCharacters) {
 		this.runtime = runtime;
+		this.maxPromptCharacters = PromptLimits.require(maxPromptCharacters);
+	}
+
+	final EvalModel runtime() {
+		return this.runtime;
 	}
 
 	/**
 	 * The concrete stage for one validated requirement.
 	 * @param model the configured harness
+	 * @param maxPromptCharacters the largest prompt its one call may send
 	 * @param requirement the validated requirement
 	 * @return its evidence stage
 	 */
-	abstract R stage(EvalModel model, Requirement<S> requirement);
+	abstract R stage(EvalModel model, int maxPromptCharacters, Requirement<S> requirement);
 
 	@Override
 	public R requirement(Requirement<S> requirement) {
 		Requirement.validate(requirement);
-		return stage(runtime, requirement);
+		return stage(runtime, maxPromptCharacters, requirement);
 	}
 
 }

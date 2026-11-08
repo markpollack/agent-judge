@@ -30,6 +30,12 @@ class GeneratedRequestStorageTest {
 	/** Prepared evidence large enough that an inline copy of the request overflows the bound. */
 	private static final int EVIDENCE_BYTES = 1_040_000;
 
+	/**
+	 * This test is about storing a verdict over large evidence, not the prompt guard, so it
+	 * raises the per-call limit above its evidence explicitly.
+	 */
+	private static final int LARGE_PROMPT_LIMIT = 2_000_000;
+
 	/** Measured size of the saved answer text. */
 	private static final int REASONING_BYTES = 16_000;
 
@@ -42,6 +48,7 @@ class GeneratedRequestStorageTest {
 				Rfc2119Requirement.of("B", "rev7", "SHOULD", "retain support", "audit", null));
 		Verdict original = Rfc2119Jury.builder()
 			.runtime(saved(requests, "A: FAIL - " + reasoning() + "\nB: PASS - holds"))
+			.maxPromptCharacters(LARGE_PROMPT_LIMIT)
 			.requirements(requirements)
 			.evidence(evidence())
 			.build()
@@ -56,6 +63,7 @@ class GeneratedRequestStorageTest {
 				"When requested, the system shall retain facts.", null));
 		Verdict original = EarsJury.builder()
 			.runtime(saved(requests, "UC1-AC1: FAIL - " + reasoning()))
+			.maxPromptCharacters(LARGE_PROMPT_LIMIT)
 			.requirements(requirements)
 			.evidence(evidence())
 			.build()

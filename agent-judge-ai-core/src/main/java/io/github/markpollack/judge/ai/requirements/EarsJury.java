@@ -73,7 +73,7 @@ public final class EarsJury implements Jury {
 		 * @return roster stage
 		 */
 		public GeneratedBuilder runtime(EvalModel runtime) {
-			return new GeneratedBuilder(Objects.requireNonNull(runtime));
+			return new GeneratedBuilder(runtime, PromptLimits.DEFAULT_MAX_PROMPT_CHARACTERS);
 		}
 
 		/**
@@ -94,8 +94,23 @@ public final class EarsJury implements Jury {
 
 		private final EvalModel runtime;
 
-		private GeneratedBuilder(EvalModel runtime) {
-			this.runtime = runtime;
+		private final int maxPromptCharacters;
+
+		private GeneratedBuilder(EvalModel runtime, int maxPromptCharacters) {
+			this.runtime = Objects.requireNonNull(runtime);
+			this.maxPromptCharacters = maxPromptCharacters;
+		}
+
+		/**
+		 * Sets the largest prompt this roster may send in its one call; a larger one is an
+		 * {@code ERROR} with no call. The default is
+		 * {@link PromptLimits#DEFAULT_MAX_PROMPT_CHARACTERS}.
+		 * @param maxPromptCharacters positive limit in characters
+		 * @return this configuration with the limit
+		 * @since 0.19.0
+		 */
+		public GeneratedBuilder maxPromptCharacters(int maxPromptCharacters) {
+			return new GeneratedBuilder(runtime, PromptLimits.require(maxPromptCharacters));
 		}
 
 		/**
@@ -104,7 +119,7 @@ public final class EarsJury implements Jury {
 		 * @return configured roster, with optional prepared evidence
 		 */
 		public GeneratedRoster requirements(List<? extends Requirement<EarsSpecification>> requirements) {
-			return new GeneratedRoster(runtime, snapshot(requirements));
+			return new GeneratedRoster(runtime, snapshot(requirements), maxPromptCharacters);
 		}
 
 	}
@@ -116,9 +131,12 @@ public final class EarsJury implements Jury {
 
 		private final List<Requirement<EarsSpecification>> requirements;
 
-		private GeneratedRoster(EvalModel runtime, List<Requirement<EarsSpecification>> requirements) {
+		private final int maxPromptCharacters;
+
+		private GeneratedRoster(EvalModel runtime, List<Requirement<EarsSpecification>> requirements, int maxPromptCharacters) {
 			this.runtime = runtime;
 			this.requirements = requirements;
+			this.maxPromptCharacters = maxPromptCharacters;
 		}
 
 		/**
@@ -139,7 +157,7 @@ public final class EarsJury implements Jury {
 		public io.github.markpollack.judge.jury.ReadyJury evidenceSupplier(Supplier<String> evidence) {
 			Objects.requireNonNull(evidence);
 			runtime.requireInput(GeneratedInput.PREPARED_EVIDENCE);
-			return () -> new EarsJury(requirements, () -> generated(runtime, requirements,
+			return () -> new EarsJury(requirements, () -> generated(runtime, requirements, maxPromptCharacters,
 					"Prepared evidence:\n" + Objects.requireNonNull(evidence.get())));
 		}
 
@@ -149,7 +167,7 @@ public final class EarsJury implements Jury {
 		 */
 		public EarsJury build() {
 			runtime.requireInput(GeneratedInput.INTEGRATED_INVESTIGATION);
-			return new EarsJury(requirements, () -> generated(runtime, requirements,
+			return new EarsJury(requirements, () -> generated(runtime, requirements, maxPromptCharacters,
 					"Investigate with the configured native workspace and tools."));
 		}
 
@@ -202,12 +220,16 @@ public final class EarsJury implements Jury {
 		return RosterJuries.snapshot("Ears", source);
 	}
 
-	private static Verdict generated(EvalModel runtime, List<Requirement<EarsSpecification>> requirements, String input) {
+	private static Verdict generated(EvalModel runtime, List<Requirement<EarsSpecification>> requirements, int maxPromptCharacters,
+			String input) {
 		List<EarsCriterion> nativeRoster = requirements.stream()
 			.map(req -> new EarsCriterion(req.id(), req.specification().title(), req.specification().requirement(),
 					req.specification().applicability()))
 			.toList();
 		String prompt = EarsParser.templateFor("Ears roster", nativeRoster).render(Map.of("workspace", input));
+		String refusal = RosterJuries.oversized(requirements, prompt, input, maxPromptCharacters);
+		if (refusal != null)
+			return RosterJuries.refused(requirements, refusal);
 		var result = runtime.execute(RosterJuries.request(requirements, prompt));
 		return RosterJuries.generated(requirements, EarsParser.rollupFor(nativeRoster, result.answer()), result,
 				EarsSpecification::applicability);

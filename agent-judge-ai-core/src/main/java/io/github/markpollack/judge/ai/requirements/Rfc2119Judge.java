@@ -89,12 +89,28 @@ public final class Rfc2119Judge implements Judge {
 	public static final class GeneratedBuilder extends GeneratedRecipeStage<Rfc2119Specification, GeneratedRequirement> {
 
 		private GeneratedBuilder(EvalModel runtime) {
-			super(runtime);
+			this(runtime, PromptLimits.DEFAULT_MAX_PROMPT_CHARACTERS);
+		}
+
+		private GeneratedBuilder(EvalModel runtime, int maxPromptCharacters) {
+			super(runtime, maxPromptCharacters);
+		}
+
+		/**
+		 * Sets the largest prompt each judging may send in its one call; a larger one is an
+		 * {@code ERROR} with no call. The default is
+		 * {@link PromptLimits#DEFAULT_MAX_PROMPT_CHARACTERS}.
+		 * @param maxPromptCharacters positive limit in characters
+		 * @return this setup with the limit
+		 * @since 0.19.0
+		 */
+		public GeneratedBuilder maxPromptCharacters(int maxPromptCharacters) {
+			return new GeneratedBuilder(runtime(), maxPromptCharacters);
 		}
 
 		@Override
-		GeneratedRequirement stage(EvalModel model, Requirement<Rfc2119Specification> requirement) {
-			return new GeneratedRequirement(model, requirement);
+		GeneratedRequirement stage(EvalModel model, int maxPromptCharacters, Requirement<Rfc2119Specification> requirement) {
+			return new GeneratedRequirement(model, maxPromptCharacters, requirement);
 		}
 
 	}
@@ -106,8 +122,8 @@ public final class Rfc2119Judge implements Judge {
 
 		private final Requirement<Rfc2119Specification> requirement;
 
-		private GeneratedRequirement(EvalModel runtime, Requirement<Rfc2119Specification> requirement) {
-			super(runtime);
+		private GeneratedRequirement(EvalModel runtime, int maxPromptCharacters, Requirement<Rfc2119Specification> requirement) {
+			super(runtime, maxPromptCharacters);
 			this.requirement = requirement;
 		}
 
@@ -118,16 +134,20 @@ public final class Rfc2119Judge implements Judge {
 
 		@Override
 		Judgment generated(EvalModel model, String input) {
-			return Rfc2119Judge.generated(model, requirement, input);
+			return Rfc2119Judge.generated(model, requirement, maxPromptCharacters(), input);
 		}
 
 	}
 
-	private static Judgment generated(EvalModel runtime, Requirement<Rfc2119Specification> requirement, String input) {
+	private static Judgment generated(EvalModel runtime, Requirement<Rfc2119Specification> requirement, int maxPromptCharacters,
+			String input) {
 		Rfc2119Constraint nativeSpec = new Rfc2119Constraint(requirement.id(), requirement.specification().keyword(),
 				requirement.specification().requirement(), requirement.specification().reason(),
 				requirement.specification().applicability());
 		String prompt = Rfc2119Parser.templateFor("Rfc2119", List.of(nativeSpec)).render(Map.of("workspace", input));
+		String refusal = RosterJuries.oversized(List.of(requirement), prompt, input, maxPromptCharacters);
+		if (refusal != null)
+			return RosterJuries.refused(requirement, refusal);
 		NativeExecution<EvalModelResponse> result = runtime.execute(RosterJuries.request(List.of(requirement), prompt));
 		return RosterJuries.single(requirement, Rfc2119Parser.rollupFor(List.of(nativeSpec), result.answer()), result);
 	}

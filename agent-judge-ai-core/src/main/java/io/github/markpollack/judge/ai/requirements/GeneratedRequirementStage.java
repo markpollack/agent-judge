@@ -25,8 +25,19 @@ abstract class GeneratedRequirementStage<J extends Judge> implements EvidenceSte
 
 	private final EvalModel runtime;
 
-	GeneratedRequirementStage(EvalModel runtime) {
+	private final int maxPromptCharacters;
+
+	GeneratedRequirementStage(EvalModel runtime, int maxPromptCharacters) {
 		this.runtime = runtime;
+		this.maxPromptCharacters = maxPromptCharacters;
+	}
+
+	/**
+	 * The largest prompt this judge's one call may send.
+	 * @return the limit in characters
+	 */
+	final int maxPromptCharacters() {
+		return this.maxPromptCharacters;
 	}
 
 	/**

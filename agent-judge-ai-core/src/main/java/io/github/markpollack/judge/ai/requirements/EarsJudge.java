@@ -89,12 +89,28 @@ public final class EarsJudge implements Judge {
 	public static final class GeneratedBuilder extends GeneratedRecipeStage<EarsSpecification, GeneratedRequirement> {
 
 		private GeneratedBuilder(EvalModel runtime) {
-			super(runtime);
+			this(runtime, PromptLimits.DEFAULT_MAX_PROMPT_CHARACTERS);
+		}
+
+		private GeneratedBuilder(EvalModel runtime, int maxPromptCharacters) {
+			super(runtime, maxPromptCharacters);
+		}
+
+		/**
+		 * Sets the largest prompt each judging may send in its one call; a larger one is an
+		 * {@code ERROR} with no call. The default is
+		 * {@link PromptLimits#DEFAULT_MAX_PROMPT_CHARACTERS}.
+		 * @param maxPromptCharacters positive limit in characters
+		 * @return this setup with the limit
+		 * @since 0.19.0
+		 */
+		public GeneratedBuilder maxPromptCharacters(int maxPromptCharacters) {
+			return new GeneratedBuilder(runtime(), maxPromptCharacters);
 		}
 
 		@Override
-		GeneratedRequirement stage(EvalModel model, Requirement<EarsSpecification> requirement) {
-			return new GeneratedRequirement(model, requirement);
+		GeneratedRequirement stage(EvalModel model, int maxPromptCharacters, Requirement<EarsSpecification> requirement) {
+			return new GeneratedRequirement(model, maxPromptCharacters, requirement);
 		}
 
 	}
@@ -106,8 +122,8 @@ public final class EarsJudge implements Judge {
 
 		private final Requirement<EarsSpecification> requirement;
 
-		private GeneratedRequirement(EvalModel runtime, Requirement<EarsSpecification> requirement) {
-			super(runtime);
+		private GeneratedRequirement(EvalModel runtime, int maxPromptCharacters, Requirement<EarsSpecification> requirement) {
+			super(runtime, maxPromptCharacters);
 			this.requirement = requirement;
 		}
 
@@ -118,15 +134,19 @@ public final class EarsJudge implements Judge {
 
 		@Override
 		Judgment generated(EvalModel model, String input) {
-			return EarsJudge.generated(model, requirement, input);
+			return EarsJudge.generated(model, requirement, maxPromptCharacters(), input);
 		}
 
 	}
 
-	private static Judgment generated(EvalModel runtime, Requirement<EarsSpecification> requirement, String input) {
+	private static Judgment generated(EvalModel runtime, Requirement<EarsSpecification> requirement, int maxPromptCharacters,
+			String input) {
 		EarsCriterion nativeSpec = new EarsCriterion(requirement.id(), requirement.specification().title(),
 				requirement.specification().requirement(), requirement.specification().applicability());
 		String prompt = EarsParser.templateFor("Ears", List.of(nativeSpec)).render(Map.of("workspace", input));
+		String refusal = RosterJuries.oversized(List.of(requirement), prompt, input, maxPromptCharacters);
+		if (refusal != null)
+			return RosterJuries.refused(requirement, refusal);
 		NativeExecution<EvalModelResponse> result = runtime.execute(RosterJuries.request(List.of(requirement), prompt));
 		return RosterJuries.single(requirement, EarsParser.rollupFor(List.of(nativeSpec), result.answer()), result);
 	}

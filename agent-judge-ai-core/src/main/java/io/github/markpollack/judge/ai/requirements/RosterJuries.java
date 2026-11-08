@@ -185,6 +185,64 @@ final class RosterJuries {
 	}
 
 	/**
+	 * Why this generated request is too large to send, or null when it fits. The size is the
+	 * whole request: every requirement header plus the rendered prompt, whose workspace slot
+	 * holds {@code workspace}.
+	 * @param requirements the requirements whose headers lead the request
+	 * @param prompt the rendered audit prompt
+	 * @param workspace what the template's workspace slot was filled with
+	 * @param limit the maximum characters per call
+	 * @return the refusal, naming the size, the limit and the breakdown, or null
+	 */
+	static @Nullable String oversized(List<? extends Requirement<?>> requirements, String prompt, String workspace,
+			int limit) {
+		int headers = requirements.stream().mapToInt(req -> RequirementPrompts.header(req).length()).sum();
+		long total = (long) headers + prompt.length();
+		if (total <= limit)
+			return null;
+		return ("The generated audit prompt of %d characters exceeds the %d-character limit, so no call was made: "
+				+ "requirement headers %d, workspace slot %d, template and criteria %d. The workspace slot is for "
+				+ "a path the judge reads with its tools, not pasted evidence; pass a path, or set "
+				+ "maxPromptCharacters on the builder.")
+			.formatted(total, limit, headers, workspace.length(), prompt.length() - workspace.length());
+	}
+
+	/**
+	 * The roster verdict when the request was refused before any call: an ERROR at the root
+	 * and a failed attempt for every requirement, with no invocation.
+	 * @param <S> specification type
+	 * @param requirements declared roster
+	 * @param refusal why no call was made
+	 * @return the refused roster verdict
+	 */
+	static <S> Verdict refused(List<Requirement<S>> requirements, String refusal) {
+		List<CompositeAttempt> attempts = new ArrayList<>();
+		for (var req : requirements)
+			attempts.add(CompositeAttempt.executionFailed(req.id(), CompositeRelation.ROSTER_ITEM, null,
+					new CompositeFailure(CompositeFailureCode.JURY_EXECUTION_FAILED,
+							new IllegalArgumentException(refusal))));
+		return Verdict.advancedBuilder()
+			.judgment(Judgment.error(io.github.markpollack.judge.judgment.JudgmentReasonCode.JUDGE_FAILED, refusal))
+			.roster(requirements)
+			.declaredCardinality(requirements.size())
+			.invocations(List.of())
+			.compositeAttempts(attempts)
+			.provenance(new VerdictProvenance(VerdictProvenanceKind.ROSTER, null, null))
+			.build();
+	}
+
+	/**
+	 * The judgment when a single-requirement request was refused before any call.
+	 * @param requirement the judged requirement
+	 * @param refusal why no call was made
+	 * @return an ERROR for the requirement, with no invocation
+	 */
+	static Judgment refused(Requirement<?> requirement, String refusal) {
+		return Judgment.error(io.github.markpollack.judge.judgment.JudgmentReasonCode.JUDGE_FAILED, refusal)
+			.forRequirement(requirement);
+	}
+
+	/**
 	 * The roster verdict of one generated audit: one attempt per declared requirement,
 	 * each referencing the audit's single invocation.
 	 * @param <S> specification type
