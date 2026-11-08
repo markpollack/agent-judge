@@ -202,7 +202,7 @@ final class ObservedHttpClient extends HttpClient {
 		try {
 			if (failure != null) {
 				finish(false);
-				result.completeExceptionally(refusal(failure, "HTTP transport failed"));
+				result.completeExceptionally(transportFailure(failure));
 				return;
 			}
 			accept(result, java.util.Objects.requireNonNull(response));
@@ -240,6 +240,27 @@ final class ObservedHttpClient extends HttpClient {
 			finish(false);
 			result.completeExceptionally(refusal(e, "Invalid provider response"));
 		}
+	}
+
+	/**
+	 * What the caller sees when the HTTP future fails. Control flow keeps its original
+	 * through asynchronous wrappers: a fatal error and a cancellation are delivered as
+	 * they are, and an interruption becomes a cancellation caused by it. An ordinary
+	 * transport failure is reported without detail.
+	 */
+	private static Throwable transportFailure(Throwable failure) {
+		Throwable original = failure;
+		while ((original instanceof java.util.concurrent.CompletionException
+				|| original instanceof java.util.concurrent.ExecutionException) && original.getCause() != null)
+			original = original.getCause();
+		if (original instanceof Error || original instanceof java.util.concurrent.CancellationException)
+			return original;
+		if (original instanceof InterruptedException) {
+			var cancelled = new java.util.concurrent.CancellationException("HTTP exchange interrupted");
+			cancelled.initCause(original);
+			return cancelled;
+		}
+		return refusal(failure, "HTTP transport failed");
 	}
 
 	/** A preservation refusal keeps its original; any other failure is reported without detail. */

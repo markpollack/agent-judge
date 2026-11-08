@@ -204,6 +204,67 @@ class TransportTest {
 		}
 	}
 
+	private CompletableFuture<HttpResponse<byte[]>> sentThenFailed(PendingHttp http, Throwable failure) {
+		var observer = new ObservedHttpClient(http, 32000, b -> {
+		});
+		var request = HttpRequest.newBuilder(ENDPOINT).POST(HttpRequest.BodyPublishers.ofByteArray(new byte[] { 1 })).build();
+		var returned = observer.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray());
+		http.actual.completeExceptionally(failure);
+		return returned;
+	}
+
+	@Test
+	void sourceFutureErrorReachesTheCallerAsTheOriginal() {
+		try (var http = new PendingHttp()) {
+			var fatal = new AssertionError("transport thread failed");
+			var returned = sentThenFailed(http, fatal);
+			assertThatThrownBy(() -> returned.get(1, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+				.hasCause(fatal);
+		}
+	}
+
+	@Test
+	void wrappedSourceFutureErrorIsUnwrapped() {
+		try (var http = new PendingHttp()) {
+			var fatal = new AssertionError("wrapped");
+			var returned = sentThenFailed(http, new java.util.concurrent.CompletionException(fatal));
+			assertThatThrownBy(() -> returned.get(1, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+				.hasCause(fatal);
+		}
+	}
+
+	@Test
+	void sourceFutureCancellationCancelsTheExposedFuture() {
+		try (var http = new PendingHttp()) {
+			var returned = sentThenFailed(http, new java.util.concurrent.CancellationException("transport cancelled"));
+			assertThatThrownBy(() -> returned.get(1, TimeUnit.SECONDS))
+				.isInstanceOf(java.util.concurrent.CancellationException.class);
+		}
+	}
+
+	@Test
+	void wrappedInterruptionBecomesCancellationKeepingTheOriginal() {
+		try (var http = new PendingHttp()) {
+			var interrupted = new InterruptedException("transport interrupted");
+			var returned = sentThenFailed(http, new java.util.concurrent.CompletionException(interrupted));
+			assertThatThrownBy(() -> returned.get(1, TimeUnit.SECONDS))
+				.isInstanceOf(java.util.concurrent.CancellationException.class)
+				.hasCause(interrupted);
+		}
+	}
+
+	@Test
+	void ordinaryTransportFailureStaysWithoutDetail() {
+		try (var http = new PendingHttp()) {
+			var returned = sentThenFailed(http, new IOException("echoed private transport details"));
+			assertThatThrownBy(() -> returned.get(1, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+				.cause()
+				.isInstanceOf(IOException.class)
+				.hasMessage("HTTP transport failed")
+				.hasNoCause();
+		}
+	}
+
 	private static HttpResponse<byte[]> ok(HttpRequest request, byte[] bytes) {
 		return new HttpResponse<>() {
 			public byte[] body() {
