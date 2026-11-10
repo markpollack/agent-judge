@@ -21,7 +21,7 @@ public final class PromptLimits {
 	 *
 	 * <p>
 	 * Derivation: one call per roster. The largest real roster measured, a 36-criterion
-	 * booking specification, renders its requirement headers, criteria and instructions in
+	 * specification, renders its requirement headers, criteria and instructions in
 	 * about 16,000 characters, and its whole specification is about 19,000. The judge reads
 	 * the implementation with its tools from the workspace it is given, so the workspace
 	 * slot is meant for a path, not for pasted source. 100,000 characters holds a roster

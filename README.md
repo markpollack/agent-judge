@@ -115,9 +115,27 @@ Configure narrower generated capabilities with `judgeModel.withInputs(GeneratedI
 
 A generated audit is one call, and its workspace slot is meant for a path the judge reads with its tools, not pasted source. Before calling, every generated EARS and RFC 2119 judge and roster jury measures the whole request. Above `PromptLimits.DEFAULT_MAX_PROMPT_CHARACTERS` (100,000 characters) it makes no call and returns ERROR, stating the size, the limit and how much is requirement headers, workspace slot, and template and criteria. Set another limit with `.maxPromptCharacters(n)` right after `.runtime(judgeModel)`.
 
+```java
+import io.github.markpollack.judge.ai.requirements.EarsJury;
+import io.github.markpollack.judge.ai.requirements.EarsRequirement;
+import io.github.markpollack.judge.ai.requirements.PromptLimits;
+
+var orderCriteria = List.of(EarsRequirement.of("UC1-AC1", "1", "Record a placed order",
+    "When a customer places an order, the system shall record the order.", null));
+Verdict sized = EarsJury.builder()
+    .runtime(judgeModel)
+    .maxPromptCharacters(2 * PromptLimits.DEFAULT_MAX_PROMPT_CHARACTERS)
+    .requirements(orderCriteria)
+    .evidence("Recorded execution evidence")
+    .build()
+    .vote();
+```
+
+The refused result stores and reads back like any other: it concludes INCONCLUSIVE and retains no invocation, because no call was made.
+
 ## Lint a specification while you write it
 
-`RequirementDocuments.lint(Path.of("spec"))` reads every Markdown file below a directory with the strict EARS and RFC 2119 readers and reports every problem with its file, requirement identifier and line. One line in one test keeps a specification repository valid; it fails listing every problem:
+`RequirementDocuments.lint(Path.of("spec"))` reads every Markdown file below a directory with the strict EARS and RFC 2119 readers ([document format](REQUIREMENT_DOCUMENTS.md)) and reports every problem with its file, requirement identifier and line. One line in one test keeps a specification repository valid; it fails listing every problem:
 
 ```java
 import java.nio.file.Path;
@@ -182,7 +200,9 @@ Core depends on no model provider or assertion framework. Public examples and co
 - [Documentation](https://lab.pollack.ai/docs/agent-judge)
 - [Configured PetClinic tutorial](https://github.com/markpollack/agent-judge-tutorial/tree/main/case-studies/spec-driven-petclinic)
 - [Executable fundamentals tutorial](https://github.com/markpollack/agent-judge-tutorial)
-- [Draft 0.18 release notes](RELEASE_NOTES_0.18.0.md) and [0.17 → 0.18 migration](MIGRATION_0.18.md)
+- [Requirement documents: syntax, strict loading and the linter](REQUIREMENT_DOCUMENTS.md)
+- [Changes on main since 0.18.0](RELEASE_NOTES_0.19.0.md) (unreleased)
+- [0.18.0 release notes](RELEASE_NOTES_0.18.0.md) and [0.17 → 0.18 migration](MIGRATION_0.18.md)
 - [Releases](https://github.com/markpollack/agent-judge/releases)
 - API Javadoc ships with each release. [AGENTS.md](AGENTS.md) lists build profiles and project rules.
 

@@ -41,6 +41,6 @@ See [portable-results-v6.md](portable-results-v6.md) for limits and explicit cod
 There are 14 JAR modules plus the parent POM. Add `agent-judge-assertj` for fluent execution,
 `agent-judge-json-jackson2` for storage, `agent-judge-ai-core` for native RFC/EARS and generated
 protocols, and `agent-judge-jev` for structured Jev. Optional runtime bridges remain separate.
-The [draft release notes](RELEASE_NOTES_0.18.0.md) enumerate all modules and behavioral changes.
+The [0.18.0 release notes](RELEASE_NOTES_0.18.0.md) enumerate all modules and behavioral changes.
 No source or binary compatibility promise, automatic history conversion or suite-wide adoption
 is made. The tutorial fundamentals remain on released 0.17.0 in their separate reactor.
