@@ -12,7 +12,7 @@
         <pmd.maxAllowedViolations>1</pmd.maxAllowedViolations>
     </properties>
     <artifactId>agent-judge-assertj</artifactId>
-    <name>Agent Judge AssertJ</name>
+    <name>Agent Eval - AssertJ</name>
     <description>Staged requirement assertions for AssertJ</description>
     <dependencyManagement>
         <dependencies>

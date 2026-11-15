@@ -14,8 +14,8 @@
     <artifactId>agent-judge-koog</artifactId>
     <packaging>jar</packaging>
 
-    <name>Agent Judge Koog</name>
-    <description>JetBrains Koog agent integration for Agent Judge - bridge from Koog agent execution to CompletionEvidence</description>
+    <name>Agent Eval - Koog</name>
+    <description>JetBrains Koog agent integration for Agent Eval - bridge from Koog agent execution to CompletionEvidence</description>
 
     <dependencies>
         <dependency>

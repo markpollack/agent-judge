@@ -12,7 +12,7 @@
         <pmd.maxAllowedViolations>10</pmd.maxAllowedViolations>
     </properties>
     <artifactId>agent-judge-jev</artifactId>
-    <name>Agent Judge Jev</name>
+    <name>Agent Eval - Jev</name>
     <description>Bounded TypeSafe Jev evaluation adapter</description>
     <dependencies>
         <dependency><groupId>io.github.markpollack</groupId><artifactId>agent-judge-json-jackson2</artifactId><version>${project.version}</version><scope>test</scope></dependency>

@@ -19,8 +19,8 @@
     <artifactId>agent-judge-exec</artifactId>
     <packaging>jar</packaging>
 
-    <name>Agent Judge Exec</name>
-    <description>Command execution judges for Agent Judge - build, test, and script validation</description>
+    <name>Agent Eval - Exec</name>
+    <description>Command execution judges for Agent Eval - build, test, and script validation</description>
 
     <dependencies>
         <dependency>

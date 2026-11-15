@@ -1,11 +1,12 @@
-# Agent Eval 1.0.0
+# Agent Eval 1.0.0 (formerly Agent Judge)
 
-> **Release candidate: remove this note when 1.0.0 is on Central.** Until then the candidate is on `main` as
-> `0.19.0-SNAPSHOT`, published to `https://central.sonatype.com/repository/maven-snapshots/` on every push.
+Agent Judge is now Agent Eval. Its Maven coordinates (`io.github.markpollack:agent-judge-*`) and Java packages
+(`io.github.markpollack.judge`) are unchanged, and Judge and Jury remain the names of its building blocks: a judge
+evaluates a requirement, and a jury combines judges.
 
-1.0.0 follows 0.18.0; there is no 0.19.0 release. Everything below is new since 0.18.0.
-
-Maven coordinates and Java packages still use `agent-judge` and `io.github.markpollack.judge`.
+Agent Eval moves from 0.18.0 to 1.0.0 with this release; there is no 0.19.0. Versions do not follow semantic
+versioning: a deliberate breaking change moves the major version, and older releases are not maintained. Everything
+below is new since 0.18.0.
 
 ## Requirement documents are read whole, strictly and as CommonMark
 
@@ -99,7 +100,7 @@ becoming a detail-free `IOException` or leaving the future incomplete.
 ## Build
 
 - **Published POMs name no repository.** The development snapshot repository is removed from every flattened POM, so
-  a consumer of a release resolves Agent Judge from Central alone.
+  a consumer of a release resolves Agent Eval from Central alone.
 - **A release depends on releases only.** On a release version, the release build fails while any dependency, direct
   or transitive, is a snapshot.
 

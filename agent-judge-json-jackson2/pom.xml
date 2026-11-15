@@ -5,7 +5,7 @@
         <!-- PMD ratchet (java-guardrails): today's count, lowered as fixes land, never raised -->
         <pmd.maxAllowedViolations>33</pmd.maxAllowedViolations>
     </properties>
- <artifactId>agent-judge-json-jackson2</artifactId><name>Agent Eval Jackson 2 Support</name>
+ <artifactId>agent-judge-json-jackson2</artifactId><name>Agent Eval - Jackson 2 Support</name>
  <dependencies>
 <dependency><groupId>io.github.markpollack</groupId><artifactId>agent-judge-core</artifactId><version>${project.version}</version><type>test-jar</type><classifier>tests</classifier><scope>test</scope></dependency>
  <dependency><groupId>io.github.markpollack</groupId><artifactId>agent-judge-core</artifactId><version>${project.version}</version></dependency>

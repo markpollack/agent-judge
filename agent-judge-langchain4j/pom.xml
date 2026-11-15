@@ -19,8 +19,8 @@
     <artifactId>agent-judge-langchain4j</artifactId>
     <packaging>jar</packaging>
 
-    <name>Agent Judge LangChain4j</name>
-    <description>LangChain4j integration for Agent Judge - bridge from LangChain4j Result to CompletionEvidence</description>
+    <name>Agent Eval - LangChain4j</name>
+    <description>LangChain4j integration for Agent Eval - bridge from LangChain4j Result to CompletionEvidence</description>
 
     <dependencies>
         <dependency>

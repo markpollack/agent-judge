@@ -21,7 +21,7 @@ import java.util.Map;
  * may count reasoning tokens inside output tokens, or cache activity inside input tokens.
  * Do not add every component, and do not require {@link #reportedTotalTokens()} to equal a
  * locally derived sum unless the originating provider contract says so.
- * {@code reportedTotalTokens} is only ever a total the source supplied — Agent Judge never
+ * {@code reportedTotalTokens} is only ever a total the source supplied — Agent Eval never
  * derives one.
  * </p>
  *
@@ -39,7 +39,7 @@ import java.util.Map;
  * @param reasoningTokens separately reported reasoning/thinking tokens
  * @param cacheCreationTokens tokens reported for cache creation/write
  * @param cacheReadTokens tokens reported for cache reads/hits
- * @param reportedTotalTokens a total supplied by the source, never one Agent Judge derives
+ * @param reportedTotalTokens a total supplied by the source, never one Agent Eval derives
  * @author Mark Pollack
  * @since 0.10.0
  */
@@ -213,7 +213,7 @@ public record Usage(Long inputTokens, Long outputTokens, Long reasoningTokens, L
 
 		/**
 		 * Record a total the source supplied. Do not compute one: a category total that
-		 * Agent Judge derived would claim provider accounting it does not have.
+		 * Agent Eval derived would claim provider accounting it does not have.
 		 * @param reportedTotalTokens the total as reported
 		 * @return this builder
 		 */

@@ -13,7 +13,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  * Code-only portable evidence that a composite stage produced no verdict.
  *
  * @param cause original runtime exception, absent in stored code-only historical records
- * @param code stable Agent Judge-owned failure code
+ * @param code stable Agent Eval-owned failure code
  * @since 0.14.0
  */
 @JsonPropertyOrder("code")

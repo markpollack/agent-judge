@@ -19,7 +19,7 @@
     <artifactId>agent-judge-ai-core</artifactId>
     <packaging>jar</packaging>
 
-    <name>Agent Judge AI Core</name>
+    <name>Agent Eval - AI Core</name>
     <description>Framework-neutral AI-backed judge infrastructure - prompt templates, model abstraction, output classification</description>
 
     <dependencies>

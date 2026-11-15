@@ -19,8 +19,8 @@
     <artifactId>agent-judge-spring-ai</artifactId>
     <packaging>jar</packaging>
 
-    <name>Agent Judge Spring AI</name>
-    <description>Spring AI ChatResponse evaluation bridge for Agent Judge - evaluated-side bridge, not judging-side LLM dependency</description>
+    <name>Agent Eval - Spring AI</name>
+    <description>Spring AI ChatResponse evaluation bridge for Agent Eval - evaluated-side bridge, not judging-side LLM dependency</description>
 
     <dependencies>
         <dependency>

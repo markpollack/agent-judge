@@ -19,8 +19,8 @@
     <artifactId>agent-judge-agent-client</artifactId>
     <packaging>jar</packaging>
 
-    <name>Agent Judge AgentClient</name>
-    <description>AgentClient CLI-agent integration for Agent Judge - bridge from CLI-delegated agent execution to AgentExecutionEvidence</description>
+    <name>Agent Eval - Agent Client</name>
+    <description>Agent Client CLI-agent integration for Agent Eval - bridge from CLI-delegated agent execution to AgentExecutionEvidence</description>
 
     <dependencies>
         <dependency>

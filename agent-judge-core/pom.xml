@@ -19,7 +19,7 @@
     <artifactId>agent-judge-core</artifactId>
     <packaging>jar</packaging>
 
-    <name>Agent Judge Core</name>
+    <name>Agent Eval - Core</name>
     <description>Framework-neutral Judge and Jury API for evaluating agent outputs</description>
 
     <dependencies>

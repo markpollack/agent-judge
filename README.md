@@ -1,6 +1,8 @@
 # Agent Eval
 
-Configure typed requirements and evidence, execute a ready Judge or Jury, and retain the complete result. Java 21; current release **0.18.0**.
+Configure typed requirements and evidence, execute a ready Judge or Jury, and retain the complete result. Java 21; current release **1.0.0**.
+
+Agent Eval was formerly Agent Judge. Its Maven coordinates stay `io.github.markpollack:agent-judge-*`, and its Java packages stay `io.github.markpollack.judge`. Judge and Jury remain the names of its building blocks: a judge evaluates a requirement, and a jury combines judges.
 
 A familiar assertion such as `org.assertj.core.api.Assertions.assertThat("4").isEqualTo("4")` compares exact values. A semantic assertion evaluates an actual requirement over selected evidence and retains the support and execution facts.
 
@@ -201,7 +203,7 @@ Core depends on no model provider or assertion framework. Public examples and co
 - [Configured PetClinic tutorial](https://github.com/markpollack/agent-judge-tutorial/tree/main/case-studies/spec-driven-petclinic)
 - [Executable fundamentals tutorial](https://github.com/markpollack/agent-judge-tutorial)
 - [Requirement documents: syntax, strict loading and the linter](REQUIREMENT_DOCUMENTS.md)
-- [1.0.0 release notes](RELEASE_NOTES_1.0.0.md) (release candidate)
+- [1.0.0 release notes](RELEASE_NOTES_1.0.0.md)
 - [0.18.0 release notes](RELEASE_NOTES_0.18.0.md) and [0.17 → 0.18 migration](MIGRATION_0.18.md)
 - [Releases](https://github.com/markpollack/agent-judge/releases)
 - API Javadoc ships with each release. [AGENTS.md](AGENTS.md) lists build profiles and project rules.

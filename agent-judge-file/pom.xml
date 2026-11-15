@@ -19,7 +19,7 @@
     <artifactId>agent-judge-file</artifactId>
     <packaging>jar</packaging>
 
-    <name>Agent Judge File Comparison</name>
+    <name>Agent Eval - File Comparison</name>
     <description>File comparison and semantic diff judges for agent evaluation</description>
 
     <dependencies>

@@ -14,8 +14,8 @@
     <artifactId>agent-judge-rag</artifactId>
     <packaging>jar</packaging>
 
-    <name>Agent Judge RAG</name>
-    <description>RAG evaluation judges for Agent Judge - faithfulness, contextual relevance, and hallucination detection</description>
+    <name>Agent Eval - RAG</name>
+    <description>RAG evaluation judges for Agent Eval - faithfulness, contextual relevance, and hallucination detection</description>
 
     <dependencies>
         <dependency>

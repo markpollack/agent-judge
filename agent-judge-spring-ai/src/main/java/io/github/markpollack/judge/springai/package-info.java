@@ -1,5 +1,5 @@
 /**
- * Spring AI ChatResponse evaluation bridge for Agent Judge.
+ * Spring AI ChatResponse evaluation bridge for Agent Eval.
  * <p>
  * This module converts Spring AI {@code ChatResponse} output into
  * {@link io.github.markpollack.judge.completion.CompletionEvidence} for evaluation by

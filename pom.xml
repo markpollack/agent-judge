@@ -9,7 +9,7 @@
     <version>0.19.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <name>Agent Judge</name>
+    <name>Agent Eval</name>
     <description>Framework-neutral, status-first evaluation for AI agent outcomes</description>
     <url>https://github.com/markpollack/agent-judge</url>
 
@@ -535,7 +535,7 @@
                             <quiet>true</quiet>
                             <javadocDirectory>${project.build.directory}/javadoc-resources</javadocDirectory>
                             <docfilessubdirs>true</docfilessubdirs>
-                            <bottom><![CDATA[Agent Judge is licensed under the project-specific Business Source License terms in the repository root LICENSE file.]]></bottom>
+                            <bottom><![CDATA[Agent Eval (formerly Agent Judge) is licensed under the project-specific Business Source License terms in the repository root LICENSE file.]]></bottom>
                         </configuration>
                         <executions>
                             <execution>

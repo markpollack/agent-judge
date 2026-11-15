@@ -19,8 +19,8 @@
     <artifactId>agent-judge-llm</artifactId>
     <packaging>jar</packaging>
 
-    <name>Agent Judge LLM</name>
-    <description>LLM-powered judges for Agent Judge - correctness, quality, and semantic evaluation</description>
+    <name>Agent Eval - LLM</name>
+    <description>LLM-powered judges for Agent Eval - correctness, quality, and semantic evaluation</description>
 
     <dependencies>
         <dependency>

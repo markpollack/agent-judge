@@ -1,6 +1,6 @@
-# Agent Judge Agent Instructions
+# Agent Eval Agent Instructions
 
-Agent Eval is a Java 21 library of configured judges, juries and retained verdicts that evaluate requirements over evidence. Repository and artifact names remain Agent Judge.
+Agent Eval is a Java 21 library of configured judges, juries and retained verdicts that evaluate requirements over evidence. It was formerly Agent Judge; the repository, groupId, artifact IDs and Java packages keep that name.
 
 ## Steward
 

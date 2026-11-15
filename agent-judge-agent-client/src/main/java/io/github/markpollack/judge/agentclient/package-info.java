@@ -1,5 +1,5 @@
 /**
- * AgentClient CLI-agent evaluation bridge for Agent Judge.
+ * AgentClient CLI-agent evaluation bridge for Agent Eval.
  * <p>
  * This module converts {@code AgentClientResponse} from CLI-delegated agent executions
  * (Claude Code, Codex, Gemini CLI, Amazon Q, etc.) into

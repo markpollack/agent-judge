@@ -1,5 +1,5 @@
 /**
- * Evaluated-side bridge from Koog agents to Agent Judge contexts.
+ * Evaluated-side bridge from Koog agents to Agent Eval contexts.
  *
  * <p>
  * The bridge captures the configured provider/model identity and the agent ID. Koog
