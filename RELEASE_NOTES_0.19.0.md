@@ -75,8 +75,9 @@ exact request bytes stores them itself and returns an `ArtifactRef` with the sam
   the consumer runs Agent Client itself, attaches correlation and waits for recording.
   Invocation facts and artifacts survive an invocation failure, as does any original response.
   The existing constructors keep their behaviour.
-- `agent-judge-agent-client` builds against Agent Client `0.32.1-SNAPSHOT` and
-  `agent-sandbox-core` `0.11.0-SNAPSHOT`.
+- `agent-judge-agent-client` builds against the published Agent Client `0.32.0`, in `provided` scope: the
+  application brings its own Agent Client.
+- `agent-judge-exec` still builds against `agent-sandbox-core` `0.11.0-SNAPSHOT`, until Sandbox releases.
 
 ## Breaking API changes
 
@@ -96,6 +97,11 @@ An `Error` or a cancellation in the Jev HTTP exchange now reaches the caller, in
 becoming a detail-free `IOException` or leaving the future incomplete.
 
 ## Build
+
+- **Published POMs name no repository.** The development snapshot repository is removed from every flattened POM, so
+  a consumer of a release resolves Agent Judge from Central alone.
+- **A release depends on releases only.** On a release version, the release build fails while any dependency, direct
+  or transitive, is a snapshot.
 
 `main` sources are now also gated by SpotBugs, Error Prone (with NullAway), PMD and CPD, and
 ArchUnit dependency-cycle rules in every module, beside the existing JaCoCo coverage floors. The fixes these gates

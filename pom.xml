@@ -62,8 +62,8 @@
         <!-- Agent Judge project version -->
         <agent-judge.version>${project.version}</agent-judge.version>
 
-        <!-- AgentClient version -->
-        <agent-client.version>0.32.1-SNAPSHOT</agent-client.version>
+        <!-- Agent Client: the published release, provided scope in the adapter only -->
+        <agent-client.version>0.32.0</agent-client.version>
 
         <!-- Core dependency versions - aligned with Spring AI 2.0 -->
         <agent-sandbox-core.version>0.11.0-SNAPSHOT</agent-sandbox-core.version>
@@ -100,6 +100,7 @@
         <maven-javadoc-plugin.version>3.6.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
+        <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
         <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
         <!-- The version Maven 3.8.6 already bound for jar packaging, pinned so no module relies on the default. -->
         <maven-jar-plugin.version>2.4</maven-jar-plugin.version>
@@ -291,7 +292,7 @@
         </dependency>
     </dependencies>
 
-    <!-- Development snapshots of Agent Client and Agent Sandbox resolve from Central snapshots -->
+    <!-- The Agent Sandbox development snapshot resolves from Central snapshots until Sandbox releases -->
     <repositories>
         <repository>
             <id>central-snapshots</id>
@@ -432,6 +433,15 @@
                         <version>1.6.0</version>
                         <configuration>
                             <flattenMode>ossrh</flattenMode>
+                            <!--
+                                A published POM names no repository. The snapshot repository above
+                                serves development builds only; a consumer of a release resolves it
+                                from Central alone.
+                            -->
+                            <pomElements>
+                                <repositories>remove</repositories>
+                                <pluginRepositories>remove</pluginRepositories>
+                            </pomElements>
                         </configuration>
                         <executions>
                             <execution>
@@ -443,6 +453,31 @@
                                 <id>flatten.clean</id>
                                 <phase>clean</phase>
                                 <goals><goal>clean</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!--
+                        A release depends on releases only. On a release version the build fails
+                        while any dependency, direct or transitive, is still a snapshot; on a
+                        development version the rule does not apply.
+                    -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-enforcer-plugin</artifactId>
+                        <version>${maven-enforcer-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>require-release-dependencies</id>
+                                <goals><goal>enforce</goal></goals>
+                                <configuration>
+                                    <rules>
+                                        <requireReleaseDeps>
+                                            <onlyWhenRelease>true</onlyWhenRelease>
+                                            <message>A release must not depend on a snapshot. Release or repin the dependency first.</message>
+                                        </requireReleaseDeps>
+                                    </rules>
+                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
