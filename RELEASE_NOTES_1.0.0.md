@@ -1,10 +1,9 @@
-# Agent Eval 0.19.0 (unreleased)
+# Agent Eval 1.0.0
 
-> **On main, not yet released.** Everything here is in `0.19.0-SNAPSHOT` and none of it is in
-> 0.18.0. Every push to `main` publishes the snapshot to
-> `https://central.sonatype.com/repository/maven-snapshots/`; name the `main` commit you built
-> against as provenance, because the snapshot's content changes as `main` moves. These notes
-> are updated as changes land and become the release notes when 0.19.0 is cut.
+> **Release candidate: remove this note when 1.0.0 is on Central.** Until then the candidate is on `main` as
+> `0.19.0-SNAPSHOT`, published to `https://central.sonatype.com/repository/maven-snapshots/` on every push.
+
+1.0.0 follows 0.18.0; there is no 0.19.0 release. Everything below is new since 0.18.0.
 
 Maven coordinates and Java packages still use `agent-judge` and `io.github.markpollack.judge`.
 
@@ -69,7 +68,7 @@ visibly instead of finding no content. A verdict over large prepared evidence no
 a second copy of it, which could exceed the codec's 1 MiB bound. A caller that must keep the
 exact request bytes stores them itself and returns an `ArtifactRef` with the same digest.
 
-## Agent Client integration
+## Agent Client and Agent Sandbox
 
 - `AgentClientEvalModel(Invocation, NativeCapture)` accepts a configured execution lifecycle:
   the consumer runs Agent Client itself, attaches correlation and waits for recording.
@@ -77,7 +76,8 @@ exact request bytes stores them itself and returns an `ArtifactRef` with the sam
   The existing constructors keep their behaviour.
 - `agent-judge-agent-client` builds against the published Agent Client `0.32.0`, in `provided` scope: the
   application brings its own Agent Client.
-- `agent-judge-exec` still builds against `agent-sandbox-core` `0.11.0-SNAPSHOT`, until Sandbox releases.
+- `agent-judge-exec` builds against the published Agent Sandbox `1.0.0` (`agent-sandbox-core`).
+- No dependency is a snapshot, and the build declares no snapshot repository.
 
 ## Breaking API changes
 

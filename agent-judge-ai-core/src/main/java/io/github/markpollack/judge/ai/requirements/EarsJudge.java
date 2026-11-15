@@ -102,7 +102,7 @@ public final class EarsJudge implements Judge {
 		 * {@link PromptLimits#DEFAULT_MAX_PROMPT_CHARACTERS}.
 		 * @param maxPromptCharacters positive limit in characters
 		 * @return this setup with the limit
-		 * @since 0.19.0
+		 * @since 1.0.0
 		 */
 		public GeneratedBuilder maxPromptCharacters(int maxPromptCharacters) {
 			return new GeneratedBuilder(runtime(), maxPromptCharacters);

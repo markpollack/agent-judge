@@ -107,7 +107,7 @@ public final class Rfc2119Jury implements Jury {
 		 * {@link PromptLimits#DEFAULT_MAX_PROMPT_CHARACTERS}.
 		 * @param maxPromptCharacters positive limit in characters
 		 * @return this configuration with the limit
-		 * @since 0.19.0
+		 * @since 1.0.0
 		 */
 		public GeneratedBuilder maxPromptCharacters(int maxPromptCharacters) {
 			return new GeneratedBuilder(runtime, PromptLimits.require(maxPromptCharacters));

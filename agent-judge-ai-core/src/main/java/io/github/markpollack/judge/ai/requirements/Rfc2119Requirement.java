@@ -67,7 +67,7 @@ public record Rfc2119Requirement(String id, String revision, String text, Rfc211
 	 * @param revision caller-selected immutable revision
 	 * @return immutable declared roster
 	 * @throws RequirementDocumentException naming every problem with its line
-	 * @since 0.19.0
+	 * @since 1.0.0
 	 */
 	public static java.util.List<Rfc2119Requirement> fromStrict(java.nio.file.Path path, String revision) {
 		return load(path, revision, true);

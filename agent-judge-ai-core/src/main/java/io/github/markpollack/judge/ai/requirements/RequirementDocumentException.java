@@ -19,7 +19,7 @@ import static java.util.stream.Collectors.joining;
  * problems and return what they could build.
  *
  * @author Mark Pollack
- * @since 0.19.0
+ * @since 1.0.0
  */
 public final class RequirementDocumentException extends IllegalArgumentException {
 

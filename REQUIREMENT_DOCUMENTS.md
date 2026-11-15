@@ -1,7 +1,7 @@
 # Requirement documents: syntax, strict loading and the linter
 
-> On main, not yet released (0.19.0-SNAPSHOT). Strict loading, whole-paragraph reading, the
-> completeness rule and the linter are not in 0.18.0. The syntax itself is unchanged since 0.16.0.
+> New in 1.0.0: strict loading, whole-paragraph reading, the completeness rule and the linter are not in
+> 0.18.0. The syntax itself is unchanged since 0.16.0.
 
 The EARS and RFC 2119 judges take their requirements from Markdown documents written before
 the code. This page is the format those documents must follow, what the readers do with it,

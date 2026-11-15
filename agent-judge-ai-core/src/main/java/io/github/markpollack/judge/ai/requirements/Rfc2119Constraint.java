@@ -157,7 +157,7 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 	 * @throws RequirementDocumentException naming each malformed heading, missing statement
 	 * or reason, duplicate identifier and invalid applicability entry, with its line
 	 * @throws java.io.UncheckedIOException if the document cannot be read
-	 * @since 0.19.0
+	 * @since 1.0.0
 	 */
 	public static List<Rfc2119Constraint> fromStrict(Path rulesFile) {
 		return parse(read(rulesFile), rulesFile.getFileName().toString()).strict();
@@ -169,7 +169,7 @@ public record Rfc2119Constraint(String id, String keyword, String requirement, S
 	 * @return the problems in document order; empty when {@link #fromStrict(Path)} would
 	 * succeed
 	 * @throws java.io.UncheckedIOException if the document cannot be read
-	 * @since 0.19.0
+	 * @since 1.0.0
 	 */
 	public static List<RequirementDocumentProblem> problems(Path rulesFile) {
 		return parse(read(rulesFile), rulesFile.getFileName().toString()).problems();

@@ -159,7 +159,7 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 	 * @throws RequirementDocumentException naming each malformed heading, missing sentence,
 	 * duplicate identifier and invalid applicability entry, with its line
 	 * @throws java.io.UncheckedIOException if the document cannot be read
-	 * @since 0.19.0
+	 * @since 1.0.0
 	 */
 	public static List<EarsCriterion> fromStrict(Path criteriaFile) {
 		return parse(read(criteriaFile), criteriaFile.getFileName().toString()).strict();
@@ -171,7 +171,7 @@ public record EarsCriterion(String id, String title, String requirement, @Nullab
 	 * @return the problems in document order; empty when {@link #fromStrict(Path)} would
 	 * succeed
 	 * @throws java.io.UncheckedIOException if the document cannot be read
-	 * @since 0.19.0
+	 * @since 1.0.0
 	 */
 	public static List<RequirementDocumentProblem> problems(Path criteriaFile) {
 		return parse(read(criteriaFile), criteriaFile.getFileName().toString()).problems();

@@ -201,7 +201,7 @@ Core depends on no model provider or assertion framework. Public examples and co
 - [Configured PetClinic tutorial](https://github.com/markpollack/agent-judge-tutorial/tree/main/case-studies/spec-driven-petclinic)
 - [Executable fundamentals tutorial](https://github.com/markpollack/agent-judge-tutorial)
 - [Requirement documents: syntax, strict loading and the linter](REQUIREMENT_DOCUMENTS.md)
-- [Changes on main since 0.18.0](RELEASE_NOTES_0.19.0.md) (unreleased)
+- [1.0.0 release notes](RELEASE_NOTES_1.0.0.md) (release candidate)
 - [0.18.0 release notes](RELEASE_NOTES_0.18.0.md) and [0.17 → 0.18 migration](MIGRATION_0.18.md)
 - [Releases](https://github.com/markpollack/agent-judge/releases)
 - API Javadoc ships with each release. [AGENTS.md](AGENTS.md) lists build profiles and project rules.

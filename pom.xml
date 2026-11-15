@@ -65,8 +65,8 @@
         <!-- Agent Client: the published release, provided scope in the adapter only -->
         <agent-client.version>0.32.0</agent-client.version>
 
-        <!-- Core dependency versions - aligned with Spring AI 2.0 -->
-        <agent-sandbox-core.version>0.11.0-SNAPSHOT</agent-sandbox-core.version>
+        <!-- Core dependency versions - aligned with Spring AI 2.0; Agent Sandbox is the published 1.0.0 -->
+        <agent-sandbox-core.version>1.0.0</agent-sandbox-core.version>
         <spring-framework.version>7.0.9</spring-framework.version>
         <spring-ai.version>2.0.1</spring-ai.version>
         <spring-boot.version>4.1.1</spring-boot.version>
@@ -292,19 +292,6 @@
         </dependency>
     </dependencies>
 
-    <!-- The Agent Sandbox development snapshot resolves from Central snapshots until Sandbox releases -->
-    <repositories>
-        <repository>
-            <id>central-snapshots</id>
-            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-        </repository>
-    </repositories>
 
     <distributionManagement>
         <snapshotRepository>
@@ -434,9 +421,9 @@
                         <configuration>
                             <flattenMode>ossrh</flattenMode>
                             <!--
-                                A published POM names no repository. The snapshot repository above
-                                serves development builds only; a consumer of a release resolves it
-                                from Central alone.
+                                A published POM names no repository, even if a development build
+                                later adds one for a snapshot dependency: a consumer of a release
+                                resolves it from Central alone.
                             -->
                             <pomElements>
                                 <repositories>remove</repositories>

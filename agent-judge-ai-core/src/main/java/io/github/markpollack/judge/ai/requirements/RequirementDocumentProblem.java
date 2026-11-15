@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
  * @param line the 1-based line in the document where the problem was found
  * @param reason what is wrong, in one sentence
  * @author Mark Pollack
- * @since 0.19.0
+ * @since 1.0.0
  */
 public record RequirementDocumentProblem(String source, @Nullable String id, int line, String reason) {
 

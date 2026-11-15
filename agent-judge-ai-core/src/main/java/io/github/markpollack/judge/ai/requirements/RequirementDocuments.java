@@ -43,7 +43,7 @@ import java.util.stream.Stream;
  * and exits with status 1 when there is any problem.
  * </p>
  *
- * @since 0.19.0
+ * @since 1.0.0
  */
 public final class RequirementDocuments {
 

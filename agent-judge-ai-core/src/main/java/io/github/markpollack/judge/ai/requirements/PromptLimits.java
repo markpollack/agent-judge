@@ -12,7 +12,7 @@ package io.github.markpollack.judge.ai.requirements;
  * size, the limit and where the characters are, never a {@code FAIL}. Each generated
  * builder accepts its own limit through {@code maxPromptCharacters(int)}.
  *
- * @since 0.19.0
+ * @since 1.0.0
  */
 public final class PromptLimits {
 
